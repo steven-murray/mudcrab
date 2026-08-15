@@ -6,7 +6,8 @@
 //! `LOOT --auto-sort` against it, reads the result back, and writes the sorted
 //! order into the MO2 profile.
 
-use super::super::install::{is_plugin_file, InstallSettings};
+use crate::config::install::stage::is_plugin_file;
+use crate::config::install::InstallSettings;
 use crate::config::mo2::mo2_profile_dir;
 use crate::config::schema::PersonalizedPlan;
 use crate::util::fs::link_or_copy;
