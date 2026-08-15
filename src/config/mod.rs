@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod check;
 pub mod compiler;
 pub mod download;

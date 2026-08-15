@@ -1,14 +1,14 @@
 use crate::archive::{extract_with_builtins, ArchiveFilters};
 use crate::config::download;
 use crate::config::schema::
-    {CompiledArchive, FomodSelection, ModAction, PersonalizedMod, PersonalizedPlan, PostInstallAction};
+    {CompiledArchive, FomodSelection, PersonalizedMod, PersonalizedPlan, PostInstallAction};
 use crate::config::mo2::{
     export_mo2_instance, mo2_profile_dir, prepare_mo2_profile, MO2_HIDDEN_SUFFIX,
 };
 use crate::config::tools::loot::run_loot_sort;
 use crate::config::tools::ToolsConfig;
 use crate::util::fs::{
-    copy_filtered_tree, eq_ci, find_child_case_insensitive, link_or_copy, normalize_relative_path,
+    copy_filtered_tree, eq_ci, find_child_case_insensitive, normalize_relative_path,
     path_exists_case_insensitive, resolve_existing_path_case_insensitive, staging_dir_for,
 };
 use roxmltree::{Document, Node};
@@ -89,7 +89,10 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         .unwrap_or_default();
 
     if settings.execute_actions {
-        apply_action_table("plan", &plan.actions, settings, None)?;
+        crate::config::actions::apply_all(
+            &plan.actions,
+            &crate::config::actions::ActionCx { owner: "plan", settings, mod_target: None },
+        )?;
     }
 
     for mod_entry in &plan.mods {
@@ -124,7 +127,14 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             );
 
             if settings.execute_actions && !actions_applied {
-                apply_actions(mod_entry, settings, &mod_target)?;
+                crate::config::actions::apply_all(
+                &mod_entry.actions,
+                &crate::config::actions::ActionCx {
+                    owner: &mod_entry.id,
+                    settings,
+                    mod_target: Some(&mod_target),
+                },
+            )?;
                 actions_applied = true;
             }
 
@@ -153,7 +163,14 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         let extracted_files = install_mod_archives(mod_entry, settings, &mod_target, &active_plugins)?;
         let mut actions_applied = false;
         if settings.execute_actions {
-            apply_actions(mod_entry, settings, &mod_target)?;
+            crate::config::actions::apply_all(
+                &mod_entry.actions,
+                &crate::config::actions::ActionCx {
+                    owner: &mod_entry.id,
+                    settings,
+                    mod_target: Some(&mod_target),
+                },
+            )?;
             actions_applied = true;
         }
 
@@ -1909,520 +1926,16 @@ fn format_layout(layout: AutoLayoutKind, mod_id: &str) -> String {
     }
 }
 
-fn apply_actions(mod_entry: &PersonalizedMod, settings: &InstallSettings, mod_target: &Path) -> anyhow::Result<()> {
-    for action in &mod_entry.actions {
-        match action.action.as_str() {
-            "ini_set" => apply_mod_ini_set_action(&mod_entry.id, action, settings, mod_target)?,
-            "qac" => apply_qac_action(&mod_entry.id, action, settings, mod_target)?,
-            other => {
-                tracing::warn!(action = other, mod_id = mod_entry.id, "unknown per-mod action, skipping");
-            }
-        }
-    }
-    Ok(())
-}
-
-/// Quick Auto Clean action.
-///
-/// For each file matched by the `plugins` glob patterns (resolved relative to
-/// the mod's staging directory), this action:
-///
-/// 1. Creates a temporary data directory containing:
-///    - Hard-links / copies of all `.esm` master files from `%GAME_DIR%/Data/`
-///      so that xEdit can resolve master references.
-///    - A copy of the plugin file being cleaned.
-/// 2. Invokes xEdit via the configured Wine/Proton prefix (on non-Windows
-///    hosts), preferring `TES4EditQuickAutoClean.exe` when available.
-/// 3. After the cleaned plugin output changes and then stabilizes, prints a
-///    simple instruction telling the user it is safe to close the QAC window.
-///    mudcrab then waits for the user to close xEdit manually.
-/// 4. Copies the cleaned plugin back into the mod's staging directory,
-///    replacing the original in-place.
-/// 5. Removes the temporary directory.
-fn apply_qac_action(
-    owner_label: &str,
-    action: &ModAction,
-    settings: &InstallSettings,
-    mod_target: &Path,
-) -> anyhow::Result<()> {
-    use globset::{Glob, GlobSetBuilder};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    let tes4edit_config = settings.tools.tes4edit.as_ref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{owner_label} qac action requires [tes4edit] configuration in tools.toml"
-        )
-    })?;
-
-    let game_dir = settings
-        .game_dir
-        .as_ref()
-        .ok_or_else(|| anyhow::anyhow!("{owner_label} qac action requires --game-dir"))?;
-    let game_data = game_dir.join("Data");
-
-    // Collect plugin glob patterns.
-    let patterns = match action.params.get("plugins") {
-        Some(toml::Value::Array(arr)) => arr
-            .iter()
-            .filter_map(|v| v.as_str().map(String::from))
-            .collect::<Vec<_>>(),
-        Some(toml::Value::String(s)) => vec![s.clone()],
-        Some(_) => anyhow::bail!("{owner_label} qac: 'plugins' must be a string or array of strings"),
-        None => anyhow::bail!("{owner_label} qac action missing required 'plugins' parameter"),
-    };
-
-    // Build a globset to match files in the mod's staging dir.
-    let mut builder = GlobSetBuilder::new();
-    for pattern in &patterns {
-        builder.add(
-            Glob::new(pattern)
-                .map_err(|err| anyhow::anyhow!("{owner_label} qac: invalid glob '{pattern}': {err}"))?,
-        );
-    }
-    let globset = builder.build().map_err(|err| {
-        anyhow::anyhow!("{owner_label} qac: failed to build glob set: {err}")
-    })?;
-
-    // Collect matching plugin files from the staging dir.
-    let matched: Vec<PathBuf> = {
-        let mut v = Vec::new();
-        for entry in std::fs::read_dir(mod_target).map_err(|err| {
-            anyhow::anyhow!("{owner_label} qac: failed to read staging dir {}: {err}", mod_target.display())
-        })? {
-            let entry = entry.map_err(|err| {
-                anyhow::anyhow!("{owner_label} qac: failed to read dir entry: {err}")
-            })?;
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            if globset.is_match(name_str.as_ref()) {
-                v.push(entry.path());
-            }
-        }
-        v
-    };
-
-    if matched.is_empty() {
-        tracing::warn!(
-            owner = owner_label,
-            patterns = ?patterns,
-            staging_dir = %mod_target.display(),
-            "qac: no plugin files matched; action is a no-op"
-        );
-        return Ok(());
-    }
-
-    for plugin_path in &matched {
-        let plugin_name = plugin_path
-            .file_name()
-            .ok_or_else(|| anyhow::anyhow!("{owner_label} qac: plugin path has no filename"))?
-            .to_string_lossy()
-            .into_owned();
-
-        if settings.dry_run {
-            tracing::info!(
-                owner = owner_label,
-                plugin = plugin_name,
-                "install dry-run qac action"
-            );
-            continue;
-        }
-
-        tracing::info!(owner = owner_label, plugin = plugin_name, "qac: cleaning plugin");
-
-        // Build a temporary data sandbox.
-        let stamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|d| d.as_nanos())
-            .unwrap_or(0);
-        let temp_root = std::env::temp_dir().join(format!("mudcrab-qac-{stamp}"));
-        let temp_data = temp_root.join("Data");
-        std::fs::create_dir_all(&temp_data).map_err(|err| {
-            anyhow::anyhow!(
-                "{owner_label} qac: failed to create temp dir {}: {err}",
-                temp_data.display()
-            )
-        })?;
-
-        let qac_result = (|| -> anyhow::Result<()> {
-            // Link/copy master ESMs from the real game Data folder so xEdit can
-            // resolve master file references during cleaning.
-            for entry in std::fs::read_dir(&game_data).map_err(|err| {
-                anyhow::anyhow!("qac: failed to read game data dir {}: {err}", game_data.display())
-            })? {
-                let entry = entry?;
-                let name = entry.file_name();
-                let name_s = name.to_string_lossy();
-                let is_esm = name_s.to_ascii_lowercase().ends_with(".esm");
-                if is_esm {
-                    link_or_copy(&entry.path(), &temp_data.join(&name))?;
-                }
-            }
-
-            // Copy the plugin to clean into the sandbox.
-            let temp_plugin = temp_data.join(&plugin_name);
-            std::fs::copy(plugin_path, &temp_plugin).map_err(|err| {
-                anyhow::anyhow!(
-                    "qac: failed to copy plugin {} to temp dir: {err}",
-                    plugin_path.display()
-                )
-            })?;
-
-            // Build the xEdit command.
-            // -TES4       : force Oblivion game mode
-            // -QAC        : Quick Auto Clean
-            // -autoload   : automatically load the specified plugin
-            // -D:<path>   : data directory (Windows-style path when via Wine)
-            #[cfg(not(target_os = "windows"))]
-            let data_arg = format!("-D:{}", ToolsConfig::unix_path_to_wine(&temp_data));
-            #[cfg(target_os = "windows")]
-            let data_arg = format!("-D:{}", temp_data.display());
-
-            let qac_exe = tes4edit_config.qac_executable();
-
-            tracing::info!(
-                owner = owner_label,
-                plugin = plugin_name,
-                exe = %qac_exe.display(),
-                "qac: waiting for xEdit; once the window says it is finished, close it manually"
-            );
-
-            let mut child = settings
-                .tools
-                .windows_tool_command(&qac_exe)?
-                .args(["-TES4", "-QAC", "-autoload", "-save", &data_arg, &plugin_name])
-                .spawn()
-                .map_err(|err| anyhow::anyhow!("qac: failed to launch xEdit: {err}"))?;
-
-            let initial_metadata = std::fs::metadata(&temp_plugin).ok();
-            let mut previous_len = initial_metadata.as_ref().map(|m| m.len());
-            let mut previous_modified = initial_metadata
-                .as_ref()
-                .and_then(|m| m.modified().ok());
-            let mut saw_output_change = false;
-            let mut stable_checks = 0u32;
-            let mut prompted_manual_close = false;
-            let start = std::time::Instant::now();
-
-            loop {
-                if let Some(status) = child
-                    .try_wait()
-                    .map_err(|err| anyhow::anyhow!("qac: failed to poll xEdit: {err}"))?
-                {
-                    if !status.success() {
-                        anyhow::bail!(
-                            "qac: xEdit exited with status {}",
-                            status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".to_string())
-                        );
-                    }
-                    break;
-                }
-
-                let current_metadata = std::fs::metadata(&temp_plugin).ok();
-                let current_len = current_metadata.as_ref().map(|m| m.len());
-                let current_modified = current_metadata
-                    .as_ref()
-                    .and_then(|m| m.modified().ok());
-
-                let changed = current_len != previous_len || current_modified != previous_modified;
-                if changed {
-                    saw_output_change = true;
-                    stable_checks = 0;
-                } else if saw_output_change {
-                    stable_checks += 1;
-                }
-
-                previous_len = current_len;
-                previous_modified = current_modified;
-
-                if saw_output_change && stable_checks >= 6 && !prompted_manual_close {
-                    tracing::info!(
-                        owner = owner_label,
-                        plugin = plugin_name,
-                        "qac: finished writing output; if the xEdit window says it is done, it is now safe to close it"
-                    );
-                    prompted_manual_close = true;
-                }
-
-                if start.elapsed() > std::time::Duration::from_secs(600) {
-                    anyhow::bail!(
-                        "qac: timed out waiting for xEdit to close; if the window shows cleaning is finished, close it manually and rerun install"
-                    );
-                }
-
-                std::thread::sleep(std::time::Duration::from_millis(500));
-            }
-
-            // Copy the cleaned plugin back to the staging directory.
-            std::fs::copy(&temp_plugin, plugin_path).map_err(|err| {
-                anyhow::anyhow!(
-                    "qac: failed to copy cleaned plugin back to staging dir: {err}"
-                )
-            })?;
-
-            Ok(())
-        })();
-
-        let _ = std::fs::remove_dir_all(&temp_root);
-        qac_result?;
-
-        tracing::info!(owner = owner_label, plugin = plugin_name, "qac: plugin cleaned successfully");
-    }
-
-    Ok(())
-}
-
-fn apply_mod_ini_set_action(
-    owner_label: &str,
-    action: &ModAction,
-    settings: &InstallSettings,
-    mod_target: &Path,
-) -> anyhow::Result<()> {
-    let p = &action.params;
-    let file = p
-        .get("file")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("{owner_label} ini_set action missing 'file'"))?;
-    let key = p
-        .get("key")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("{owner_label} ini_set action missing 'key'"))?;
-    let value = p
-        .get("value")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| anyhow::anyhow!("{owner_label} ini_set action missing 'value'"))?;
-    let format = p.get("format").and_then(|v| v.as_str());
-    let scope = p.get("scope").and_then(|v| v.as_str()).unwrap_or("mod");
-
-    let ini_path = match scope {
-        "mod" => mod_target.join(normalize_relative_path(file)?),
-        "game" => {
-            let Some(path) = resolve_game_scoped_ini_path(settings, file) else {
-                tracing::warn!(
-                    owner = owner_label,
-                    file = file,
-                    "skipping game-scoped ini_set: no game-dir available in staging mode"
-                );
-                return Ok(());
-            };
-            path
-        }
-        other => anyhow::bail!("{owner_label} ini_set action has unsupported scope '{other}'"),
-    };
-
-    let ini_path = resolve_existing_path_case_insensitive(&ini_path).ok_or_else(|| {
-        anyhow::anyhow!(
-            "{} ini_set target file does not exist: {}",
-            owner_label,
-            ini_path.display()
-        )
-    })?;
-
-    if settings.dry_run {
-        tracing::info!(
-            owner = owner_label,
-            ini = %ini_path.display(),
-            key = key,
-            value = value,
-            scope = scope,
-            "install dry-run ini_set action"
-        );
-        return Ok(());
-    }
-
-    apply_ini_set(&ini_path, key, value, format)
-}
-
-fn apply_action_table(
-    owner_label: &str,
-    actions: &toml::Table,
-    settings: &InstallSettings,
-    mod_target: Option<&Path>,
-) -> anyhow::Result<()> {
-    let Some(ini_set) = actions.get("ini_set") else {
-        return Ok(());
-    };
-
-    let ini_set_entries = ini_set.as_array().ok_or_else(|| {
-        anyhow::anyhow!("{} actions.ini_set must be an array of tables", owner_label)
-    })?;
-
-    for entry in ini_set_entries {
-        let table = entry.as_table().ok_or_else(|| {
-            anyhow::anyhow!("{} actions.ini_set entries must be tables", owner_label)
-        })?;
-
-        let file = table
-            .get("file")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("{} ini_set entry missing 'file'", owner_label))?;
-        let key = table
-            .get("key")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("{} ini_set entry missing 'key'", owner_label))?;
-        let value = table
-            .get("value")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("{} ini_set entry missing 'value'", owner_label))?;
-        let format = table.get("format").and_then(|v| v.as_str());
-        let scope = table
-            .get("scope")
-            .and_then(|v| v.as_str())
-            .unwrap_or("mod");
-
-        let ini_path = match scope {
-            "mod" => {
-                let Some(mod_target) = mod_target else {
-                    anyhow::bail!("{} ini_set entry uses scope=mod but has no mod target", owner_label);
-                };
-                mod_target.join(normalize_relative_path(file)?)
-            }
-            "game" => {
-                let Some(path) = resolve_game_scoped_ini_path(settings, file) else {
-                    tracing::warn!(
-                        owner = owner_label,
-                        file = file,
-                        "skipping game-scoped ini_set: no game-dir available in staging mode"
-                    );
-                    continue;
-                };
-                path
-            }
-            other => {
-                anyhow::bail!(
-                    "{} ini_set entry has unsupported scope '{}'",
-                    owner_label,
-                    other
-                )
-            }
-        };
-
-        let ini_path = resolve_existing_path_case_insensitive(&ini_path).ok_or_else(|| {
-            anyhow::anyhow!(
-                "{} ini_set target file does not exist: {}",
-                owner_label,
-                ini_path.display()
-            )
-        })?;
-
-        if settings.dry_run {
-            tracing::info!(
-                owner = owner_label,
-                ini = %ini_path.display(),
-                key = key,
-                value = value,
-                scope = scope,
-                "install dry-run ini_set action"
-            );
-            continue;
-        }
-
-        apply_ini_set(&ini_path, key, value, format)?;
-    }
-
-    Ok(())
-}
-
-fn resolve_game_scoped_ini_path(settings: &InstallSettings, file: &str) -> Option<PathBuf> {
-    if let Some(profile_dir) = mo2_profile_dir(settings) {
-        let rel = normalize_relative_path(file).ok()?;
-        return Some(profile_dir.join(rel));
-    }
-
-    let game_dir = settings.game_dir.as_ref()?;
-    let rel = normalize_relative_path(file).ok()?;
-    Some(game_dir.join(rel))
-}
-
-#[derive(Clone, Copy)]
-enum IniSetFormat {
-    Standard,
-    SetTo,
-}
-
-fn parse_ini_set_format(format: Option<&str>) -> anyhow::Result<IniSetFormat> {
-    match format.unwrap_or("standard") {
-        "standard" => Ok(IniSetFormat::Standard),
-        "set-to" => Ok(IniSetFormat::SetTo),
-        other => anyhow::bail!("unsupported ini_set format '{other}'"),
-    }
-}
-
-fn render_ini_assignment(key: &str, value: &str, format: IniSetFormat) -> String {
-    match format {
-        IniSetFormat::Standard => format!("{} = {}", key, value),
-        IniSetFormat::SetTo => format!("set {} to {}", key, value),
-    }
-}
-
-fn apply_ini_set(path: &Path, key: &str, value: &str, format: Option<&str>) -> anyhow::Result<()> {
-    let format = parse_ini_set_format(format)?;
-    let mut lines: Vec<String> = std::fs::read_to_string(path)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?
-        .lines()
-        .map(ToString::to_string)
-        .collect();
-
-    let mut replaced = false;
-    for line in &mut lines {
-        if is_ini_key_line(line, key, format) {
-            *line = render_ini_assignment(key, value, format);
-            replaced = true;
-        }
-    }
-
-    if !replaced {
-        lines.push(render_ini_assignment(key, value, format));
-    }
-
-    let mut content = lines.join("\n");
-    if !content.ends_with('\n') {
-        content.push('\n');
-    }
-
-    std::fs::write(path, content)
-        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))?;
-    Ok(())
-}
-
-fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bool {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with('#') || trimmed.starts_with(';') {
-        return false;
-    }
-
-    match format {
-        IniSetFormat::Standard => {
-            let Some((lhs, _)) = trimmed.split_once('=') else {
-                return false;
-            };
-            lhs.trim() == key
-        }
-        IniSetFormat::SetTo => {
-            let mut parts = trimmed.split_whitespace();
-            let Some(command) = parts.next() else {
-                return false;
-            };
-            let Some(found_key) = parts.next() else {
-                return false;
-            };
-            let Some(separator) = parts.next() else {
-                return false;
-            };
-
-            command.eq_ignore_ascii_case("set")
-                && separator.eq_ignore_ascii_case("to")
-                && found_key == key
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_ini_set, extract_archive, hash_personalized_mod, should_skip_mod_install, InstalledMod,
+        extract_archive, hash_personalized_mod, should_skip_mod_install, InstalledMod,
     };
+    use crate::config::actions::ini_set::apply_ini_set;
     use crate::config::tools::loot::find_unlisted_plugins;
-    use crate::config::schema::{CompiledArchive, FomodSelection, ModAction, PersonalizedMod};
+    use crate::config::schema::{
+        CompiledArchive, FomodSelection, IniSetFormat, ModAction, PersonalizedMod, QacAction,
+    };
     use std::collections::HashSet;
     use tempfile::tempdir;
     use zip::write::SimpleFileOptions;
@@ -2445,10 +1958,9 @@ mod tests {
                 game_root_files: Vec::new(),
             }],
             files: Vec::new(),
-            actions: vec![ModAction {
-                action: "qac".to_string(),
-                params: toml::Table::new(),
-            }],
+            actions: vec![ModAction::Qac(QacAction {
+                plugins: vec!["*.esp".to_string()],
+            })],
         }
     }
 
@@ -2537,7 +2049,7 @@ mod tests {
         let ini_path = temp.path().join("example.ini");
         std::fs::write(&ini_path, "foo = 1\n").expect("write ini");
 
-        apply_ini_set(&ini_path, "foo", "2", None).expect("ini_set should succeed");
+        apply_ini_set(&ini_path, "foo", "2", IniSetFormat::Standard).expect("ini_set should succeed");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
         assert_eq!(content, "foo = 2\n");
@@ -2550,7 +2062,7 @@ mod tests {
         std::fs::write(&ini_path, "set   zzzMigckQ.bBetterSkillup    to    1\n")
             .expect("write ini");
 
-        apply_ini_set(&ini_path, "zzzMigckQ.bBetterSkillup", "0", Some("set-to"))
+        apply_ini_set(&ini_path, "zzzMigckQ.bBetterSkillup", "0", IniSetFormat::SetTo)
             .expect("ini_set should succeed");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");

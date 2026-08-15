@@ -1,3 +1,4 @@
+use crate::config::schema::ModAction;
 use crate::cli::SetupToolsArgs;
 use crate::config::loader::load_modlist;
 use crate::config::schema::PostInstallAction;
@@ -25,7 +26,7 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
     })?;
     for (_id, spec) in &flat {
         for action in &spec.actions {
-            if action.action == "qac" {
+            if matches!(action, ModAction::Qac(_)) {
                 required.needs_tes4edit = true;
             }
         }

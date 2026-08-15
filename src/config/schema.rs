@@ -70,10 +70,99 @@ pub enum ModNode {
 /// Glob patterns in action parameters (e.g. `plugins`) are resolved relative
 /// to the mod's own staged data folder, never against the raw game directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModAction {
-    pub action: String,
-    #[serde(flatten)]
-    pub params: toml::Table,
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum ModAction {
+    IniSet(IniSetAction),
+    Qac(QacAction),
+}
+
+impl ModAction {
+    /// Name as written in TOML, for logs and error messages.
+    pub fn name(&self) -> &'static str {
+        match self {
+            ModAction::IniSet(_) => "ini_set",
+            ModAction::Qac(_) => "qac",
+        }
+    }
+}
+
+/// Set a key in an INI file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IniSetAction {
+    /// Path to the INI. Relative to the mod's staged data folder for
+    /// `scope = "mod"`, or to the game/profile INI location for `scope = "game"`.
+    pub file: String,
+    pub key: String,
+    pub value: IniValue,
+    #[serde(default)]
+    pub format: IniSetFormat,
+    #[serde(default)]
+    pub scope: IniScope,
+}
+
+/// Quick Auto Clean: run xEdit's QAC over the named plugins.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QacAction {
+    /// Glob patterns resolved relative to the mod's staged data folder.
+    /// Required: a qac action with nothing to clean is always a mistake.
+    pub plugins: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IniScope {
+    /// An INI shipped by the mod itself.
+    #[default]
+    Mod,
+    /// A game-scoped INI (Oblivion.ini). Never edited in place in the game
+    /// directory -- resolved to the MO2 profile-local copy.
+    Game,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum IniSetFormat {
+    /// `key = value`
+    #[default]
+    Standard,
+    /// `set key to value` -- used by Oblivion script-style INIs.
+    SetTo,
+}
+
+/// An INI value.
+///
+/// Accepts any TOML scalar and normalises to its string form, so `value = 0`,
+/// `value = "0"` and `value = false` are all accepted. Booleans become 1/0,
+/// matching Oblivion's INI conventions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct IniValue(pub String);
+
+impl std::fmt::Display for IniValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for IniValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let value = toml::Value::deserialize(deserializer)?;
+        Ok(IniValue(match value {
+            toml::Value::String(text) => text,
+            toml::Value::Integer(number) => number.to_string(),
+            toml::Value::Float(number) => number.to_string(),
+            toml::Value::Boolean(flag) => if flag { "1" } else { "0" }.to_string(),
+            other => {
+                return Err(D::Error::custom(format!(
+                    "ini value must be a string, number or boolean, got {}",
+                    other.type_str()
+                )))
+            }
+        }))
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -228,8 +317,10 @@ pub struct CompiledModlist {
     pub mod_count: usize,
     pub plugin_count: usize,
     pub inputs: HashMap<String, InputSpec>,
+    /// Install-wide actions, currently only those desugared from the top-level
+    /// `[ini]` table. Same type as per-mod actions so there is one dispatcher.
     #[serde(default)]
-    pub actions: toml::Table,
+    pub actions: Vec<ModAction>,
     pub plugins: Vec<String>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
@@ -287,7 +378,7 @@ pub struct PersonalizedPlan {
     pub mod_order: Vec<String>,
     pub selected_mods: Vec<String>,
     #[serde(default)]
-    pub actions: toml::Table,
+    pub actions: Vec<ModAction>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
     #[serde(default)]

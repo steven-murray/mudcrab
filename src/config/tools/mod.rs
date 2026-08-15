@@ -1,4 +1,5 @@
 pub mod loot;
+pub mod xedit;
 
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
