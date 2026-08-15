@@ -7,8 +7,13 @@ This folder tracks a practical translation pipeline from human instructions to m
 
 ## Current Status
 
-- Web extraction of the Nexus description page is currently blocked by anti-bot/ad redirects in the fetch tool.
-- Workspace scaffolding is ready for structured transcription and iterative implementation.
+- Source capture is complete: [input/mofam-source.md](input/mofam-source.md) holds the
+  full manually-transcribed page (~158 KB, 40 Parts), since automated web extraction of
+  the Nexus description page was blocked by anti-bot/ad redirects in the fetch tool.
+- Translation to TOML is in progress: Parts 1, 2, 3, 4, and 6 are fully translated in
+  [input/mofam.full.toml](input/mofam.full.toml) and have been installed end-to-end
+  (see [output/mo2-instance](output/mo2-instance) and the install logs under `output/`).
+  The remaining Parts are not yet translated.
 
 ## Workflow
 
