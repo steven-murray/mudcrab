@@ -1,0 +1,18 @@
+# NPC Merge
+# Allocator input: each source plugin in merge order, followed by its own
+# object indices (ascending, deduplicated) as 6-hex values, one per line.
+# Generated from the real MOFAM install; the expected output is map.json.
+@LFO - All Races Addon.esp
+@Oblivion_Character_Overhaul_Faces.esp
+@LFO OCO New Eyes.esp
+@NPC Hair Matches Beard.esp
+@OCO uses merged teeth.esp
+@Improved NPC Faces for OCOv2.esp
+@OCOv2 - DLC Addon.esp
+@OCO Unused Eyes and DLC Eyes Incorporated.esp
+@OOOShiveringIsles_OCO_Patch.esp
+@Baurus tweak.esp
+@Siren's Deception Beautified.esp
+@Unique Artifacts for Unique People - Distribution.esp
+@Dahyka_OCO_Patch.esp
+@NPC Merge Consistency Patch.esp
