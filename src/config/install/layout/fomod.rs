@@ -1,9 +1,9 @@
 //! FOMOD installer support: parse ModuleConfig.xml and apply the selected options.
 
+use super::{destination_for, with_staged_archive};
 use crate::archive::ArchiveFilters;
-use crate::archive::extract_with_builtins;
 use crate::config::schema::{CompiledArchive, FomodSelection};
-use crate::util::fs::{copy_filtered_tree, normalize_relative_path, staging_dir_for};
+use crate::util::fs::{copy_filtered_tree, normalize_relative_path};
 use roxmltree::{Document, Node};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -51,108 +51,16 @@ pub(crate) fn extract_archive_with_fomod_layout(
         );
     }
 
-    let staging_dir = staging_dir_for(target_root)?;
-    std::fs::create_dir_all(&staging_dir)
-        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
-
-    let empty_patterns: Vec<String> = Vec::new();
-    let passthrough_filters = ArchiveFilters::new(&empty_patterns, &empty_patterns)?;
-    let extract_result = extract_with_builtins(source, &staging_dir, &passthrough_filters);
-    if let Err(err) = extract_result {
-        let _ = std::fs::remove_dir_all(&staging_dir);
-        return Err(err);
-    }
-
-    let result = (|| -> anyhow::Result<usize> {
-        let module_config = find_fomod_config(&staging_dir)?;
-        let xml = read_xml_text(&module_config)?;
-        let doc = Document::parse(&xml).map_err(|err| {
-            anyhow::anyhow!("failed to parse FOMOD config {}: {err}", module_config.display())
-        })?;
-        let content_root = module_config
-            .parent()
-            .and_then(Path::parent)
-            .ok_or_else(|| anyhow::anyhow!("invalid FOMOD structure in {}", source.display()))?;
-
-        let root = doc.root_element();
-        let selection_map = build_fomod_selection_map(&archive.fomod_selections);
-        let mut flags = HashMap::<String, String>::new();
-        let mut entries = Vec::<FomodInstallEntry>::new();
-
-        if let Some(required) = find_child_element(root, "requiredInstallFiles") {
-            collect_fomod_entries(required, &mut entries)?;
-        }
-
-        if let Some(steps) = find_child_element(root, "installSteps") {
-            for step in child_elements(steps, "installStep") {
-                if let Some(visible) = find_child_element(step, "visible") {
-                    if let Some(deps) = find_child_element(visible, "dependencies") {
-                        if !fomod_dependencies_match(deps, active_plugins, &flags)? {
-                            continue;
-                        }
-                    }
-                }
-
-                let step_name = step.attribute("name").unwrap_or("");
-                for file_groups in child_elements(step, "optionalFileGroups") {
-                    for group in child_elements(file_groups, "group") {
-                        let group_name = group.attribute("name").unwrap_or("");
-                        let group_type = group.attribute("type").unwrap_or("SelectAny");
-                        let plugins = find_child_element(group, "plugins").ok_or_else(|| {
-                            anyhow::anyhow!(
-                                "FOMOD group '{}' in step '{}' is missing <plugins>",
-                                group_name,
-                                step_name
-                            )
-                        })?;
-
-                        let plugin_nodes: Vec<Node<'_, '_>> = child_elements(plugins, "plugin").collect();
-                        let option_types: Vec<FomodOptionType> = plugin_nodes
-                            .iter()
-                            .map(|plugin| fomod_option_type(*plugin, active_plugins, &flags))
-                            .collect::<anyhow::Result<_>>()?;
-
-                        let selected_indices = select_fomod_options(
-                            step_name,
-                            group_name,
-                            group_type,
-                            &plugin_nodes,
-                            &option_types,
-                            &selection_map,
-                        )?;
-
-                        for idx in selected_indices {
-                            let plugin = plugin_nodes[idx];
-                            if let Some(condition_flags) = find_child_element(plugin, "conditionFlags") {
-                                for flag in child_elements(condition_flags, "flag") {
-                                    let Some(name) = flag.attribute("name") else {
-                                        continue;
-                                    };
-                                    let value = flag.text().unwrap_or("").trim().to_string();
-                                    flags.insert(name.to_ascii_lowercase(), value);
-                                }
-                            }
-
-                            if let Some(files) = find_child_element(plugin, "files") {
-                                collect_fomod_entries(files, &mut entries)?;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut destination_root = target_root.to_path_buf();
-        if let Some(target_subdir) = archive.target_subdir.as_deref() {
-            let rel = normalize_relative_path(target_subdir)?;
-            destination_root = destination_root.join(rel);
-        }
-
-        apply_fomod_entries(content_root, &destination_root, &entries, filters)
-    })();
-
-    let _ = std::fs::remove_dir_all(&staging_dir);
-    result
+    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
+    with_staged_archive(source, target_root, |staging_dir| {
+        apply_fomod_from_staging(
+            staging_dir,
+            &destination_root,
+            archive,
+            filters,
+            active_plugins,
+        )
+    })
 }
 
 pub(crate) fn find_fomod_config(staging_dir: &Path) -> anyhow::Result<PathBuf> {

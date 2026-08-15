@@ -62,7 +62,13 @@ pub(crate) fn extract_build_archive(
                     active_plugins,
                 )
             }
-            Some("bain") => apply_bain_from_staging(&staging_dir, &destination_root, archive, filters),
+            Some("bain") => apply_bain_from_staging(
+                &staging_dir,
+                &destination_root,
+                archive,
+                filters,
+                "build layer",
+            ),
             _ => copy_filtered_tree(&staging_dir, &destination_root, filters),
         }
     })();
