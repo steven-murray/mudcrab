@@ -74,13 +74,31 @@ pub(crate) fn install_mod_archives(
 
     for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
         if !archive.build.is_empty() {
-            let effective_exclude: Vec<String> = archive
-                .exclude
-                .iter()
-                .chain(archive.game_root_files.iter())
-                .cloned()
-                .collect();
-            let filters = ArchiveFilters::new(&archive.include, &effective_exclude)?;
+            // game_root_files has no extraction pass on the build path. Previously
+            // these patterns were merged into the exclude list, so matching files
+            // were dropped from the mod folder and never written to the game root
+            // either -- silently lost. Reject rather than lose files.
+            if !archive.game_root_files.is_empty() {
+                anyhow::bail!(
+                    "mod '{}' archive {}: game_root_files is not supported together with \
+                     build layers. Split the game-root files into their own archive entry.",
+                    mod_entry.id,
+                    archive_index
+                );
+            }
+
+            let filters = ArchiveFilters::new(&archive.include, &archive.exclude)?;
+
+            if settings.dry_run {
+                tracing::info!(
+                    mod_id = %mod_entry.id,
+                    destination = %target_root.display(),
+                    layers = archive.build.len(),
+                    "install dry-run build-layer extract"
+                );
+                continue;
+            }
+
             extracted_count += extract_build_archive(
                 &mod_entry.id,
                 archive_index,

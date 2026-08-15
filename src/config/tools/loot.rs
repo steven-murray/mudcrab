@@ -62,6 +62,9 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
         .as_ref()
         .and_then(|l| l.game_appdata_path.clone());
 
+    // Captured inside the closure so it can be restored on every exit path.
+    let mut plugins_backup: Option<Vec<(PathBuf, Option<Vec<u8>>)>> = None;
+
     let sort_result = (|| -> anyhow::Result<()> {
         // Discover unlisted plugins by scanning installed mod staging dirs.
         stage_game_executable(&resolved_game_dir, &temp_root)?;
@@ -79,7 +82,7 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
         let seeded_plugins = canonicalize_plugins_for_staged_data(&plan.plugins, &temp_data)?;
 
         // Determine which plugins.txt path LOOT will actually read/write.
-        let (plugins_dir, plugins_backup): (PathBuf, Option<Vec<(PathBuf, Option<Vec<u8>>)>>) =
+        let plugins_dir: PathBuf =
             if let Some(ref appdata) = game_appdata_path {
                 // Real-path strategy: write our desired list into the path LOOT
                 // auto-detects, and back up whatever is already there so it
@@ -102,7 +105,8 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
                     "post-install loot-sort: using real game AppData path for plugins.txt"
                 );
                 write_plugin_list_files(appdata, &seeded_plugins)?;
-                (appdata.clone(), Some(backup))
+                plugins_backup = Some(backup);
+                appdata.clone()
             } else {
                 tracing::warn!(
                     "post-install loot-sort: no loot.game_appdata_path configured; \
@@ -112,7 +116,7 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
                 // Sandbox strategy: write to temp local dir as before.
                 write_plugin_list_files(&temp_local, &seeded_plugins)?;
                 write_loot_settings(&loot_data, &temp_root, &temp_local)?;
-                (temp_local.clone(), None)
+                temp_local.clone()
             };
 
         tracing::info!("post-install loot-sort: running LOOT --auto-sort");
@@ -183,30 +187,34 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
 
         write_sorted_plugins_to_profile(settings, &sorted_plugins)?;
 
-        // Restore the original plugins.txt in the game AppData dir.
-        if game_appdata_path.is_some() {
-            if let Some(backups) = &plugins_backup {
-                for (path, original) in backups {
-                    match original {
-                        Some(bytes) => {
-                            let _ = std::fs::write(path, bytes);
-                        }
-                        None => {
-                            let _ = std::fs::remove_file(path);
-                        }
-                    }
-                }
-            }
-        }
-
         Ok(())
     })();
 
-    // Best-effort cleanup on error paths when sorting fails.
-    if sort_result.is_err() {
-        if let Some(ref appdata) = game_appdata_path {
-            let original_path = appdata.join("plugins.txt");
-            let _ = std::fs::remove_file(&original_path);
+    // Restore whatever we overwrote in the real game AppData directory, whether
+    // or not sorting succeeded.
+    //
+    // This previously only ran on success; the failure path instead *deleted*
+    // plugins.txt without restoring the backup, and ignored the other filename
+    // variants write_plugin_list_files had also overwritten. A LOOT crash
+    // therefore destroyed the user's real load order.
+    if let Some(backups) = &plugins_backup {
+        for (path, original) in backups {
+            match original {
+                Some(bytes) => {
+                    if let Err(err) = std::fs::write(path, bytes) {
+                        tracing::error!(
+                            path = %path.display(),
+                            %err,
+                            "failed to restore original plugin list after loot-sort"
+                        );
+                    }
+                }
+                // The file did not exist before we wrote it, so removing it
+                // restores the original state.
+                None => {
+                    let _ = std::fs::remove_file(path);
+                }
+            }
         }
     }
 

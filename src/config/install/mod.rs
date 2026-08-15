@@ -32,6 +32,28 @@ use manifest::{
 };
 pub(crate) use stage::is_plugin_file;
 
+/// Validate a mod id before using it as a directory name.
+///
+/// Mod ids are arbitrary keys from user-authored TOML, but they are joined
+/// straight onto the mods directory. Archive *members* were carefully
+/// normalised against traversal while the mod id itself was not, so an id
+/// containing a separator or `..` could escape the mods directory.
+pub(crate) fn safe_mod_dir_name(mod_id: &str) -> anyhow::Result<&str> {
+    if mod_id.is_empty() {
+        anyhow::bail!("mod id must not be empty");
+    }
+    if mod_id.contains('/') || mod_id.contains('\\') {
+        anyhow::bail!("mod id '{mod_id}' must not contain a path separator");
+    }
+    if mod_id == "." || mod_id == ".." {
+        anyhow::bail!("mod id '{mod_id}' is not a valid directory name");
+    }
+    if Path::new(mod_id).is_absolute() {
+        anyhow::bail!("mod id '{mod_id}' must not be an absolute path");
+    }
+    Ok(mod_id)
+}
+
 pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
     let active_plugins: HashSet<String> = plan
         .plugins
@@ -77,7 +99,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     }
 
     for mod_entry in &plan.mods {
-        let mut mod_target = settings.mods_dir.join(&mod_entry.id);
+        let mut mod_target = settings.mods_dir.join(safe_mod_dir_name(&mod_entry.id)?);
         let definition_hash = hash_personalized_mod(mod_entry)?;
         let previous = previous_by_id.get(&mod_entry.id);
 
@@ -350,6 +372,26 @@ fn run_post_install_actions(plan: &PersonalizedPlan, settings: &InstallSettings)
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn rejects_mod_ids_that_would_escape_the_mods_directory() {
+        use super::safe_mod_dir_name;
+        for bad in ["", "..", ".", "a/b", "a\\b", "/etc/passwd", "../../etc"] {
+            assert!(
+                safe_mod_dir_name(bad).is_err(),
+                "mod id {bad:?} should be rejected"
+            );
+        }
+        // Real MOFAM ids contain spaces, brackets, apostrophes and dashes.
+        for ok in [
+            "Harvest [Flora]",
+            "Oscuro's_Oblivion_Overhaul",
+            "36 - zMERGED PLUGINS",
+            "OOO - KotN Patch",
+        ] {
+            assert!(safe_mod_dir_name(ok).is_ok(), "mod id {ok:?} should be accepted");
+        }
+    }
     use super::{
         hash_personalized_mod, should_skip_mod_install, InstalledMod,
     };
