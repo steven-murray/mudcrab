@@ -7,7 +7,7 @@ pub mod fomod;
 
 use crate::archive::{extract_with_builtins, ArchiveFilters};
 use crate::config::download;
-use crate::config::schema::{ArchiveLayout, CompiledArchive, PersonalizedMod};
+use crate::config::schema::{ArchiveLayout, CompiledArchive, ModType, PersonalizedMod};
 use auto::extract_archive_with_auto_layout;
 use bain::extract_archive_with_bain_layout;
 use build::extract_build_archive;
@@ -66,7 +66,7 @@ pub(crate) fn install_mod_archives(
     target_root: &Path,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<usize> {
-    if mod_entry.mod_type.as_deref() == Some("build-from-files") {
+    if mod_entry.mod_type == Some(ModType::BuildFromFiles) {
         return install_mod_from_files(mod_entry, settings, target_root);
     }
 

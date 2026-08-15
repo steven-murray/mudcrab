@@ -7,7 +7,7 @@ This guide describes the currently implemented command flow.
 1. Compile source TOML into compiled JSON.
 2. Resolve query inputs into a personalized plan JSON.
 3. Download archives into a local cache.
-4. Install staged mod archive layout from cache.
+4. Install staged mod archive layout from cache, then build any declared merges.
 
 ## Commands
 
@@ -86,8 +86,34 @@ Current behavior:
    last two shell out to the system `bsdtar` (tried first) and `7z` (fallback)
    binaries, so those tools must be available on `PATH` -- see the readme's
    Requirements section.
-5. Runs post-install actions (e.g. `loot-sort`, per-mod actions declared in the
+5. Builds any `type = "merge"` mods, writing the merged plugin plus a
+   `merge - <id>/` sidecar containing `map.json` (in zMerge's shape, so it diffs
+   directly against a real zMerge run) and `mudcrab-merge.json`.
+6. Hides each merged source plugin as `<name>.esp.mohidden`, recording it in the
+   manifest. Sources stay **enabled** so their assets and BSAs keep loading.
+7. Runs post-install actions (e.g. `loot-sort`, per-mod actions declared in the
    modlist) by default; pass `--skip-actions` to skip them.
+
+Merges are built after all mods are installed and before LOOT sorts, so LOOT sees
+the merged plugin rather than the sources it replaced. Re-running `install` is safe:
+merges are rebuilt deterministically and hiding is idempotent.
+
+## unhide-merges
+
+Restore source plugins that `install` hid on behalf of a merge, reading the install
+manifest so it undoes what was actually done rather than what the modlist currently
+says.
+
+```bash
+mudcrab unhide-merges --mo2-instance-dir <dir> [--profile-name <name>]
+mudcrab unhide-merges --mods-dir <dir>
+```
+
+Example:
+
+```bash
+mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
+```
 
 ## check
 

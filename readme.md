@@ -150,7 +150,7 @@ These are features we want, but are intentionally deferred for later milestones.
 3. Full Nexus workflow polish (expanded metadata support and richer auth UX).
 4. Export phase implementation (Markdown/HTML output from compiled plans).
 5. Composable/includable sub-modlists (see below).
-6. `zmerge` and `custom` mod types -- a headless zMerge replacement is actively in progress in `src/merge/` (see `MOFAM-test/notes/merge-recon.md`), but it is not wired into the modlist schema or CLI yet.
+6. A `custom` mod type for arbitrary user-supplied build steps.
 
 `mudcrab` is **not** a mod manager. It doesn't replace Mod Organizer 2. 
 It's **more** like Wabbajack -- an automatic way to install an entire cohesive
@@ -370,30 +370,50 @@ Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/p
 via the `actions` machinery in `src/config/actions/` -- see `MOFAM-test/input/mofam.full.toml`
 for real examples.
 
-Along with standard archive-based mods, it should eventually be possible to specify
-mods that are built from other mods -- for example, a merged plugin produced from
-several other mods' `.esp` files. **In progress, not yet available**: a headless
-replacement for zEdit's zMerge is under active development in `src/merge/`, but the
-`zmerge` and `custom` mod types below do not exist yet. Today the only special
-`mod_type` recognized by the installer is `"build-from-files"`, which assembles a mod's
-contents from local files/layers instead of a downloaded archive (see `BuildLayer` in
-`src/config/schema.rs`). The shape once `zmerge` lands is expected to look like:
+Along with standard archive-based mods, a mod can be **built** rather than extracted.
+Two `type` values do this today:
+
+- `"build-from-files"` assembles a mod's contents from local files and layers instead
+  of a downloaded archive (see `BuildLayer` in `src/config/schema.rs`).
+- `"merge"` produces a single merged plugin from several other mods' `.esp` files --
+  a headless, native replacement for zEdit's zMerge, so a modlist requiring merges can
+  be installed without driving a GUI tool.
+
+### Merges
 
 ```toml
 [[mods]]
-id = "modname"
-dependencies = [
-    "mod A",
-    "mod B",
-]
-type = "zmerge"
-plugins = [
-    "modA.esp",
-    "modB.esp",
-]
+id      = "Unique Forts Merged"
+section = ["36 - zMERGED PLUGINS"]
+type    = "merge"
+
+  [mods.merge]
+  output       = "Unique Forts Merged.esp"
+  method       = "clobber"   # the default; last source wins on conflicts
+  hide_sources = true        # the default
+  sources = [
+    { mod = "Better Fort Aurus",       plugin = "Unique Forts Fort Aurus.esp" },
+    { mod = "Better Fort Doublecross", plugin = "Unique Forts Fort Doublecross.esp" },
+    # ...
+  ]
 ```
 
-and, for fully custom actions:
+`sources` is **ordered**: the order defines both clobber precedence and FormID
+allocation, so reordering changes the output. Each source names a **mod id**, not a
+data-folder path -- the path is resolved at install time, so it survives renames.
+There is no `load_order` field; the load order comes from the modlist's own `plugins`.
+
+`hide_sources` renames each source plugin to `<name>.esp.mohidden`, which drops it from
+MO2's virtual filesystem while leaving its mod **enabled** so its meshes, textures and
+BSAs keep loading -- the same mechanism as MO2's "Merge Plugins Hide" plugin. Undo it
+with `mudcrab unhide-merges`.
+
+Because sources are hidden, the modlist's `plugins` list must contain the merge's
+`output` and must **not** contain any source plugin. `mudcrab validate` enforces that,
+along with: every source mod exists, no plugin is merged twice, and a merge mod
+declares no archives of its own.
+
+For fully custom actions (**not yet available**):
 
 ```toml
 [[mods]]

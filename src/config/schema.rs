@@ -200,9 +200,10 @@ pub struct ModEntry {
     pub condition: Option<String>,
     #[serde(default)]
     pub archives: Vec<ArchiveSpec>,
-    /// Mod type. Currently supported: `"build-from-files"`.
     #[serde(rename = "type")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    /// Merge definition. Required when `type = "merge"`, rejected otherwise.
+    pub merge: Option<MergeSpec>,
     #[serde(default)]
     pub plugins: Vec<String>,
     /// Source file globs for mods of type `"build-from-files"`.
@@ -211,6 +212,62 @@ pub struct ModEntry {
     pub files: Vec<String>,
     #[serde(default)]
     pub actions: Vec<ModAction>,
+}
+
+/// A mod that is produced rather than extracted.
+///
+/// Absent means the ordinary case: a mod installed from its archives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModType {
+    /// Assembled from files already on disk, listed in `files`.
+    BuildFromFiles,
+    /// Produced by merging plugins from other mods; see `[mods.merge]`.
+    Merge,
+}
+
+/// How overlapping records are resolved when two sources define the same one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MergeMethod {
+    /// Last writer wins, by source order. zMerge's "Clobber".
+    #[default]
+    Clobber,
+}
+
+/// One plugin to merge, named by the mod that owns it.
+///
+/// Naming the mod id rather than a data-folder path is the main improvement
+/// over zMerge's `merges.json`: the path is derived at install time, so it
+/// survives mod renames and does not encode a Windows drive letter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MergeSource {
+    #[serde(rename = "mod")]
+    pub mod_id: String,
+    pub plugin: String,
+}
+
+/// A merge definition, attached to the mod that will contain the output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MergeSpec {
+    /// Filename of the merged plugin, written into this mod's folder.
+    pub output: String,
+    #[serde(default)]
+    pub method: MergeMethod,
+    /// Rename each source plugin to `<name>.mohidden` so MO2 drops it from the
+    /// virtual filesystem while leaving its mod enabled to serve assets.
+    #[serde(default = "default_true")]
+    pub hide_sources: bool,
+    /// Ordered: this defines both clobber precedence and FormID allocation
+    /// order, so reordering changes the output. There is deliberately no
+    /// `load_order` field -- it is derived from the modlist's `plugins`.
+    pub sources: Vec<MergeSource>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -326,7 +383,9 @@ pub struct CompiledModlist {
 pub struct CompiledMod {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
     pub archives: Vec<CompiledArchive>,
     pub condition: Option<String>,
@@ -380,11 +439,25 @@ pub struct PersonalizedPlan {
     pub plugins: Vec<String>,
 }
 
+impl PersonalizedPlan {
+    /// Selected merges, in modlist order.
+    ///
+    /// Derived rather than stored: a second list would be a second source of
+    /// truth that could disagree with `mods` after conditions are resolved.
+    pub fn merges(&self) -> impl Iterator<Item = (&PersonalizedMod, &MergeSpec)> {
+        self.mods
+            .iter()
+            .filter_map(|entry| entry.merge.as_ref().map(|merge| (entry, merge)))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonalizedMod {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<MergeSpec>,
     pub archives: Vec<CompiledArchive>,
     #[serde(default)]
     pub files: Vec<String>,

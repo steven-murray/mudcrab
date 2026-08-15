@@ -12,7 +12,8 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         .map(|(id, spec)| -> anyhow::Result<CompiledMod> {
             Ok(CompiledMod {
                 id: id.clone(),
-                mod_type: spec.mod_type.clone(),
+                mod_type: spec.mod_type,
+                merge: spec.merge.clone(),
                 dependencies: spec.dependencies.clone(),
                 archives: spec
                     .archives

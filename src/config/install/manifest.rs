@@ -13,6 +13,11 @@ pub(crate) struct InstallManifest {
     pub(crate) name: String,
     #[serde(default)]
     pub(crate) installed_mods: Vec<InstalledMod>,
+    /// Source plugins renamed to `.mohidden` on behalf of a merge. Recorded so
+    /// `unhide-merges` can undo exactly what was done, not what the modlist
+    /// currently says should have been done.
+    #[serde(default)]
+    pub(crate) hidden_plugins: Vec<super::merge::HiddenPlugin>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,6 +39,22 @@ pub(crate) fn get_install_manifest_path(settings: &InstallSettings) -> PathBuf {
         profile_dir.join("install_manifest.json")
     } else {
         settings.mods_dir.join("install_manifest.json")
+    }
+}
+
+/// Manifest path from the locations alone, for commands that operate on an
+/// existing install and have no plan or tool config to build settings from.
+pub fn manifest_path(
+    mods_dir: &Path,
+    mo2_instance_dir: Option<&Path>,
+    profile_name: &str,
+) -> PathBuf {
+    match mo2_instance_dir {
+        Some(instance) => instance
+            .join("profiles")
+            .join(profile_name)
+            .join("install_manifest.json"),
+        None => mods_dir.join("install_manifest.json"),
     }
 }
 

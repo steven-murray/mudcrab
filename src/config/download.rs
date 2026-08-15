@@ -602,6 +602,7 @@ mod tests {
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 mod_type: None,
+                merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     download_handler: Some("nexus".to_string()),
@@ -668,6 +669,7 @@ mod tests {
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 mod_type: None,
+                merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     download_handler: Some("nexus".to_string()),
