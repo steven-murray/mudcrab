@@ -10,7 +10,7 @@ pub struct SourceModlist {
     #[serde(default)]
     pub ini: toml::Table,
     #[serde(default)]
-    pub modlist: IndexMap<String, ModNode>,
+    pub mods: Vec<ModEntry>,
     #[serde(default)]
     pub plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
@@ -18,21 +18,46 @@ pub struct SourceModlist {
 }
 
 impl SourceModlist {
-    pub fn flatten_mods(&self) -> anyhow::Result<IndexMap<String, ModSpec>> {
+    /// Mods keyed by id, in declaration order. Errors on duplicate ids.
+    pub fn flatten_mods(&self) -> anyhow::Result<IndexMap<String, ModEntry>> {
         let mut out = IndexMap::new();
-        for (key, node) in &self.modlist {
-            flatten_mod_node(node, key, &mut out)?;
+        for entry in &self.mods {
+            if out.contains_key(&entry.id) {
+                anyhow::bail!("duplicate mod id {}", entry.id);
+            }
+            out.insert(entry.id.clone(), entry.clone());
         }
         Ok(out)
     }
 
+    /// The MO2 modlist as an ordered mix of separators and mods.
+    ///
+    /// A separator is emitted for each level of a mod's section path at the
+    /// point that level first differs from the previous mod's, so
+    /// `section = ["OBSE PLUGINS", "Core"]` yields separators `OBSE PLUGINS`
+    /// and `OBSE PLUGINS - Core` before the mod itself.
     pub fn mo2_modlist_entries(&self) -> anyhow::Result<Vec<Mo2ModlistEntry>> {
         let mut out = Vec::new();
-        let mut seen_mod_ids = HashSet::new();
-        let mut section_path = Vec::new();
+        let mut seen_ids = HashSet::new();
+        let mut previous: Vec<String> = Vec::new();
 
-        for (key, node) in &self.modlist {
-            collect_mo2_entries(node, key, &mut section_path, &mut seen_mod_ids, &mut out)?;
+        for entry in &self.mods {
+            for depth in 0..entry.section.len() {
+                if previous.len() > depth && previous[..=depth] == entry.section[..=depth] {
+                    continue;
+                }
+                out.push(Mo2ModlistEntry::Section {
+                    name: entry.section[..=depth].join(" - "),
+                });
+            }
+            previous = entry.section.clone();
+
+            if !seen_ids.insert(entry.id.clone()) {
+                anyhow::bail!("duplicate mod id {}", entry.id);
+            }
+            out.push(Mo2ModlistEntry::Mod {
+                id: entry.id.clone(),
+            });
         }
 
         Ok(out)
@@ -40,6 +65,7 @@ impl SourceModlist {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct InputSpec {
     #[serde(rename = "type")]
     pub input_type: InputType,
@@ -54,13 +80,6 @@ pub enum InputType {
     Bool,
     Choice,
     Text,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum ModNode {
-    Mod(ModSpec),
-    Section(IndexMap<String, ModNode>),
 }
 
 /// A per-mod action to execute during installation.
@@ -165,9 +184,16 @@ impl<'de> Deserialize<'de> for IniValue {
     }
 }
 
+/// One mod in the flat `[[mods]]` list.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ModSpec {
+pub struct ModEntry {
+    /// Unique id; also the mod's directory name.
+    pub id: String,
+    /// Section path, outermost first. Each level becomes an MO2 separator.
+    /// Always a list, so there is a single shape to read, write and test.
+    #[serde(default)]
+    pub section: Vec<String>,
     #[serde(default)]
     pub dependencies: Vec<String>,
     #[serde(rename = "if")]
@@ -185,57 +211,6 @@ pub struct ModSpec {
     pub files: Vec<String>,
     #[serde(default)]
     pub actions: Vec<ModAction>,
-}
-
-fn flatten_mod_node(
-    node: &ModNode,
-    key: &str,
-    out: &mut IndexMap<String, ModSpec>,
-) -> anyhow::Result<()> {
-    match node {
-        ModNode::Mod(spec) => {
-            if out.contains_key(key) {
-                anyhow::bail!("duplicate mod id {key}");
-            }
-            out.insert(key.to_string(), spec.clone());
-            Ok(())
-        }
-        ModNode::Section(children) => {
-            for (child_key, child_node) in children {
-                flatten_mod_node(child_node, child_key, out)?;
-            }
-            Ok(())
-        }
-    }
-}
-
-fn collect_mo2_entries(
-    node: &ModNode,
-    key: &str,
-    section_path: &mut Vec<String>,
-    seen_mod_ids: &mut HashSet<String>,
-    out: &mut Vec<Mo2ModlistEntry>,
-) -> anyhow::Result<()> {
-    match node {
-        ModNode::Mod(_) => {
-            if !seen_mod_ids.insert(key.to_string()) {
-                anyhow::bail!("duplicate mod id {key}");
-            }
-            out.push(Mo2ModlistEntry::Mod { id: key.to_string() });
-            Ok(())
-        }
-        ModNode::Section(children) => {
-            section_path.push(key.to_string());
-            out.push(Mo2ModlistEntry::Section {
-                name: section_path.join(" - "),
-            });
-            for (child_key, child_node) in children {
-                collect_mo2_entries(child_node, child_key, section_path, seen_mod_ids, out)?;
-            }
-            section_path.pop();
-            Ok(())
-        }
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -266,12 +241,28 @@ impl<'de> Deserialize<'de> for PostInstallAction {
     }
 }
 
+/// Declared archive layout. `None` means "detect automatically".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ArchiveLayout {
+    /// Archive root is the mod's data folder; copied as-is.
+    Simple,
+    /// FOMOD installer: driven by fomod/ModuleConfig.xml + fomod_selections.
+    Fomod,
+    /// BAIN package: selected top-level subpackages merged into the mod root.
+    Bain,
+    /// The mod's data folder is somewhere other than the archive root; the
+    /// location is given by `data_folder`, which is then required.
+    CustomDataFolder,
+}
+
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArchiveSpec {
     #[serde(default)]
     pub path: Option<String>,
     pub download_handler: Option<String>,
-    pub layout: Option<String>,
+    pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
     #[serde(default)]
@@ -291,6 +282,7 @@ pub struct ArchiveSpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct FomodSelection {
     pub step: String,
     pub group: String,
@@ -299,6 +291,7 @@ pub struct FomodSelection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BuildLayer {
     pub path: String,
     #[serde(default)]
@@ -348,7 +341,7 @@ pub struct CompiledArchive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
     pub download_handler: Option<String>,
-    pub layout: Option<String>,
+    pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
     #[serde(default)]

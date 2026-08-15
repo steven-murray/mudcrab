@@ -399,7 +399,8 @@ mod tests {
     use crate::config::actions::ini_set::apply_ini_set;
     use crate::config::tools::loot::find_unlisted_plugins;
     use crate::config::schema::{
-        CompiledArchive, FomodSelection, IniSetFormat, ModAction, PersonalizedMod, QacAction,
+        ArchiveLayout, CompiledArchive, FomodSelection, IniSetFormat, ModAction, PersonalizedMod,
+        QacAction,
     };
     use std::collections::HashSet;
     use tempfile::tempdir;
@@ -566,7 +567,7 @@ mod tests {
         let archive = CompiledArchive {
             path: Some("nexus:oblivion/1/1".to_string()),
             download_handler: None,
-            layout: Some("bain".to_string()),
+            layout: Some(ArchiveLayout::Bain),
             data_folder: None,
             target_subdir: None,
             bain_subpackages: vec!["00 Option1".to_string(), "01 Option2".to_string()],
@@ -702,7 +703,7 @@ mod tests {
         let archive = CompiledArchive {
             path: Some("local-fomod.zip".to_string()),
             download_handler: None,
-            layout: Some("fomod".to_string()),
+            layout: Some(ArchiveLayout::Fomod),
             data_folder: None,
             target_subdir: None,
             bain_subpackages: Vec::new(),

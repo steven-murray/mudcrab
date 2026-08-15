@@ -97,10 +97,11 @@ At minimum:
 ```toml
 name = "Example Modlist"
 
-[modlist.core]
+[[mods]]
+id = "core"
 dependencies = []
 
-[[modlist.core.archives]]
+[[mods.archives]]
 path = "https://example.com/mod.zip"
 download_handler = "http"
 ```
@@ -114,10 +115,12 @@ name = "Conditional Example"
 type = "bool"
 query = "Install HD textures?"
 
-[modlist.base]
+[[mods]]
+id = "base"
 dependencies = []
 
-[modlist.hd_pack]
+[[mods]]
+id = "hd_pack"
 dependencies = ["base"]
 if = "use_hd_textures"
 ```
@@ -248,8 +251,9 @@ The modlist format is TOML with the following allowed fields:
 * `ini`: an optional table of game-scope `Oblivion.ini` edits to apply independently
    of any specific mod. Values must be scalar TOML values. Keys containing spaces must
    be quoted.
-* `modlist`: a table where each entry is either a mod, or a subsection containing
-   additional mod entries. Subsections may be nested arbitrarily deep.
+* `mods`: an ordered array of mod entries. Each entry has an `id` (unique; also the
+   mod's directory name) and an optional `section`, a list naming its MO2 separator
+   path from outermost to innermost. Every level of the path becomes a separator.
 * `plugins`: an ordered list of plugins. Each entry should be an exact filename. 
 * `post-install-actions`: optional ordered list of install-wide actions to run after
    extraction and MO2 export. Currently supports `"loot-sort"`.
@@ -259,13 +263,19 @@ Example with nested sections:
 ```toml
 name = "Nested Sections Example"
 
-[modlist.foundation.base]
+[[mods]]
+id = "base"
+section = ["foundation"]
 dependencies = []
 
-[modlist.gameplay.combat]
+[[mods]]
+id = "combat"
+section = ["gameplay"]
 dependencies = ["base"]
 
-[modlist.gameplay.magic]
+[[mods]]
+id = "magic"
+section = ["gameplay"]
 dependencies = ["base"]
 ```
 
@@ -297,9 +307,11 @@ For BAIN-style archives, use `layout = "bain"` and list the top-level package di
 Example:
 
 ```toml
-[modlist.example."DLC Lore Books"]
+[[mods]]
+id = "DLC Lore Books"
+section = ["example"]
 
-[[modlist.example."DLC Lore Books".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46715/1000012857"
 layout = "bain"
 bain_subpackages = ["00 Merged"]

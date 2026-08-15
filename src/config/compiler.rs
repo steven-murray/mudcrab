@@ -1,5 +1,5 @@
 use crate::config::schema::{
-    CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
+    ArchiveLayout, CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
     ModAction, SourceModlist,
 };
 
@@ -21,6 +21,15 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                         if archive.path.is_some() && !archive.build.is_empty() {
                             return Err(anyhow::anyhow!(
                                 "mod '{}': archive cannot have both 'path' and 'build'",
+                                id
+                            ));
+                        }
+                        if archive.layout == Some(ArchiveLayout::CustomDataFolder)
+                            && archive.data_folder.is_none()
+                        {
+                            return Err(anyhow::anyhow!(
+                                "mod '{}': layout = \"custom-data-folder\" requires data_folder \
+                                 to say where the data folder is",
                                 id
                             ));
                         }
