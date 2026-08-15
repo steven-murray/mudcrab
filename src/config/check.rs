@@ -73,12 +73,17 @@ fn check_single_archive(
         anyhow::bail!("cached archive path is a directory: {}", source.display());
     }
 
+    // Listing the archive is what actually proves it is readable and not a
+    // truncated or misnamed download. This previously claimed to "verify the
+    // archive is openable" in a comment and then returned without opening it,
+    // so `check` only stat'd files unless game_root_files was set.
+    let file_paths = archive::list_archive_paths(&source)
+        .map_err(|err| anyhow::anyhow!("cached archive is not readable ({}): {err}", source.display()))?;
+
     if archive.game_root_files.is_empty() {
-        // Just verify the archive is openable; skip listing overhead.
         return Ok(0);
     }
 
-    let file_paths = archive::list_archive_paths(&source)?;
     validate_file_references(&file_paths, &archive.game_root_files)
 }
 
