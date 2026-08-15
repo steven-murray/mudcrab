@@ -167,3 +167,191 @@ fn section_is_always_a_list_and_each_level_becomes_a_separator() {
         ]
     );
 }
+
+#[test]
+fn accepts_valid_modlist_with_merge() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\nsection = [\"36 - zMERGED PLUGINS\"]\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    validate(&source).expect("validation should pass");
+}
+
+#[test]
+fn rejects_merge_type_with_no_merge_section() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\"]\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err.to_string().contains("no [mods.merge] section"));
+}
+
+#[test]
+fn rejects_merge_section_on_mod_not_typed_merge() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err.to_string().contains("but is not type = \"merge\""));
+}
+
+#[test]
+fn rejects_merge_mod_that_also_declares_archives() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n\
+         [[mods.archives]]\npath = \"b.zip\"\ndownload_handler = \"local\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err
+        .to_string()
+        .contains("also declares archives or files"));
+}
+
+#[test]
+fn rejects_merge_output_missing_from_load_order() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    let msg = err.to_string();
+    assert!(msg.contains("produces"), "{msg}");
+    assert!(msg.contains("missing from the global plugins load order"), "{msg}");
+}
+
+#[test]
+fn rejects_merge_source_naming_unknown_mod() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\"]\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Nonexistent\", plugin = \"Foo.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err.to_string().contains("from unknown mod Nonexistent"));
+}
+
+#[test]
+fn rejects_merge_source_plugin_still_in_global_load_order() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\", \"Alpha.esp\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err
+        .to_string()
+        .contains("still in the global plugins load order"));
+}
+
+#[test]
+fn rejects_same_source_plugin_claimed_by_two_merges() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"MergedA.esp\", \"MergedB.esp\"]\n\n\
+         [[mods]]\nid = \"Alpha\"\n\
+         [[mods.archives]]\npath = \"a.zip\"\ndownload_handler = \"local\"\n\n\
+         [[mods]]\nid = \"Merged A\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"MergedA.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n\n\
+         [[mods]]\nid = \"Merged B\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"MergedB.esp\"\n\
+         sources = [\n  { mod = \"Alpha\", plugin = \"Alpha.esp\" },\n]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err.to_string().contains("is merged by both"));
+}
+
+#[test]
+fn rejects_merge_with_empty_sources() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"x\"\nplugins = [\"Oblivion.esm\", \"Merged.esp\"]\n\n\
+         [[mods]]\nid = \"Merged Plugins\"\ntype = \"merge\"\n\n\
+         [mods.merge]\noutput = \"Merged.esp\"\nsources = []\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let err = validate(&source).expect_err("validation should fail");
+
+    assert!(err.to_string().contains("lists no source plugins"));
+}

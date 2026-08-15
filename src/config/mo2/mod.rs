@@ -6,7 +6,7 @@
 use super::install::InstallSettings;
 use crate::config::download;
 use crate::config::schema::{Mo2ModlistEntry, PersonalizedPlan};
-use crate::util::fs::write_text_file;
+use crate::util::fs::{find_child_case_insensitive, write_text_file};
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
@@ -16,6 +16,86 @@ use std::time::UNIX_EPOCH;
 /// to drop merged source plugins out of the plugin list while leaving their
 /// mods enabled so the assets still load.
 pub(crate) const MO2_HIDDEN_SUFFIX: &str = ".mohidden";
+
+/// Outcome of trying to hide a plugin, so callers can report accurately rather
+/// than claiming work they did not do.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum HideOutcome {
+    /// Renamed `<plugin>` to `<plugin>.mohidden`.
+    Hidden,
+    /// Already hidden by a previous run.
+    AlreadyHidden,
+}
+
+/// Hide one plugin inside a mod folder by renaming it.
+///
+/// Idempotent, because installs are re-run: hiding an already-hidden plugin is
+/// a no-op, not an error. But if *both* names exist the situation is
+/// ambiguous -- either the mod was reinstalled over a previous hide, or two
+/// different files claim the same plugin -- and picking one silently would
+/// either resurrect a stale plugin or discard a fresh one. Refuse instead.
+pub(crate) fn hide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<HideOutcome> {
+    let visible = find_child_case_insensitive(mod_dir, plugin);
+    let hidden = find_child_case_insensitive(mod_dir, &format!("{plugin}{MO2_HIDDEN_SUFFIX}"));
+
+    match (visible, hidden) {
+        (Some(visible), Some(hidden)) => anyhow::bail!(
+            "cannot hide {plugin}: both {} and {} exist, so which one is current is ambiguous. \
+             Delete whichever is stale and re-run.",
+            visible.display(),
+            hidden.display()
+        ),
+        (Some(visible), None) => {
+            let destination = visible.with_file_name(format!(
+                "{}{MO2_HIDDEN_SUFFIX}",
+                visible.file_name().unwrap_or_default().to_string_lossy()
+            ));
+            std::fs::rename(&visible, &destination).map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to hide {} as {}: {err}",
+                    visible.display(),
+                    destination.display()
+                )
+            })?;
+            Ok(HideOutcome::Hidden)
+        }
+        (None, Some(_)) => Ok(HideOutcome::AlreadyHidden),
+        (None, None) => anyhow::bail!(
+            "cannot hide {plugin}: it is not in {}. Check the merge's source mod id.",
+            mod_dir.display()
+        ),
+    }
+}
+
+/// Reverse `hide_plugin`. Also idempotent: an already-visible plugin is fine.
+pub(crate) fn unhide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<()> {
+    let hidden_name = format!("{plugin}{MO2_HIDDEN_SUFFIX}");
+    let Some(hidden) = find_child_case_insensitive(mod_dir, &hidden_name) else {
+        return Ok(());
+    };
+
+    if let Some(visible) = find_child_case_insensitive(mod_dir, plugin) {
+        anyhow::bail!(
+            "cannot unhide {plugin}: {} already exists alongside {}",
+            visible.display(),
+            hidden.display()
+        );
+    }
+
+    let file_name = hidden.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let restored = hidden.with_file_name(
+        file_name
+            .strip_suffix(MO2_HIDDEN_SUFFIX)
+            .unwrap_or(&file_name),
+    );
+    std::fs::rename(&hidden, &restored).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to unhide {} as {}: {err}",
+            hidden.display(),
+            restored.display()
+        )
+    })
+}
 
 pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<()> {
     let root = mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;

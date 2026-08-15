@@ -30,6 +30,21 @@ pub enum Command {
     Export(ExportArgs),
     /// Scan a source modlist and generate a tools.toml configuration template.
     SetupTools(SetupToolsArgs),
+    /// Restore plugins that were hidden to make room for a merge.
+    UnhideMerges(UnhideMergesArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct UnhideMergesArgs {
+    /// Installation directory containing the mod folders.
+    #[arg(long)]
+    pub mods_dir: Option<PathBuf>,
+    /// ModOrganizer2 instance root whose profile manifest records the hides.
+    #[arg(long)]
+    pub mo2_instance_dir: Option<PathBuf>,
+    /// Profile name whose manifest to read.
+    #[arg(long, default_value = "Default")]
+    pub profile_name: String,
 }
 
 #[derive(Debug, Args)]

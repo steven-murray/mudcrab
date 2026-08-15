@@ -23,6 +23,7 @@ pub struct InstallSettings {
 
 pub mod layout;
 pub mod manifest;
+pub mod merge;
 pub mod stage;
 
 use layout::install_mod_archives;
@@ -195,10 +196,25 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         });
     }
 
+    // Merges run after every mod is on disk (they read other mods' plugins)
+    // and before LOOT sorts, so LOOT sees the merged plugin rather than the
+    // sources it just hid.
+    let installed_paths: merge::InstalledPaths = installed_mods
+        .iter()
+        .map(|entry| {
+            (
+                entry.id.clone(),
+                settings.mods_dir.join(&entry.installed_path),
+            )
+        })
+        .collect();
+    let hidden_plugins = merge::run_merges(plan, settings, &installed_paths)?;
+
     if !settings.dry_run {
         let manifest = InstallManifest {
             name: plan.name.clone(),
             installed_mods,
+            hidden_plugins,
         };
         let payload = serde_json::to_string_pretty(&manifest)
             .map_err(|err| anyhow::anyhow!("failed to serialize install manifest: {err}"))?;
@@ -410,6 +426,7 @@ mod tests {
         PersonalizedMod {
             id: id.to_string(),
             mod_type: None,
+            merge: None,
             archives: vec![CompiledArchive {
                 path: Some(archive_path.to_string()),
                 download_handler: None,
