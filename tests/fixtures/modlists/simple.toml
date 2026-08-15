@@ -1,0 +1,18 @@
+name = "Simple Skyrim Core"
+plugins = ["SkyUI_SE.esp"]
+
+[inputs.use_hd_textures]
+type = "bool"
+query = "Install HD textures?"
+
+[modlist.skyui]
+dependencies = []
+
+[[modlist.skyui.archives]]
+path = "https://example.com/skyui.zip"
+download_handler = "http"
+layout = "simple"
+
+[modlist.unofficial_patch]
+dependencies = ["skyui"]
+if = "use_hd_textures"
