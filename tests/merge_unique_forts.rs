@@ -262,11 +262,13 @@ fn merges_unique_forts_equivalently_to_zmerge() {
 
     // --- our output must contain no dangling references -----------------
     //
-    // zMerge's own output fails this: 247 of its references carry the source
+    // zMerge's own output fails this: 718 of its references carry the source
     // plugin's *load order position* as their mod index instead of the merged
     // plugin's own index, so they point past the master list at nothing. Those
     // are excluded from the comparison below rather than allowed to mask a
     // real difference, and this assertion keeps us honest about our own side.
+    // See MOFAM-test/notes/zmerge-dangling-refs.md -- this must be re-checked
+    // per merge in M7 before concluding zMerge is wrong in general.
     let our_own_index = ours.masters.own_mod_index();
     let mut our_dangling = Vec::new();
     for record in ours.records() {
