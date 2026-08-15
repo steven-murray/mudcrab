@@ -113,18 +113,20 @@ name = "Simple"
 type = "bool"
 query = "Install HD textures?"
 
-[modlist.base]
+[[mods]]
+id = "base"
 dependencies = []
 
-[[modlist.base.archives]]
+[[mods.archives]]
 path = "https://example.com/base.zip"
 download_handler = "http"
 
-[modlist.hd]
+[[mods]]
+id = "hd"
 dependencies = ["base"]
 if = "use_hd_textures"
 
-[[modlist.hd.archives]]
+[[mods.archives]]
 path = "nexus:skyrimspecialedition/1234/5678"
 download_handler = "nexus"
 ```

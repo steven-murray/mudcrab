@@ -7,7 +7,7 @@ pub mod fomod;
 
 use crate::archive::{extract_with_builtins, ArchiveFilters};
 use crate::config::download;
-use crate::config::schema::{CompiledArchive, PersonalizedMod};
+use crate::config::schema::{ArchiveLayout, CompiledArchive, PersonalizedMod};
 use auto::extract_archive_with_auto_layout;
 use bain::extract_archive_with_bain_layout;
 use build::extract_build_archive;
@@ -332,11 +332,11 @@ pub(crate) fn extract_archive(
     filters: &ArchiveFilters,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<usize> {
-    if matches!(archive.layout.as_deref(), Some("fomod")) {
+    if archive.layout == Some(ArchiveLayout::Fomod) {
         return extract_archive_with_fomod_layout(source, target_root, archive, filters, active_plugins);
     }
 
-    if matches!(archive.layout.as_deref(), Some("bain")) {
+    if archive.layout == Some(ArchiveLayout::Bain) {
         return extract_archive_with_bain_layout(source, target_root, archive, filters);
     }
 

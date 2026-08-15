@@ -2,7 +2,7 @@
 
 use crate::archive::{extract_with_builtins, ArchiveFilters};
 use crate::config::download;
-use crate::config::schema::CompiledArchive;
+use crate::config::schema::{ArchiveLayout, CompiledArchive};
 use super::bain::apply_bain_from_staging;
 use super::fomod::apply_fomod_from_staging;
 use crate::util::fs::{copy_filtered_tree, normalize_relative_path, staging_dir_for};
@@ -52,8 +52,8 @@ pub(crate) fn extract_build_archive(
         std::fs::create_dir_all(&destination_root)
             .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", destination_root.display()))?;
 
-        match archive.layout.as_deref() {
-            Some("fomod") => {
+        match archive.layout {
+            Some(ArchiveLayout::Fomod) => {
                 apply_fomod_from_staging(
                     &staging_dir,
                     &destination_root,
@@ -62,7 +62,7 @@ pub(crate) fn extract_build_archive(
                     active_plugins,
                 )
             }
-            Some("bain") => apply_bain_from_staging(
+            Some(ArchiveLayout::Bain) => apply_bain_from_staging(
                 &staging_dir,
                 &destination_root,
                 archive,

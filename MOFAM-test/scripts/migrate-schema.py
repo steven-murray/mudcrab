@@ -7,7 +7,7 @@ them. This rewrites only table headers and leaves every other line untouched.
 
     [modlist."SECTION"."Mod Name"]                 ->  [[mods]]
                                                        id = "Mod Name"
-                                                       section = "SECTION"
+                                                       section = ["SECTION"]
     [[modlist."SECTION"."Mod Name".archives]]      ->  [[mods.archives]]
     [[modlist."SECTION"."Mod Name".archives.build]] -> [[mods.archives.build]]
     [[modlist."SECTION"."Mod Name".actions]]       ->  [[mods.actions]]
@@ -105,9 +105,9 @@ def migrate(text: str) -> tuple[str, dict]:
                 stats["sections"].add(" - ".join(section_path))
             out.append("[[mods]]")
             out.append(f"id = {toml_str(mod_name)}")
-            if len(section_path) == 1:
-                out.append(f"section = {toml_str(section_path[0])}")
-            elif len(section_path) > 1:
+            if section_path:
+                # Always a list, including the single-level case: one shape to
+                # read, write and test.
                 joined = ", ".join(toml_str(s) for s in section_path)
                 out.append(f"section = [{joined}]")
             if tail:

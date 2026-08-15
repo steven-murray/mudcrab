@@ -5,14 +5,16 @@ plugins = ["SkyUI_SE.esp"]
 type = "bool"
 query = "Install HD textures?"
 
-[modlist.skyui]
+[[mods]]
+id = "skyui"
 dependencies = []
 
-[[modlist.skyui.archives]]
+[[mods.archives]]
 path = "https://example.com/skyui.zip"
 download_handler = "http"
 layout = "simple"
 
-[modlist.unofficial_patch]
+[[mods]]
+id = "unofficial_patch"
 dependencies = ["skyui"]
 if = "use_hd_textures"

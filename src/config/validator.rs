@@ -1,4 +1,4 @@
-use crate::config::schema::{InputType, ModSpec, SourceModlist};
+use crate::config::schema::{InputType, ModEntry, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::HashSet;
 
@@ -70,7 +70,7 @@ fn is_plugin_filename(value: &str) -> bool {
     lower.ends_with(".esp") || lower.ends_with(".esm")
 }
 
-fn detect_cycles(mods: &IndexMap<String, ModSpec>) -> anyhow::Result<()> {
+fn detect_cycles(mods: &IndexMap<String, ModEntry>) -> anyhow::Result<()> {
     let mut visiting = HashSet::new();
     let mut visited = HashSet::new();
 
@@ -82,7 +82,7 @@ fn detect_cycles(mods: &IndexMap<String, ModSpec>) -> anyhow::Result<()> {
 }
 
 fn visit(
-    mods: &IndexMap<String, ModSpec>,
+    mods: &IndexMap<String, ModEntry>,
     mod_id: &str,
     visiting: &mut HashSet<String>,
     visited: &mut HashSet<String>,

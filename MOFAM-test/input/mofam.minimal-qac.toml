@@ -5,7 +5,9 @@ plugins = [
 	"DLCHorseArmor - Unofficial Patch.esp",
 ]
 
-[modlist."CLEANED MASTERS"."Cleaned DLC Masters"]
+[[mods]]
+id = "Cleaned DLC Masters"
+section = ["CLEANED MASTERS"]
 type = "build-from-files"
 files = [
 	"%GAME_DIR%/OriginalESPs/DLCHorseArmor.esp",
