@@ -441,7 +441,7 @@ impl ArchiveExtractor for SystemArchiveExtractor {
     ) -> anyhow::Result<usize> {
         let stage = system_staging_dir(source)?;
         let result = system_extract_to(source, &stage)
-            .and_then(|()| copy_filtered_staging(&stage, target_root, filters));
+            .and_then(|()| crate::util::fs::copy_filtered_tree(&stage, target_root, filters));
         let _ = std::fs::remove_dir_all(&stage);
         result
     }
@@ -508,60 +508,6 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     } else {
         anyhow::bail!("7z failed (exit {status}) extracting {}", source.display())
     }
-}
-
-fn copy_filtered_staging(
-    staging: &Path,
-    target: &Path,
-    filters: &ArchiveFilters,
-) -> anyhow::Result<usize> {
-    let mut count = 0usize;
-    copy_staging_recursive(staging, staging, target, filters, &mut count)?;
-    Ok(count)
-}
-
-fn copy_staging_recursive(
-    current: &Path,
-    root: &Path,
-    target: &Path,
-    filters: &ArchiveFilters,
-    count: &mut usize,
-) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(current)
-        .map_err(|err| anyhow::anyhow!("failed to read staging dir {}: {err}", current.display()))?
-    {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to read dir entry: {err}"))?;
-        let path = entry.path();
-        let ft = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("file type error for {}: {err}", path.display()))?;
-
-        if ft.is_dir() {
-            copy_staging_recursive(&path, root, target, filters, count)?;
-            continue;
-        }
-        if !ft.is_file() {
-            continue;
-        }
-
-        let rel = path
-            .strip_prefix(root)
-            .map_err(|err| anyhow::anyhow!("path strip error: {err}"))?;
-        let rel_str = rel.to_string_lossy().replace('\\', "/");
-        if !filters.should_extract(&rel_str) {
-            continue;
-        }
-
-        let dest = target.join(rel);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-        }
-        std::fs::copy(&path, &dest)
-            .map_err(|err| anyhow::anyhow!("failed to copy {} to {}: {err}", path.display(), dest.display()))?;
-        *count += 1;
-    }
-    Ok(())
 }
 
 fn compile_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
