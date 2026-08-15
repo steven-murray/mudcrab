@@ -13,6 +13,7 @@ pub mod formid;
 pub mod group;
 pub mod reader;
 pub mod record;
+pub mod schema;
 pub mod writer;
 
 pub use formid::{FormId, MasterTable, Origin, PluginName};
