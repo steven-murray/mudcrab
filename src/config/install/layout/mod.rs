@@ -22,6 +22,44 @@ use std::path::{Path, PathBuf};
 
 use super::InstallSettings;
 
+/// Extract `source` into a fresh staging directory, hand it to `f`, then clean up.
+///
+/// Every layout handler needs the same dance -- make a unique temp dir, extract
+/// with passthrough filters, run the layout logic, remove the temp dir even on
+/// failure. It was copy-pasted five times with subtly different cleanup.
+pub(crate) fn with_staged_archive<T>(
+    source: &Path,
+    target_root: &Path,
+    f: impl FnOnce(&Path) -> anyhow::Result<T>,
+) -> anyhow::Result<T> {
+    let staging_dir = staging_dir_for(target_root)?;
+    std::fs::create_dir_all(&staging_dir).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to create staging dir {}: {err}",
+            staging_dir.display()
+        )
+    })?;
+
+    let no_patterns: Vec<String> = Vec::new();
+    let result = ArchiveFilters::new(&no_patterns, &no_patterns)
+        .and_then(|passthrough| extract_with_builtins(source, &staging_dir, &passthrough))
+        .and_then(|_| f(&staging_dir));
+
+    let _ = std::fs::remove_dir_all(&staging_dir);
+    result
+}
+
+/// Append `target_subdir` to the mod root when the archive declares one.
+pub(crate) fn destination_for(
+    target_root: &Path,
+    target_subdir: Option<&str>,
+) -> anyhow::Result<PathBuf> {
+    match target_subdir {
+        Some(subdir) => Ok(target_root.join(normalize_relative_path(subdir)?)),
+        None => Ok(target_root.to_path_buf()),
+    }
+}
+
 pub(crate) fn install_mod_archives(
     mod_entry: &PersonalizedMod,
     settings: &InstallSettings,

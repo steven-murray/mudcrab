@@ -1,9 +1,9 @@
 //! Automatic layout detection for archives that declare no explicit layout.
 
-use crate::archive::{extract_with_builtins, ArchiveFilters};
+use super::with_staged_archive;
+use crate::archive::ArchiveFilters;
 use crate::util::fs::{
     copy_filtered_tree, eq_ci, find_child_case_insensitive, path_exists_case_insensitive,
-    staging_dir_for,
 };
 use std::path::{Path, PathBuf};
 
@@ -15,22 +15,10 @@ pub(crate) fn extract_archive_with_auto_layout(
     mod_id: &str,
     filters: &ArchiveFilters,
 ) -> anyhow::Result<usize> {
-    let staging_dir = staging_dir_for(target_root)?;
-    std::fs::create_dir_all(&staging_dir)
-        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
-
-    let empty_patterns: Vec<String> = Vec::new();
-    let passthrough_filters = ArchiveFilters::new(&empty_patterns, &empty_patterns)?;
-    let extract_result = extract_with_builtins(source, &staging_dir, &passthrough_filters);
-    if let Err(err) = extract_result {
-        let _ = std::fs::remove_dir_all(&staging_dir);
-        return Err(err);
-    }
-
-    let source_root = detect_auto_source_root(&staging_dir, mod_id, source)?;
-    let copy_result = copy_filtered_tree(&source_root, target_root, filters);
-    let _ = std::fs::remove_dir_all(&staging_dir);
-    copy_result
+    with_staged_archive(source, target_root, |staging_dir| {
+        let source_root = detect_auto_source_root(staging_dir, mod_id, source)?;
+        copy_filtered_tree(&source_root, target_root, filters)
+    })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
