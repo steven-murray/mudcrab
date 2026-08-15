@@ -2,6 +2,7 @@ pub mod archive;
 pub mod cli;
 pub mod commands;
 pub mod config;
+pub mod merge;
 pub mod plugin;
 pub mod util;
 
