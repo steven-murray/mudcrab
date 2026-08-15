@@ -3,12 +3,17 @@ use crate::config::download;
 use crate::config::schema::
     {CompiledArchive, FomodSelection, ModAction, Mo2ModlistEntry, PersonalizedMod, PersonalizedPlan, PostInstallAction};
 use crate::config::tools::ToolsConfig;
+use crate::util::fs::{
+    copy_filtered_tree, eq_ci, find_child_case_insensitive, link_or_copy, normalize_relative_path,
+    path_exists_case_insensitive, resolve_existing_path_case_insensitive, staging_dir_for,
+    write_text_file,
+};
 use roxmltree::{Document, Node};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet};
 use std::io::Read;
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(Debug, Clone)]
@@ -1045,31 +1050,6 @@ fn is_plugin_file(path: &Path) -> bool {
     lower == "esp" || lower == "esm"
 }
 
-fn link_or_copy(source: &Path, destination: &Path) -> anyhow::Result<()> {
-    if let Some(parent) = destination.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-    }
-
-    if destination.exists() {
-        std::fs::remove_file(destination)
-            .map_err(|err| anyhow::anyhow!("failed to replace {}: {err}", destination.display()))?;
-    }
-
-    match std::fs::hard_link(source, destination) {
-        Ok(()) => Ok(()),
-        Err(_) => std::fs::copy(source, destination)
-            .map(|_| ())
-            .map_err(|err| {
-                anyhow::anyhow!(
-                    "failed to stage plugin {} to {}: {err}",
-                    source.display(),
-                    destination.display()
-                )
-            }),
-    }
-}
-
 fn install_mod_archives(
     mod_entry: &PersonalizedMod,
     settings: &InstallSettings,
@@ -1347,7 +1327,7 @@ fn extract_archive(
         return extract_archive_with_auto_layout(source, target_root, mod_id, filters);
     }
 
-    let staging_dir = create_staging_dir(target_root)?;
+    let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir)
         .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
 
@@ -1428,7 +1408,7 @@ fn extract_archive_with_fomod_layout(
         );
     }
 
-    let staging_dir = create_staging_dir(target_root)?;
+    let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir)
         .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
 
@@ -2086,7 +2066,7 @@ fn extract_build_archive(
     active_plugins: &HashSet<String>,
     settings: &InstallSettings,
 ) -> anyhow::Result<usize> {
-    let staging_dir = create_staging_dir(target_root)?;
+    let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir)
         .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
 
@@ -2143,7 +2123,7 @@ fn merge_layer_into_staging(
     dest_prefix: Option<&str>,
     filters: &ArchiveFilters,
 ) -> anyhow::Result<()> {
-    let layer_temp = create_staging_dir(staging_dir)?;
+    let layer_temp = staging_dir_for(staging_dir)?;
     std::fs::create_dir_all(&layer_temp)
         .map_err(|err| anyhow::anyhow!("failed to create layer temp dir {}: {err}", layer_temp.display()))?;
 
@@ -2187,7 +2167,7 @@ fn extract_archive_with_bain_layout(
         );
     }
 
-    let staging_dir = create_staging_dir(target_root)?;
+    let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir)
         .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
 
@@ -2231,7 +2211,7 @@ fn extract_archive_with_auto_layout(
     mod_id: &str,
     filters: &ArchiveFilters,
 ) -> anyhow::Result<usize> {
-    let staging_dir = create_staging_dir(target_root)?;
+    let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir)
         .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
 
@@ -2529,131 +2509,6 @@ fn format_layout(layout: AutoLayoutKind, mod_id: &str) -> String {
         AutoLayoutKind::Mod => format!("/{mod_id}/plugin.esp"),
         AutoLayoutKind::ModData => format!("/{mod_id}/Data/plugin.esp"),
     }
-}
-
-fn path_exists_case_insensitive(parent: &Path, child_name: &str) -> bool {
-    find_child_case_insensitive(parent, child_name).is_some()
-}
-
-fn find_child_case_insensitive(parent: &Path, child_name: &str) -> Option<PathBuf> {
-    let read_dir = std::fs::read_dir(parent).ok()?;
-    for entry in read_dir.flatten() {
-        let name = entry.file_name();
-        if eq_ci(name.to_string_lossy().as_ref(), child_name) {
-            return Some(entry.path());
-        }
-    }
-    None
-}
-
-fn eq_ci(a: &str, b: &str) -> bool {
-    a.eq_ignore_ascii_case(b)
-}
-
-fn create_staging_dir(target_root: &Path) -> anyhow::Result<PathBuf> {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map_err(|err| anyhow::anyhow!("system clock error: {err}"))?
-        .as_nanos();
-    let mut name = target_root
-        .file_name()
-        .and_then(|v| v.to_str())
-        .unwrap_or("mod")
-        .to_string();
-    name = name
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
-
-    Ok(std::env::temp_dir().join(format!(
-        "mudcrab-stage-{}-{}-{}",
-        name,
-        std::process::id(),
-        stamp
-    )))
-}
-
-fn copy_filtered_tree(source_root: &Path, destination_root: &Path, filters: &ArchiveFilters) -> anyhow::Result<usize> {
-    let mut copied = 0usize;
-    copy_tree_recursive(source_root, source_root, destination_root, filters, &mut copied)?;
-    Ok(copied)
-}
-
-fn copy_tree_recursive(
-    current: &Path,
-    source_root: &Path,
-    destination_root: &Path,
-    filters: &ArchiveFilters,
-    copied: &mut usize,
-) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(current)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?
-    {
-        let entry = entry.map_err(|err| {
-            anyhow::anyhow!("failed to iterate directory {}: {err}", current.display())
-        })?;
-        let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
-
-        if file_type.is_dir() {
-            copy_tree_recursive(&path, source_root, destination_root, filters, copied)?;
-            continue;
-        }
-        if !file_type.is_file() {
-            continue;
-        }
-
-        let rel = path.strip_prefix(source_root).map_err(|err| {
-            anyhow::anyhow!(
-                "failed to compute relative path for {} from {}: {err}",
-                path.display(),
-                source_root.display()
-            )
-        })?;
-        let rel_norm = rel.to_string_lossy().replace('\\', "/");
-        if !filters.should_extract(&rel_norm) {
-            continue;
-        }
-
-        let destination = destination_root.join(rel);
-        if let Some(parent) = destination.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-        }
-
-        std::fs::copy(&path, &destination).map_err(|err| {
-            anyhow::anyhow!(
-                "failed to copy {} to {}: {err}",
-                path.display(),
-                destination.display()
-            )
-        })?;
-        *copied += 1;
-    }
-
-    Ok(())
-}
-
-fn normalize_relative_path(value: &str) -> anyhow::Result<PathBuf> {
-    let path = Path::new(value);
-    let mut out = PathBuf::new();
-
-    for component in path.components() {
-        match component {
-            Component::Normal(seg) => out.push(seg),
-            Component::CurDir => {}
-            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                anyhow::bail!("invalid relative path '{}'", value);
-            }
-        }
-    }
-
-    if out.as_os_str().is_empty() {
-        anyhow::bail!("relative path must not be empty");
-    }
-    Ok(out)
 }
 
 fn apply_actions(mod_entry: &PersonalizedMod, settings: &InstallSettings, mod_target: &Path) -> anyhow::Result<()> {
@@ -3305,16 +3160,6 @@ fn collect_bsa_files(root: &Path, current: &Path, out: &mut Vec<String>) -> anyh
     Ok(())
 }
 
-fn write_text_file(path: &Path, content: &str) -> anyhow::Result<()> {
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent)
-            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-    }
-    std::fs::write(path, content)
-        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))?;
-    Ok(())
-}
-
 fn resolve_game_scoped_ini_path(settings: &InstallSettings, file: &str) -> Option<PathBuf> {
     if let Some(profile_dir) = mo2_profile_dir(settings) {
         let rel = normalize_relative_path(file).ok()?;
@@ -3324,55 +3169,6 @@ fn resolve_game_scoped_ini_path(settings: &InstallSettings, file: &str) -> Optio
     let game_dir = settings.game_dir.as_ref()?;
     let rel = normalize_relative_path(file).ok()?;
     Some(game_dir.join(rel))
-}
-
-fn resolve_existing_path_case_insensitive(path: &Path) -> Option<PathBuf> {
-    if path.exists() {
-        return Some(path.to_path_buf());
-    }
-
-    let mut resolved = if path.is_absolute() {
-        PathBuf::new()
-    } else {
-        std::env::current_dir().ok()?
-    };
-
-    for component in path.components() {
-        match component {
-            Component::Prefix(_) => return None,
-            Component::RootDir => {
-                resolved.push(Path::new("/"));
-            }
-            Component::CurDir => {}
-            Component::ParentDir => {
-                resolved.pop();
-            }
-            Component::Normal(name) => {
-                let exact = resolved.join(name);
-                if exact.exists() {
-                    resolved = exact;
-                    continue;
-                }
-
-                let matched = find_case_insensitive_child(&resolved, name)?;
-                resolved = matched;
-            }
-        }
-    }
-
-    resolved.exists().then_some(resolved)
-}
-
-fn find_case_insensitive_child(parent: &Path, wanted: &std::ffi::OsStr) -> Option<PathBuf> {
-    let wanted = wanted.to_string_lossy();
-    let read_dir = std::fs::read_dir(parent).ok()?;
-    for entry in read_dir.flatten() {
-        let candidate = entry.file_name();
-        if candidate.to_string_lossy().eq_ignore_ascii_case(&wanted) {
-            return Some(entry.path());
-        }
-    }
-    None
 }
 
 fn mo2_instance_dir(settings: &InstallSettings) -> Option<&Path> {
