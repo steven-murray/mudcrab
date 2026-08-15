@@ -1,0 +1,15 @@
+name = "MOFAM Minimal QAC Test"
+
+plugins = [
+	"DLCHorseArmor.esp",
+	"DLCHorseArmor - Unofficial Patch.esp",
+]
+
+[modlist."CLEANED MASTERS"."Cleaned DLC Masters"]
+type = "build-from-files"
+files = [
+	"%GAME_DIR%/OriginalESPs/DLCHorseArmor.esp",
+]
+actions = [
+	{ action = "qac", plugins = ["DLCHorseArmor.esp"] },
+]

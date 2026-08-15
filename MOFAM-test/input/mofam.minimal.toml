@@ -1,0 +1,47 @@
+name = "MOFAM Minimal Behavior Test"
+
+# Keep this file small and high-signal:
+# include only entries that exercise new behavior or currently unsupported behavior.
+
+[inputs.use_high_res]
+type = "bool"
+query = "Install high resolution option?"
+
+[inputs.ui_variant]
+type = "choice"
+query = "Choose UI variant"
+choices = ["default", "immersive"]
+
+[modlist.baseline]
+dependencies = []
+
+[[modlist.baseline.archives]]
+# Replace with real MOFAM source after extraction
+path = "nexus:oblivion/52949/000000"
+download_handler = "nexus"
+layout = "simple"
+include = ["Data/**"]
+exclude = ["Docs/**"]
+
+[modlist.conditional_patch]
+dependencies = ["baseline"]
+if = "use_high_res"
+
+[[modlist.conditional_patch.archives]]
+path = "nexus:oblivion/52949/000001"
+download_handler = "nexus"
+layout = "simple"
+include = ["Data/**"]
+
+[modlist.needs_custom_action]
+dependencies = ["baseline"]
+if = "ui_variant == immersive"
+
+[[modlist.needs_custom_action.archives]]
+path = "nexus:oblivion/52949/000002"
+download_handler = "nexus"
+layout = "custom-data-folder"
+data_folder = "."
+include = ["Menus/**"]
+
+plugins = []
