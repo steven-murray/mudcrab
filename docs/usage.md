@@ -77,13 +77,49 @@ Example:
 mudcrab install build/plan.json --cache .mudcrab-cache --mods-dir build/mods
 ```
 
-Current MVP behavior:
+Current behavior:
 
 1. Verifies required cached archives exist.
 2. Unpacks archives under per-mod directories.
 3. Writes `install_manifest.json` in the mods directory.
-4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, and `.tgz`.
-5. Does not yet support `.7z` or `.rar`, and does not run post-install actions.
+4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar`. The
+   last two shell out to the system `bsdtar` (tried first) and `7z` (fallback)
+   binaries, so those tools must be available on `PATH` -- see the readme's
+   Requirements section.
+5. Runs post-install actions (e.g. `loot-sort`, per-mod actions declared in the
+   modlist) by default; pass `--skip-actions` to skip them.
+
+## check
+
+Validate cached archives and archive-backed file references without installing.
+
+```bash
+mudcrab check <plan.json> [--cache <dir>]
+```
+
+Example:
+
+```bash
+mudcrab check build/plan.json --cache .mudcrab-cache
+```
+
+## setup-tools
+
+Scan a source modlist and generate a `tools.toml` configuration template for the
+machine-local tools (e.g. LOOT, xEdit) that the modlist's actions require.
+
+```bash
+mudcrab setup-tools <modlist.toml> [--output <tools.toml>] [--force]
+```
+
+`--output` defaults to `tools.toml` in the same directory as the input file.
+`--force` overwrites an existing `tools.toml`.
+
+Example:
+
+```bash
+mudcrab setup-tools path/to/modlist.toml --output tools.toml
+```
 
 ## Nexus Sources
 
