@@ -596,7 +596,7 @@ mod tests {
             responses: std::collections::HashMap::new(),
             mod_order: vec!["core".to_string()],
             selected_mods: vec!["core".to_string()],
-            actions: toml::Table::new(),
+            actions: Vec::new(),
             post_install_actions: vec![],
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
@@ -662,7 +662,7 @@ mod tests {
             responses: std::collections::HashMap::new(),
             mod_order: vec!["core".to_string()],
             selected_mods: vec!["core".to_string()],
-            actions: toml::Table::new(),
+            actions: Vec::new(),
             post_install_actions: vec![],
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {

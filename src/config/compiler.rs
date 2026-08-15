@@ -1,4 +1,7 @@
-use crate::config::schema::{CompiledArchive, CompiledMod, CompiledModlist, SourceModlist};
+use crate::config::schema::{
+    CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
+    ModAction, SourceModlist,
+};
 
 pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     let actions = compile_top_level_actions(&source.ini);
@@ -64,24 +67,22 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     })
 }
 
-fn compile_top_level_actions(ini: &toml::Table) -> toml::Table {
-    if ini.is_empty() {
-        return toml::Table::new();
-    }
-
-    let mut ini_set = Vec::new();
-    for (key, value) in ini {
-        let mut entry = toml::Table::new();
-        entry.insert("scope".to_string(), toml::Value::String("game".to_string()));
-        entry.insert("file".to_string(), toml::Value::String("Oblivion.ini".to_string()));
-        entry.insert("key".to_string(), toml::Value::String(key.clone()));
-        entry.insert("value".to_string(), toml::Value::String(ini_value_to_string(value)));
-        ini_set.push(toml::Value::Table(entry));
-    }
-
-    let mut actions = toml::Table::new();
-    actions.insert("ini_set".to_string(), toml::Value::Array(ini_set));
-    actions
+/// Desugar the top-level `[ini]` table into game-scoped ini_set actions.
+///
+/// These target Oblivion.ini specifically; game-scoped writes are redirected to
+/// the MO2 profile-local copy, never the original in the game directory.
+fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
+    ini.iter()
+        .map(|(key, value)| {
+            ModAction::IniSet(IniSetAction {
+                scope: IniScope::Game,
+                file: "Oblivion.ini".to_string(),
+                key: key.clone(),
+                value: IniValue(ini_value_to_string(value)),
+                format: IniSetFormat::Standard,
+            })
+        })
+        .collect()
 }
 
 fn ini_value_to_string(value: &toml::Value) -> String {
