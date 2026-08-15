@@ -5,7 +5,7 @@ use std::path::PathBuf;
 #[command(
     name = "mudcrab",
     version,
-    about = "Declarative, cross-platform modlist compiler and installer"
+    about = "Declarative modlist compiler and installer for TES4: Oblivion"
 )]
 pub struct Cli {
     #[command(subcommand)]
