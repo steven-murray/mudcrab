@@ -12,6 +12,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         .map(|(id, spec)| -> anyhow::Result<CompiledMod> {
             Ok(CompiledMod {
                 id: id.clone(),
+                oracle_name: spec.oracle_name.clone(),
                 section: spec.section.clone(),
                 mod_type: spec.mod_type,
                 merge: spec.merge.clone(),

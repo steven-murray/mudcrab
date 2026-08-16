@@ -190,6 +190,10 @@ impl<'de> Deserialize<'de> for IniValue {
 pub struct ModEntry {
     /// Unique id; also the mod's directory name.
     pub id: String,
+    /// The mod's folder name in a reference instance, used only by `diff` when
+    /// our id is deliberately different; it does NOT affect installation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_name: Option<String>,
     /// Section path, outermost first. Each level becomes an MO2 separator.
     /// Always a list, so there is a single shape to read, write and test.
     #[serde(default)]
@@ -391,6 +395,10 @@ pub struct CompiledModlist {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledMod {
     pub id: String,
+    /// The mod's folder name in a reference instance, used only by `diff` when
+    /// our id is deliberately different; it does NOT affect installation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_name: Option<String>,
     /// Section path, carried through from the source entry.
     ///
     /// The flattened separator names in `mo2_modlist_entries` are a rendering
@@ -475,6 +483,10 @@ impl PersonalizedPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonalizedMod {
     pub id: String,
+    /// The mod's folder name in a reference instance, used only by `diff` when
+    /// our id is deliberately different; it does NOT affect installation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_name: Option<String>,
     /// Section path, carried through from the compiled entry so `download`,
     /// `check` and `install` can be scoped to part of the list. Defaulted so
     /// plans written before this field existed still parse.

@@ -495,6 +495,7 @@ mod tests {
     fn sample_mod(id: &str, archive_path: &str) -> PersonalizedMod {
         PersonalizedMod {
             id: id.to_string(),
+            oracle_name: None,
             section: Vec::new(),
             mod_type: None,
             merge: None,

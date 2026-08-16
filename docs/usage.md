@@ -310,6 +310,20 @@ Without it every directory in either tree is compared and `--section` is refused
 because a mod folder on disk does not record which section it belongs to.
 `--only` works either way, since it matches the folder name.
 
+Mods are matched between the trees by folder name, so an id we deliberately
+spell differently from the Oracle's folder would otherwise report as one missing
+mod plus one extra, twice over, and bury the real differences. A mod may
+therefore declare `oracle_name` -- the folder name to look for in the reference
+instance. Our side always uses `id`; only the Oracle side follows `oracle_name`,
+and the mod is still reported under our `id`, with the Oracle's folder named
+alongside it. It is read by `diff` alone and has no effect on installation:
+
+```toml
+[[mods]]
+id = "Cleaned DLC Masters"
+oracle_name = "Clean ESM"  # ours is build-from-files
+```
+
 Version drift is reported separately, under `version notes`. The MOFAM guide was
 published in March 2025 and often says only "use the top file on the page", so an
 Oracle archive stamped later than that is a file the guide never named. The

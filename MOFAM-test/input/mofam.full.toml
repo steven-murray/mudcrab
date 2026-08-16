@@ -104,6 +104,7 @@ post-install-actions = ["loot-sort"]
 
 [[mods]]
 id = "Cleaned DLC Masters"
+oracle_name = "Clean ESM"  # ours is build-from-files
 section = ["CLEANED MASTERS"]
 type = "build-from-files"
 files = [
@@ -135,7 +136,7 @@ data_folder = "Data"
 game_root_files = ["*.dll", "*.exe"]
 
 [[mods]]
-id = "Add Actor Values"
+id = "AddActorValues"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -164,7 +165,7 @@ layout = "custom-data-folder"
 data_folder = "BOS"
 
 [[mods]]
-id = "Better Auto-Walk OBSE"
+id = "Better Autowalk (OBSE)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -201,7 +202,7 @@ layout = "custom-data-folder"
 data_folder = "Non Selectable Player In Console"
 
 [[mods]]
-id = "Console Numpad Support OBSE"
+id = "Console Numpad Support (OBSE)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -224,7 +225,7 @@ layout = "custom-data-folder"
 data_folder = "Crash Logger Improved"
 
 [[mods]]
-id = "Engine Bug Fixes"
+id = "EngineBugFixes"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -240,14 +241,14 @@ section = ["OBSE PLUGINS"]
 path = "nexus:oblivion/50462/1000028626"
 
 [[mods]]
-id = "Faster Sleep Wait"
+id = "Faster Sleep Wait (OBSE)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/50517/1000026121"
 
 [[mods]]
-id = "Fractional Magic Damage"
+id = "FractionalMagicDamage"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -264,21 +265,21 @@ section = ["OBSE PLUGINS"]
 path = "nexus:oblivion/49545/1000022702"
 
 [[mods]]
-id = "Jump While Blocking"
+id = "Jump While Blocking (OBSE)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/49495/1000022536"
 
 [[mods]]
-id = "List Missing Mods on Load"
+id = "List Missing Mods On Load"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/52717/1000033675"
 
 [[mods]]
-id = "Map Menu Doesn't Click While Dragging OBSE"
+id = "Map Menu Doesn't Click While Dragging (OBSE)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -304,7 +305,7 @@ data_folder = "Data"
 exclude = ["**/OBSE_Kyoma_MenuQue.dll"]
 
 [[mods]]
-id = "Message Logger"
+id = "MessageLogger"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -320,7 +321,7 @@ section = ["OBSE PLUGINS"]
 path = "nexus:oblivion/52723/1000033709"
 
 [[mods]]
-id = "No Inventory on Alt-Tab"
+id = "No Inventory On Alt-Tab"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -377,6 +378,7 @@ value = "0"
 
 [[mods]]
 id = "Oblivion Priority"
+oracle_name = "Oblivion Priority 3.0.0"  # Oracle folder pins a version
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -410,7 +412,7 @@ section = ["OBSE PLUGINS"]
 path = "nexus:oblivion/49568/1000022815"
 
 [[mods]]
-id = "WalkBlessed OBSE Plugin"
+id = "WalkBlessed OBSE Plugin (diagonal move)"
 section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
@@ -428,7 +430,7 @@ path = "nexus:oblivion/51244/1000028495"
 # ------------------------------
 
 [[mods]]
-id = "Unofficial Oblivion Patch"
+id = "Unofficial Oblivion Patch - UOP"
 section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
@@ -436,28 +438,28 @@ path = "nexus:oblivion/5296/1000037331"
 exclude = ["**/UOP Vampire Aging & Face Fix.esp"]
 
 [[mods]]
-id = "Unofficial Shivering Isles Patch"
+id = "Unofficial Shivering Isles Patch - USIP"
 section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/10739/1000037332"
 
 [[mods]]
-id = "Unofficial Oblivion DLC Patches"
+id = "Unofficial Oblivion DLC Patches - UODP"
 section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/9969/1000037333"
 
 [[mods]]
-id = "Unofficial Oblivion Tree Patch"
+id = "Unofficial Oblivion Tree Patch - UOTP"
 section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/53079/1000035080"
 
 [[mods]]
-id = "Unofficial Shivering Isles Tree Patch"
+id = "Unofficial Shivering Isles Tree Patch - USITP"
 section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
@@ -519,6 +521,7 @@ path = "nexus:oblivion/51375/1000028986"
 
 [[mods]]
 id = "Imperial City Landscape Fix"
+oracle_name = "Market District Landscape Fix and Imperial City Landscape Fix"  # Oracle combines two mods
 section = ["TWEAKS AND FIXES"]
 
 [[mods.archives]]
@@ -527,7 +530,7 @@ layout="custom-data-folder"
 data_folder="Imperial City Landscape Fix 1.1/Imperial City Landscape Fix"
 
 [[mods]]
-id = "Thieves Den Barter For Upgrades"
+id = "Thieves Den Barter for Upgrades"
 section = ["TWEAKS AND FIXES"]
 
 [[mods.archives]]
@@ -713,7 +716,7 @@ section = ["UI & UX IMPROVEMENTS"]
 path = "nexus:oblivion/54904/1000041088"
 
 [[mods]]
-id = "Link Plus Plus"
+id = "LINK Plus Plus"
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
@@ -721,6 +724,7 @@ path = "nexus:oblivion/53352/1000036221"
 
 [[mods]]
 id = "DarnifiedUI FOMOD Conversion"
+oracle_name = "DarNified UI"  # ours is a built FOMOD conversion
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
@@ -843,6 +847,7 @@ value = "258"
 
 [[mods]]
 id = "VKVII Oblivion Cyrodiil Map"
+oracle_name = "VKVII_Oblivion_Cyrodiil_Map_Weathered"  # Oracle folder is the archive name
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
@@ -856,7 +861,7 @@ section = ["UI & UX IMPROVEMENTS"]
 path = "nexus:oblivion/45768/1000008685"
 
 [[mods]]
-id = "World Maps for All Worldspaces"
+id = "World Maps For All Worldspaces"
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
@@ -971,7 +976,7 @@ section = ["UI & UX IMPROVEMENTS"]
 path = "nexus:oblivion/44844/1000005987"
 
 [[mods]]
-id = "Pick Me"
+id = "Pick Me - lockpicking interface retexture"
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
