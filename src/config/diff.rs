@@ -827,7 +827,17 @@ pub fn classify_guide_age(
 ) -> GuideAge {
     let name = installation_file.map(str::trim).filter(|name| !name.is_empty());
 
-    if let Some(timestamp) = name.and_then(parse_trailing_timestamp) {
+    let Some(name) = name else {
+        // Without an `installationFile` there is no archive to date. MO2 still
+        // writes a `nexusLastModified`, but for a hand-installed mod that is
+        // simply when the folder was created -- dating a 2019 file to today.
+        // A confident wrong answer is worse here than admitting ignorance.
+        return GuideAge::Unknown {
+            reason: "the Oracle's meta.ini records no installationFile".to_string(),
+        };
+    };
+
+    if let Some(timestamp) = parse_trailing_timestamp(name) {
         return classify_timestamp(timestamp);
     }
 
@@ -836,10 +846,7 @@ pub fn classify_guide_age(
     }
 
     GuideAge::Unknown {
-        reason: match name {
-            Some(name) => format!("no Unix timestamp in '{name}', and no nexusLastModified"),
-            None => "the Oracle's meta.ini records no installationFile".to_string(),
-        },
+        reason: format!("no Unix timestamp in '{name}', and no nexusLastModified"),
     }
 }
 
@@ -1349,6 +1356,18 @@ mod tests {
 
         let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"));
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
+    }
+
+    #[test]
+    fn no_installation_file_means_unknown_even_with_a_meta_ini_date() {
+        // A hand-installed mod has no `installationFile`, and MO2's
+        // `nexusLastModified` is then just when the folder was written. Reading
+        // it would date a 2019 archive to today and flag it POST-GUIDE.
+        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"));
+        assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
+
+        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"));
+        assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 
     #[test]

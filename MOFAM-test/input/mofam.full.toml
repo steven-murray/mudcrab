@@ -503,12 +503,6 @@ section = ["UNOFFICIAL PATCHES"]
 [[mods.archives]]
 path = "nexus:oblivion/53079/1000035080"
 file_name = "Unofficial Oblivion Tree Patch-53079-1-0-1687285444.rar"
-# The archive wraps everything in <mod name>/Data/, and `trees/` is not one of
-# the folder names the auto layout recognises as game content, so nothing
-# unwraps it. Without this every file lands two levels too deep, and the patch
-# silently does nothing.
-layout = "custom-data-folder"
-data_folder = "Unofficial Oblivion Tree Patch/Data"
 
 [[mods]]
 id = "Unofficial Shivering Isles Tree Patch - USITP"
@@ -517,12 +511,6 @@ section = ["UNOFFICIAL PATCHES"]
 [[mods.archives]]
 path = "nexus:oblivion/53101/1000035151"
 file_name = "Unofficial Shivering Isles Tree Patch-53101-1-0-1687786889.rar"
-# The archive wraps everything in <mod name>/Data/, and `trees/` is not one of
-# the folder names the auto layout recognises as game content, so nothing
-# unwraps it. Without this every file lands two levels too deep, and the patch
-# silently does nothing.
-layout = "custom-data-folder"
-data_folder = "Unofficial Shivering Isles Tree Patch/Data"
 
 # ------------------------------
 # Part 4 - TWEAKS AND FIXES
@@ -1542,11 +1530,8 @@ section = ["7 - CHARACTER AND NPCS"]
 path = "nexus:oblivion/51511/1000029601"
 download_handler = "nexus"
 file_name = "Argonian and Khajiit patch-51511-1-0-1637434309.rar"
-layout = "custom-data-folder"
-data_folder = "patch/Data"
 # oracle version 1.0.0.0
 
-# Guide 18, third archive. Same nesting as the one above.
 [[mods]]
 id = "Warpaints scars and face markings for OCO2 - Argonian Patch for Seamless"
 section = ["7 - CHARACTER AND NPCS"]
@@ -1555,8 +1540,6 @@ section = ["7 - CHARACTER AND NPCS"]
 path = "nexus:oblivion/51511/1000029446"
 download_handler = "nexus"
 file_name = "Argonians patch for Seamless mod-51511-1-0-1635777320.rar"
-layout = "custom-data-folder"
-data_folder = "argonians seamless patch/Data"
 # oracle version 1.0.0.0
 
 # Guide 19: BAIN, "001 core" only. The other two subpackages are alternates for
@@ -1770,17 +1753,16 @@ file_name = "Full Textures-49078-v2-1548284164.zip"
 # Guide 1: pinned to OLD FILES 4.9.4.2, which is a deliberate choice on the
 # guide's part rather than "the top file on the page".
 #
-# The Oracle runs 5.0.5 (uploaded 2025-11-23, eight months after the guide), so
-# this mod diffs wholesale against it -- a deliberate divergence, like ORC.
-# MOO 5.x also dropped `ini_levelscaling_npc_overridden`, so one of the 37
-# settings below would silently do nothing there. All 37 exist in 4.9.4.2 and
-# every one of them changes a value away from its default.
+# The Oracle ran 5.0.5 until 2026-08-16 and has since been downgraded to match,
+# so the two agree again. MOO 5.x dropped `ini_levelscaling_npc_overridden`, so
+# one of the 37 settings below would have silently done nothing there; all 37
+# exist in 4.9.4.2 and every one changes a value away from its default.
 #
-# The Oracle's meta.ini records no `1\fileid`, so this entry was written from
-# the download's own .meta sidecar rather than `add --from-oracle`.
+# The Oracle's meta.ini for the old 5.0.5 folder recorded no `1\fileid`, so this
+# entry was written from the download's own .meta sidecar rather than
+# `add --from-oracle`.
 [[mods]]
 id = "Maskar's Oblivion Overhaul"
-oracle_name = "Maskars Oblivion Overhaul 5_0_5"  # the Oracle runs 5.0.5; see above
 section = ["8 - OVERHAULS MASKAR"]
 
 [[mods.archives]]
@@ -2072,10 +2054,6 @@ section = ["8 - OVERHAULS MASKAR"]
 path = "nexus:oblivion/54665/1000040133"
 download_handler = "nexus"
 file_name = "MOO-Non-ES Franchise Recolors 1.1-54665-1-1-1734142574.rar"
-# Data/ nested inside a folder named after the archive, which the auto layout
-# only unwraps when that folder matches the mod id.
-layout = "custom-data-folder"
-data_folder = "MOO-Non-ES Franchise Recolors 1.1/Data"
 # oracle version 1.1.0.0
 
 [[mods]]
@@ -2086,10 +2064,6 @@ section = ["8 - OVERHAULS MASKAR"]
 path = "nexus:oblivion/54664/1000040049"
 download_handler = "nexus"
 file_name = "MOO - Hill Giant Eye Fix-54664-1-0-1733611164.rar"
-# Data/ nested inside a folder named after the archive, which the auto layout
-# only unwraps when that folder matches the mod id.
-layout = "custom-data-folder"
-data_folder = "MOO - Hill Giant Eye Fix/Data"
 # oracle version 1.0.0.0
 
 # Guide 4: install manually and set 01_MOO_DefaultProbabilities as the data

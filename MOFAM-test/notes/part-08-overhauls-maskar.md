@@ -3,7 +3,7 @@
 Ten guide rows, eleven mod folders — row 7 says "install both main files
 separately". Built 2026-08-16.
 
-**Result: 11 compared, 8 identical, 3 differing, all explained. Nothing missing,
+**Result: 11 compared, 9 identical, 2 differing, both explained. Nothing missing,
 nothing extra. All 37 of MOO's INI settings verified applied.**
 
 ## The version decision: MOO 4.9.4.2, not 5.0.5
@@ -22,9 +22,13 @@ The deciding evidence: of the guide's 37 INI settings,
 - **5.0.5 has 36.** `MOO.ini_levelscaling_npc_overridden` was removed in 5.x, so
   that instruction would silently do nothing on the Oracle's build.
 
-So this mod diverges from the Oracle wholesale and permanently, in the same way
-ORC does. `diff` reports 16 differing files, 8 only in the Oracle, and an
-`archive mismatch`. That is the divergence, not a defect.
+This began as a permanent divergence, like ORC -- 16 differing files, 8 only in
+the Oracle, plus an `archive mismatch`. **The user then downgraded the Oracle to
+4.9.4.2 as well (2026-08-16), so the two now agree and this mod matches
+byte-for-byte.** The old `Maskars Oblivion Overhaul 5_0_5` folder is still in the
+Oracle and shows as one of the many "missing from ours"; the new folder is named
+`Maskar's Oblivion Overhaul`, which is our mod id, so no `oracle_name` alias is
+needed.
 
 The Oracle's `meta.ini` records `1\fileid=0`, so `add --from-oracle` could not
 build a URL for this row at all; the entry was written from the download's own
@@ -43,7 +47,7 @@ list. After install, all 37 were read back from the staged INI and confirmed.
 Worth noting `set X to Y` is a script command, not an assignment, so it is
 exempt from the INI spacing rule that Part 7's DarNified fonts needed.
 
-## The other two differences
+## The two remaining differences
 
 `MOBS patch for Maskar's Oblivion Overhaul` and `OCOv2 -MOO Patch` each differ
 only by a plugin hidden in the Oracle and active here. Both are Part 36 merge
@@ -53,9 +57,9 @@ sources — the same expected pattern as Part 7's ten.
 
 | # | mod | what it needed |
 |---|---|---|
-| 1 | Maskar's Oblivion Overhaul | `--nexus` entry, `oracle_name`, 37 `ini_set` |
-| 2 | MOO - Non-Elder Scrolls Franchise Recolors | `data_folder` |
-| 3 | Hill Giant Eye Fix | `data_folder` |
+| 1 | Maskar's Oblivion Overhaul | `--nexus` entry, 37 `ini_set` |
+| 2 | MOO - Non-Elder Scrolls Franchise Recolors | nothing, since the auto-layout fix |
+| 3 | Hill Giant Eye Fix | nothing, since the auto-layout fix |
 | 4 | Basic harvest | `data_folder` — `01_MOO_DefaultProbabilities` of three alternatives |
 | 5 | MOO Themed Loading Screens | `file_prune` of `textures` |
 | 7b | …WEPON | `target_subdir = "Menus/Strings"` |
@@ -65,23 +69,28 @@ screens supply the same 55 images at higher resolution, so keeping MOO's would
 mean 55 textures shadowed in the VFS for nothing. The Oracle deleted rather than
 hid them, so `file_prune` matches.
 
-## A pattern worth a decision soon
+## The wrapper-`Data/` pattern, now fixed
 
-`Data/` nested inside a folder named after the *archive* rather than the mod is
-now the single most common reason a row needs an explicit `data_folder`. Six
-occurrences so far:
+`Data/` nested inside a folder named after the *archive* was the most common
+reason a row needed an explicit `data_folder`. Six occurrences:
 
 - Part 7: Warpaints Argonian and Khajiit Patch, Warpaints Argonian Patch for
   Seamless
-- Unofficial Patches: UOTP, USITP (these two were silently broken for months —
-  see `earlier-sections-backlog.md`)
+- Unofficial Patches: UOTP, USITP (silently broken for months -- see
+  `earlier-sections-backlog.md`)
 - Part 8: MOO Recolors, Hill Giant Eye Fix
 
-The auto layout unwraps `<mod id>/Data/` but not `<anything>/Data/`, and the mod
-id is *our* name for the mod, not a property of the archive — so the current
-rule keys off the wrong thing. Generalising to "exactly one top-level directory
-containing a `Data/`" would remove the whole class.
+The auto layout unwrapped `<mod id>/Data/` but not `<anything>/Data/`, and the
+mod id is *our* name for the mod rather than a property of the archive, so the
+rule keyed off the wrong thing. It now unwraps a lone top-level folder that
+contains a `Data/`, whatever that folder is called.
 
-Not done yet because it changes layout resolution for all 164 existing mods and
-wants a full-instance diff to confirm nothing regresses. Cheap to try, and the
-evidence is six archives and counting.
+All six explicit overrides were **removed** and the whole instance rebuilt with
+`--force`: 164 mods re-resolved, all six still byte-identical to the Oracle, and
+no other mod changed. That is the check that mattered -- fixtures show the rule
+works, only a full rebuild shows it broke nothing.
+
+The no-`Data/` case stays name-gated on purpose. A lone folder with no `Data/`
+inside is as likely to *be* the content (an archive that is just `textures/`) as
+to wrap it, and unwrapping that would install the textures' contents at the mod
+root.
