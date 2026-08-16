@@ -351,22 +351,22 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
 
     // bsdtar -tf prints one path per line
-    if let Ok(output) = Command::new("bsdtar").args(["-t", "-f", src]).output() {
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout);
-            let mut out = Vec::new();
-            for line in text.lines() {
-                let p = Path::new(line.trim());
-                if line.trim().ends_with('/') {
-                    continue; // directory entry
-                }
-                let normalized = normalize_archive_path(p)?;
-                if !normalized.is_empty() {
-                    out.push(normalized);
-                }
+    if let Ok(output) = Command::new("bsdtar").args(["-t", "-f", src]).output()
+        && output.status.success()
+    {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut out = Vec::new();
+        for line in text.lines() {
+            let p = Path::new(line.trim());
+            if line.trim().ends_with('/') {
+                continue; // directory entry
             }
-            return Ok(out);
+            let normalized = normalize_archive_path(p)?;
+            if !normalized.is_empty() {
+                out.push(normalized);
+            }
         }
+        return Ok(out);
     }
 
     // Fall back to `7z l -slt` which emits "Path = ..." lines
@@ -392,24 +392,24 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         } else if line.starts_with("Attributes = D") || line == "Folder = +" {
             current_is_dir = true;
         } else if line.is_empty() {
-            if let Some(path) = current_path.take() {
-                if !current_is_dir {
-                    let normalized = normalize_archive_path(Path::new(&path))?;
-                    if !normalized.is_empty() {
-                        out.push(normalized);
-                    }
+            if let Some(path) = current_path.take()
+                && !current_is_dir
+            {
+                let normalized = normalize_archive_path(Path::new(&path))?;
+                if !normalized.is_empty() {
+                    out.push(normalized);
                 }
             }
             current_is_dir = false;
         }
     }
     // flush final entry if file didn't end with blank line
-    if let Some(path) = current_path {
-        if !current_is_dir {
-            let normalized = normalize_archive_path(Path::new(&path))?;
-            if !normalized.is_empty() {
-                out.push(normalized);
-            }
+    if let Some(path) = current_path
+        && !current_is_dir
+    {
+        let normalized = normalize_archive_path(Path::new(&path))?;
+        if !normalized.is_empty() {
+            out.push(normalized);
         }
     }
 
@@ -441,7 +441,7 @@ impl ArchiveExtractor for SystemArchiveExtractor {
     ) -> anyhow::Result<usize> {
         let stage = system_staging_dir(source)?;
         let result = system_extract_to(source, &stage)
-            .and_then(|()| copy_filtered_staging(&stage, target_root, filters));
+            .and_then(|()| crate::util::fs::copy_filtered_tree(&stage, target_root, filters));
         let _ = std::fs::remove_dir_all(&stage);
         result
     }
@@ -484,10 +484,9 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
+        && status.success()
     {
-        if status.success() {
-            return Ok(());
-        }
+        return Ok(());
     }
 
     // Fall back to 7z
@@ -508,60 +507,6 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     } else {
         anyhow::bail!("7z failed (exit {status}) extracting {}", source.display())
     }
-}
-
-fn copy_filtered_staging(
-    staging: &Path,
-    target: &Path,
-    filters: &ArchiveFilters,
-) -> anyhow::Result<usize> {
-    let mut count = 0usize;
-    copy_staging_recursive(staging, staging, target, filters, &mut count)?;
-    Ok(count)
-}
-
-fn copy_staging_recursive(
-    current: &Path,
-    root: &Path,
-    target: &Path,
-    filters: &ArchiveFilters,
-    count: &mut usize,
-) -> anyhow::Result<()> {
-    for entry in std::fs::read_dir(current)
-        .map_err(|err| anyhow::anyhow!("failed to read staging dir {}: {err}", current.display()))?
-    {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to read dir entry: {err}"))?;
-        let path = entry.path();
-        let ft = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("file type error for {}: {err}", path.display()))?;
-
-        if ft.is_dir() {
-            copy_staging_recursive(&path, root, target, filters, count)?;
-            continue;
-        }
-        if !ft.is_file() {
-            continue;
-        }
-
-        let rel = path
-            .strip_prefix(root)
-            .map_err(|err| anyhow::anyhow!("path strip error: {err}"))?;
-        let rel_str = rel.to_string_lossy().replace('\\', "/");
-        if !filters.should_extract(&rel_str) {
-            continue;
-        }
-
-        let dest = target.join(rel);
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-        }
-        std::fs::copy(&path, &dest)
-            .map_err(|err| anyhow::anyhow!("failed to copy {} to {}: {err}", path.display(), dest.display()))?;
-        *count += 1;
-    }
-    Ok(())
 }
 
 fn compile_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {

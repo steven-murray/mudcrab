@@ -2,6 +2,9 @@ pub mod archive;
 pub mod cli;
 pub mod commands;
 pub mod config;
+pub mod merge;
+pub mod plugin;
+pub mod util;
 
 pub fn init_tracing() {
     let filter = tracing_subscriber::EnvFilter::try_from_default_env()

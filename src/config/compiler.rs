@@ -1,4 +1,7 @@
-use crate::config::schema::{CompiledArchive, CompiledMod, CompiledModlist, SourceModlist};
+use crate::config::schema::{
+    ArchiveLayout, CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
+    ModAction, SourceModlist,
+};
 
 pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     let actions = compile_top_level_actions(&source.ini);
@@ -9,7 +12,8 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         .map(|(id, spec)| -> anyhow::Result<CompiledMod> {
             Ok(CompiledMod {
                 id: id.clone(),
-                mod_type: spec.mod_type.clone(),
+                mod_type: spec.mod_type,
+                merge: spec.merge.clone(),
                 dependencies: spec.dependencies.clone(),
                 archives: spec
                     .archives
@@ -18,6 +22,15 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                         if archive.path.is_some() && !archive.build.is_empty() {
                             return Err(anyhow::anyhow!(
                                 "mod '{}': archive cannot have both 'path' and 'build'",
+                                id
+                            ));
+                        }
+                        if archive.layout == Some(ArchiveLayout::CustomDataFolder)
+                            && archive.data_folder.is_none()
+                        {
+                            return Err(anyhow::anyhow!(
+                                "mod '{}': layout = \"custom-data-folder\" requires data_folder \
+                                 to say where the data folder is",
                                 id
                             ));
                         }
@@ -30,7 +43,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                         Ok(CompiledArchive {
                             path: archive.path.clone(),
                             download_handler: archive.download_handler.clone(),
-                            layout: archive.layout.clone(),
+                            layout: archive.layout,
                             data_folder: archive.data_folder.clone(),
                             target_subdir: archive.target_subdir.clone(),
                             bain_subpackages: archive.bain_subpackages.clone(),
@@ -64,24 +77,22 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     })
 }
 
-fn compile_top_level_actions(ini: &toml::Table) -> toml::Table {
-    if ini.is_empty() {
-        return toml::Table::new();
-    }
-
-    let mut ini_set = Vec::new();
-    for (key, value) in ini {
-        let mut entry = toml::Table::new();
-        entry.insert("scope".to_string(), toml::Value::String("game".to_string()));
-        entry.insert("file".to_string(), toml::Value::String("Oblivion.ini".to_string()));
-        entry.insert("key".to_string(), toml::Value::String(key.clone()));
-        entry.insert("value".to_string(), toml::Value::String(ini_value_to_string(value)));
-        ini_set.push(toml::Value::Table(entry));
-    }
-
-    let mut actions = toml::Table::new();
-    actions.insert("ini_set".to_string(), toml::Value::Array(ini_set));
-    actions
+/// Desugar the top-level `[ini]` table into game-scoped ini_set actions.
+///
+/// These target Oblivion.ini specifically; game-scoped writes are redirected to
+/// the MO2 profile-local copy, never the original in the game directory.
+fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
+    ini.iter()
+        .map(|(key, value)| {
+            ModAction::IniSet(IniSetAction {
+                scope: IniScope::Game,
+                file: "Oblivion.ini".to_string(),
+                key: key.clone(),
+                value: IniValue(ini_value_to_string(value)),
+                format: IniSetFormat::Standard,
+            })
+        })
+        .collect()
 }
 
 fn ini_value_to_string(value: &toml::Value) -> String {

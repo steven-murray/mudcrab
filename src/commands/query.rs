@@ -2,7 +2,6 @@ use crate::cli::QueryArgs;
 use crate::config;
 
 pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
-    let game_dir = super::require_game_dir(None)?;
     let raw = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
 
@@ -15,15 +14,15 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
 
     let plan = config::query::build_plan(&compiled, args.headless)?;
 
-    if let Some(parent) = args.output.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|err| {
-                anyhow::anyhow!(
-                    "failed to create output directory {}: {err}",
-                    parent.display()
-                )
-            })?;
-        }
+    if let Some(parent) = args.output.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to create output directory {}: {err}",
+                parent.display()
+            )
+        })?;
     }
 
     let data = serde_json::to_string_pretty(&plan)
@@ -34,7 +33,6 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
     tracing::info!(
         input = %args.input.display(),
         output = %args.output.display(),
-        game_dir = %game_dir.display(),
         headless = args.headless,
         "query requested"
     );

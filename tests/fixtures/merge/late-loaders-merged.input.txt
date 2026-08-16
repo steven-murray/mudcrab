@@ -1,0 +1,41 @@
+# Late Loaders Merged
+# Allocator input: each source plugin in merge order, followed by its own
+# object indices (ascending, deduplicated) as 6-hex values, one per line.
+# Generated from the real MOFAM install; the expected output is map.json.
+@WACIntegration - MOO Patch.esp
+@All Natural - Real Lights - candelabra pathgrid fix.esp
+@DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp
+@tbskGuardsFeatures_UOP_Patch.esp
+@LFO - Local Guards Features Patch.esp
+@DispMiscPatch_OCRP_VGR_Patch.esp
+@DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp
+@Auto Update Leveled Items And Spells - Script Patch.esp
+@Cobl Glue - Bravil Barrel Fix.esp
+@OCOv2 - MOO Patch.esp
+@MOO MOBS Patch.esp
+@Wolf Animations Restored - MOO Patch.esp
+@MGE Compatibility.esp
+@Improved MG Patch.esp
+00678A
+00678B
+00678C
+00678D
+006790
+006791
+006792
+006793
+006794
+006795
+006796
+006797
+006798
+006799
+00679A
+006E6E
+@FGE Compatibility.esp
+@Improved FG Patch.esp
+001C7A
+@LandMagicPatch.esp
+@Cava Obscura - Cyrodiil.esp
+@Cava Obscura - SI.esp
+@Late Loaders Consistency Patch.esp

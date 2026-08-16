@@ -7,7 +7,7 @@ This guide describes the currently implemented command flow.
 1. Compile source TOML into compiled JSON.
 2. Resolve query inputs into a personalized plan JSON.
 3. Download archives into a local cache.
-4. Install staged mod archive layout from cache.
+4. Install staged mod archive layout from cache, then build any declared merges.
 
 ## Commands
 
@@ -77,13 +77,75 @@ Example:
 mudcrab install build/plan.json --cache .mudcrab-cache --mods-dir build/mods
 ```
 
-Current MVP behavior:
+Current behavior:
 
 1. Verifies required cached archives exist.
 2. Unpacks archives under per-mod directories.
 3. Writes `install_manifest.json` in the mods directory.
-4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, and `.tgz`.
-5. Does not yet support `.7z` or `.rar`, and does not run post-install actions.
+4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar`. The
+   last two shell out to the system `bsdtar` (tried first) and `7z` (fallback)
+   binaries, so those tools must be available on `PATH` -- see the readme's
+   Requirements section.
+5. Builds any `type = "merge"` mods, writing the merged plugin plus a
+   `merge - <id>/` sidecar containing `map.json` (in zMerge's shape, so it diffs
+   directly against a real zMerge run) and `mudcrab-merge.json`.
+6. Hides each merged source plugin as `<name>.esp.mohidden`, recording it in the
+   manifest. Sources stay **enabled** so their assets and BSAs keep loading.
+7. Runs post-install actions (e.g. `loot-sort`, per-mod actions declared in the
+   modlist) by default; pass `--skip-actions` to skip them.
+
+Merges are built after all mods are installed and before LOOT sorts, so LOOT sees
+the merged plugin rather than the sources it replaced. Re-running `install` is safe:
+merges are rebuilt deterministically and hiding is idempotent.
+
+## unhide-merges
+
+Restore source plugins that `install` hid on behalf of a merge, reading the install
+manifest so it undoes what was actually done rather than what the modlist currently
+says.
+
+```bash
+mudcrab unhide-merges --mo2-instance-dir <dir> [--profile-name <name>]
+mudcrab unhide-merges --mods-dir <dir>
+```
+
+Example:
+
+```bash
+mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
+```
+
+## check
+
+Validate cached archives and archive-backed file references without installing.
+
+```bash
+mudcrab check <plan.json> [--cache <dir>]
+```
+
+Example:
+
+```bash
+mudcrab check build/plan.json --cache .mudcrab-cache
+```
+
+## setup-tools
+
+Scan a source modlist and generate a `tools.toml` configuration template for the
+machine-local tools (e.g. LOOT, xEdit) that the modlist's actions require.
+
+```bash
+mudcrab setup-tools <modlist.toml> [--output <tools.toml>] [--force]
+```
+
+`--output` defaults to `tools.toml` in the same directory as the input file.
+`--force` overwrites an existing `tools.toml`.
+
+Example:
+
+```bash
+mudcrab setup-tools path/to/modlist.toml --output tools.toml
+```
 
 ## Nexus Sources
 
@@ -113,18 +175,20 @@ name = "Simple"
 type = "bool"
 query = "Install HD textures?"
 
-[modlist.base]
+[[mods]]
+id = "base"
 dependencies = []
 
-[[modlist.base.archives]]
+[[mods.archives]]
 path = "https://example.com/base.zip"
 download_handler = "http"
 
-[modlist.hd]
+[[mods]]
+id = "hd"
 dependencies = ["base"]
 if = "use_hd_textures"
 
-[[modlist.hd.archives]]
+[[mods.archives]]
 path = "nexus:skyrimspecialedition/1234/5678"
 download_handler = "nexus"
 ```

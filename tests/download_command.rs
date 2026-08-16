@@ -20,7 +20,7 @@ fn download_copies_local_archives_into_cache() {
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
     let source = format!(
-        "name = \"Local Download Test\"\n\n[modlist.core]\ndependencies = []\n\n[[modlist.core.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Local Download Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
