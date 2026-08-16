@@ -1,91 +1,102 @@
-# Open: zMerge's Unique Forts output has 718 dangling references
+# zMerge writes load-order indices into 4 of the 6 merges
 
-**Status: pinned, not concluded.** One merge, one machine, one zMerge run. Do
-not treat this as "zMerge is broken" until M7 has checked the other five.
+**Status: reproduced across four merges with a single consistent signature.**
+Superseded the earlier "possible operator error" framing — that hypothesis is
+now ruled out (see below).
 
-## What was measured
+## The measurement
 
-`Unique Forts Merged.esp`, as built by zMerge and currently installed in
-MOFAM-03.25, contains **718 references whose mod index exceeds the plugin's own
-mod index**. A TES4 FormID's high byte indexes the *owning plugin's* master
-list; the merged plugin has 2 masters, so its own index is 2 and any index > 2
-addresses nothing. Those references are dangling in the shipped file.
+Each merge was rebuilt from zEdit's own definitions and compared semantically
+against the installed output. All six agree on every record and every
+reference edge. But zMerge's *own* output contains references whose mod index
+exceeds its master count, so they address a master slot that does not exist:
 
-The pattern is consistent and diagnostic: the bad mod index equals the source
-plugin's **position in the load order**, not its position in the merged
-plugin's master list.
+| merge | sources | remapped | records | broken refs |
+|---|---|---|---|---|
+| OOO Patches Merged | 19 | 0 | 1759 | 0 |
+| NPC Merge | 14 | 0 | 2278 | 0 |
+| Late Loaders Merged | 20 | 0 | 4361 | **12** |
+| Prebash Merge | 86 | 0 | 4505 | **19** |
+| Unique Forts Merged | 11 | 2004 | 7912 | **718** |
+| TACE Merge | 21 | 1170 | 8533 | **1322** |
 
-Worked example, verified end to end:
+Reproduce: `MUDCRAB_MOFAM_ROOT=... cargo test --test merge_oracle -- --nocapture`
 
-| | |
-|---|---|
-| record | an ACHR inside Fort Irony, referencing another of Fort Irony's own records |
-| correct merged FormID | `01001F8D` (own index 1... see below) |
-| zMerge wrote | `06001F8D` |
-| Fort Irony's load order position | **6** |
+Two distinct failure modes were counted separately, because conflating them
+would have hidden the pattern: references *beyond the master list*, and
+references claiming to be the plugin's own records at an object index it never
+allocated. **All are the first kind; there are zero of the second.**
 
-So the high byte is a load-order index that leaked into a field that is
-supposed to hold a master-list index.
+## The signature
 
-## Why this is not our bug
+In every case the bad mod index is exactly the source plugin's **position in
+the load order**, while the object index is carried over untouched:
 
-- mudcrab's output for the same merge has **zero** references with an
-  out-of-range mod index (asserted directly in `tests/merge_unique_forts.rs`).
-- Record count matches zMerge exactly (7912), clobber count matches the recon
-  measurement exactly (56), and every other reference edge agrees.
-- The 718 are excluded from the tier-2 comparison *by count*, and the test
-  asserts our surplus edges are exactly the repaired ones — so the exclusion
-  cannot mask a genuine disagreement elsewhere.
+| merge | record | zMerge wrote | bad mod index resolves to |
+|---|---|---|---|
+| Unique Forts | FACT `02001F94` | `06001F94` | load order[6] = Unique Forts Fort Irony.esp |
+| Unique Forts | FACT `02002636` | `03002636` | load order[3] = Unique Forts Fort Doublecross.esp |
+| TACE | REFR `0001C5F4` | `0C005394` | load order[12] = Chorrol LCH.esp |
+| Late Loaders | REFR `2200678B` | `2F00678A` | load order[47] = Improved MG Patch.esp |
+| Prebash | CONT `000244A5` | `37000ED4` | load order[55] = Bibliophilia.esp |
+
+So zMerge translated the object index correctly and then wrote a **load-order
+index** into the mod-index byte instead of the merged plugin's master-index
+space. These are references that should have pointed at the merged plugin's
+own records.
+
+That the object index survives is what makes our side verifiable: mudcrab emits
+the same object index with the correct mod index, so ours resolves to a record
+that exists and zMerge's resolves to nothing. Being different from a suspect
+oracle is not the same as being right — here the difference is checkable, and
+it is only the high byte.
+
+## Hypotheses now ruled out
+
+- **Operator error / GUI misfire.** The merges were built on the original
+  prefix (22330), where the zEdit GUI works correctly. The GUI trouble was on
+  the newly created prefix, which only ever received copies of already-built
+  merges. Nothing about how these were invoked explains a malformed high byte.
+- **Confined to one merge.** Four of six are affected.
+- **Confined to the merges that renumber FormIDs.** Late Loaders and Prebash
+  remap nothing and are still affected — so the renumbering path is not the
+  (only) trigger. Renumbering does correlate with *magnitude* (718 and 1322 vs
+  12 and 19), which suggests it multiplies an underlying fault rather than
+  causing it.
+- **Dirty source plugins.** mudcrab hard-errors on a reference whose mod index
+  exceeds its plugin's own master list. All 170 sources parse and merge without
+  triggering it, so the defect is introduced by the merge, not inherited.
 
 ## Consequences
 
-1. **Tier 3 (near-byte-exact) is unreachable for this merge.** The oracle is
-   wrong in 718 places; matching it byte-for-byte would mean reproducing the
-   defect. Tier 2 is the real gate.
-2. **The installed merge is probably faulty in game** — dangling references
-   typically surface as missing NPCs/objects or scripts failing to resolve
-   their targets, localised to the affected forts.
+1. **The installed merges are faulty in game.** Dangling references typically
+   surface as missing NPCs, objects or containers, and as scripts failing to
+   resolve their targets. Unique Forts and TACE are badly affected; Late
+   Loaders and Prebash marginally.
+2. **Tier 3 (near-byte-exact) is unreachable and should stay that way.**
+   Matching zMerge byte-for-byte would mean reproducing 2071 broken
+   references. Tier 2 — semantic reference-graph equivalence — is the real
+   gate, and all six merges pass it.
 
-## Alternative explanations not yet ruled out
+## Still open
 
-The user built this merge through zEdit's GUI, which was misbehaving badly on
-this machine (see the Wine/zEdit debugging session). Plausible causes, in
-rough order of likelihood:
+- **Which fields.** The affected records are FACT, SCPT, REFR and CONT so far.
+  Whether the fault is per-field or per-record-type is unestablished.
+- **Upstream.** Not reported. A reproducer would need a minimal merge, which
+  none of these are.
 
-1. **Operator error / GUI misfire** — plugins added to the merge in a state
-   zMerge did not expect, or a merge re-run over stale output.
-2. **A zMerge bug** specific to some property of this merge (it is the only one
-   of the six with a large CELL/worldspace remap load: 2004 object-index
-   remaps, 84 CELLs, PGRDs, worldspace children).
-3. **A genuine zMerge bug affecting everything**, which would make all six
-   installed merges suspect.
+## Unrelated oracle drift found along the way
 
-## How to discriminate — do this in M7
+Worth recording so it is not re-diagnosed as a bug:
 
-Run each remaining merge and count dangling references in **zMerge's** output
-for each:
-
-| merge | sources | remaps | zMerge dangling refs |
-|---|---|---|---|
-| Unique Forts Merged | 11 | 2004 | **718** |
-| TACE Merge | 21 | 1170 | ? |
-| NPC Merge | 14 | 0 | ? |
-| Late Loaders Merged | 20 | 0 | ? |
-| OOO Patches Merged | 19 | 0 | ? |
-| Prebash Merge | 86 | 0 | ? |
-
-Reading the result:
-
-- **Only Unique Forts affected** → most likely a one-off (cause 1 or 2). Rebuild
-  that merge and move on; do not generalise.
-- **Only the two merges with remaps affected** (Unique Forts, TACE) → points at
-  a real zMerge bug in the renumbering path, since the four zero-remap merges
-  exercise only master-index remapping. This is the most informative outcome.
-- **All six affected** → systemic; every installed merge needs replacing, and
-  the claim deserves an upstream report with a reproducer.
-
-Before concluding zMerge is wrong in *any* of these cases, confirm the
-opposite direction too: pick 3 of the flagged references per merge, resolve
-them by hand against the source plugin, and check that mudcrab's value is the
-one that resolves to the intended record. Being different from a suspect oracle
-is not the same as being right.
+- **`merges.json` load orders are stale** for Late Loaders and NPC Merge.
+  zMerge's master lists for those are supersets of what any source requires and
+  are not monotonic in the recorded load order; NPC Merge's even names a plugin
+  absent from that load order entirely. Their exact master lists are therefore
+  not reproducible from what was recorded. Extra unused masters are harmless —
+  they shift mod indices, and tier 2 is immune to that by construction.
+- **`merges.json` points ORC.esp at the v194 mod folder, but the built Prebash
+  merge came from v180.** The definition was updated when the ORC upgrade
+  began; the merge was never rebuilt. The oracle fixture pins v180 because
+  that is what the installed `.esp` actually contains. Rebuilding Prebash for
+  real should use v194.
