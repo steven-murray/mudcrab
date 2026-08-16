@@ -10,6 +10,7 @@
 //! is one dispatcher rather than two implementations that drifted apart.
 
 pub mod create_dummy_plugin;
+pub mod file_hide;
 pub mod file_prune;
 pub mod ini_set;
 pub mod pack_bsa;
@@ -44,6 +45,7 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
         ModAction::PackBsa(spec) => pack_bsa::apply(spec, cx),
         ModAction::CreateDummyPlugin(spec) => create_dummy_plugin::apply(spec, cx),
         ModAction::FilePrune(spec) => file_prune::apply(spec, cx),
+        ModAction::FileHide(spec) => file_hide::apply(spec, cx),
     }
 }
 
