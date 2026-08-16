@@ -140,7 +140,7 @@ fn round_trips_a_compressed_record() {
                 esp::FLAG_COMPRESSED,
                 &[
                     esp::field(b"EDID", &esp::zstring("CompressedNpc")),
-                    esp::field(b"FGGS", &vec![0x42; 200]),
+                    esp::field(b"FGGS", &[0x42; 200]),
                 ],
             )],
         )],

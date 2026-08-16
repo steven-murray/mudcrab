@@ -181,7 +181,7 @@ pub(crate) fn install_mod_archives(
                 "install dry-run extract"
             );
         } else {
-            std::fs::create_dir_all(&target_root).map_err(|err| {
+            std::fs::create_dir_all(target_root).map_err(|err| {
                 anyhow::anyhow!("failed to create {}: {err}", target_root.display())
             })?;
 

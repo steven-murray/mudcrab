@@ -73,10 +73,10 @@ impl Tes4EditConfig {
             .parent()
             .map(|parent| parent.join("TES4EditQuickAutoClean.exe"));
 
-        if let Some(path) = sibling_qac {
-            if path.exists() {
-                return path;
-            }
+        if let Some(path) = sibling_qac
+            && path.exists()
+        {
+            return path;
         }
 
         self.exe.clone()
@@ -168,38 +168,37 @@ impl ToolsConfig {
                 let mut set_client_install_path = false;
                 // Derive STEAM_COMPAT_DATA_PATH and STEAM_COMPAT_CLIENT_INSTALL_PATH
                 // from <steam_root>/steamapps/compatdata/<appid>/pfx.
-                if let Some(pfx_name) = wine.prefix.file_name().and_then(|n| n.to_str()) {
-                    if pfx_name.eq_ignore_ascii_case("pfx") {
-                        if let Some(compat_data_path) = wine.prefix.parent() {
-                            cmd.env("STEAM_COMPAT_DATA_PATH", compat_data_path);
+                if let Some(pfx_name) = wine.prefix.file_name().and_then(|n| n.to_str())
+                    && pfx_name.eq_ignore_ascii_case("pfx")
+                    && let Some(compat_data_path) = wine.prefix.parent()
+                {
+                    cmd.env("STEAM_COMPAT_DATA_PATH", compat_data_path);
 
-                            let mut current = compat_data_path.parent();
-                            while let Some(path) = current {
-                                if path
-                                    .file_name()
-                                    .and_then(|n| n.to_str())
-                                    .map(|n| n.eq_ignore_ascii_case("steamapps"))
-                                    .unwrap_or(false)
-                                {
-                                    if let Some(steam_root) = path.parent() {
-                                        cmd.env("STEAM_COMPAT_CLIENT_INSTALL_PATH", steam_root);
-                                        set_client_install_path = true;
-                                    }
-                                    break;
-                                }
-                                current = path.parent();
+                    let mut current = compat_data_path.parent();
+                    while let Some(path) = current {
+                        if path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .map(|n| n.eq_ignore_ascii_case("steamapps"))
+                            .unwrap_or(false)
+                        {
+                            if let Some(steam_root) = path.parent() {
+                                cmd.env("STEAM_COMPAT_CLIENT_INSTALL_PATH", steam_root);
+                                set_client_install_path = true;
                             }
+                            break;
                         }
+                        current = path.parent();
                     }
                 }
 
                 // Last-resort fallback for Proton wrappers if the path parser above
                 // could not discover a Steam root from prefix structure.
-                if !set_client_install_path {
-                    if let Some(home) = std::env::var_os("HOME") {
-                        let default_steam_root = PathBuf::from(home).join(".local/share/Steam");
-                        cmd.env("STEAM_COMPAT_CLIENT_INSTALL_PATH", default_steam_root);
-                    }
+                if !set_client_install_path
+                    && let Some(home) = std::env::var_os("HOME")
+                {
+                    let default_steam_root = PathBuf::from(home).join(".local/share/Steam");
+                    cmd.env("STEAM_COMPAT_CLIENT_INSTALL_PATH", default_steam_root);
                 }
             }
 
