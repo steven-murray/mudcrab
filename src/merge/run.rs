@@ -57,6 +57,10 @@ pub struct MergeReport {
     pub remapped: usize,
     /// Records dropped because a later source defined the same FormID.
     pub clobbered: usize,
+    /// References in the *sources* whose mod index ran past their own master
+    /// list. Translated correctly; reported because it says the source was
+    /// written by a tool that does not emit canonical indices.
+    pub non_canonical_inputs: usize,
     pub next_object_id: u32,
 }
 
@@ -102,6 +106,7 @@ pub fn run(request: &MergeRequest) -> Result<MergeOutput, MergeError> {
     //    replacing an earlier one *is* Clobber's last-writer-wins.
     let mut collected = Collected::default();
     let mut source_records = 0usize;
+    let mut non_canonical_inputs = 0usize;
 
     for (name, plugin) in &loaded {
         let mut entries = plugin.entries.clone();
@@ -118,6 +123,20 @@ pub fn run(request: &MergeRequest) -> Result<MergeOutput, MergeError> {
         super::audit::audit_scripts(name, plugin, &remapper)?;
 
         rewrite_entries(&mut entries, &remapper)?;
+
+        let non_canonical = remapper.non_canonical_count();
+        if non_canonical > 0 {
+            tracing::warn!(
+                merge = %request.name,
+                plugin = %name,
+                references = non_canonical,
+                "merge: source uses mod indices past its own master list; these mean \
+                 'my own record' and were translated as such, but the source was written \
+                 by a tool that does not emit canonical indices"
+            );
+            non_canonical_inputs += non_canonical;
+        }
+
         source_records += plugin.records().count();
         collected.absorb(entries);
     }
@@ -156,6 +175,7 @@ pub fn run(request: &MergeRequest) -> Result<MergeOutput, MergeError> {
         group_count,
         remapped: allocation.total_remapped(),
         clobbered: source_records.saturating_sub(record_count),
+        non_canonical_inputs,
         next_object_id,
     };
 

@@ -94,7 +94,7 @@ pub fn audit_scripts(
             .into_iter()
             .filter(|raw| {
                 let old = FormId(*raw);
-                remapper.map(old).map(|new| new != old).unwrap_or(false)
+                remapper.probe(old).map(|new| new != old).unwrap_or(false)
             })
             .collect();
         if changed.is_empty() {
