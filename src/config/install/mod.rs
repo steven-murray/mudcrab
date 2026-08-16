@@ -100,11 +100,21 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         );
     }
 
-    if settings.execute_actions {
+    // Actions mutate things outside the mods directory -- ini_set rewrites
+    // Oblivion.ini, qac shells out to xEdit and rewrites real plugins -- so a
+    // dry run must not reach them. It previously did, which made --dry-run
+    // considerably more destructive than installing.
+    if settings.execute_actions && !settings.dry_run {
         crate::config::actions::apply_all(
             &plan.actions,
             &crate::config::actions::ActionCx { owner: "plan", settings, mod_target: None },
         )?;
+    } else if settings.execute_actions && !plan.actions.is_empty() {
+        tracing::info!(
+            owner = "plan",
+            actions = plan.actions.len(),
+            "install dry-run: would apply actions"
+        );
     }
 
     for mod_entry in &plan.mods {
@@ -156,7 +166,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                 "install: mod status"
             );
 
-            if settings.execute_actions && !actions_applied {
+            if settings.execute_actions && !actions_applied && !settings.dry_run {
                 crate::config::actions::apply_all(
                 &mod_entry.actions,
                 &crate::config::actions::ActionCx {
@@ -192,7 +202,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
 
         let extracted_files = install_mod_archives(mod_entry, settings, &mod_target, &active_plugins)?;
         let mut actions_applied = false;
-        if settings.execute_actions {
+        if settings.execute_actions && !settings.dry_run {
             crate::config::actions::apply_all(
                 &mod_entry.actions,
                 &crate::config::actions::ActionCx {
@@ -202,6 +212,12 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                 },
             )?;
             actions_applied = true;
+        } else if settings.execute_actions && !mod_entry.actions.is_empty() {
+            tracing::info!(
+                mod_id = %mod_entry.id,
+                actions = mod_entry.actions.len(),
+                "install dry-run: would apply actions"
+            );
         }
 
         tracing::info!(
