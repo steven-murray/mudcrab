@@ -156,6 +156,8 @@ pub struct Collected {
     /// same override under *different* parent cells, and keeping both would
     /// emit the record twice.
     child_parent: IndexMap<FormId, FormId>,
+    /// Which dialogue topic currently holds each INFO, for the same reason.
+    info_parent: IndexMap<FormId, FormId>,
 }
 
 impl Collected {
@@ -193,8 +195,8 @@ impl Collected {
                     }
                 }
                 GroupType::TopicChildren(parent) => {
-                    if let Some((_, infos)) = self.dialogue.get_mut(&parent) {
-                        infos.extend(group.entries);
+                    for child in group.entries {
+                        self.attach_info(parent, child);
                     }
                 }
                 _ => {
@@ -239,7 +241,16 @@ impl Collected {
                 self.worlds.insert(record.form_id, record);
             }
             b"DIAL" => {
-                self.dialogue.insert(record.form_id, (record, Vec::new()));
+                // Same rule as cells: Clobber replaces the topic *record*, but
+                // the INFO children accumulate across sources. Replacing the
+                // whole entry discards every response an earlier source filed
+                // under this topic.
+                match self.dialogue.get_mut(&record.form_id) {
+                    Some((existing, _)) => *existing = record,
+                    None => {
+                        self.dialogue.insert(record.form_id, (record, Vec::new()));
+                    }
+                }
             }
             signature => {
                 self.by_signature
@@ -277,6 +288,38 @@ impl Collected {
         // record so it is not silently dropped.
         if let Entry::Record(record) = child {
             self.absorb_record(record, None);
+        }
+    }
+
+    /// File one INFO under its dialogue topic, last writer winning.
+    ///
+    /// Mirrors `attach_child`: the same response can be defined by several
+    /// sources, and can even be attached to *different* topics by different
+    /// sources, so clobbering has to be global rather than per-topic.
+    fn attach_info(&mut self, parent: FormId, child: Entry) {
+        if let Entry::Record(record) = &child {
+            let form_id = record.form_id;
+            if let Some(previous) = self.info_parent.get(&form_id).copied() {
+                self.remove_info(previous, form_id);
+            }
+            self.info_parent.insert(form_id, parent);
+        }
+
+        if let Some((_, infos)) = self.dialogue.get_mut(&parent) {
+            infos.push(child);
+            return;
+        }
+        // A response whose topic no source defines. The file format puts the
+        // DIAL immediately before its children group, so this should not
+        // happen -- but keep the record rather than drop it silently.
+        if let Entry::Record(record) = child {
+            self.absorb_record(record, None);
+        }
+    }
+
+    fn remove_info(&mut self, parent: FormId, form_id: FormId) {
+        if let Some((_, infos)) = self.dialogue.get_mut(&parent) {
+            infos.retain(|entry| !matches!(entry, Entry::Record(r) if r.form_id == form_id));
         }
     }
 
@@ -503,6 +546,96 @@ fn cell_grid(record: &Record) -> Option<(i32, i32)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::plugin::{Group, Subrecord};
+
+    fn dial(form_id: u32) -> Record {
+        Record::new(b"DIAL", FormId(form_id), vec![Subrecord::new(b"EDID", b"t\0".to_vec())])
+    }
+
+    fn info(form_id: u32, marker: &str) -> Entry {
+        Entry::Record(Record::new(
+            b"INFO",
+            FormId(form_id),
+            vec![Subrecord::new(b"NAM1", format!("{marker}\0").into_bytes())],
+        ))
+    }
+
+    /// One source's dialogue topic and the responses it files under it.
+    fn topic(form_id: u32, infos: Vec<Entry>) -> Vec<Entry> {
+        vec![
+            Entry::Record(dial(form_id)),
+            Entry::Group(Group::new(GroupType::TopicChildren(FormId(form_id)), infos)),
+        ]
+    }
+
+    fn collected_infos(collected: &Collected, topic_id: u32) -> Vec<(FormId, String)> {
+        collected.dialogue[&FormId(topic_id)]
+            .1
+            .iter()
+            .filter_map(|entry| match entry {
+                Entry::Record(record) => Some((
+                    record.form_id,
+                    record
+                        .fields()
+                        .iter()
+                        .find(|f| &f.signature == b"NAM1")
+                        .map(|f| {
+                            String::from_utf8_lossy(&f.data).trim_end_matches('\0').to_string()
+                        })
+                        .unwrap_or_default(),
+                )),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn overriding_a_topic_keeps_the_responses_earlier_sources_filed_under_it() {
+        // Two plugins both override the same vanilla topic, each adding its
+        // own responses. Clobber replaces the DIAL *record*; the INFO children
+        // have to accumulate, exactly as cell children do. Replacing the whole
+        // entry silently loses the earlier plugin's dialogue.
+        let mut collected = Collected::default();
+        collected.absorb(topic(0x0100_0801, vec![info(0x0100_1000, "a")]));
+        collected.absorb(topic(0x0100_0801, vec![info(0x0100_2000, "b")]));
+
+        let infos = collected_infos(&collected, 0x0100_0801);
+        assert_eq!(
+            infos,
+            vec![
+                (FormId(0x0100_1000), "a".to_string()),
+                (FormId(0x0100_2000), "b".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_response_defined_twice_is_clobbered_not_duplicated() {
+        let mut collected = Collected::default();
+        collected.absorb(topic(0x0100_0801, vec![info(0x0100_1000, "first")]));
+        collected.absorb(topic(0x0100_0801, vec![info(0x0100_1000, "second")]));
+
+        assert_eq!(
+            collected_infos(&collected, 0x0100_0801),
+            vec![(FormId(0x0100_1000), "second".to_string())],
+            "the later source must win outright"
+        );
+    }
+
+    #[test]
+    fn a_response_refiled_under_a_different_topic_does_not_appear_twice() {
+        // The dialogue twin of the cell case: two sources can attach the same
+        // INFO to different topics.
+        let mut collected = Collected::default();
+        collected.absorb(topic(0x0100_0801, vec![info(0x0100_1000, "first")]));
+        collected.absorb(topic(0x0100_0802, vec![info(0x0100_1000, "second")]));
+
+        assert!(collected_infos(&collected, 0x0100_0801).is_empty());
+        assert_eq!(
+            collected_infos(&collected, 0x0100_0802),
+            vec![(FormId(0x0100_1000), "second".to_string())]
+        );
+    }
 
     #[test]
     fn interior_blocks_come_from_the_object_index() {
