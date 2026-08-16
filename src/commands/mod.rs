@@ -3,6 +3,7 @@ pub mod check;
 pub mod download;
 pub mod export;
 pub mod install;
+pub mod merge;
 pub mod query;
 pub mod setup_tools;
 pub mod unhide_merges;
@@ -38,5 +39,6 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Export(args) => export::run(args).await,
         Command::SetupTools(args) => setup_tools::run(args).await,
         Command::UnhideMerges(args) => unhide_merges::run(args).await,
+        Command::Merge(args) => merge::run(args).await,
     }
 }

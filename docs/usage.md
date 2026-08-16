@@ -98,6 +98,29 @@ Merges are built after all mods are installed and before LOOT sorts, so LOOT see
 the merged plugin rather than the sources it replaced. Re-running `install` is safe:
 merges are rebuilt deterministically and hiding is idempotent.
 
+## merge
+
+Build merged plugins from an already-installed mods directory, without
+installing anything. Reads the source mod folders and writes elsewhere: it
+never renames a source plugin, never writes into the mods directory, and never
+touches a profile -- so a merge can be built and inspected before anything in a
+real instance changes.
+
+```bash
+mudcrab merge <modlist.toml> --mods-dir <mods> --output <dir> [--only <merge id>]
+```
+
+Example:
+
+```bash
+mudcrab merge MOFAM-test/input/mofam.merges.toml \
+  --mods-dir ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+  --output /tmp/mudcrab-merges --only "Unique Forts Merged"
+```
+
+Each merge is written to `<output>/<merge id>/`, alongside a
+`merge - <id>/map.json` in zMerge's shape.
+
 ## unhide-merges
 
 Restore source plugins that `install` hid on behalf of a merge, reading the install

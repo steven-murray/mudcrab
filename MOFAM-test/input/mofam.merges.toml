@@ -1,0 +1,993 @@
+# MOFAM merges, for building and verifying against the real install.
+#
+# Generated from zEdit's merges.json. This is deliberately NOT a full modlist:
+# the source mods are declared as bare ids so the merges can name them, with no
+# archives, because `mudcrab merge` only ever reads their folders.
+#
+#   mudcrab merge MOFAM-test/input/mofam.merges.toml \
+#     --mods-dir ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+#     --output /tmp/mudcrab-merges --only "Unique Forts Merged"
+#
+# hide_sources is false throughout: this file builds plugins for inspection and
+# must not rename anything in a real instance. The install path sets it true.
+#
+# NOTE: ORC.esp resolves to the v194 folder here, which is the upgraded mod.
+# The *installed* Prebash Merge was built from v180 and never rebuilt, so this
+# file will not reproduce it byte for byte -- that is intended, and the oracle
+# test pins v180 separately. See MOFAM-test/notes/zmerge-dangling-refs.md.
+
+name = "MOFAM merges"
+
+plugins = [
+  "Oblivion.esm",
+  "Waalx Animals & Creatures.esm",
+  "Cobl Main.esm",
+  "Oscuro's_Oblivion_Overhaul.esm",
+  "Harvest [Flora].esp",
+  "Unofficial Oblivion Patch.esp",
+  "All Natural - Real Lights.esp",
+  "AFK_Weye.esp",
+  "DialogTweaks.esp",
+  "OOOShiveringIsles.esp",
+  "DLCOrrery.esp",
+  "DLCShiveringIsles.esp",
+  "WACIntegration.esp",
+  "Oblivion_Character_Overhaul.esp",
+  "DLCMehrunesRazor.esp",
+  "DLCBattlehornCastle.esp",
+  "DLCFrostcrag.esp",
+  "DLCHorseArmor.esp",
+  "DLCSpellTomes.esp",
+  "DLCVileLair.esp",
+  "DLCVileLair - Unofficial Patch.esp",
+  "DLCThievesDen.esp",
+  "Knights.esp",
+  "Knights - Unofficial Patch.esp",
+  "SM Plugin Refurbish Lite.esp",
+  "Unique Artifacts for Unique People.esp",
+  "The Lost Spires.esp",
+  "Add some flavor - Roadside inns.esp",
+  "Knights Infamy.esp",
+  "Unofficial Shivering Isles Patch.esp",
+  "Oblivion Content Restoration Project.esp",
+  "Reedstand.esp",
+  "Ducks and Swans.esp",
+  "Sutch Village.esp",
+  "Gottshaw Village.esp",
+  "tbskGuardsFeatures.esp",
+  "Oscuro's_Oblivion_Overhaul.esp",
+  "OOO Enhanced.esp",
+  "The Ayleid Steps.esp",
+  "Reworked Posts.esp",
+  "Oblivion Citadel Door Fix.esp",
+  "UOPTalosBridgeCollisionFix.esp",
+  "DLCSpellTomes - Unofficial Patch.esp",
+  "Av Latta Magicka - Rebalance Complete.esp",
+  "MageGuild_simbol.esp",
+  "WeightlessAmmoConsumablesPotions.esp",
+  "weightlessstones.esp",
+  "aesrespawningamberstumpsandmadnessoredeposits.esp",
+  "aesrespawninggoldandsilverveins.esp",
+  "DLCVileLair - Tweaks.esp",
+  "DLCThievesDen - BarterForUpgrd.esp",
+  "FasterHorses.esp",
+  "Initial Glow Redux - Creatures.esp",
+  "Initial Glow Redux.esp",
+  "lGet rid of Small Souls - Soulgem Prices.esp",
+  "Bibliophilia.esp",
+  "Banes Steel Helm Replacer.esp",
+  "ReteroX_ClosedIronHelmet_v1.esp",
+  "ReteroX_ClosedEbonyHelmet_v1.esp",
+  "Imperial City Landscape Fix.esp",
+  "Alternate ghost shader.esp",
+  "Oblivion Content Restoration Project -- Knights.esp",
+  "DialogTweaksTweakedTrespassing.esp",
+  "00 Realistic Player Speech.esp",
+  "lVanilla Style Loading Screens Addon.esp",
+  "xxReworkedReedstand.esp",
+  "xxreworkedgottshaw.esp",
+  "xxreworkedSutch.esp",
+  "Louder Chapel Bells.esp",
+  "PinarusInventiusActualHunter.esp",
+  "Unused Magic Items Integrated.esp",
+  "Voices for Female Dremora NPCs.esp",
+  "The Ayleid Steps - Patches.esp",
+  "lLet there be Flowers.esp",
+  "GuardInfamyGreetingFix.esp",
+  "AyleidWellMessage.esp",
+  "GoblinTribesFixed.esp",
+  "ExpandedGreetings.esp",
+  "tbskGuardsFeaturesMergedVanillaAddons.esp",
+  "DLCSpellTomes-No Attack.esp",
+  "SM Plugin Refurbish Lite Knights Infamy.esp",
+  "Bruma Frostcrag Spire LOD.esp",
+  "ORC.esp",
+  "MehrunesDagonWalk.esp",
+  "Better Traps.esp",
+  "DaedricRequirements.esp",
+  "OCOv2 Beast Races Enhanced.esp",
+  "WAC - HGEC Equipment Replacer.esp",
+  "Wolf Animations Restored.esp",
+  "The Ayleid Steps - Voiced Addon.esp",
+  "Shivering Isles Female Armor Displays.esp",
+  "DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp",
+  "DispMiscPatch_Ducks and Swans - Reedstand Patch.esp",
+  "WAC Integration HGEC Gauntlets Patch.esp",
+  "The Lost Spires - NPC AI Addon.esp",
+  "Locked Fighters Guild Doors Bug Fix.esp",
+  "DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp",
+  "ApparatusIcons.esp",
+  "Harvest [Flora] - DLCFrostcrag.esp",
+  "Harvest [Flora] - DLCVileLair.esp",
+  "Harvest [Flora] - Shivering Isles.esp",
+  "Female Amulets.esp",
+  "more books teach.esp",
+  "Book Jackets Oblivion.esp",
+  "Knights - Book Jackets.esp",
+  "Book Jackets DLC Misc.esp",
+  "Alluring Wine Bottles.esp",
+  "Better minotaurs.esp",
+  "BetterLorgrenBenirus_NoStaffEdit.esp",
+  "KingofMisc.esp",
+  "BattlehornLich.esp",
+  "Weapon Improvement Project.esp",
+  "Goblin Totem Staff Icon.esp",
+  "PekCOBLBookJackets.esp",
+  "Improved Fires and Flames - Increased Sound.esp",
+  "Symphony of Violence.esp",
+  "Vicious Trolls Sound Attenuator.esp",
+  "PotionReplacer.esp",
+  "CoopArmoredLegionHorses.esp",
+  "DLCHorseArmor - Mane Enabled.esp",
+  "ShiveringIslesTrainersPartial.esp",
+  "SavillaStoneEnhanced.esp",
+  "DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp",
+  "AFK_Weye - Typo and Grammatical Patch.esp",
+  "Minotaur Horns Fix.esp",
+  "Merge Consistency Patch.esp",
+  "DaedraShrinesProddedWithAStick.esp",
+  "Countess.esp",
+  "MGRebuildN01.esp",
+  "Travelling Equipment.esp",
+  "HackdirtTheDeepOnes.esp",
+  "Tavern Goers 2 - Redux.esp",
+  "AgronakChampionHouse.v1.01.esp",
+  "More Mythic Dawn Agents.esp",
+  "Vanilla Gear Redux.esp",
+  "FGRebuild.esp",
+  "JBlades!1.1.esp",
+  "AoG - Greed Arena.esp",
+  "Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
+  "DLCBattlehornCastle - Unofficial Patch.esp",
+  "Very Horny Knights.esp",
+  "DLCThievesDen - Unofficial Patch.esp",
+  "Legion Forester Outposts.esp",
+  "DLCOrrery - Unofficial Patch.esp",
+  "BrotherhoodRenewed.esp",
+  "DLCOrrery - OOO Adaptation.esp",
+  "Knights of Nine - OOO Enhanced Adaptation.esp",
+  "LFO - All Races Addon.esp",
+  "Oblivion_Character_Overhaul_Faces.esp",
+  "LFO OCO New Eyes.esp",
+  "NPC Hair Matches Beard.esp",
+  "OCO uses merged teeth.esp",
+  "Improved NPC Faces for OCOv2.esp",
+  "OCOv2 - DLC Addon.esp",
+  "OCO Unused Eyes and DLC Eyes Incorporated.esp",
+  "OOOShiveringIsles_OCO_Patch.esp",
+  "Baurus tweak.esp",
+  "Siren's Deception Beautified.esp",
+  "Unique Artifacts for Unique People - Distribution.esp",
+  "Dahyka_OCO_Patch.esp",
+  "NPC Merge Consistency Patch.esp",
+  "Av Latta Magicka.esm",
+  "Auto Update Leveled Items And Spells.esp",
+  "OblivionDeadLands.esp",
+  "Molapi.esp",
+  "Maskar's Oblivion Overhaul.esp",
+  "Cliff_BetterLetters.esp",
+  "MigMiscellanea.esp",
+  "Cobl Glue.esp",
+  "TheWellOfMinlorada.esp",
+  "OCRAFT.esp",
+  "OCRAFT - Integration.esp",
+  "xulBrenaRiverRavine.esp",
+  "WACIntegration - MOO Patch.esp",
+  "All Natural - Real Lights - candelabra pathgrid fix.esp",
+  "DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp",
+  "tbskGuardsFeatures_UOP_Patch.esp",
+  "LFO - Local Guards Features Patch.esp",
+  "DispMiscPatch_OCRP_VGR_Patch.esp",
+  "DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp",
+  "Auto Update Leveled Items And Spells - Script Patch.esp",
+  "Cobl Glue - Bravil Barrel Fix.esp",
+  "OCOv2 - MOO Patch.esp",
+  "MOO MOBS Patch.esp",
+  "Wolf Animations Restored - MOO Patch.esp",
+  "MGE Compatibility.esp",
+  "Improved MG Patch.esp",
+  "FGE Compatibility.esp",
+  "Improved FG Patch.esp",
+  "LandMagicPatch.esp",
+  "Cava Obscura - Cyrodiil.esp",
+  "Cava Obscura - SI.esp",
+  "Late Loaders Consistency Patch.esp",
+  "Av Latta Magicka.esp",
+  "Feldscar.esp",
+  "Vergayun.esp",
+  "Weapons Of Morrowind.esp",
+  "Better Dark Brotherhood Sanctuary.esp",
+  "Cobl Tweaks - OOO.esp",
+  "DLCMehrunesRazor - Unofficial Patch.esp",
+  "Oscuro's_Oblivion_Overhaul - Knights of Nine.esp",
+  "DLCFrostcrag - OOO Adaptation.esp",
+  "DLCHorseArmor - OOO Adaptation.esp",
+  "DLCBattlehornCastle - OOO Adaptation.esp",
+  "DLCMehrunesRazor - OOO Adaptation.esp",
+  "DLCThievesDen - OOO Adaptation.esp",
+  "DLCVileLair - OOO Adaptation.esp",
+  "OOO Enhanced - Shivering Isles.esp",
+  "Arthmoor Villages - OOO Adaptation.esp",
+  "BDBS - Oscuro's Oblivion Overhaul.esp",
+  "UAUP - OOO Patch.esp",
+  "Weapons Of Morrowind - OOO  (Extended) Patch.esp",
+  "PotionReplacer OOO Patch.esp",
+  "tbskGuardsFeatures OOO Patch.esp",
+  "OOO Spectral Fix.esp",
+  "OOOCoblTweaksFix.esp",
+  "OOO_Unoficial-Patch.esp",
+  "OOO Enhanced - Av Latta Magica Compatibility Patch.esp",
+  "OPM Consistency Patch.esp",
+  "Tales of Cyrodiil.esp",
+  "Anvil the city of Dibella.esp",
+  "Anvil_MorningGlory_Mixed.esp",
+  "Cheydinhal Castle Courtyard.esp",
+  "Cheydinhal Peach Tree Island.esp",
+  "CheydinhalGarden.esp",
+  "Chorrol Castle Courtyard.esp",
+  "Chorrol Park.esp",
+  "ChorrolGreatOakReplacer.esp",
+  "Falling leaves Chorrol.esp",
+  "Chorrol LCH.esp",
+  "Falling Pollen Leyawiin.esp",
+  "Falling Rubbish Bravil.esp",
+  "Gardens of Cyrodill-Knights of the Thorn Lodge.esp",
+  "Skingrad Castle Courtyard.esp",
+  "SkingradDeuglified.esp",
+  "Add some flavor - city gates - without IC.esp",
+  "Enhanced Cyrodiil - Cities.esp",
+  "Add some flavor - Talos bridge.esp",
+  "Bruma Greenhouses.esp",
+  "Slightly Different Bruma.esp",
+  "TACE Consistency Patch.esp",
+  "xulCloudtopMountains.esp",
+  "Unique Forts Fort Aurus.esp",
+  "Unique Forts Fort Doublecross.esp",
+  "Unique Forts Fort Facian.esp",
+  "Unique Forts Fort Hastrel.esp",
+  "Unique Forts Fort Irony.esp",
+  "Unique Forts Fort Naso.esp",
+  "Unique Forts Fort Rayles.esp",
+  "Unique Forts Fort Redman.esp",
+  "Unique Forts Fort Teleman.esp",
+  "Unique Forts Fort Vlastarus.esp",
+  "UFM Consistency Patch.esp",
+  "OOO Patches Merged.esp",
+  "Unique Forts Merged.esp",
+  "TACE Merge.esp",
+  "Late Loaders Merged.esp",
+  "NPC Merge.esp",
+  "Prebash Merge.esp",
+]
+
+# --- source mods: declared so the merges can reference them by id ---
+
+[[mods]]
+id = "OOO - KotN Patch"
+
+[[mods]]
+id = "OOO Enhanced"
+
+[[mods]]
+id = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)"
+
+[[mods]]
+id = "Better Dark Brotherhood Sanctuary - OOO Patch"
+
+[[mods]]
+id = "Unique Artifacts for Unique People - OOO Patch"
+
+[[mods]]
+id = "Weapons Of Morrowind - OOO (Extended) Patch"
+
+[[mods]]
+id = "Retextured Potions - OOO Patch"
+
+[[mods]]
+id = "Local Guards Features - OOO Patch"
+
+[[mods]]
+id = "OOO Spectral Fix"
+
+[[mods]]
+id = "OOO CoblTweaks Fix"
+
+[[mods]]
+id = "OOO - Oscuro's Oblivion Overhaul - Updated (Unofficial patch)"
+
+[[mods]]
+id = "OPM Consistency Patch"
+
+[[mods]]
+id = "Better Fort Aurus"
+
+[[mods]]
+id = "Better Fort Doublecross"
+
+[[mods]]
+id = "Better Fort Facian"
+
+[[mods]]
+id = "Better Fort Hastrel"
+
+[[mods]]
+id = "Better Fort Irony"
+
+[[mods]]
+id = "Better Fort Naso"
+
+[[mods]]
+id = "Better Fort Rayles"
+
+[[mods]]
+id = "Better Fort Redman"
+
+[[mods]]
+id = "Better Fort Teleman"
+
+[[mods]]
+id = "Better Fort Vlastarus"
+
+[[mods]]
+id = "MOFAM - UFM Consistency Patch"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Anvil the city of Dibella"
+
+[[mods]]
+id = "Anvil Morning Glory"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Cheydinhal"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Cheydinhal Peach Tree Island"
+
+[[mods]]
+id = "Cheydinhal Garden"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Chorrol"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Chorrol Park"
+
+[[mods]]
+id = "Chorrol Great Oak Replacer"
+
+[[mods]]
+id = "Falling Leaves Chorrol - Project Ambience"
+
+[[mods]]
+id = "Chorrol Lower Class Houses"
+
+[[mods]]
+id = "Falling Pollen Leyawiin - Project Ambience"
+
+[[mods]]
+id = "Falling Rubbish Bravil - Project Ambience"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Knights of the Thorn Lodge"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Skingrad"
+
+[[mods]]
+id = "People Live Here - Skingrad Enhancement Mod"
+
+[[mods]]
+id = "Add some flavor - city gates"
+
+[[mods]]
+id = "Enhanced Cyrodiil - Cities"
+
+[[mods]]
+id = "Add some flavor - Talos Bridge"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Bruma Greenhouses"
+
+[[mods]]
+id = "Slightly Different Bruma"
+
+[[mods]]
+id = "MOFAM - TACE Consistency Patch"
+
+[[mods]]
+id = "WAC - Integration"
+
+[[mods]]
+id = "Weather - All Natural Real Lights - Candelabra pathgrid fix"
+
+[[mods]]
+id = "Av Latta Magicka - Migcks Misc Elemental Fists Poison Patch"
+
+[[mods]]
+id = "Local Guards Features Unofficial Patch"
+
+[[mods]]
+id = "Legion Forester Outposts Revisited"
+
+[[mods]]
+id = "Oblivion Content Restoration Project Patches"
+
+[[mods]]
+id = "AULIAS - Script Patch"
+
+[[mods]]
+id = "Cobl Unofficial Patch"
+
+[[mods]]
+id = "OCOv2 -MOO Patch"
+
+[[mods]]
+id = "MOBS patch for Maskar's Oblivion Overhaul"
+
+[[mods]]
+id = "Unique Wolf Animations Restored"
+
+[[mods]]
+id = "Improved Mages Guild ENG OOO and ALL NATURAL PATCH"
+
+[[mods]]
+id = "AsteriaSennall's MOFAM Fixes"
+
+[[mods]]
+id = "Improved Fighters Guild ENG OOO and All Natural Patch"
+
+[[mods]]
+id = "MOFAM - Land Magic"
+
+[[mods]]
+id = "Cava Obscura"
+
+[[mods]]
+id = "MOFAM - Late Loaders Consistency Patch"
+
+[[mods]]
+id = "Oblivion Character Overhaul - Advanced Edition"
+
+[[mods]]
+id = "Legion Forester Outposts Revisited OCO Eyes for all Races"
+
+[[mods]]
+id = "NPC Hair Matches Beard - Updated"
+
+[[mods]]
+id = "OCOv2 Uses Merged Teeth"
+
+[[mods]]
+id = "Improved NPC Faces for OCOv2"
+
+[[mods]]
+id = "Oblivion Character Overhaul v2 - DLC Addon"
+
+[[mods]]
+id = "Unused OCOv2 Eyes and DLC Characters Incorporated"
+
+[[mods]]
+id = "OOO Shivering Isles - OCO Compatibility Patch"
+
+[[mods]]
+id = "OCOv2 Baurus tweak"
+
+[[mods]]
+id = "Sirens Deception Beautified"
+
+[[mods]]
+id = "Unique Artifacts for Unique People"
+
+[[mods]]
+id = "OCOv2 - Race Rebalance Mods Patches"
+
+[[mods]]
+id = "MOFAM - NPC Merge Consistency Patch"
+
+[[mods]]
+id = "Unofficial Oblivion Patch - UOP"
+
+[[mods]]
+id = "UOP Talos Bridge Collision Fix"
+
+[[mods]]
+id = "Unofficial Oblivion DLC Patches - UODP"
+
+[[mods]]
+id = "Av Latta Magicka - Oblivion Magic Overhaul"
+
+[[mods]]
+id = "Signs of Mage Guilde English version - Mergeable"
+
+[[mods]]
+id = "Weightless Arrows-Potions-Other Consumables"
+
+[[mods]]
+id = "Weightless Varla and Welkynd stones"
+
+[[mods]]
+id = "Respawning Hollowed Amber Stumps and Madness Ore Deposits"
+
+[[mods]]
+id = "Respawning Hollowed Amber Stumps and Madness Ore Deposits - Gold and Silver"
+
+[[mods]]
+id = "Vile Lair DLC - Tweaks and Fixes"
+
+[[mods]]
+id = "Thieves Den Barter for Upgrades"
+
+[[mods]]
+id = "Faster Horses"
+
+[[mods]]
+id = "Initial Glow Redux"
+
+[[mods]]
+id = "Get rid of small Souls - Empty Soulgems Prices"
+
+[[mods]]
+id = "Bibliophilia"
+
+[[mods]]
+id = "Banes Steel Helm Replacer"
+
+[[mods]]
+id = "Closed Iron Helmet"
+
+[[mods]]
+id = "Closed Ebony Helmet"
+
+[[mods]]
+id = "Market District Landscape Fix and Imperial City Landscape Fix"
+
+[[mods]]
+id = "Alternate ghost effect"
+
+[[mods]]
+id = "Oblivion Content Restoration Project - Knights"
+
+[[mods]]
+id = "Miguick's Dialogue Tweaks Trespassing Tweaked"
+
+[[mods]]
+id = "Realistic Player Dialogue Overhaul"
+
+[[mods]]
+id = "Vanilla Style Loading Screens Addon"
+
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Reedstand"
+
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Gottshaw"
+
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Sutch"
+
+[[mods]]
+id = "Louder Chapel Bells"
+
+[[mods]]
+id = "Pinarus Inventius - Actual Hunter"
+
+[[mods]]
+id = "Unused Magic Items Integrated"
+
+[[mods]]
+id = "Voices for Female Dremora NPCs"
+
+[[mods]]
+id = "The Ayleid Steps - Compatibility Patches"
+
+[[mods]]
+id = "Let there be Flowers"
+
+[[mods]]
+id = "Guard Infamy Greeting Fix"
+
+[[mods]]
+id = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods"
+
+[[mods]]
+id = "Goblin Tribes Fixed"
+
+[[mods]]
+id = "Expanded Greetings"
+
+[[mods]]
+id = "Local Guards Features - Gaius Prentus Addon"
+
+[[mods]]
+id = "No Annoying Conjurer Attack (Spell Tomes DLC fix)"
+
+[[mods]]
+id = "SM DLC Plugin Refurbish"
+
+[[mods]]
+id = "Oblivion Comprehensive Modding Guide by Dispensation (OCMG)"
+
+[[mods]]
+id = "Oblivion Reloaded Combined(ORC) v194"
+
+[[mods]]
+id = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation"
+
+[[mods]]
+id = "Better Traps"
+
+[[mods]]
+id = "Fame Based Daedric Quest Requirements"
+
+[[mods]]
+id = "Claws whiskers and Seamless tails only"
+
+[[mods]]
+id = "HGEC Equipment Replacer for WAC"
+
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - The Ayleid Steps"
+
+[[mods]]
+id = "Patch for Vanilla Gear Redux Reasonable Flavor - Clipping and fpv fixes"
+
+[[mods]]
+id = "Oblivion Character Overhaul Version 2 Patches"
+
+[[mods]]
+id = "Compatibility Patches for Arthmoor's Mods"
+
+[[mods]]
+id = "WAC - Integration - HGEC Gauntlets Conversion"
+
+[[mods]]
+id = "The Lost Spires - NPC AI Addon"
+
+[[mods]]
+id = "Locked Fighters Guild Doors Bug Fix"
+
+[[mods]]
+id = "Miscellaneous Patch Collection by Dipensation - Add Some Flavor Mods"
+
+[[mods]]
+id = "Icons for Alchemy Apparatus"
+
+[[mods]]
+id = "Harvest Flora"
+
+[[mods]]
+id = "Vanilla Amulets fix for HGEC"
+
+[[mods]]
+id = "More Books Teach"
+
+[[mods]]
+id = "Book Jackets Oblivion High Res BAIN"
+
+[[mods]]
+id = "Book Jackets KOTN"
+
+[[mods]]
+id = "Book Jackets for Misc DLC"
+
+[[mods]]
+id = "Alluring Wine Bottles with Real Glass"
+
+[[mods]]
+id = "Better minotaurs"
+
+[[mods]]
+id = "Better Lorgren Benirus"
+
+[[mods]]
+id = "Unique Liches"
+
+[[mods]]
+id = "Unique Liches - Battlehorn Lich"
+
+[[mods]]
+id = "Weapon Improvement Project"
+
+[[mods]]
+id = "Goblin Totem Staff Icon"
+
+[[mods]]
+id = "Wrye Bash Collection of Mergeable Mods - Pekkas COBL Books Jackets"
+
+[[mods]]
+id = "Improved Fires and Flames"
+
+[[mods]]
+id = "Symphony of Violence - Combat Sound Enhancement"
+
+[[mods]]
+id = "Vicious Trolls Sound Replacer"
+
+[[mods]]
+id = "Retextured Potions"
+
+[[mods]]
+id = "Coop's TW3 Oblivion Horse Replacer"
+
+[[mods]]
+id = "Shivering Isles Trainers (Partial)"
+
+[[mods]]
+id = "Savilla's Stone Enhanced"
+
+[[mods]]
+id = "Miscellaneous Patch Collection by Dispensation - AFK Weye"
+
+[[mods]]
+id = "AFK_Weye - Typo and Grammatical Patch"
+
+[[mods]]
+id = "Minotaur Horn Drop Fix"
+
+[[mods]]
+id = "MOFAM - Prebash Merge Consistency Patch"
+
+# --- the merges ---
+
+[[mods]]
+id = "OOO Patches Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "OOO Patches Merged.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "OOO - KotN Patch", plugin = "Oscuro's_Oblivion_Overhaul - Knights of Nine.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCFrostcrag - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCHorseArmor - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCBattlehornCastle - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCMehrunesRazor - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCThievesDen - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCVileLair - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "OOO Enhanced - Shivering Isles.esp" },
+    { mod = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)", plugin = "Arthmoor Villages - OOO Adaptation.esp" },
+    { mod = "Better Dark Brotherhood Sanctuary - OOO Patch", plugin = "BDBS - Oscuro's Oblivion Overhaul.esp" },
+    { mod = "Unique Artifacts for Unique People - OOO Patch", plugin = "UAUP - OOO Patch.esp" },
+    { mod = "Weapons Of Morrowind - OOO (Extended) Patch", plugin = "Weapons Of Morrowind - OOO  (Extended) Patch.esp" },
+    { mod = "Retextured Potions - OOO Patch", plugin = "PotionReplacer OOO Patch.esp" },
+    { mod = "Local Guards Features - OOO Patch", plugin = "tbskGuardsFeatures OOO Patch.esp" },
+    { mod = "OOO Spectral Fix", plugin = "OOO Spectral Fix.esp" },
+    { mod = "OOO CoblTweaks Fix", plugin = "OOOCoblTweaksFix.esp" },
+    { mod = "OOO - Oscuro's Oblivion Overhaul - Updated (Unofficial patch)", plugin = "OOO_Unoficial-Patch.esp" },
+    { mod = "OOO Enhanced", plugin = "OOO Enhanced - Av Latta Magica Compatibility Patch.esp" },
+    { mod = "OPM Consistency Patch", plugin = "OPM Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "Unique Forts Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Unique Forts Merged.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "Better Fort Aurus", plugin = "Unique Forts Fort Aurus.esp" },
+    { mod = "Better Fort Doublecross", plugin = "Unique Forts Fort Doublecross.esp" },
+    { mod = "Better Fort Facian", plugin = "Unique Forts Fort Facian.esp" },
+    { mod = "Better Fort Hastrel", plugin = "Unique Forts Fort Hastrel.esp" },
+    { mod = "Better Fort Irony", plugin = "Unique Forts Fort Irony.esp" },
+    { mod = "Better Fort Naso", plugin = "Unique Forts Fort Naso.esp" },
+    { mod = "Better Fort Rayles", plugin = "Unique Forts Fort Rayles.esp" },
+    { mod = "Better Fort Redman", plugin = "Unique Forts Fort Redman.esp" },
+    { mod = "Better Fort Teleman", plugin = "Unique Forts Fort Teleman.esp" },
+    { mod = "Better Fort Vlastarus", plugin = "Unique Forts Fort Vlastarus.esp" },
+    { mod = "MOFAM - UFM Consistency Patch", plugin = "UFM Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "TACE Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "TACE Merge.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "Gardens of Cyrodiil - Anvil the city of Dibella", plugin = "Anvil the city of Dibella.esp" },
+    { mod = "Anvil Morning Glory", plugin = "Anvil_MorningGlory_Mixed.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Cheydinhal", plugin = "Cheydinhal Castle Courtyard.esp" },
+    { mod = "Gardens of Cyrodiil - Cheydinhal Peach Tree Island", plugin = "Cheydinhal Peach Tree Island.esp" },
+    { mod = "Cheydinhal Garden", plugin = "CheydinhalGarden.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Chorrol", plugin = "Chorrol Castle Courtyard.esp" },
+    { mod = "Gardens of Cyrodiil - Chorrol Park", plugin = "Chorrol Park.esp" },
+    { mod = "Chorrol Great Oak Replacer", plugin = "ChorrolGreatOakReplacer.esp" },
+    { mod = "Falling Leaves Chorrol - Project Ambience", plugin = "Falling leaves Chorrol.esp" },
+    { mod = "Chorrol Lower Class Houses", plugin = "Chorrol LCH.esp" },
+    { mod = "Falling Pollen Leyawiin - Project Ambience", plugin = "Falling Pollen Leyawiin.esp" },
+    { mod = "Falling Rubbish Bravil - Project Ambience", plugin = "Falling Rubbish Bravil.esp" },
+    { mod = "Gardens of Cyrodiil - Knights of the Thorn Lodge", plugin = "Gardens of Cyrodill-Knights of the Thorn Lodge.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Skingrad", plugin = "Skingrad Castle Courtyard.esp" },
+    { mod = "People Live Here - Skingrad Enhancement Mod", plugin = "SkingradDeuglified.esp" },
+    { mod = "Add some flavor - city gates", plugin = "Add some flavor - city gates - without IC.esp" },
+    { mod = "Enhanced Cyrodiil - Cities", plugin = "Enhanced Cyrodiil - Cities.esp" },
+    { mod = "Add some flavor - Talos Bridge", plugin = "Add some flavor - Talos bridge.esp" },
+    { mod = "Gardens of Cyrodiil - Bruma Greenhouses", plugin = "Bruma Greenhouses.esp" },
+    { mod = "Slightly Different Bruma", plugin = "Slightly Different Bruma.esp" },
+    { mod = "MOFAM - TACE Consistency Patch", plugin = "TACE Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "Late Loaders Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Late Loaders Merged.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "WAC - Integration", plugin = "WACIntegration - MOO Patch.esp" },
+    { mod = "Weather - All Natural Real Lights - Candelabra pathgrid fix", plugin = "All Natural - Real Lights - candelabra pathgrid fix.esp" },
+    { mod = "Av Latta Magicka - Migcks Misc Elemental Fists Poison Patch", plugin = "DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp" },
+    { mod = "Local Guards Features Unofficial Patch", plugin = "tbskGuardsFeatures_UOP_Patch.esp" },
+    { mod = "Legion Forester Outposts Revisited", plugin = "LFO - Local Guards Features Patch.esp" },
+    { mod = "Oblivion Content Restoration Project Patches", plugin = "DispMiscPatch_OCRP_VGR_Patch.esp" },
+    { mod = "Oblivion Content Restoration Project Patches", plugin = "DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp" },
+    { mod = "AULIAS - Script Patch", plugin = "Auto Update Leveled Items And Spells - Script Patch.esp" },
+    { mod = "Cobl Unofficial Patch", plugin = "Cobl Glue - Bravil Barrel Fix.esp" },
+    { mod = "OCOv2 -MOO Patch", plugin = "OCOv2 - MOO Patch.esp" },
+    { mod = "MOBS patch for Maskar's Oblivion Overhaul", plugin = "MOO MOBS Patch.esp" },
+    { mod = "Unique Wolf Animations Restored", plugin = "Wolf Animations Restored - MOO Patch.esp" },
+    { mod = "Improved Mages Guild ENG OOO and ALL NATURAL PATCH", plugin = "MGE Compatibility.esp" },
+    { mod = "AsteriaSennall's MOFAM Fixes", plugin = "Improved MG Patch.esp" },
+    { mod = "Improved Fighters Guild ENG OOO and All Natural Patch", plugin = "FGE Compatibility.esp" },
+    { mod = "AsteriaSennall's MOFAM Fixes", plugin = "Improved FG Patch.esp" },
+    { mod = "MOFAM - Land Magic", plugin = "LandMagicPatch.esp" },
+    { mod = "Cava Obscura", plugin = "Cava Obscura - Cyrodiil.esp" },
+    { mod = "Cava Obscura", plugin = "Cava Obscura - SI.esp" },
+    { mod = "MOFAM - Late Loaders Consistency Patch", plugin = "Late Loaders Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "NPC Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "NPC Merge.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "Legion Forester Outposts Revisited", plugin = "LFO - All Races Addon.esp" },
+    { mod = "Oblivion Character Overhaul - Advanced Edition", plugin = "Oblivion_Character_Overhaul_Faces.esp" },
+    { mod = "Legion Forester Outposts Revisited OCO Eyes for all Races", plugin = "LFO OCO New Eyes.esp" },
+    { mod = "NPC Hair Matches Beard - Updated", plugin = "NPC Hair Matches Beard.esp" },
+    { mod = "OCOv2 Uses Merged Teeth", plugin = "OCO uses merged teeth.esp" },
+    { mod = "Improved NPC Faces for OCOv2", plugin = "Improved NPC Faces for OCOv2.esp" },
+    { mod = "Oblivion Character Overhaul v2 - DLC Addon", plugin = "OCOv2 - DLC Addon.esp" },
+    { mod = "Unused OCOv2 Eyes and DLC Characters Incorporated", plugin = "OCO Unused Eyes and DLC Eyes Incorporated.esp" },
+    { mod = "OOO Shivering Isles - OCO Compatibility Patch", plugin = "OOOShiveringIsles_OCO_Patch.esp" },
+    { mod = "OCOv2 Baurus tweak", plugin = "Baurus tweak.esp" },
+    { mod = "Sirens Deception Beautified", plugin = "Siren's Deception Beautified.esp" },
+    { mod = "Unique Artifacts for Unique People", plugin = "Unique Artifacts for Unique People - Distribution.esp" },
+    { mod = "OCOv2 - Race Rebalance Mods Patches", plugin = "Dahyka_OCO_Patch.esp" },
+    { mod = "MOFAM - NPC Merge Consistency Patch", plugin = "NPC Merge Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "Prebash Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Prebash Merge.esp"
+  method = "clobber"
+  hide_sources = false
+  sources = [
+    { mod = "Unofficial Oblivion Patch - UOP", plugin = "Oblivion Citadel Door Fix.esp" },
+    { mod = "UOP Talos Bridge Collision Fix", plugin = "UOPTalosBridgeCollisionFix.esp" },
+    { mod = "Unofficial Oblivion DLC Patches - UODP", plugin = "DLCSpellTomes - Unofficial Patch.esp" },
+    { mod = "Av Latta Magicka - Oblivion Magic Overhaul", plugin = "Av Latta Magicka - Rebalance Complete.esp" },
+    { mod = "Signs of Mage Guilde English version - Mergeable", plugin = "MageGuild_simbol.esp" },
+    { mod = "Weightless Arrows-Potions-Other Consumables", plugin = "WeightlessAmmoConsumablesPotions.esp" },
+    { mod = "Weightless Varla and Welkynd stones", plugin = "weightlessstones.esp" },
+    { mod = "Respawning Hollowed Amber Stumps and Madness Ore Deposits", plugin = "aesrespawningamberstumpsandmadnessoredeposits.esp" },
+    { mod = "Respawning Hollowed Amber Stumps and Madness Ore Deposits - Gold and Silver", plugin = "aesrespawninggoldandsilverveins.esp" },
+    { mod = "Vile Lair DLC - Tweaks and Fixes", plugin = "DLCVileLair - Tweaks.esp" },
+    { mod = "Thieves Den Barter for Upgrades", plugin = "DLCThievesDen - BarterForUpgrd.esp" },
+    { mod = "Faster Horses", plugin = "FasterHorses.esp" },
+    { mod = "Initial Glow Redux", plugin = "Initial Glow Redux - Creatures.esp" },
+    { mod = "Initial Glow Redux", plugin = "Initial Glow Redux.esp" },
+    { mod = "Get rid of small Souls - Empty Soulgems Prices", plugin = "lGet rid of Small Souls - Soulgem Prices.esp" },
+    { mod = "Bibliophilia", plugin = "Bibliophilia.esp" },
+    { mod = "Banes Steel Helm Replacer", plugin = "Banes Steel Helm Replacer.esp" },
+    { mod = "Closed Iron Helmet", plugin = "ReteroX_ClosedIronHelmet_v1.esp" },
+    { mod = "Closed Ebony Helmet", plugin = "ReteroX_ClosedEbonyHelmet_v1.esp" },
+    { mod = "Market District Landscape Fix and Imperial City Landscape Fix", plugin = "Imperial City Landscape Fix.esp" },
+    { mod = "Alternate ghost effect", plugin = "Alternate ghost shader.esp" },
+    { mod = "Oblivion Content Restoration Project - Knights", plugin = "Oblivion Content Restoration Project -- Knights.esp" },
+    { mod = "Miguick's Dialogue Tweaks Trespassing Tweaked", plugin = "DialogTweaksTweakedTrespassing.esp" },
+    { mod = "Realistic Player Dialogue Overhaul", plugin = "00 Realistic Player Speech.esp" },
+    { mod = "Vanilla Style Loading Screens Addon", plugin = "lVanilla Style Loading Screens Addon.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Reedstand", plugin = "xxReworkedReedstand.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Gottshaw", plugin = "xxreworkedgottshaw.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Sutch", plugin = "xxreworkedSutch.esp" },
+    { mod = "Louder Chapel Bells", plugin = "Louder Chapel Bells.esp" },
+    { mod = "Pinarus Inventius - Actual Hunter", plugin = "PinarusInventiusActualHunter.esp" },
+    { mod = "Unused Magic Items Integrated", plugin = "Unused Magic Items Integrated.esp" },
+    { mod = "Voices for Female Dremora NPCs", plugin = "Voices for Female Dremora NPCs.esp" },
+    { mod = "The Ayleid Steps - Compatibility Patches", plugin = "The Ayleid Steps - Patches.esp" },
+    { mod = "Let there be Flowers", plugin = "lLet there be Flowers.esp" },
+    { mod = "Guard Infamy Greeting Fix", plugin = "GuardInfamyGreetingFix.esp" },
+    { mod = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods", plugin = "AyleidWellMessage.esp" },
+    { mod = "Goblin Tribes Fixed", plugin = "GoblinTribesFixed.esp" },
+    { mod = "Expanded Greetings", plugin = "ExpandedGreetings.esp" },
+    { mod = "Local Guards Features - Gaius Prentus Addon", plugin = "tbskGuardsFeaturesMergedVanillaAddons.esp" },
+    { mod = "No Annoying Conjurer Attack (Spell Tomes DLC fix)", plugin = "DLCSpellTomes-No Attack.esp" },
+    { mod = "SM DLC Plugin Refurbish", plugin = "SM Plugin Refurbish Lite Knights Infamy.esp" },
+    { mod = "Oblivion Comprehensive Modding Guide by Dispensation (OCMG)", plugin = "Bruma Frostcrag Spire LOD.esp" },
+    { mod = "Oblivion Reloaded Combined(ORC) v194", plugin = "ORC.esp" },
+    { mod = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation", plugin = "MehrunesDagonWalk.esp" },
+    { mod = "Better Traps", plugin = "Better Traps.esp" },
+    { mod = "Fame Based Daedric Quest Requirements", plugin = "DaedricRequirements.esp" },
+    { mod = "Claws whiskers and Seamless tails only", plugin = "OCOv2 Beast Races Enhanced.esp" },
+    { mod = "HGEC Equipment Replacer for WAC", plugin = "WAC - HGEC Equipment Replacer.esp" },
+    { mod = "Unique Wolf Animations Restored", plugin = "Wolf Animations Restored.esp" },
+    { mod = "Voiced Addons Collection for Mods (ElevenLabs) - The Ayleid Steps", plugin = "The Ayleid Steps - Voiced Addon.esp" },
+    { mod = "Patch for Vanilla Gear Redux Reasonable Flavor - Clipping and fpv fixes", plugin = "Shivering Isles Female Armor Displays.esp" },
+    { mod = "Oblivion Character Overhaul Version 2 Patches", plugin = "DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp" },
+    { mod = "Compatibility Patches for Arthmoor's Mods", plugin = "DispMiscPatch_Ducks and Swans - Reedstand Patch.esp" },
+    { mod = "WAC - Integration - HGEC Gauntlets Conversion", plugin = "WAC Integration HGEC Gauntlets Patch.esp" },
+    { mod = "The Lost Spires - NPC AI Addon", plugin = "The Lost Spires - NPC AI Addon.esp" },
+    { mod = "Locked Fighters Guild Doors Bug Fix", plugin = "Locked Fighters Guild Doors Bug Fix.esp" },
+    { mod = "Miscellaneous Patch Collection by Dipensation - Add Some Flavor Mods", plugin = "DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp" },
+    { mod = "Icons for Alchemy Apparatus", plugin = "ApparatusIcons.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - DLCFrostcrag.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - DLCVileLair.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - Shivering Isles.esp" },
+    { mod = "Vanilla Amulets fix for HGEC", plugin = "Female Amulets.esp" },
+    { mod = "More Books Teach", plugin = "more books teach.esp" },
+    { mod = "Book Jackets Oblivion High Res BAIN", plugin = "Book Jackets Oblivion.esp" },
+    { mod = "Book Jackets KOTN", plugin = "Knights - Book Jackets.esp" },
+    { mod = "Book Jackets for Misc DLC", plugin = "Book Jackets DLC Misc.esp" },
+    { mod = "Alluring Wine Bottles with Real Glass", plugin = "Alluring Wine Bottles.esp" },
+    { mod = "Better minotaurs", plugin = "Better minotaurs.esp" },
+    { mod = "Better Lorgren Benirus", plugin = "BetterLorgrenBenirus_NoStaffEdit.esp" },
+    { mod = "Unique Liches", plugin = "KingofMisc.esp" },
+    { mod = "Unique Liches - Battlehorn Lich", plugin = "BattlehornLich.esp" },
+    { mod = "Weapon Improvement Project", plugin = "Weapon Improvement Project.esp" },
+    { mod = "Goblin Totem Staff Icon", plugin = "Goblin Totem Staff Icon.esp" },
+    { mod = "Wrye Bash Collection of Mergeable Mods - Pekkas COBL Books Jackets", plugin = "PekCOBLBookJackets.esp" },
+    { mod = "Improved Fires and Flames", plugin = "Improved Fires and Flames - Increased Sound.esp" },
+    { mod = "Symphony of Violence - Combat Sound Enhancement", plugin = "Symphony of Violence.esp" },
+    { mod = "Vicious Trolls Sound Replacer", plugin = "Vicious Trolls Sound Attenuator.esp" },
+    { mod = "Retextured Potions", plugin = "PotionReplacer.esp" },
+    { mod = "Coop's TW3 Oblivion Horse Replacer", plugin = "CoopArmoredLegionHorses.esp" },
+    { mod = "Coop's TW3 Oblivion Horse Replacer", plugin = "DLCHorseArmor - Mane Enabled.esp" },
+    { mod = "Shivering Isles Trainers (Partial)", plugin = "ShiveringIslesTrainersPartial.esp" },
+    { mod = "Savilla's Stone Enhanced", plugin = "SavillaStoneEnhanced.esp" },
+    { mod = "Miscellaneous Patch Collection by Dispensation - AFK Weye", plugin = "DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp" },
+    { mod = "AFK_Weye - Typo and Grammatical Patch", plugin = "AFK_Weye - Typo and Grammatical Patch.esp" },
+    { mod = "Minotaur Horn Drop Fix", plugin = "Minotaur Horns Fix.esp" },
+    { mod = "MOFAM - Prebash Merge Consistency Patch", plugin = "Merge Consistency Patch.esp" },
+  ]
