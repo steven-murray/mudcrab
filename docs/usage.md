@@ -46,6 +46,7 @@ Download archives required by a personalized plan.
 ```bash
 mudcrab download <plan.json> [--cache <dir>] [--retry <n>] [--parallel <n>]
                  [--section <name>]... [--only <mod id>]...
+                 [--archive-search-path <dir>]...
 ```
 
 Example:
@@ -55,6 +56,36 @@ mudcrab download build/plan.json --cache .mudcrab-cache --retry 3
 ```
 
 Note: `--parallel` is accepted but currently downloads sequentially.
+
+## Using archives you already have
+
+Most of a large modlist is usually already on the machine, in an MO2 or
+Wabbajack downloads folder from an earlier build. `--archive-search-path` points
+`download`, `check` and `install` at those folders so the archives are reused
+instead of fetched again.
+
+```bash
+mudcrab install build/plan.json --cache .mudcrab-cache \
+  --mo2-instance-dir ~/mo2/MOFAM \
+  --archive-search-path ~/Games/mod-organizer-2-oblivion/modorganizer2/downloads \
+  --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
+```
+
+Each archive is resolved in this order:
+
+1. Already in the cache -- used as is.
+2. Otherwise, if the archive declares `file_name`, each search path is scanned
+   for that exact filename, case-insensitively, in the order given. The first
+   hit is hard-linked into the cache (falling back to a copy across
+   filesystems) and recorded there under its cache name, so no download runs.
+3. Otherwise the archive is downloaded as usual.
+
+Search paths are read-only sources: nothing is ever written, renamed or deleted
+inside them. An archive with no `file_name` has nothing to match against, so it
+always takes the download path.
+
+Because resolution happens during `install` too, a list whose archives are all
+already on disk can be installed without running `download` at all.
 
 ## Working on part of a modlist
 
@@ -103,6 +134,7 @@ Install from a personalized plan and cache into a mods directory.
 ```bash
 mudcrab install <plan.json> --cache <dir> --mods-dir <mods_dir> [--dry-run] [--skip-actions]
                 [--section <name>]... [--only <mod id>]...
+                [--archive-search-path <dir>]...
 ```
 
 Example:
@@ -177,14 +209,23 @@ mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
 Validate cached archives and archive-backed file references without installing.
 
 ```bash
-mudcrab check <plan.json> [--cache <dir>]
+mudcrab check <plan.json> [--cache <dir>] [--section <name>]... [--only <mod id>]...
+              [--archive-search-path <dir>]...
 ```
 
 Example:
 
 ```bash
-mudcrab check build/plan.json --cache .mudcrab-cache
+mudcrab check build/plan.json --cache .mudcrab-cache \
+  --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
 ```
+
+Every archive is reported as one of `cached`, `resolvable locally` (present in a
+search path) or `MUST BE DOWNLOADED`, followed by a summary count. The summary is
+printed even when the check fails, since a failing run is the one whose report
+matters -- it is how a dead link is found before a later section depends on it.
+`check` only reports: it never adopts a locally resolvable archive into the
+cache.
 
 ## setup-tools
 
@@ -247,5 +288,12 @@ if = "use_hd_textures"
 
 [[mods.archives]]
 path = "nexus:skyrimspecialedition/1234/5678"
+file_name = "HD Textures-1234-1-0.7z"
 download_handler = "nexus"
 ```
+
+`path` says where to get an archive; `file_name` says what it is called. A nexus
+descriptor carries no filename, so declaring `file_name` is what lets an install
+find a copy already sitting in an `--archive-search-path`. It is also the name
+the archive is exported under into MO2's `downloads/`, in preference to whatever
+the server happened to call it.

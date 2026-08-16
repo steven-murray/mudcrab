@@ -318,6 +318,15 @@ pub enum ArchiveLayout {
 pub struct ArchiveSpec {
     #[serde(default)]
     pub path: Option<String>,
+    /// The archive's own filename, as the host serves it.
+    ///
+    /// `path` identifies *where* to get the archive, not what it is called: a
+    /// `nexus:oblivion/<mod_id>/<file_id>` descriptor names neither. Stating the
+    /// filename here is what lets an install find a copy already sitting in an
+    /// `--archive-search-path` instead of downloading it again, and it is also
+    /// the name the archive is exported under into MO2's `downloads/`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
@@ -408,6 +417,9 @@ pub struct CompiledMod {
 pub struct CompiledArchive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// The archive's own filename; see `ArchiveSpec::file_name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,

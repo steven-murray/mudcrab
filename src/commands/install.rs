@@ -44,6 +44,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
             ToolsConfig::load(&path)?
         },
         filter: args.filter.to_mod_filter(),
+        archive_search_paths: args.archive_sources.archive_search_paths.clone(),
     };
 
     config::install::install_all(&plan, &settings)?;

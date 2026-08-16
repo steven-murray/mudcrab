@@ -43,6 +43,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                         }
                         Ok(CompiledArchive {
                             path: archive.path.clone(),
+                            file_name: archive.file_name.clone(),
                             download_handler: archive.download_handler.clone(),
                             layout: archive.layout,
                             data_folder: archive.data_folder.clone(),

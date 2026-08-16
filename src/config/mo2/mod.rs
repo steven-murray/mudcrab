@@ -7,7 +7,7 @@ use super::install::InstallSettings;
 use crate::config::download;
 use crate::config::install::is_plugin_file;
 use crate::config::schema::{Mo2ModlistEntry, PersonalizedPlan};
-use crate::util::fs::{find_child_case_insensitive, write_text_file};
+use crate::util::fs::{find_child_case_insensitive, link_or_copy, write_text_file};
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -221,23 +221,66 @@ pub(crate) fn export_downloads(
                 anyhow::bail!("missing cached archive for MO2 export: {}", source.display());
             }
 
-            let dest_name = read_cached_original_name(&settings.cache_dir, &cache_name)
+            // The modlist's own `file_name` beats the sidecar: it is the name
+            // the author declared, whereas the sidecar only records whatever the
+            // server happened to call the file on the day it was fetched.
+            let dest_name = declared_download_name(archive.file_name.as_deref())
+                .or_else(|| read_cached_original_name(&settings.cache_dir, &cache_name))
                 .unwrap_or_else(|| {
                     let ext = detect_archive_ext(&source);
                     format!("{cache_name}{ext}")
                 });
             let destination = downloads_dir.join(&dest_name);
-            std::fs::copy(&source, &destination).map_err(|err| {
-                anyhow::anyhow!(
-                    "failed to copy {} to {}: {err}",
-                    source.display(),
-                    destination.display()
-                )
-            })?;
+
+            // MO2's downloads/ is a second copy of an archive set that runs to
+            // tens of gigabytes, and installs are re-run constantly. Re-copying
+            // a file that is already there wastes the disk twice over: once on
+            // the redundant write, and once because an unconditional copy breaks
+            // the hard link that made the first export free.
+            if same_size(&source, &destination) {
+                tracing::debug!(
+                    mod_id = %mod_entry.id,
+                    destination = %destination.display(),
+                    "mo2 export: archive already present, skipping"
+                );
+                continue;
+            }
+
+            link_or_copy(&source, &destination)?;
         }
     }
 
     Ok(())
+}
+
+/// Whether `destination` is already the same file, by size.
+///
+/// Size alone rather than a hash: these are immutable published archives keyed
+/// by a name that encodes the mod and file id, so a same-named, same-sized file
+/// in downloads/ is the same file. Hashing tens of gigabytes on every install to
+/// prove it would cost more than the copy this avoids.
+fn same_size(source: &Path, destination: &Path) -> bool {
+    let (Ok(source), Ok(destination)) = (source.metadata(), destination.metadata()) else {
+        return false;
+    };
+    destination.is_file() && source.len() == destination.len()
+}
+
+/// A `file_name` from the modlist, if it is usable as a filename.
+///
+/// Rejects anything with a path separator: the value is user-authored TOML and
+/// is joined straight onto the downloads directory.
+fn declared_download_name(file_name: Option<&str>) -> Option<String> {
+    let trimmed = file_name?.trim();
+    if trimmed.is_empty()
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || trimmed == "."
+        || trimmed == ".."
+    {
+        return None;
+    }
+    Some(trimmed.to_string())
 }
 
 pub(crate) fn read_cached_original_name(cache_dir: &Path, cache_name: &str) -> Option<String> {

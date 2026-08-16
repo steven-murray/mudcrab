@@ -119,6 +119,22 @@ impl FilterArgs {
     }
 }
 
+/// Point a command at archives this machine already has.
+///
+/// Shared by `download`, `check` and `install` for the same reason as
+/// `FilterArgs`: the three have to agree on what is available, or `check` would
+/// report a download that `install` then does not need.
+#[derive(Debug, Default, Args)]
+pub struct ArchiveSourceArgs {
+    /// Directory to search for archives that are already downloaded, before
+    /// fetching anything. An archive is matched by its `file_name` from the
+    /// modlist, compared case-insensitively, and a hit is hard-linked into the
+    /// cache rather than copied. Repeatable and tried in the order given, first
+    /// hit wins. These directories are only ever read from.
+    #[arg(long = "archive-search-path", value_name = "DIR")]
+    pub archive_search_paths: Vec<PathBuf>,
+}
+
 #[derive(Debug, Args)]
 pub struct DownloadArgs {
     /// Path to personalized install plan.
@@ -134,6 +150,8 @@ pub struct DownloadArgs {
     pub retry: u32,
     #[command(flatten)]
     pub filter: FilterArgs,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
 }
 
 #[derive(Debug, Args)]
@@ -145,6 +163,8 @@ pub struct CheckArgs {
     pub cache: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
 }
 
 #[derive(Debug, Args)]
@@ -182,6 +202,8 @@ pub struct InstallArgs {
     pub tools_config: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
 }
 
 #[derive(Debug, Args)]
