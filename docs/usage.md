@@ -8,6 +8,7 @@ This guide describes the currently implemented command flow.
 2. Resolve query inputs into a personalized plan JSON.
 3. Download archives into a local cache.
 4. Install staged mod archive layout from cache, then build any declared merges.
+5. Diff the result against a reference instance to verify the section.
 
 ## Commands
 
@@ -135,8 +136,8 @@ already on disk can be installed without running `download` at all.
 
 ## Working on part of a modlist
 
-A large list is built a section at a time, so `download`, `check` and `install`
-all accept the same two flags:
+A large list is built a section at a time, so `download`, `check`, `install` and
+`diff` all accept the same two flags:
 
 - `--section <name>` -- match any level of a mod's section path,
   case-insensitively. `--section "5 - LOD"` selects `section = ["5 - LOD"]` and
@@ -272,6 +273,61 @@ printed even when the check fails, since a failing run is the one whose report
 matters -- it is how a dead link is found before a later section depends on it.
 `check` only reports: it never adopts a locally resolvable archive into the
 cache.
+
+## diff
+
+Compare the mods directory we produced against a reference ("Oracle") MO2
+instance, so each section can be verified as it is built rather than at the end.
+Where `check` validates the archives we are about to install from, `diff`
+validates what actually landed on disk.
+
+```bash
+mudcrab diff --mods-dir <OURS> --oracle <ORACLE_MODS_DIR> [--plan <plan.json>]
+             [--section <name>]... [--only <mod id>]... [--format text|json]
+```
+
+Example:
+
+```bash
+mudcrab diff --mods-dir ~/Games/Wabbajack/Oblivion/MudCrab/mods \
+  --oracle ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+  --plan build/plan.json --section "OBSE PLUGINS"
+```
+
+For every mod folder in scope the report gives presence (ours only, Oracle only,
+or both) and, for the ones in both, the files present on only one side and the
+files whose contents differ. The exit code is non-zero when anything differs, so
+a section can be gated on it.
+
+Both trees come from Windows-authored archives, so paths are matched
+case-insensitively and `\` is folded to `/`. Three things are deliberately not
+differences: MO2's own `meta.ini` at a mod root (ours will never have one), a
+`.mohidden` suffix (a plugin hidden for a merge is the same file), and MO2's
+`_separator` folders (list furniture, not mods).
+
+`--plan` supplies each mod's section and the archive it was meant to come from.
+Without it every directory in either tree is compared and `--section` is refused,
+because a mod folder on disk does not record which section it belongs to.
+`--only` works either way, since it matches the folder name.
+
+Version drift is reported separately, under `version notes`. The MOFAM guide was
+published in March 2025 and often says only "use the top file on the page", so an
+Oracle archive stamped later than that is a file the guide never named. The
+timestamp comes from the `installationFile=` recorded in the Oracle's `meta.ini`,
+which usually ends in a Unix timestamp (`Better Fort Aurus-50682-1-1-1647873144.7z`
+-> 2022-03-21); such mods are flagged `POST-GUIDE`. Where no timestamp can be
+read the mod is listed under `UNKNOWN AGE` rather than assumed to be fine.
+Neither flag affects the exit code -- both describe the reference's own archive,
+not a fault in our copy of it. A plan that names an archive the Oracle did not
+install *is* a difference, and does gate the run.
+
+Content is established lazily, because the Oracle is 40GB: nothing is read for a
+mod that exists on only one side, differing sizes settle a file without reading
+a byte, equal sizes are compared chunk by chunk with an early exit, and digests
+are computed only for the handful of files already known to differ, to name the
+difference in the report. Mods are compared in parallel. Diffing a 704-mod, 40GB
+instance against itself -- the worst case, where every byte on both sides has to
+be read -- takes about 20 seconds.
 
 ## setup-tools
 

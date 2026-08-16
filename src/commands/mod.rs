@@ -1,6 +1,7 @@
 pub mod add;
 pub mod compile;
 pub mod check;
+pub mod diff;
 pub mod download;
 pub mod export;
 pub mod install;
@@ -37,6 +38,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Download(args) => download::run(args).await,
         Command::Check(args) => check::run(args).await,
         Command::Install(args) => install::run(args).await,
+        Command::Diff(args) => diff::run(args).await,
         Command::Validate(args) => validate::run(args).await,
         Command::Export(args) => export::run(args).await,
         Command::SetupTools(args) => setup_tools::run(args).await,
