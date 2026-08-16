@@ -26,6 +26,8 @@ pub struct InstallSettings {
     /// archive found here is adopted into the cache instead of downloaded, so a
     /// list can be installed with no network access at all.
     pub archive_search_paths: Vec<PathBuf>,
+    /// Rebuild every merge in scope even when its recorded inputs still match.
+    pub force_merges: bool,
 }
 
 pub mod layout;
@@ -36,8 +38,9 @@ pub mod stage;
 use layout::install_mod_archives;
 use manifest::{
     get_install_manifest_path, hash_personalized_mod, load_install_manifest,
-    relative_path_to_mod, should_skip_mod_install, InstallManifest, InstalledMod,
+    relative_path_to_mod, should_skip_mod_install, BuiltMerge, InstallManifest, InstalledMod,
 };
+use merge::HiddenPlugin;
 pub(crate) use stage::is_plugin_file;
 
 /// Validate a mod id before using it as a directory name.
@@ -89,13 +92,29 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     } else {
         load_install_manifest(&manifest_path)?
     };
-    let (previous_installed, previous_hidden) = previous_manifest
-        .map(|manifest| (manifest.installed_mods, manifest.hidden_plugins))
+    let (previous_installed, previous_hidden, previous_built) = previous_manifest
+        .map(|manifest| {
+            (
+                manifest.installed_mods,
+                manifest.hidden_plugins,
+                manifest.built_merges,
+            )
+        })
         .unwrap_or_default();
     let previous_by_id: HashMap<String, InstalledMod> = previous_installed
-        .into_iter()
-        .map(|entry| (entry.id.clone(), entry))
+        .iter()
+        .map(|entry| (entry.id.clone(), entry.clone()))
         .collect();
+    let previous_built_by_id: HashMap<String, BuiltMerge> = previous_built
+        .iter()
+        .map(|entry| (entry.id.clone(), entry.clone()))
+        .collect();
+
+    // What the previous run recorded and this run has not yet reached. An entry
+    // leaves this list the moment its mod is touched, so a manifest written
+    // part way through describes exactly what is on disk: the mods this run has
+    // finished, plus the ones an earlier run left alone.
+    let mut carried_forward = previous_installed;
 
     if !settings.filter.is_empty() {
         tracing::info!(
@@ -122,6 +141,12 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     }
 
     for mod_entry in &plan.mods {
+        // Whatever happens to this mod below, this run now owns its record:
+        // the copy the previous manifest holds must not also be carried
+        // forward, or a mod that is cleared and then fails to extract would
+        // stay recorded as installed and never be retried.
+        carried_forward.retain(|entry| entry.id != mod_entry.id);
+
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
             // A filtered run narrows what is installed; it does not uninstall
             // the rest. Carrying the previous entry forward keeps the manifest
@@ -201,6 +226,18 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         );
 
         if !settings.dry_run {
+            // Recorded as gone *before* it is removed. Between the clear and
+            // the extraction the mod is not on disk, and a manifest still
+            // claiming it would make the next run skip a mod that is not there.
+            if previous.is_some() {
+                write_install_manifest(
+                    &manifest_path,
+                    plan,
+                    snapshot(&installed_mods, &carried_forward),
+                    previous_hidden.clone(),
+                    previous_built.clone(),
+                )?;
+            }
             clear_install_target(&mod_target)?;
         }
 
@@ -240,6 +277,20 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                         installed_path: relative_path_to_mod(&mod_target, &settings.mods_dir),
             actions_applied,
         });
+
+        // Persisted per mod rather than once at the end. A run that fails on
+        // mod 250 of 300 used to return Err with nothing written, so the 249
+        // mods it had just extracted were absent from the manifest and the next
+        // run unpacked every one of them again.
+        if !settings.dry_run {
+            write_install_manifest(
+                &manifest_path,
+                plan,
+                snapshot(&installed_mods, &carried_forward),
+                previous_hidden.clone(),
+                previous_built.clone(),
+            )?;
+        }
     }
 
     // Merges run after every mod is on disk (they read other mods' plugins)
@@ -254,7 +305,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             )
         })
         .collect();
-    let mut hidden_plugins = merge::run_merges(plan, settings, &installed_paths)?;
+    let merge_outcome = merge::run_merges(plan, settings, &installed_paths, &previous_built_by_id)?;
+    let mut hidden_plugins = merge_outcome.hidden;
 
     // A merge the filter skipped was not rebuilt, so it also did not re-record
     // what it hid. Without carrying those records forward the sources it hid on
@@ -281,18 +333,13 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             Some(installed_mods.iter().map(|entry| entry.id.clone()).collect())
         };
 
-        let manifest = InstallManifest {
-            name: plan.name.clone(),
-            installed_mods,
+        write_install_manifest(
+            &manifest_path,
+            plan,
+            snapshot(&installed_mods, &carried_forward),
             hidden_plugins,
-        };
-        let payload = serde_json::to_string_pretty(&manifest)
-            .map_err(|err| anyhow::anyhow!("failed to serialize install manifest: {err}"))?;
-
-        let manifest_path = get_install_manifest_path(settings);
-        std::fs::write(&manifest_path, payload).map_err(|err| {
-            anyhow::anyhow!("failed to write {}: {err}", manifest_path.display())
-        })?;
+            merge_outcome.built,
+        )?;
 
         if settings.mo2_instance_dir.is_some() {
             export_mo2_instance(plan, settings, export_scope.as_ref())?;
@@ -304,6 +351,34 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     }
 
     Ok(())
+}
+
+/// Everything the manifest should claim right now: what this run has settled,
+/// then what an earlier run installed and this run has not reached.
+fn snapshot(settled: &[InstalledMod], carried_forward: &[InstalledMod]) -> Vec<InstalledMod> {
+    let mut out = Vec::with_capacity(settled.len() + carried_forward.len());
+    out.extend_from_slice(settled);
+    out.extend_from_slice(carried_forward);
+    out
+}
+
+fn write_install_manifest(
+    manifest_path: &Path,
+    plan: &PersonalizedPlan,
+    installed_mods: Vec<InstalledMod>,
+    hidden_plugins: Vec<HiddenPlugin>,
+    built_merges: Vec<BuiltMerge>,
+) -> anyhow::Result<()> {
+    let manifest = InstallManifest {
+        name: plan.name.clone(),
+        installed_mods,
+        hidden_plugins,
+        built_merges,
+    };
+    let payload = serde_json::to_string_pretty(&manifest)
+        .map_err(|err| anyhow::anyhow!("failed to serialize install manifest: {err}"))?;
+    std::fs::write(manifest_path, payload)
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", manifest_path.display()))
 }
 
 fn clear_install_target(mod_target: &Path) -> anyhow::Result<()> {

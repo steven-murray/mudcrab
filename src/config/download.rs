@@ -35,6 +35,10 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     let client = Client::new();
     let mut downloaded = 0usize;
     let mut skipped = 0usize;
+    // Accumulated rather than propagated, exactly as `check` does. A section of
+    // a 700-mod list routinely contains more than one dead link, and stopping
+    // at the first one turns finding them into one round trip each.
+    let mut errors: Vec<String> = Vec::new();
 
     for mod_entry in &plan.mods {
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
@@ -53,7 +57,7 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                     ));
                     // Build layers carry no `file_name`, so there is nothing to
                     // match a local copy against; they always take the network path.
-                    let outcome = download_with_retry(
+                    let result = download_with_retry(
                         &client,
                         &layer.path,
                         None,
@@ -61,16 +65,24 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                         &destination,
                         settings,
                     )
-                    .await?;
-                    downloaded += 1;
-                    log_download_outcome(&mod_entry.id, &layer.path, &outcome);
+                    .await;
+                    match result {
+                        Ok(outcome) => {
+                            downloaded += 1;
+                            log_download_outcome(&mod_entry.id, &layer.path, &outcome);
+                        }
+                        Err(err) => errors.push(format!(
+                            "mod '{}' archive {} build layer {}: {err}",
+                            mod_entry.id, archive_index, layer_index
+                        )),
+                    }
                 }
             } else {
                 let path = archive.path.as_deref().unwrap_or_default();
                 let destination = settings
                     .cache_dir
                     .join(cache_file_name(&mod_entry.id, archive_index, path));
-                let outcome = download_with_retry(
+                let result = download_with_retry(
                     &client,
                     path,
                     archive.file_name.as_deref(),
@@ -78,19 +90,41 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                     &destination,
                     settings,
                 )
-                .await?;
-                downloaded += 1;
-                log_download_outcome(&mod_entry.id, path, &outcome);
+                .await;
+                match result {
+                    Ok(outcome) => {
+                        downloaded += 1;
+                        log_download_outcome(&mod_entry.id, path, &outcome);
+                    }
+                    Err(err) => errors.push(format!(
+                        "mod '{}' archive {} ({}): {err}",
+                        mod_entry.id,
+                        archive_index,
+                        archive.file_name.as_deref().unwrap_or(path)
+                    )),
+                }
             }
         }
     }
 
+    // Emitted before the bail, as in `check`: the run that fails is the run
+    // whose summary is worth having, because it is the one naming dead links.
     tracing::info!(
         downloaded,
+        failed = errors.len(),
         skipped_by_filter = skipped,
         scope = %settings.filter.describe(),
         "download phase completed"
     );
+
+    if !errors.is_empty() {
+        let joined = errors.join("\n");
+        anyhow::bail!(
+            "download failed for {} archive(s):\n{joined}",
+            errors.len()
+        );
+    }
+
     Ok(())
 }
 
