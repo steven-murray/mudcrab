@@ -9,7 +9,7 @@ use mudcrab::bsa::Bsa;
 use mudcrab::config::actions::{apply_all, ActionCx};
 use mudcrab::config::install::InstallSettings;
 use mudcrab::config::schema::{
-    CreateDummyPluginAction, FilePruneAction, ModAction, PackBsaAction,
+    CreateDummyPluginAction, FileHideAction, FilePruneAction, ModAction, PackBsaAction,
 };
 use mudcrab::plugin::Plugin;
 use std::path::{Path, PathBuf};
@@ -73,6 +73,12 @@ fn pack(output: &str, include: &[&str], exclude: &[&str]) -> ModAction {
 fn dummy(output: &str) -> ModAction {
     ModAction::CreateDummyPlugin(CreateDummyPluginAction {
         output: output.to_string(),
+    })
+}
+
+fn hide(paths: &[&str]) -> ModAction {
+    ModAction::FileHide(FileHideAction {
+        paths: paths.iter().map(|s| s.to_string()).collect(),
     })
 }
 
@@ -447,4 +453,99 @@ fn all_three_are_only_valid_as_per_mod_actions() {
             "{name} should be rejected without a mod target: {err:#}"
         );
     }
+}
+
+// --- file_hide --------------------------------------------------------------
+
+#[test]
+fn file_hide_renames_a_file_the_way_mo2_does() {
+    let (dir, target) = staged_mod();
+    run(&[hide(&["meshes/rocks/rock01.nif"])], dir.path(), &target).expect("hide");
+
+    assert!(!target.join("meshes/rocks/rock01.nif").exists());
+    assert!(target.join("meshes/rocks/rock01.nif.mohidden").exists());
+    assert!(
+        target.join("meshes/rocks/rock02.nif").exists(),
+        "its neighbour is untouched"
+    );
+}
+
+#[test]
+fn file_hide_hides_a_whole_folder_in_one_rename() {
+    // What MO2 does when you hide a directory: the folder is renamed and
+    // everything below it goes with it, rather than each file being renamed.
+    let (dir, target) = staged_mod();
+    run(&[hide(&["meshes/rocks"])], dir.path(), &target).expect("hide");
+
+    assert!(target.join("meshes/rocks.mohidden/rock01.nif").exists());
+    assert!(target.join("meshes/rocks.mohidden/rock02.nif").exists());
+    assert!(!target.join("meshes/rocks").exists());
+}
+
+#[test]
+fn file_hide_matches_each_segment_case_insensitively() {
+    // Archives are built on Windows and the guide transcribes paths by eye:
+    // "Textures > Characters > Nuska > Hair" has to find `textures/...`.
+    let (dir, target) = staged_mod();
+    run(&[hide(&["Meshes/Rocks/ROCK01.nif"])], dir.path(), &target).expect("hide");
+
+    assert!(target.join("meshes/rocks/rock01.nif.mohidden").exists());
+}
+
+#[test]
+fn file_hide_is_idempotent() {
+    let (dir, target) = staged_mod();
+    let actions = [hide(&["meshes/rocks"])];
+
+    run(&actions, dir.path(), &target).expect("first hide");
+    run(&actions, dir.path(), &target).expect("second hide");
+
+    assert!(target.join("meshes/rocks.mohidden/rock01.nif").exists());
+    assert!(
+        !target.join("meshes/rocks.mohidden.mohidden").exists(),
+        "hiding twice must not double the suffix"
+    );
+}
+
+#[test]
+fn file_hide_fails_when_a_path_is_not_there() {
+    // These are literal paths the guide named, not globs. One that is missing
+    // means the archive changed or the entry has a typo, and either way the
+    // install would keep a file it was told to remove.
+    let (dir, target) = staged_mod();
+    let err = run(&[hide(&["meshes/rocks", "meshes/nope"])], dir.path(), &target)
+        .expect_err("a missing path should fail");
+
+    let message = format!("{err:#}");
+    assert!(message.contains("'meshes/nope'"), "{message}");
+    assert!(!message.contains("'meshes/rocks'"), "{message}");
+}
+
+#[test]
+fn file_hide_refuses_a_path_escaping_the_mod_folder() {
+    let (dir, target) = staged_mod();
+    let err = run(&[hide(&["../escaped"])], dir.path(), &target).unwrap_err();
+    assert!(
+        err.chain().any(|c| c.to_string().contains("invalid relative path")),
+        "{err:#}"
+    );
+}
+
+#[test]
+fn file_hide_changes_nothing_in_a_dry_run() {
+    let (dir, target) = staged_mod();
+    let mut settings = settings(dir.path());
+    settings.dry_run = true;
+
+    apply_all(
+        &[hide(&["meshes/rocks"])],
+        &ActionCx {
+            owner: "Example",
+            settings: &settings,
+            mod_target: Some(&target),
+        },
+    )
+    .expect("dry run");
+
+    assert!(target.join("meshes/rocks/rock01.nif").exists());
 }

@@ -96,6 +96,7 @@ pub enum ModAction {
     PackBsa(PackBsaAction),
     CreateDummyPlugin(CreateDummyPluginAction),
     FilePrune(FilePruneAction),
+    FileHide(FileHideAction),
 }
 
 impl ModAction {
@@ -107,6 +108,7 @@ impl ModAction {
             ModAction::PackBsa(_) => "pack_bsa",
             ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
             ModAction::FilePrune(_) => "file_prune",
+            ModAction::FileHide(_) => "file_hide",
         }
     }
 }
@@ -151,6 +153,22 @@ pub struct CreateDummyPluginAction {
 pub struct FilePruneAction {
     /// Glob patterns resolved relative to the mod's staged data folder.
     /// Required: a prune with nothing to delete is always a mistake.
+    pub paths: Vec<String>,
+}
+
+/// Rename staged files to `<name>.mohidden`, MO2's way of dropping something
+/// out of the virtual file system without deleting it.
+///
+/// The guide's usual phrasing is "hide or delete"; this is the hide half, and
+/// the one a hand-built MO2 instance ends up containing. Naming a directory
+/// hides everything below it in a single rename, exactly as MO2 does.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileHideAction {
+    /// Paths relative to the mod's staged data folder, matched
+    /// case-insensitively a segment at a time. Literal paths, not globs: each
+    /// one is a file or folder the guide named, and one that is not there is an
+    /// error rather than a silent skip.
     pub paths: Vec<String>,
 }
 

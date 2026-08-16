@@ -215,6 +215,16 @@ pub struct VersionInfo {
     pub guide_age: GuideAge,
 }
 
+/// A file both trees hold, which only one of them hides from the game.
+#[derive(Debug, Clone, Serialize)]
+pub struct HiddenDiff {
+    /// Folder-relative path, with `.mohidden` stripped so both sides read the
+    /// same.
+    pub path: String,
+    /// True when we hide it and the Oracle does not; false for the reverse.
+    pub hidden_in_ours: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ModDiff {
     pub id: String,
@@ -230,6 +240,9 @@ pub struct ModDiff {
     /// Folder-relative paths present only in the Oracle's tree.
     pub only_in_oracle: Vec<String>,
     pub content_differs: Vec<ContentDiff>,
+    /// Files present on both sides but hidden on only one. The game sees a
+    /// different set of files even though the folders hold the same bytes.
+    pub hidden_differs: Vec<HiddenDiff>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<VersionInfo>,
     /// Anything that went wrong reading either tree. Recorded per mod rather
@@ -249,6 +262,7 @@ impl ModDiff {
             && self.only_in_ours.is_empty()
             && self.only_in_oracle.is_empty()
             && self.content_differs.is_empty()
+            && self.hidden_differs.is_empty()
             && self.errors.is_empty()
             && !self.version.as_ref().is_some_and(|v| v.archive_mismatch)
     }
@@ -494,6 +508,7 @@ fn compare_mod(candidate: &Candidate) -> ModDiff {
         only_in_ours: Vec::new(),
         only_in_oracle: Vec::new(),
         content_differs: Vec::new(),
+        hidden_differs: Vec::new(),
         version: None,
         errors: Vec::new(),
     };
@@ -530,6 +545,16 @@ fn compare_mod(candidate: &Candidate) -> ModDiff {
             continue;
         };
 
+        // Same file, but one side is out of the VFS and the other is not.
+        // Content comparison cannot see this: the key deliberately ignores
+        // `.mohidden` so a hidden file still matches its unhidden twin.
+        if ours_file.hidden != oracle_file.hidden {
+            diff.hidden_differs.push(HiddenDiff {
+                path: strip_hidden_path(&ours_file.display),
+                hidden_in_ours: ours_file.hidden,
+            });
+        }
+
         match compare_files(ours_file, oracle_file) {
             Ok(Some(content)) => diff.content_differs.push(content),
             Ok(None) => {}
@@ -551,13 +576,17 @@ struct FileEntry {
     display: String,
     path: PathBuf,
     size: u64,
+    /// Whether any segment of the path carries `.mohidden`, i.e. whether the
+    /// game can see this file at all.
+    hidden: bool,
 }
 
 /// Walk a mod folder into a map from comparison key to file.
 ///
 /// The key is lowercased, `/`-separated and stripped of any `.mohidden`
-/// suffix, which is what makes `Textures\Foo.DDS` and `textures/foo.dds` the
-/// same file and `Fort Aurus.esp.mohidden` the same file as `Fort Aurus.esp`.
+/// suffix on *every* segment, which is what makes `Textures\Foo.DDS` and
+/// `textures/foo.dds` the same file, `Fort Aurus.esp.mohidden` the same file as
+/// `Fort Aurus.esp`, and `hair.mohidden/x.dds` the same file as `hair/x.dds`.
 fn walk_mod_tree(root: &Path) -> anyhow::Result<BTreeMap<String, FileEntry>> {
     let mut files = BTreeMap::new();
     collect_files(root, root, 0, &mut files)?;
@@ -609,10 +638,13 @@ fn collect_files(
         let display = relative.to_string_lossy().replace('\\', "/");
         let key = comparison_key(&display);
 
+        let hidden = display.split('/').any(|segment| strip_hidden_suffix(segment) != segment);
+
         files.entry(key).or_insert(FileEntry {
             display,
             path: path.clone(),
             size: metadata.len(),
+            hidden,
         });
     }
 
@@ -622,17 +654,24 @@ fn collect_files(
 /// Fold a folder-relative path to the form both trees agree on.
 fn comparison_key(relative: &str) -> String {
     let normalized = relative.replace('\\', "/");
-    let (head, name) = match normalized.rsplit_once('/') {
-        Some((head, name)) => (Some(head), name),
-        None => (None, normalized.as_str()),
-    };
+    // Every segment, not just the last: MO2 hides a whole folder by renaming
+    // the directory, so `textures/characters/nuska/hair.mohidden/x.dds` is the
+    // same file as `textures/characters/nuska/hair/x.dds`.
+    normalized
+        .split('/')
+        .map(strip_hidden_suffix)
+        .collect::<Vec<_>>()
+        .join("/")
+        .to_lowercase()
+}
 
-    let name = strip_hidden_suffix(name);
-    let joined = match head {
-        Some(head) => format!("{head}/{name}"),
-        None => name.to_string(),
-    };
-    joined.to_lowercase()
+/// A path with `.mohidden` removed from every segment, keeping its on-disk case.
+fn strip_hidden_path(display: &str) -> String {
+    display
+        .split('/')
+        .map(strip_hidden_suffix)
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 fn strip_hidden_suffix(name: &str) -> &str {
@@ -1053,6 +1092,21 @@ fn render_mod(out: &mut String, diff: &ModDiff) {
         render_overflow(out, diff.content_differs.len());
     }
 
+    if !diff.hidden_differs.is_empty() {
+        out.push_str(&format!(
+            "      hidden on one side only ({}):\n",
+            diff.hidden_differs.len()
+        ));
+        for entry in diff.hidden_differs.iter().take(LIST_LIMIT) {
+            out.push_str(&format!(
+                "        {}  (hidden in {})\n",
+                entry.path,
+                if entry.hidden_in_ours { "ours" } else { "the Oracle" }
+            ));
+        }
+        render_overflow(out, diff.hidden_differs.len());
+    }
+
     render_paths(out, "only in ours", &diff.only_in_ours);
     render_paths(out, "only in the Oracle", &diff.only_in_oracle);
 
@@ -1168,12 +1222,19 @@ fn render_version_notes(out: &mut String, report: &DiffReport) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::tempdir;
 
     #[test]
     fn comparison_key_folds_case_separators_and_hidden_suffix() {
         assert_eq!(comparison_key("Textures\\Foo.DDS"), "textures/foo.dds");
         assert_eq!(comparison_key("textures/foo.dds"), "textures/foo.dds");
         assert_eq!(comparison_key("Fort Aurus.esp.mohidden"), "fort aurus.esp");
+        // MO2 hides a folder by renaming the directory, so the suffix can sit
+        // on any segment, not only the last.
+        assert_eq!(
+            comparison_key("Textures/characters/nuska/hair.mohidden/nugrey.dds"),
+            "textures/characters/nuska/hair/nugrey.dds"
+        );
         assert_eq!(comparison_key("Fort Aurus.esp.MOHIDDEN"), "fort aurus.esp");
         // A file actually named ".mohidden" keeps its name: stripping it would
         // leave an empty path.
@@ -1217,6 +1278,62 @@ mod tests {
             GuideAge::Unknown { .. }
         ));
         assert!(matches!(classify_guide_age(None, None), GuideAge::Unknown { .. }));
+    }
+
+    fn compare_trees(ours: &Path, oracle: &Path) -> ModDiff {
+        compare_mod(&Candidate {
+            id: "Example".to_string(),
+            oracle_name: None,
+            section: vec!["7 - CHARACTER AND NPCS".to_string()],
+            ours: Some(ours.to_path_buf()),
+            oracle: Some(oracle.to_path_buf()),
+            plan_file_names: Vec::new(),
+        })
+    }
+
+    fn write_file(path: &Path, contents: &[u8]) {
+        std::fs::create_dir_all(path.parent().expect("file has a parent")).expect("mkdir");
+        std::fs::write(path, contents).expect("write");
+    }
+
+    #[test]
+    fn a_file_hidden_on_only_one_side_is_reported() {
+        // `comparison_key` deliberately ignores `.mohidden`, so a hidden file
+        // still matches its unhidden twin and the content comparison sees
+        // nothing. Without this check, hiding the wrong file is invisible.
+        let temp = tempdir().expect("tempdir");
+        let ours = temp.path().join("ours");
+        let oracle = temp.path().join("oracle");
+
+        write_file(&ours.join("textures/khajiit/head.dds.mohidden"), b"same");
+        write_file(&oracle.join("textures/khajiit/head.dds"), b"same");
+        write_file(&ours.join("textures/khajiit/ear.dds"), b"same");
+        write_file(&oracle.join("textures/khajiit/ear.dds"), b"same");
+
+        let diff = compare_trees(&ours, &oracle);
+
+        assert!(diff.only_in_ours.is_empty(), "{:?}", diff.only_in_ours);
+        assert!(diff.only_in_oracle.is_empty(), "{:?}", diff.only_in_oracle);
+        assert!(diff.content_differs.is_empty(), "the bytes are identical");
+        assert_eq!(diff.hidden_differs.len(), 1);
+        assert_eq!(diff.hidden_differs[0].path, "textures/khajiit/head.dds");
+        assert!(diff.hidden_differs[0].hidden_in_ours);
+        assert!(!diff.is_identical(), "a hidden-state mismatch is a difference");
+    }
+
+    #[test]
+    fn hiding_a_whole_folder_matches_hiding_it_the_same_way() {
+        let temp = tempdir().expect("tempdir");
+        let ours = temp.path().join("ours");
+        let oracle = temp.path().join("oracle");
+
+        write_file(&ours.join("textures/nuska/hair.mohidden/grey.dds"), b"same");
+        write_file(&oracle.join("textures/nuska/hair.mohidden/grey.dds"), b"same");
+
+        let diff = compare_trees(&ours, &oracle);
+
+        assert!(diff.hidden_differs.is_empty(), "{:?}", diff.hidden_differs);
+        assert!(diff.is_identical());
     }
 
     #[test]

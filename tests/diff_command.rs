@@ -233,15 +233,52 @@ fn paths_are_matched_case_insensitively_and_across_separators() {
 }
 
 #[test]
-fn a_mohidden_plugin_is_the_same_file_as_the_unsuffixed_one() {
+fn a_mohidden_plugin_is_the_same_file_but_not_the_same_state() {
     let fixture = Fixture::new();
-    // The Oracle hid this plugin to make room for a merge. That is a rename,
-    // not a difference: reporting it would flag every merged source plugin.
+    // The Oracle hid this plugin to make room for a merge. The rename is not a
+    // content difference -- the file is matched to its unhidden twin and the
+    // bytes are never reported as differing -- but it *is* a difference in what
+    // the game loads, so it is reported on its own line.
     write(&fixture.ours(), "Fort Aurus/Fort Aurus.esp", "plugin bytes");
     write(
         &fixture.oracle(),
         "Fort Aurus/Fort Aurus.esp.mohidden",
         "plugin bytes",
+    );
+
+    let output = fixture.diff().assert().failure().get_output().stdout.clone();
+    let text = String::from_utf8(output).expect("utf-8");
+
+    assert!(
+        text.contains("hidden on one side only (1):"),
+        "unexpected report:\n{text}"
+    );
+    assert!(
+        text.contains("Fort Aurus.esp  (hidden in the Oracle)"),
+        "unexpected report:\n{text}"
+    );
+    assert!(
+        !text.contains("only in ours") && !text.contains("only in the Oracle"),
+        "the file must still be matched to its twin, not reported as unpaired:\n{text}"
+    );
+    assert!(
+        !text.contains("content differs"),
+        "the bytes are identical:\n{text}"
+    );
+}
+
+#[test]
+fn a_file_hidden_the_same_way_on_both_sides_is_identical() {
+    let fixture = Fixture::new();
+    write(
+        &fixture.ours(),
+        "Beast Races/textures/khajiit.mohidden/head.dds",
+        "texture bytes",
+    );
+    write(
+        &fixture.oracle(),
+        "Beast Races/textures/khajiit.mohidden/head.dds",
+        "texture bytes",
     );
 
     let output = fixture.diff().assert().success().get_output().stdout.clone();
@@ -251,7 +288,6 @@ fn a_mohidden_plugin_is_the_same_file_as_the_unsuffixed_one() {
         text.contains("1 compared, 1 identical, 0 differing"),
         "unexpected report:\n{text}"
     );
-    assert!(!text.contains("mohidden"), "unexpected report:\n{text}");
 }
 
 #[test]
