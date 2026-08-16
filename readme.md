@@ -55,6 +55,14 @@ Validate source modlist without writing compiled output:
 cargo run -- validate path/to/modlist.toml
 ```
 
+Add a mod to a source modlist in place, keeping its comments and formatting
+byte-for-byte (see `docs/usage.md` for the full flag list):
+
+```bash
+cargo run -- add path/to/modlist.toml \
+  --from-oracle /path/to/mo2/mods --mod "Blockhead" --section "OBSE PLUGINS"
+```
+
 ### End-to-End Example
 
 ```bash
