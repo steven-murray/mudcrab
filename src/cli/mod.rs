@@ -15,6 +15,8 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    /// Add a mod to a source modlist, preserving its comments and formatting.
+    Add(AddArgs),
     /// Validate and compile a source modlist into a machine-friendly artifact.
     Compile(CompileArgs),
     /// Resolve interactive inputs into a personalized install plan.
@@ -35,6 +37,50 @@ pub enum Command {
     UnhideMerges(UnhideMergesArgs),
     /// Build merged plugins from an already-installed mods directory.
     Merge(MergeArgs),
+}
+
+/// Add one `[[mods]]` block to a source modlist.
+///
+/// The modlist is edited in place by line-based splice, never by re-emitting
+/// parsed TOML: these files carry their reasoning in comments and a
+/// parse-and-rewrite would delete all of it.
+#[derive(Debug, Args)]
+pub struct AddArgs {
+    /// Path to the source modlist TOML to edit in place.
+    pub input: PathBuf,
+    /// Read the mod's details from `<DIR>/<--mod>/meta.ini`, as written by
+    /// Mod Organizer 2. Only ever read from.
+    #[arg(long, value_name = "ORACLE_MODS_DIR", conflicts_with = "nexus")]
+    pub from_oracle: Option<PathBuf>,
+    /// Name of the mod folder inside the Oracle mods directory.
+    #[arg(long = "mod", value_name = "FOLDER", requires = "from_oracle")]
+    pub mod_folder: Option<String>,
+    /// Nexus source as `<modid>/<fileid>`, for a mod with no Oracle folder.
+    #[arg(long, value_name = "MODID/FILEID")]
+    pub nexus: Option<String>,
+    /// Mod id, which is also the directory it installs into.
+    /// Defaults to the Oracle folder name; required with --nexus.
+    #[arg(long, value_name = "MOD_ID")]
+    pub id: Option<String>,
+    /// Section to file the mod under. Repeat for a nested section path,
+    /// outermost first. The block is inserted after that section's last mod.
+    #[arg(long = "section", value_name = "NAME")]
+    pub sections: Vec<String>,
+    /// The archive's own filename. Taken from the Oracle `installationFile=`
+    /// when not given.
+    #[arg(long = "file-name", value_name = "ARCHIVE")]
+    pub file_name: Option<String>,
+    /// When --section names a section the file does not have yet, start it
+    /// immediately before this existing section instead of at end of file.
+    /// Repeat for a nested path, as with --section.
+    ///
+    /// Section order in the file is section order in MO2, so a section
+    /// belonging mid-list cannot simply be appended.
+    #[arg(long = "before-section", value_name = "NAME")]
+    pub before_sections: Vec<String>,
+    /// Print the block and where it would go, and change nothing.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

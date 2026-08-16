@@ -1,4 +1,5 @@
 pub mod actions;
+pub mod add;
 pub mod check;
 pub mod compiler;
 pub mod download;

@@ -11,6 +11,52 @@ This guide describes the currently implemented command flow.
 
 ## Commands
 
+## add
+
+Add one `[[mods]]` block to a source modlist, in place.
+
+```bash
+mudcrab add <modlist.toml> --from-oracle <ORACLE_MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
+mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--dry-run]
+```
+
+The edit is a line-based splice, not a parse-and-rewrite: every byte of the file
+outside the inserted block -- comments, blank lines, tab indentation, key order --
+is preserved exactly. The block goes after the last existing mod in `--section`,
+so the file stays grouped; if that section has no mods yet, it is appended at the
+end of the file. Repeat `--section` for a nested section path, outermost first.
+
+`--from-oracle` reads `<ORACLE_MODS_DIR>/<mod folder>/meta.ini` as written by Mod
+Organizer 2 and takes `modid` + `[installedFiles] 1\fileid` for the
+`nexus:oblivion/<modid>/<fileid>` path, `installationFile` for `file_name`, and
+`version` for a trailing `# oracle version ...` comment. The mod id defaults to
+the folder name. The directory is only ever read from.
+
+A folder with `modid=0` was not installed from Nexus: the block is written with
+`file_name` but no `path`, marked with a `# TODO: non-Nexus source` comment, and a
+warning goes to stderr. No URL is invented.
+
+If the Oracle folder ships `.esp`/`.esm` files, they are listed on stderr. They
+are **not** added to the top-level `plugins` array and the block declares no
+`plugins` key -- putting a plugin at the wrong point in load order fails silently
+in game, so the position is yours to choose.
+
+Safety:
+
+- an id that already exists in the file is refused;
+- the file is written via a temp file next to it, then renamed;
+- after writing, the modlist is re-parsed and validated, and the original is
+  restored if either fails;
+- `--dry-run` prints the block and its destination and changes nothing.
+
+Example:
+
+```bash
+mudcrab add mofam.toml \
+  --from-oracle ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+  --mod "Blockhead" --section "OBSE PLUGINS" --dry-run
+```
+
 ## compile
 
 Validate and compile a source modlist.

@@ -1,3 +1,4 @@
+pub mod add;
 pub mod compile;
 pub mod check;
 pub mod download;
@@ -30,6 +31,7 @@ pub fn require_game_dir(explicit: Option<PathBuf>) -> anyhow::Result<PathBuf> {
 
 pub async fn execute(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
+        Command::Add(args) => add::run(args).await,
         Command::Compile(args) => compile::run(args).await,
         Command::Query(args) => query::run(args).await,
         Command::Download(args) => download::run(args).await,
