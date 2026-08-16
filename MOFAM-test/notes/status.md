@@ -8,32 +8,24 @@ Last updated: 2026-08-16.
 ## Done
 
 - **Tooling (plan Phase 2) is complete.** `add`, `diff`, `inspect`,
-  `--section`/`--only` filters, `--archive-search-path`, native BSA
+  `--section`/`--only` filters, `--archive-search-path`, `install --force`,
+  `add --before-mod`, `inspect` of a `.bsa`, native BSA
   reader/writer, `pack_bsa` / `create_dummy_plugin` / `file_prune`.
-  307 tests, clippy clean under `-D warnings`.
+  324 tests, clippy clean under `-D warnings`.
 - **Merges**: all six reproduce zMerge semantically. Unique Forts and TACE
   verified in game. Prebash rebuilt without `ORC.esp` for the Oracle.
 - **Parts 1, 2, 3, 4, 6** authored (105 mods, pre-existing).
 
-## In progress: Part 5 (LOD)
+## Done: Part 5 (LOD)
 
-Nine of ten rows authored in `MOFAM-test/input/mofam.full.toml`; 114 `[[mods]]`
-total. **Nothing installed or diffed yet** -- that is the next step.
+All ten rows authored, installed and diffed. **9 of 10 byte-for-byte identical
+against the Oracle; the tenth differs only in the two files mudcrab generates
+(a BSA and a dummy plugin), for reasons written up in `part-05-lod.md`.**
 
-Row 1, Evenstars Colourwheel LOD Update, is **not yet authored**. It was
-blocked on BSA support, which now exists. It needs, in this order:
-
-1. `layout = "bain"` with `bain_subpackages = ["00 Textures", "04 Statues and shrines"]`
-   (note the archive's lowercase "shrines"; the guide capitalises it)
-2. `pack_bsa` to `Evenstars Colourwheel LOD Update.bsa`
-3. `create_dummy_plugin` for `Evenstars Colourwheel LOD Update.esp`
-4. `file_prune` of the loose `meshes` and `textures` folders
-
-The Oracle's copy of that mod contains exactly the `.bsa` + `.esp`, which is
-what to diff against.
-
-Then: `install --section "5 - LOD"`, `diff --section "5 - LOD"`, explain every
-difference, and stop-point SP1 covers Parts 5-7 together.
+Two silent bugs surfaced doing it, both now fixed and tested: `file_prune`
+matched nothing for a bare directory name (and said nothing about it), and
+`pack_bsa` wrote zero asset-kind flags, which makes an archive invisible to the
+engine. Neither was visible from the install -- only from the diff.
 
 ## Next sections
 
@@ -42,6 +34,9 @@ are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at
 Part 25, which is modelled as one mod with several archives.
+
+**Stop-point SP1 covers Parts 5-7**, so Parts 6 (already built) and 7 come
+before the user next loads the game.
 
 ## Open threads
 
@@ -53,7 +48,12 @@ Part 25, which is modelled as one mod with several archives.
 - Six mods legitimately have no Oracle counterpart and show as extras in
   `diff`: `xOBSE`, four `No Havoc Objects` splits, `T4UT - Menus Repolished`.
 - 51 Oracle mods post-date the March 2025 guide; `diff` flags them
-  `POST-GUIDE`. Each needs a conscious accept when its section is built.
+  `POST-GUIDE`. Each needs a conscious accept when its section is built. Note
+  that a file from mod page **52949 is the guide's own** -- MOFAM is 52949 --
+  so a post-guide date there is expected, not drift.
+- BSArch deduplicates identical payloads within an archive; mudcrab's BSA
+  writer does not. Costs ~2% on an archive with repeated files. Cosmetic, and
+  the only reason a packed mod ever differs from the Oracle by size alone.
 - MudCrab Test has ~21 stale mod folders under pre-rename ids. They will show
   as extras until cleaned up.
 
@@ -71,3 +71,11 @@ Part 25, which is modelled as one mod with several archives.
   than paying cold-start context per section.
 - Agents start cold and re-derive context, so a task worth 20 lines of edits
   is usually not worth an agent at all now that the tooling exists.
+- **Improve the command rather than working around it.** Part 5 needed a row
+  inserted at the *start* of a section, an install re-run after an action's
+  behaviour changed, and a way to look inside a BSA. Those became
+  `add --before-mod`, `install --force` and `inspect <file>.bsa` instead of
+  three pieces of shell. Each will be wanted again.
+- **A silent no-op is the failure mode to design against.** Both Part 5 bugs
+  produced a successful install and a wrong tree. Where an action can match
+  nothing, matching nothing should be an error.

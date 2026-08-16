@@ -75,6 +75,7 @@ plugins = [
 	"Quest Log Manager.esp", 
 	"WorldMapsForAllWorldspaces.esp", 
 	"lVanilla Style Loading Screens Addon.esp",
+	"Evenstars Colourwheel LOD Update.esp",
 	"Bruma Frostcrag Spire LOD.esp",
 	"lVWD for Leyawiin.esp",
 	"IC LOD.esp",
@@ -712,6 +713,41 @@ data_folder="Mind Your Head - Signs Repositioned 1.3"
 # ------------------------------
 # Part 6 - UI & UX IMPROVEMENTS
 # ------------------------------
+
+# Guide: BAIN -> "00 Textures" and "04 Statues and Shrines", then pack with
+# BSArch, name the BSA and a dummy plugin after the mod, and delete the loose
+# meshes/textures. The archive spells the subpackage "04 Statues and shrines";
+# the Oracle's own meta.ini records that same lowercase form under
+# [Plugins] BAIN%20Installer, so the guide's capitalisation is the typo.
+#
+# The BSA exists to keep ~2000 LOD files out of the VFS, so packing is the
+# point of the row, not an optimisation -- hence the file_prune afterwards.
+[[mods]]
+id = "Evenstars Colourwheel LOD Update"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/42190/90711"
+download_handler = "nexus"
+file_name = "Evenstar CW LOD-42190-1-2.7z"
+layout = "bain"
+bain_subpackages = ["00 Textures", "04 Statues and shrines"]
+# oracle version 1.2.0.0
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Evenstars Colourwheel LOD Update.bsa"
+
+# Oblivion only loads Foo.bsa when a Foo.esp is active.
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "Evenstars Colourwheel LOD Update.esp"
+
+# After the pack, not via the pack's own `exclude`: these are the files that
+# were just archived.
+[[mods.actions]]
+action = "file_prune"
+paths = ["meshes", "textures"]
 
 [[mods]]
 id = "VWD for Leyawiin"
