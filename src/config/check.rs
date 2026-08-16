@@ -1,11 +1,15 @@
 use crate::archive;
 use crate::config::download;
+use crate::config::filter::ModFilter;
 use crate::config::schema::{CompiledArchive, PersonalizedPlan};
 use globset::{GlobBuilder, GlobMatcher};
 use std::path::PathBuf;
 
+#[derive(Debug, Clone, Default)]
 pub struct CheckSettings {
     pub cache_dir: PathBuf,
+    /// Which mods to check. Empty means the whole plan.
+    pub filter: ModFilter,
 }
 
 pub struct CheckReport {
@@ -15,11 +19,17 @@ pub struct CheckReport {
 }
 
 pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::Result<CheckReport> {
+    let mut mods_checked = 0usize;
     let mut archives_checked = 0usize;
     let mut file_references_checked = 0usize;
     let mut errors = Vec::new();
 
     for mod_entry in &plan.mods {
+        if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+            continue;
+        }
+        mods_checked += 1;
+
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             archives_checked += 1;
 
@@ -49,7 +59,7 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
     }
 
     Ok(CheckReport {
-        mods_checked: plan.mods.len(),
+        mods_checked,
         archives_checked,
         file_references_checked,
     })

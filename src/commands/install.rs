@@ -43,6 +43,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
                 .unwrap_or_else(|| PathBuf::from("tools.toml"));
             ToolsConfig::load(&path)?
         },
+        filter: args.filter.to_mod_filter(),
     };
 
     config::install::install_all(&plan, &settings)?;

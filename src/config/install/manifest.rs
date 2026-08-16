@@ -97,8 +97,17 @@ pub(crate) fn should_skip_mod_install(
     mod_target.exists() && previous.definition_hash == definition_hash
 }
 
+/// Fingerprint of everything about a mod that decides what lands on disk.
+///
+/// `section` is deliberately excluded. It only decides where the mod appears in
+/// MO2's list, so hashing it would have invalidated every existing manifest the
+/// first time a plan carried sections and forced a full reinstall of a 700-mod
+/// list for a purely cosmetic field.
 pub(crate) fn hash_personalized_mod(mod_entry: &PersonalizedMod) -> anyhow::Result<String> {
-    let payload = serde_json::to_vec(mod_entry)
+    let mut hashable = mod_entry.clone();
+    hashable.section.clear();
+
+    let payload = serde_json::to_vec(&hashable)
         .map_err(|err| anyhow::anyhow!("failed to serialize mod {} for hashing: {err}", mod_entry.id))?;
     let digest = Sha256::digest(&payload);
     let mut out = String::with_capacity(digest.len() * 2);

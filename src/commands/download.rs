@@ -25,6 +25,7 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         retry: args.retry,
         nexus_api_key: std::env::var("NEXUS_API_KEY").ok(),
         nexus_api_base: std::env::var("NEXUS_API_BASE").ok(),
+        filter: args.filter.to_mod_filter(),
     };
 
     config::download::download_all(&plan, &settings).await?;

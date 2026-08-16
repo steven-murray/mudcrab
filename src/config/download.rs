@@ -1,13 +1,16 @@
+use crate::config::filter::ModFilter;
 use crate::config::schema::PersonalizedPlan;
 use reqwest::Client;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct DownloadSettings {
     pub cache_dir: PathBuf,
     pub retry: u32,
     pub nexus_api_key: Option<String>,
     pub nexus_api_base: Option<String>,
+    /// Which mods to fetch. Empty means the whole plan.
+    pub filter: ModFilter,
 }
 
 enum DownloadOutcome {
@@ -25,8 +28,14 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
 
     let client = Client::new();
     let mut downloaded = 0usize;
+    let mut skipped = 0usize;
 
     for mod_entry in &plan.mods {
+        if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+            skipped += 1;
+            continue;
+        }
+
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             if !archive.build.is_empty() {
                 for (layer_index, layer) in archive.build.iter().enumerate() {
@@ -66,7 +75,12 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
         }
     }
 
-    tracing::info!(downloaded, "download phase completed");
+    tracing::info!(
+        downloaded,
+        skipped_by_filter = skipped,
+        scope = %settings.filter.describe(),
+        "download phase completed"
+    );
     Ok(())
 }
 
@@ -587,6 +601,7 @@ mod tests {
             retry: 1,
             nexus_api_key: Some("test-key".to_string()),
             nexus_api_base: Some(format!("{}/v1", server.uri())),
+            filter: ModFilter::default(),
         };
 
         let plan = PersonalizedPlan {
@@ -600,6 +615,7 @@ mod tests {
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
+                section: Vec::new(),
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
@@ -654,6 +670,7 @@ mod tests {
             retry: 1,
             nexus_api_key: None,
             nexus_api_base: None,
+            filter: ModFilter::default(),
         };
 
         let plan = PersonalizedPlan {
@@ -667,6 +684,7 @@ mod tests {
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
+                section: Vec::new(),
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
