@@ -79,7 +79,24 @@ plugins = [
 	"Bruma Frostcrag Spire LOD.esp",
 	"lVWD for Leyawiin.esp",
 	"IC LOD.esp",
-	"MergedLOD.esp"
+	"MergedLOD.esp",
+	# Part 7. Every one of these except the first four is a Part 36 merge source
+	# and is `.mohidden` in the Oracle; here they stay active, because the merge
+	# that replaces them does not exist yet. Part 36 removes them from this list.
+	"Oblivion_Character_Overhaul.esp",
+	"Oblivion_Character_Overhaul_Faces.esp",
+	"Ragdolls.esp",
+	"EVE_KnightsoftheNine.esp",
+	"Character Customization Expanded.esp",
+	"NPC Hair Matches Beard.esp",
+	"OCO uses merged teeth.esp",
+	"OCOv2 Beast Races Enhanced.esp",
+	"Improved NPC Faces for OCOv2.esp",
+	"OCOv2 - DLC Addon.esp",
+	"OCO Unused Eyes and DLC Eyes Incorporated.esp",
+	"Baurus tweak.esp",
+	"Siren's Deception Beautified.esp",
+	"DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp"
 ]
 
 post-install-actions = ["loot-sort"]
@@ -1245,3 +1262,467 @@ bain_subpackages = [
 	"MOO Themed Loading Screens",
 	"Vanilla Style Loading Screens Addon derpy",
 ]
+
+# Guide 1a [MI]: the archive wraps everything in Data/, which the auto layout
+# already unwraps, so "manual install" needs no override here. The real
+# instruction is to deselect the plugin: 1b below ships the copy that is used.
+# Archive 5484 files, Oracle 5483 -- exactly this one.
+[[mods]]
+id = "Oblivion Character Overhaul version 2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44676/1000007063"
+download_handler = "nexus"
+file_name = "Oblivion Character Overhaul v203-44676-2-03.zip"
+exclude = ["**/Oblivion_Character_Overhaul.esp"]
+# oracle version f2.03
+
+[[mods]]
+id = "Oblivion Character Overhaul - Advanced Edition"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52010/1000034842"
+download_handler = "nexus"
+file_name = "OCOv2 - Advanced Edition (OCOv2 Hairstyles)-52010-1-5-1685711033.7z"
+# oracle version 1.5.0.0
+
+# Guide 2: "delete/hide the textures\characters\nuska\hair folder". The Oracle
+# hid it, so the folder is still there as `hair.mohidden`.
+# The archive's own top folder is misspelled "Enahced"; that is the archive, not
+# a typo here.
+[[mods]]
+id = "AI Enhanced - Oblivion Character Overhaul version 2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52135/1000031704"
+download_handler = "nexus"
+file_name = "AI Enhanced - Oblivion Character Overhaul v203 Textures-52135-1-0-1657042577.rar"
+layout = "custom-data-folder"
+data_folder = "AI Enahced - Oblivion Character Overhaul 2"
+
+[[mods.actions]]
+action = "file_hide"
+paths = ["textures/characters/nuska/hair"]
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Ragdolls for Oblivion"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51844/1000030664"
+download_handler = "nexus"
+file_name = "Ragdolls - Main File-51844-1-1-1648036849.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Ragdolls for Oblivion - Wraith"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51844/1000030650"
+download_handler = "nexus"
+file_name = "Wraith Ragdoll - Optional File-51844-1-0-1647893556.7z"
+# oracle version 1.0.0.0
+
+# Guide 4: create meshes/, then characters/ inside it, then drag _1stperson and
+# _male in. The archive is those two folders and nothing else (3 files), so the
+# whole instruction is one target_subdir.
+[[mods]]
+id = "Light compatible Skeleton"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49080/1000030663"
+download_handler = "nexus"
+file_name = "SkeletonV5-49080-5-0-1648036451.7z"
+target_subdir = "meshes/characters"
+# oracle version 5.0.0.0
+
+# Guide 5: hide or delete the two EVE plugins and meshes/characters/Argonian.
+# EVE_KnightsoftheNine.esp stays and is active. Neither hidden plugin is a merge
+# source, which is what distinguishes these from the plugins Part 36 hides.
+[[mods]]
+id = "Seamless - OCOv2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45859/1000027820"
+download_handler = "nexus"
+file_name = "SR- OCOv2 44676-45859-1-5a-1621134647.7z"
+[[mods.actions]]
+action = "file_hide"
+paths = [
+  "EVE_ShiveringIslesEasterEggs.esp",
+  "EVE_StockEquipmentReplacer.esp",
+  "meshes/characters/argonian",
+]
+# oracle version 1.5.0.0a
+
+[[mods]]
+id = "Seamless - OCOv2 - Nudes"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45859/1000027792"
+download_handler = "nexus"
+file_name = "SR- OCOv2 Nudes-45859-1-5-1620999021.7z"
+# oracle version 1.5.0.0
+
+[[mods]]
+id = "Seamless - OCOv2 - Wide Chin Dunmer"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45859/1000022987"
+download_handler = "nexus"
+file_name = "SR- OCOv2 Wider Chin Dunmer-45859-1-0-1569002808.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "New Brows for OCO v2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48199/1000018239"
+download_handler = "nexus"
+file_name = "New Brows for OCO v2-48199-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Detailed Mouth for OCOv2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47463/1000015727"
+download_handler = "nexus"
+file_name = "Realistic Mouth OCOv2-47463-1-2.rar"
+# oracle version 1.2.0.0
+
+[[mods]]
+id = "Oblivion Texture Overhaul - Realistic Mouth ( Teeth plus )"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51720/1000030128"
+download_handler = "nexus"
+file_name = "Oblivion Texture Overhaul - Realistic Mouth ( Teeth plus )-51720-1-0-1643211204.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "New Eyes for OCO v2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46995/1000018581"
+download_handler = "nexus"
+file_name = "New Eyes for OCOv2-46995-1-5.7z"
+# oracle version 1.5.0.0
+
+[[mods]]
+id = "Beards in Tamriel"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47071/1000014356"
+download_handler = "nexus"
+file_name = "Beards-47071-1.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "NPC Hair Matches Beard - Updated"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49861/1000031093"
+download_handler = "nexus"
+file_name = "NPC Hair Matches Beard - Updated-49861-1-3-1651775539.7z"
+# oracle version 1.3.0.0
+
+[[mods]]
+id = "OCOv2 Male Beard"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48816/1000029376"
+download_handler = "nexus"
+file_name = "OCOv2 Male Beard 1.12-48816-1-12-1634912853.zip"
+# oracle version 1.12.0.0
+
+[[mods]]
+id = "OCOv2 Uses Merged Teeth"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48378/1000019010"
+download_handler = "nexus"
+file_name = "OCOv2 uses merged teeth-48378-1.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Distinct Nord Stubbles for OCOv2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50906/1000027201"
+download_handler = "nexus"
+file_name = "Distinct Nord Stubbles for OCOv2-50906-1-2-1615556758.7z"
+# oracle version 1.2.0.0
+
+[[mods]]
+id = "Lifelike Eye Normalmaps"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47467/1000017182"
+download_handler = "nexus"
+file_name = "Lifelike Eyes OCOv2-47467-1-1-11.rar"
+# oracle version 1.1.11.0
+
+[[mods]]
+id = "Warpaints scars and face markings for OCO2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51511/1000029445"
+download_handler = "nexus"
+file_name = "Main File-51511-2-0-1635777181.rar"
+# oracle version 2.0.0.0
+
+# Guide 18, second archive. Data/ sits inside a folder called `patch`, which
+# the auto layout only unwraps when that folder is named after the mod.
+[[mods]]
+id = "Warpaints scars and face markings for OCO2 - Argonian and Khajiit Patch"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51511/1000029601"
+download_handler = "nexus"
+file_name = "Argonian and Khajiit patch-51511-1-0-1637434309.rar"
+layout = "custom-data-folder"
+data_folder = "patch/Data"
+# oracle version 1.0.0.0
+
+# Guide 18, third archive. Same nesting as the one above.
+[[mods]]
+id = "Warpaints scars and face markings for OCO2 - Argonian Patch for Seamless"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51511/1000029446"
+download_handler = "nexus"
+file_name = "Argonians patch for Seamless mod-51511-1-0-1635777320.rar"
+layout = "custom-data-folder"
+data_folder = "argonians seamless patch/Data"
+# oracle version 1.0.0.0
+
+# Guide 19: BAIN, "001 core" only. The other two subpackages are alternates for
+# setups this list does not use (Seamless Khajiit/Argonian, VKVII Argonian).
+[[mods]]
+id = "For OCOv2 - Reposition Teeth For All Races"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51625/1000031809"
+download_handler = "nexus"
+file_name = "Reposition Teeth For All Races - OCOv2-51625-1-3-1658007270.rar"
+layout = "bain"
+bain_subpackages = ["001 core"]
+# oracle version 1.3.0.0
+
+[[mods]]
+id = "OCO 2 glowing nostrils fix"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46342/1000011223"
+download_handler = "nexus"
+file_name = "OCO2 nostrils fix-46342-1-0.7z"
+# oracle version 1.0.0.0
+
+# Guide 21 [MI]: the data folder is two levels down. The plugin is deleted (the
+# Oracle's folder has no copy at all); the rest of the list is hidden.
+#
+# GUIDE/ORACLE CONFLICT, unresolved -- see notes/part-07-character-and-npcs.md.
+# The guide says to remove "Textures > Characters > Nuska > Khajiit >
+# headkhajiit (x2 files)". The Oracle instead hid textures/characters/khajiit/
+# headkhajiit*.dds and left the nuska pair alone. Both pairs exist in the
+# archive. Following the guide, so this row differs from the Oracle by 4 files.
+[[mods]]
+id = "OCOv2 Enhanced Beast Races patch"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47866/1000020510"
+download_handler = "nexus"
+file_name = "OCOv2 Personal Beast Tweak-47866-1-5.rar"
+layout = "custom-data-folder"
+data_folder = "OCO Enhanced Beast Races/Data"
+exclude = ["**/OCOv2 Beast Races Enhanced.esp"]
+
+[[mods.actions]]
+action = "file_hide"
+paths = [
+  "meshes/characters/argonian/headargonian.egt",
+  "textures/characters/argonian/female",
+  "textures/characters/argonian/male",
+  "textures/characters/khajiit/female",
+  "textures/characters/khajiit/male",
+  "textures/characters/khajiit/earkhajiit.dds",
+  "textures/characters/khajiit/earkhajiit_n.dds",
+  "textures/characters/nuska/khajiit/headkhajiit.dds",
+  "textures/characters/nuska/khajiit/headkhajiit_n.dds",
+]
+# oracle version 1.5.0.0
+
+# Guide 22: delete the female Argonian tail mesh. The Oracle deleted it rather
+# than hiding it, so `exclude` matches. Its plugin stays: unlike the Seamless
+# pair above, this one is a Prebash merge source and Part 36 hides it.
+[[mods]]
+id = "Claws whiskers and Seamless tails only"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47866/1000017356"
+download_handler = "nexus"
+file_name = "Claws whiskers and Seamless tails only-47866-.rar"
+layout = "custom-data-folder"
+data_folder = "Optional Seamless"
+exclude = ["**/bodyassetoverrides/perrace/F/argonian_tail.nif"]
+# oracle version 0.0.0.0-1500233492
+
+[[mods]]
+id = "Enhanced Beast Races HGEC Argonian patch"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51542/1000029557"
+download_handler = "nexus"
+file_name = "HGEC Argonian fix-51542-1-0-1636906971.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Enhanced Beast Races alternate male Argonians"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51685/1000030031"
+download_handler = "nexus"
+file_name = "Main File-51685-1-0-1642182406.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Improved NPC Faces for OCOv2"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51971/1000039077"
+download_handler = "nexus"
+file_name = "Improved NPC Faces for OCOv2-51971-4-7-1723579509.7z"
+# oracle version 4.7.0.0
+
+[[mods]]
+id = "Oblivion Character Overhaul v2 - DLC Addon"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52405/1000036241"
+download_handler = "nexus"
+file_name = "Oblivion Character Overhaul v2 DLC Addon-52405-1-2-1695444012.7z"
+# oracle version 1.2.0.0
+
+[[mods]]
+id = "Unused OCOv2 Eyes and DLC Characters Incorporated"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52052/1000036242"
+download_handler = "nexus"
+file_name = "Unused OCOv2 Eyes and DLC Characters Incorporated-52052-2-5-1695444069.7z"
+# oracle version 2.5.0.0
+
+[[mods]]
+id = "OCOv2 Baurus tweak"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48370/1000018990"
+download_handler = "nexus"
+file_name = "OCOv2 Baurus tweak-48370-1.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Sirens Deception Beautified"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/42291/91063"
+download_handler = "nexus"
+file_name = "Sirens Deception Beautified-42291-1-0.7z"
+# oracle version 1.0.0.0
+
+# Guide 30: one folder out of a 16-folder collection, named after what it is
+# because the same archive is installed several times across the list.
+#
+# The guide says to *delete* DispMiscPatch_OCOv2 - VKVII Argonian and Khajiit
+# Patch.esp; the Oracle hid it. Same effect, and hiding is what the Oracle
+# contains, so the diff stays clean. The other plugin here is a merge source and
+# is left for Part 36.
+[[mods]]
+id = "Oblivion Character Overhaul Version 2 Patches"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "custom-data-folder"
+data_folder = "Oblivion Character Overhaul version 2 Patches"
+
+[[mods.actions]]
+action = "file_hide"
+paths = ["DispMiscPatch_OCOv2 - VKVII Argonian and Khajiit Patch.esp"]
+# oracle version 1.2.2.0
+
+[[mods]]
+id = "OCOv2 Eyelash Mesh Fix"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53752/1000037527"
+download_handler = "nexus"
+file_name = "OCOv2 Eyelash Mesh Fix-53752-1-0-1706395425.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Character Customization Expanded"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53860/1000037957"
+download_handler = "nexus"
+file_name = "Character Customization Expanded-53860-1-02-1709844542.7z"
+# oracle version f1.02
+
+[[mods]]
+id = "Improved Vanilla Hairs"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49078/1000021333"
+download_handler = "nexus"
+file_name = "Mesh Improvements-49078-v3-1550035489.7z"
+# oracle version 3.0.0.0
+
+[[mods]]
+id = "Improved Vanilla Hairs - Textures"
+section = ["7 - CHARACTER AND NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49078/1000021191"
+download_handler = "nexus"
+file_name = "Full Textures-49078-v2-1548284164.zip"
+# oracle version 2.0.0.0

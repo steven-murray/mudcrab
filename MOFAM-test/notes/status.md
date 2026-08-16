@@ -9,9 +9,9 @@ Last updated: 2026-08-16.
 
 - **Tooling (plan Phase 2) is complete.** `add`, `diff`, `inspect`,
   `--section`/`--only` filters, `--archive-search-path`, `install --force`,
-  `add --before-mod`, `inspect` of a `.bsa`, native BSA
-  reader/writer, `pack_bsa` / `create_dummy_plugin` / `file_prune`.
-  324 tests, clippy clean under `-D warnings`.
+  `add --before-mod`, `inspect` of a `.bsa`, native BSA reader/writer,
+  `pack_bsa` / `create_dummy_plugin` / `file_prune` / `file_hide`.
+  334 tests, clippy clean under `-D warnings`.
 - **Merges**: all six reproduce zMerge semantically. Unique Forts and TACE
   verified in game. Prebash rebuilt without `ORC.esp` for the Oracle.
 - **Parts 1, 2, 3, 4, 6** authored (105 mods, pre-existing).
@@ -27,6 +27,25 @@ matched nothing for a bare directory name (and said nothing about it), and
 `pack_bsa` wrote zero asset-kind flags, which makes an archive invisible to the
 engine. Neither was visible from the install -- only from the diff.
 
+## Done: Part 7 (Character & NPCs)
+
+38 mods (33 guide rows; seven say "install separately"). **26 identical, 12
+differing, all explained** in `part-07-character-and-npcs.md`:
+
+- **10** are one plugin each, hidden in the Oracle and active here, and every
+  one is a Part 36 merge source. Expected until the merge exists. The
+  correspondence is exact -- of the 13 plugins the Oracle hides in this
+  section, precisely the 3 that are *not* merge sources are the 3 the guide
+  gives an explicit hide/delete instruction for.
+- **1** is a guide/Oracle conflict on 4 files, unresolved, following the guide.
+  Needs an in-game look at a Khajiit head at SP1.
+- **1** is a readme sitting outside the archive's `Data/` folder.
+
+Added `file_hide` (MO2's rename-to-`.mohidden`, for the guide's constant "hide
+or delete"), and fixed `diff` being blind to hiding -- it stripped `.mohidden`
+from filenames only, and never reported a hidden-state mismatch at all. Without
+that fix this section would have reported 37 of 38 identical and been wrong.
+
 ## Next sections
 
 Guide order from Part 7. Most rows are trivial; the ones needing new features
@@ -35,8 +54,8 @@ The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at
 Part 25, which is modelled as one mod with several archives.
 
-**Stop-point SP1 covers Parts 5-7**, so Parts 6 (already built) and 7 come
-before the user next loads the game.
+**Stop-point SP1 (Parts 5-7) is now complete** -- ready for the user to load
+the game. Next section is Part 8 (Overhauls: Maskar).
 
 ## Open threads
 
@@ -44,7 +63,11 @@ before the user next loads the game.
   MudCrab Test reproduces the guide, which uses ORC v1.8.0 and therefore
   needs all 86. Do not copy the merge block across unchanged.
 - `Bruma Frostcrag Spire LOD.esp` is in `plugins` for now. Part 36 merges it
-  into Prebash, and the validator will then require its removal.
+  into Prebash, and the validator will then require its removal. The same
+  applies to 9 of Part 7's 14 plugins -- see that section's notes.
+- Section names are inconsistent: Parts 5 and 7 use the Oracle's numbered
+  separators (`7 - CHARACTER AND NPCS`), Parts 1-4 and 6 use bare names. Worth
+  one normalising pass, not worth churning mid-build.
 - Six mods legitimately have no Oracle counterpart and show as extras in
   `diff`: `xOBSE`, four `No Havoc Objects` splits, `T4UT - Menus Repolished`.
 - 51 Oracle mods post-date the March 2025 guide; `diff` flags them
