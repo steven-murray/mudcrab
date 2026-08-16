@@ -82,6 +82,19 @@ fn plan_mod(id: &str, section: &[&str], file_name: Option<&str>) -> String {
     )
 }
 
+/// The same entry, plus the `oracle_name` that says what the reference instance
+/// calls this mod when our id is deliberately different.
+fn aliased_plan_mod(id: &str, oracle_name: &str, section: &[&str]) -> String {
+    let sections = section
+        .iter()
+        .map(|name| format!("\"{name}\""))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!(
+        r#"{{"id": "{id}", "oracle_name": "{oracle_name}", "section": [{sections}], "archives": [], "files": [], "actions": []}}"#
+    )
+}
+
 #[test]
 fn identical_trees_report_no_differences_and_exit_zero() {
     let fixture = Fixture::new();
@@ -427,6 +440,115 @@ fn section_filtering_narrows_the_run_to_the_planned_section() {
     // The whole-tree run over the same fixture does see the broken mod, which
     // is what proves the filter narrowed rather than the mod being clean.
     fixture.diff().assert().failure();
+}
+
+/// Write the pair of folders that our id and the Oracle's disagree about.
+///
+/// One file matches and one differs, so a run that matched them up has
+/// something to say beyond "both sides exist".
+fn write_aliased_pair(fixture: &Fixture) {
+    write(&fixture.ours(), "Cleaned DLC Masters/shared.esp", "plugin bytes");
+    write(&fixture.oracle(), "Clean ESM/shared.esp", "plugin bytes");
+    write(&fixture.ours(), "Cleaned DLC Masters/notes.txt", "ours");
+    write(&fixture.oracle(), "Clean ESM/notes.txt", "theirs");
+}
+
+#[test]
+fn an_oracle_name_matches_the_differently_named_oracle_folder() {
+    let fixture = Fixture::new();
+    write_aliased_pair(&fixture);
+    fixture.write_plan(&aliased_plan_mod(
+        "Cleaned DLC Masters",
+        "Clean ESM",
+        &["MASTERS"],
+    ));
+
+    let assert = fixture
+        .diff()
+        .arg("--plan")
+        .arg(fixture.plan_path())
+        .assert()
+        .failure();
+    let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
+
+    // One mod, not two: the Oracle's folder was claimed by our id rather than
+    // reported as a mod of its own.
+    assert!(
+        text.contains("1 compared, 0 identical, 1 differing, 0 missing from ours, 0 extra in ours"),
+        "unexpected report:\n{text}"
+    );
+    // Reported under our id, naming the Oracle folder it was compared against.
+    assert!(
+        text.contains("~ Cleaned DLC Masters  (oracle: Clean ESM)"),
+        "unexpected report:\n{text}"
+    );
+    // Matching them up is only useful if the files were then compared.
+    assert!(
+        text.contains("content differs (1):") && text.contains("notes.txt"),
+        "unexpected report:\n{text}"
+    );
+    assert!(!text.contains("shared.esp"), "unexpected report:\n{text}");
+}
+
+#[test]
+fn without_an_oracle_name_the_same_pair_is_a_missing_and_an_extra() {
+    let fixture = Fixture::new();
+    write_aliased_pair(&fixture);
+    fixture.write_plan(&plan_mod("Cleaned DLC Masters", &["MASTERS"], None));
+
+    let assert = fixture
+        .diff()
+        .arg("--plan")
+        .arg(fixture.plan_path())
+        .assert()
+        .failure();
+    let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
+
+    assert!(
+        text.contains("2 compared, 0 identical, 0 differing, 1 missing from ours, 1 extra in ours"),
+        "unexpected report:\n{text}"
+    );
+    assert!(
+        text.contains("- Clean ESM  (missing from ours)"),
+        "unexpected report:\n{text}"
+    );
+    assert!(
+        text.contains("+ Cleaned DLC Masters  (not in the Oracle)"),
+        "unexpected report:\n{text}"
+    );
+    // No file was read for either side, so the real difference stays buried --
+    // which is the whole reason `oracle_name` exists.
+    assert!(!text.contains("content differs"), "unexpected report:\n{text}");
+}
+
+#[test]
+fn an_aliased_mod_we_have_not_built_is_reported_under_our_id() {
+    let fixture = Fixture::new();
+    write(&fixture.oracle(), "Clean ESM/shared.esp", "plugin bytes");
+    fixture.write_plan(&aliased_plan_mod(
+        "Cleaned DLC Masters",
+        "Clean ESM",
+        &["MASTERS"],
+    ));
+
+    let assert = fixture
+        .diff()
+        .arg("--plan")
+        .arg(fixture.plan_path())
+        .assert()
+        .failure();
+    let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
+
+    assert!(
+        text.contains("1 compared, 0 identical, 0 differing, 1 missing from ours, 0 extra in ours"),
+        "unexpected report:\n{text}"
+    );
+    // Our tree has no folder to take a name from, so the plan's id stands in;
+    // the Oracle's own name would be the one thing we know is not ours.
+    assert!(
+        text.contains("- Cleaned DLC Masters  (oracle: Clean ESM)  (missing from ours)"),
+        "unexpected report:\n{text}"
+    );
 }
 
 #[test]

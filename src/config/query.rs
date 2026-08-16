@@ -24,6 +24,7 @@ pub fn build_plan(compiled: &CompiledModlist, headless: bool) -> anyhow::Result<
             selected_mods.push(entry.id.clone());
             mods.push(PersonalizedMod {
                 id: entry.id.clone(),
+                oracle_name: entry.oracle_name.clone(),
                 section: entry.section.clone(),
                 mod_type: entry.mod_type,
                 merge: entry.merge.clone(),

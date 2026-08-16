@@ -73,8 +73,10 @@ pub struct DiffSettings {
 /// What a plan tells us about a mod that the directories themselves cannot.
 ///
 /// A mod folder on disk knows its name and its files. It does not know which
-/// section of the list it belongs to, nor which archive we intended to install
-/// it from, so `--section` filtering and archive comparison both need the plan.
+/// section of the list it belongs to, which archive we intended to install it
+/// from, nor what the Oracle calls it when we deliberately named it something
+/// else -- so `--section` filtering, archive comparison and `oracle_name`
+/// matching all need the plan.
 #[derive(Debug, Default)]
 pub struct PlanIndex {
     /// Keyed by lowercased id, because the directory on disk may not match the
@@ -83,10 +85,19 @@ pub struct PlanIndex {
     /// Distinct section paths in plan order, so the report is grouped the way
     /// the modlist is written rather than alphabetically.
     order: Vec<Vec<String>>,
+    /// Lowercased `oracle_name` to lowercased id, for the mods whose Oracle
+    /// folder is deliberately named differently from ours. Without this, the
+    /// Oracle's folder would be an unclaimed key and report as its own mod.
+    aliases: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default)]
 struct PlanEntry {
+    /// Our id in the plan's own spelling, used when the folder is missing from
+    /// our tree and there is no on-disk name to report it under.
+    id: String,
+    /// The Oracle's folder name, only when the plan states one that differs.
+    oracle_name: Option<String>,
     section: Vec<String>,
     file_names: Vec<String>,
 }
@@ -95,14 +106,26 @@ impl PlanIndex {
     pub fn from_plan(plan: &PersonalizedPlan) -> Self {
         let mut entries = HashMap::new();
         let mut order: Vec<Vec<String>> = Vec::new();
+        let mut aliases = HashMap::new();
 
         for mod_entry in &plan.mods {
             if !order.iter().any(|seen| seen == &mod_entry.section) {
                 order.push(mod_entry.section.clone());
             }
+            // An `oracle_name` that only restates the id is not an alias: it
+            // would map a key onto itself and claim the mod's own folder.
+            let oracle_name = mod_entry
+                .oracle_name
+                .clone()
+                .filter(|name| !name.eq_ignore_ascii_case(&mod_entry.id));
+            if let Some(name) = &oracle_name {
+                aliases.insert(name.to_lowercase(), mod_entry.id.to_lowercase());
+            }
             entries.insert(
                 mod_entry.id.to_lowercase(),
                 PlanEntry {
+                    id: mod_entry.id.clone(),
+                    oracle_name,
                     section: mod_entry.section.clone(),
                     file_names: mod_entry
                         .archives
@@ -113,11 +136,24 @@ impl PlanIndex {
             );
         }
 
-        Self { entries, order }
+        Self {
+            entries,
+            order,
+            aliases,
+        }
     }
 
     fn get(&self, id: &str) -> Option<&PlanEntry> {
         self.entries.get(&id.to_lowercase())
+    }
+
+    /// Whether this Oracle folder is claimed by some *other* mod's
+    /// `oracle_name` and so must not be compared as a mod in its own right.
+    ///
+    /// A key that is also one of our own ids stays a mod: two entries could
+    /// legitimately collide, and dropping ours would hide it entirely.
+    fn is_claimed_alias(&self, key: &str) -> bool {
+        self.aliases.contains_key(key) && !self.entries.contains_key(key)
     }
 }
 
@@ -182,6 +218,11 @@ pub struct VersionInfo {
 #[derive(Debug, Clone, Serialize)]
 pub struct ModDiff {
     pub id: String,
+    /// The Oracle folder this was compared against, when the plan aliased it to
+    /// a different id of ours. Always reported under our id; this names the
+    /// folder the other side of the comparison actually came from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_name: Option<String>,
     pub section: Vec<String>,
     pub presence: Presence,
     /// Folder-relative paths present only in our tree.
@@ -277,6 +318,9 @@ pub fn diff_all(settings: &DiffSettings) -> anyhow::Result<DiffReport> {
 struct Candidate {
     /// Display id: our spelling where we have it, the Oracle's otherwise.
     id: String,
+    /// The Oracle's folder name, only when the plan aliased it to a different
+    /// id of ours. Carried so the report can say which folder it compared.
+    oracle_name: Option<String>,
     section: Vec<String>,
     ours: Option<PathBuf>,
     oracle: Option<PathBuf>,
@@ -315,21 +359,52 @@ fn union_candidates(
     oracle: &BTreeMap<String, PathBuf>,
     settings: &DiffSettings,
 ) -> Vec<Candidate> {
-    let mut keys: Vec<&String> = ours.keys().chain(oracle.keys()).collect();
+    let mut keys: Vec<String> = ours.keys().chain(oracle.keys()).cloned().collect();
+    // An aliased mod we have not built yet has no key on either side under our
+    // id -- only the Oracle's differently-named folder, which is skipped below.
+    // Adding our id back is what makes it report as missing rather than vanish.
+    if let Some(plan) = &settings.plan {
+        for (oracle_key, id_key) in &plan.aliases {
+            if oracle.contains_key(oracle_key) {
+                keys.push(id_key.clone());
+            }
+        }
+    }
     keys.sort_unstable();
     keys.dedup();
 
     let mut candidates = Vec::new();
     for key in keys {
-        let ours_path = ours.get(key);
-        let oracle_path = oracle.get(key);
-        let id = ours_path
-            .or(oracle_path)
-            .and_then(|path| path.file_name())
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_else(|| key.clone());
+        if settings
+            .plan
+            .as_ref()
+            .is_some_and(|plan| plan.is_claimed_alias(&key))
+        {
+            continue;
+        }
 
-        let entry = settings.plan.as_ref().and_then(|plan| plan.get(&id));
+        let entry = settings.plan.as_ref().and_then(|plan| plan.get(&key));
+        // Our side is always keyed by our own id; only the Oracle side follows
+        // `oracle_name`, and only when the plan set one.
+        let ours_path = ours.get(&key);
+        let oracle_name = entry.and_then(|entry| entry.oracle_name.clone());
+        let oracle_path = match &oracle_name {
+            Some(name) => oracle.get(&name.to_lowercase()),
+            None => oracle.get(&key),
+        };
+
+        let id = match ours_path {
+            Some(path) => file_name_of(path, &key),
+            // The Oracle's folder name is not ours to report an aliased mod
+            // under, so the plan's spelling stands in when our tree has none.
+            None if oracle_name.is_some() => {
+                entry.map(|entry| entry.id.clone()).unwrap_or_else(|| key.clone())
+            }
+            None => oracle_path
+                .map(|path| file_name_of(path, &key))
+                .unwrap_or_else(|| key.clone()),
+        };
+
         let section = entry.map(|entry| entry.section.clone()).unwrap_or_default();
 
         if !settings.filter.matches(&section, &id) {
@@ -338,6 +413,7 @@ fn union_candidates(
 
         candidates.push(Candidate {
             id,
+            oracle_name,
             section,
             ours: ours_path.cloned(),
             oracle: oracle_path.cloned(),
@@ -346,6 +422,12 @@ fn union_candidates(
     }
 
     candidates
+}
+
+fn file_name_of(path: &Path, fallback: &str) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_else(|| fallback.to_string())
 }
 
 /// Spread the mods across a small worker pool.
@@ -402,6 +484,7 @@ fn compare_in_parallel(candidates: &[Candidate]) -> Vec<ModDiff> {
 fn compare_mod(candidate: &Candidate) -> ModDiff {
     let mut diff = ModDiff {
         id: candidate.id.clone(),
+        oracle_name: candidate.oracle_name.clone(),
         section: candidate.section.clone(),
         presence: match (&candidate.ours, &candidate.oracle) {
             (Some(_), Some(_)) => Presence::Both,
@@ -879,16 +962,24 @@ pub fn render_text(report: &DiffReport) -> String {
 }
 
 fn render_mod(out: &mut String, diff: &ModDiff) {
+    // Reported under our id, with the Oracle's own folder named alongside it so
+    // the line can still be found in the reference instance.
+    let alias = diff
+        .oracle_name
+        .as_deref()
+        .map(|name| format!("  (oracle: {name})"))
+        .unwrap_or_default();
+
     match diff.presence {
         Presence::OracleOnly => {
-            out.push_str(&format!("  - {}  (missing from ours)\n", diff.id));
+            out.push_str(&format!("  - {}{alias}  (missing from ours)\n", diff.id));
             return;
         }
         Presence::OursOnly => {
-            out.push_str(&format!("  + {}  (not in the Oracle)\n", diff.id));
+            out.push_str(&format!("  + {}{alias}  (not in the Oracle)\n", diff.id));
             return;
         }
-        Presence::Both => out.push_str(&format!("  ~ {}\n", diff.id)),
+        Presence::Both => out.push_str(&format!("  ~ {}{alias}\n", diff.id)),
     }
 
     if !diff.content_differs.is_empty() {
