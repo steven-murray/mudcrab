@@ -28,6 +28,8 @@ pub struct InstallSettings {
     pub archive_search_paths: Vec<PathBuf>,
     /// Rebuild every merge in scope even when its recorded inputs still match.
     pub force_merges: bool,
+    /// Reinstall every mod in scope even when its recorded definition matches.
+    pub force: bool,
 }
 
 pub mod layout;
@@ -182,7 +184,13 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             mod_target = handle_mod_conflict(&mod_target, &mod_entry.id, &definition_hash, settings)?;
         }
 
-        if should_skip_mod_install(&mod_target, &definition_hash, previous, settings.dry_run) {
+        if should_skip_mod_install(
+            &mod_target,
+            &definition_hash,
+            previous,
+            settings.dry_run,
+            settings.force,
+        ) {
             let previous_extracted = previous.map(|entry| entry.extracted_files).unwrap_or(0);
             let mut actions_applied = previous.map(|entry| entry.actions_applied).unwrap_or(false);
 
@@ -653,13 +661,14 @@ mod tests {
                     installed_path: String::new(),
         };
 
-        assert!(should_skip_mod_install(&mod_target, &hash, Some(&previous), false));
+        assert!(should_skip_mod_install(&mod_target, &hash, Some(&previous), false, false));
 
         let different_hash = "deadbeef".to_string();
         assert!(!should_skip_mod_install(
             &mod_target,
             &different_hash,
             Some(&previous),
+            false,
             false
         ));
 
@@ -668,10 +677,16 @@ mod tests {
             &missing_target,
             &hash,
             Some(&previous),
+            false,
             false
         ));
 
-        assert!(!should_skip_mod_install(&mod_target, &hash, Some(&previous), true));
+        assert!(!should_skip_mod_install(&mod_target, &hash, Some(&previous), true, false));
+
+        // --force reinstalls a mod the fingerprint says is settled. The
+        // fingerprint covers the plan, not the installer, so it cannot see a
+        // change in what an action does.
+        assert!(!should_skip_mod_install(&mod_target, &hash, Some(&previous), false, true));
     }
 
     #[test]

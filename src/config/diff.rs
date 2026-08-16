@@ -757,39 +757,86 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
 
     VersionInfo {
         oracle_version: meta.version,
-        guide_age: classify_guide_age(installation_file.as_deref()),
+        guide_age: classify_guide_age(
+            installation_file.as_deref(),
+            meta.nexus_last_modified.as_deref(),
+        ),
         oracle_installation_file: installation_file,
         plan_file_name,
         archive_mismatch,
     }
 }
 
-/// Date the Oracle's archive from the timestamp Nexus embeds in its filename.
+/// Date the Oracle's archive, to decide whether the March 2025 guide could
+/// have meant this file.
 ///
-/// Nexus names downloads `<title>-<modid>-<version parts>-<unix timestamp>.7z`,
-/// but only for files uploaded since it started doing so: older archives end in
-/// the bare mod id, and hand-named ones end in nothing useful. An unreadable
-/// timestamp is reported as unreadable, because "no timestamp" and "old enough"
-/// are very different answers to "did the guide mean this file?".
-pub fn classify_guide_age(installation_file: Option<&str>) -> GuideAge {
-    let Some(name) = installation_file.map(str::trim).filter(|name| !name.is_empty()) else {
-        return GuideAge::Unknown {
-            reason: "the Oracle's meta.ini records no installationFile".to_string(),
-        };
-    };
+/// Two sources, in order of how specific they are:
+///
+/// 1. The timestamp Nexus embeds in a download's filename
+///    (`<title>-<modid>-<version parts>-<unix timestamp>.7z`). This names the
+///    exact file, so it is preferred -- but Nexus only started doing it at some
+///    point, and older archives end in the bare mod id or nothing useful.
+/// 2. `nexusLastModified` from the Oracle's `meta.ini`, which MO2 records when
+///    it fetches. Present for 704 of the Oracle's 745 mods, and it agrees with
+///    the filename timestamp wherever both exist.
+///
+/// With neither, the age is reported as unknown rather than guessed: "no
+/// timestamp" and "old enough" are very different answers.
+pub fn classify_guide_age(
+    installation_file: Option<&str>,
+    nexus_last_modified: Option<&str>,
+) -> GuideAge {
+    let name = installation_file.map(str::trim).filter(|name| !name.is_empty());
 
-    let Some(timestamp) = parse_trailing_timestamp(name) else {
-        return GuideAge::Unknown {
-            reason: format!("no Unix timestamp in '{name}'"),
-        };
-    };
+    if let Some(timestamp) = name.and_then(parse_trailing_timestamp) {
+        return classify_timestamp(timestamp);
+    }
 
+    if let Some(timestamp) = nexus_last_modified.and_then(parse_iso8601_date) {
+        return classify_timestamp(timestamp);
+    }
+
+    GuideAge::Unknown {
+        reason: match name {
+            Some(name) => format!("no Unix timestamp in '{name}', and no nexusLastModified"),
+            None => "the Oracle's meta.ini records no installationFile".to_string(),
+        },
+    }
+}
+
+fn classify_timestamp(timestamp: i64) -> GuideAge {
     let date = format_date(timestamp);
     if timestamp >= GUIDE_CUTOFF {
         GuideAge::PostGuide { timestamp, date }
     } else {
         GuideAge::PreGuide { timestamp, date }
     }
+}
+
+/// Seconds since the epoch for an MO2 `nexusLastModified` value.
+///
+/// Only the date is read. The value is always UTC (`2012-05-20T03:59:22Z`), and
+/// the question being asked -- before or after March 2025 -- is not one a
+/// time-of-day can change the answer to.
+fn parse_iso8601_date(value: &str) -> Option<i64> {
+    let date = value.trim().split('T').next()?;
+    let mut parts = date.split('-');
+    let year: i64 = parts.next()?.parse().ok()?;
+    let month: i64 = parts.next()?.parse().ok()?;
+    let day: i64 = parts.next()?.parse().ok()?;
+    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+
+    // Days from the epoch to the civil date, by Howard Hinnant's algorithm.
+    let year = year - i64::from(month <= 2);
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    let days = era * 146_097 + day_of_era - 719_468;
+
+    Some(days * 86_400)
 }
 
 fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
@@ -1152,24 +1199,64 @@ mod tests {
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
         assert_eq!(
-            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z")),
+            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None),
             GuideAge::PreGuide {
                 timestamp: 1_647_873_144,
                 date: "2022-03-21".to_string()
             }
         );
         assert_eq!(
-            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z")),
+            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None),
             GuideAge::PostGuide {
                 timestamp: 1_750_000_000,
                 date: "2025-06-15".to_string()
             }
         );
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory-19039.7z")),
+            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None),
             GuideAge::Unknown { .. }
         ));
-        assert!(matches!(classify_guide_age(None), GuideAge::Unknown { .. }));
+        assert!(matches!(classify_guide_age(None, None), GuideAge::Unknown { .. }));
+    }
+
+    #[test]
+    fn nexus_last_modified_dates_an_archive_whose_filename_cannot() {
+        // Evenstars ships as `Evenstar CW LOD-42190-1-2.7z`: the trailing field
+        // is the version, not a timestamp, so the filename says nothing about
+        // when the file was uploaded. MO2 recorded the date anyway.
+        let age = classify_guide_age(
+            Some("Evenstar CW LOD-42190-1-2.7z"),
+            Some("2012-05-20T03:59:22Z"),
+        );
+        assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
+
+        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"));
+        assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
+    }
+
+    #[test]
+    fn a_filename_timestamp_wins_over_the_meta_ini_date() {
+        // The filename names *this* file; nexusLastModified is about the mod
+        // page and can have moved on since.
+        let age = classify_guide_age(
+            Some("Better Fort Aurus-50682-1-1-1647873144.7z"),
+            Some("2026-01-01T00:00:00Z"),
+        );
+        match age {
+            GuideAge::PreGuide { date, .. } => assert_eq!(date, "2022-03-21"),
+            other => panic!("expected the filename's 2022 date, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unparseable_meta_ini_date_leaves_the_age_unknown() {
+        for value in ["", "not a date", "2012-13-01T00:00:00Z", "2012-05-32"] {
+            let age = classify_guide_age(Some("Hand Named.7z"), Some(value));
+            assert!(
+                matches!(age, GuideAge::Unknown { .. }),
+                "'{value}' should not parse as a date, got {age:?}"
+            );
+        }
     }
 
     #[test]
