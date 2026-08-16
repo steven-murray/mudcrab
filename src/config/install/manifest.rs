@@ -100,8 +100,12 @@ pub(crate) fn should_skip_mod_install(
     definition_hash: &str,
     previous: Option<&InstalledMod>,
     dry_run: bool,
+    force: bool,
 ) -> bool {
-    if dry_run {
+    // The fingerprint covers the plan, not mudcrab itself, so a mod whose spec
+    // is unchanged is skipped even when the code that installs it has changed.
+    // `--force` is the way back out of that.
+    if force || dry_run {
         return false;
     }
 

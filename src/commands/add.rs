@@ -1,6 +1,8 @@
 use crate::cli::AddArgs;
 use crate::config;
-use crate::config::add::{find_plugins, parse_meta_ini, plan_insertion_before, NewMod, OracleMeta};
+use crate::config::add::{
+    find_plugins, parse_meta_ini, plan_insertion_at, NewMod, OracleMeta, Placement,
+};
 use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
 
@@ -29,12 +31,11 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
         );
     }
 
-    let before: Option<&[String]> = if args.before_sections.is_empty() {
-        None
-    } else {
-        Some(&args.before_sections)
+    let placement = Placement {
+        before_mod: args.before_mod.clone(),
+        before_section: (!args.before_sections.is_empty()).then(|| args.before_sections.clone()),
     };
-    let plan = plan_insertion_before(&original, &source.mods, &new_mod, before)?;
+    let plan = plan_insertion_at(&original, &source.mods, &new_mod, &placement)?;
 
     if new_mod.section.is_empty() {
         eprintln!(

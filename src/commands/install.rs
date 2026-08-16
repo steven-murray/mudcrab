@@ -45,7 +45,10 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         },
         filter: args.filter.to_mod_filter(),
         archive_search_paths: args.archive_sources.archive_search_paths.clone(),
-        force_merges: args.force_merges,
+        // Forcing a reinstall without also forcing the merges would rebuild
+        // the sources and leave merges built from the old ones.
+        force_merges: args.force_merges || args.force,
+        force: args.force,
     };
 
     config::install::install_all(&plan, &settings)?;
@@ -59,6 +62,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         game_dir = %game_dir.display(),
         skip_actions = args.skip_actions,
         force_merges = args.force_merges,
+        force = args.force,
         dry_run = args.dry_run,
         "install requested"
     );

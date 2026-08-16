@@ -861,3 +861,131 @@ mod tests {
         assert!(snippet.contains(r#"data_folder = "Odd\"Name\\Here""#), "{snippet}");
     }
 }
+
+// --- BSA ---------------------------------------------------------------------
+
+/// What `inspect` reports for a `.bsa`.
+///
+/// A BSA is not an installable archive -- it has no layout to guess and no
+/// modlist entry to paste -- so it gets its own report rather than being forced
+/// into `InspectReport`. What matters about one is its shape: how many files,
+/// how big they are unpacked, and whether the payloads are compressed, which is
+/// what decides whether two archives of the same content are the same size.
+#[derive(Debug, Serialize)]
+pub struct BsaReport {
+    pub archive: String,
+    pub file_name: String,
+    pub folder_count: usize,
+    pub file_count: usize,
+    /// Bytes the payloads occupy in the archive, as stored.
+    pub stored_bytes: u64,
+    /// Archive-wide flags, including `FLAG_COMPRESSED`.
+    pub archive_flags: u32,
+    pub file_flags: u32,
+    /// Whether the archive's default is compressed payloads.
+    pub compressed_by_default: bool,
+    /// Files whose payload is actually compressed. A file may opt out of the
+    /// archive default, so this is counted rather than inferred from the flag.
+    pub compressed_files: usize,
+    pub plugins: Vec<String>,
+    /// Every path in the archive; only populated with `--files`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub files: Option<Vec<String>>,
+}
+
+pub fn inspect_bsa(source: &Path, include_files: bool) -> anyhow::Result<BsaReport> {
+    let bytes = std::fs::read(source)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", source.display()))?;
+    let archive = crate::bsa::Bsa::parse(&bytes)
+        .map_err(|err| anyhow::anyhow!("failed to parse {}: {err}", source.display()))?;
+
+    let mut stored_bytes = 0u64;
+    let mut compressed_files = 0usize;
+    for (_, file) in archive.files() {
+        stored_bytes += file.stored_bytes().len() as u64;
+        if file.compressed {
+            compressed_files += 1;
+        }
+    }
+
+    let mut paths: Vec<String> = archive.paths().collect();
+    paths.sort();
+    let plugins: Vec<String> = paths
+        .iter()
+        .filter(|path| is_plugin_file(Path::new(&path.replace('\\', "/"))))
+        .cloned()
+        .collect();
+
+    Ok(BsaReport {
+        archive: source.display().to_string(),
+        file_name: source
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or_default()
+            .to_string(),
+        folder_count: archive.folders.len(),
+        file_count: archive.file_count(),
+        stored_bytes,
+        archive_flags: archive.archive_flags,
+        file_flags: archive.file_flags,
+        compressed_by_default: archive.compressed_by_default(),
+        compressed_files,
+        plugins,
+        files: include_files.then_some(paths),
+    })
+}
+
+pub fn render_bsa_text(report: &BsaReport) -> String {
+    let mut out = String::new();
+
+    out.push_str(&format!("archive: {}\n", report.archive));
+    out.push_str(&format!(
+        "files:   {} in {} {}\n",
+        report.file_count,
+        report.folder_count,
+        plural(report.folder_count, "folder", "folders"),
+    ));
+    out.push_str(&format!(
+        "payload: {} bytes stored\n",
+        report.stored_bytes
+    ));
+    out.push_str(&format!(
+        "flags:   archive 0x{:08x}, file 0x{:08x}\n",
+        report.archive_flags, report.file_flags
+    ));
+    out.push_str(&format!(
+        "packed:  {} ({} of {} {} compressed)\n",
+        if report.compressed_by_default {
+            "compressed by default"
+        } else {
+            "uncompressed by default"
+        },
+        report.compressed_files,
+        report.file_count,
+        plural(report.file_count, "file", "files"),
+    ));
+
+    if !report.plugins.is_empty() {
+        out.push_str(&format!("\n{} plugins:\n", report.plugins.len()));
+        for plugin in &report.plugins {
+            out.push_str(&format!("  {plugin}\n"));
+        }
+    }
+
+    match &report.files {
+        Some(files) => {
+            out.push_str(&format!("\n{} files:\n", files.len()));
+            for path in files {
+                out.push_str(&format!("  {path}\n"));
+            }
+        }
+        None => {
+            out.push_str(&format!(
+                "\n{} files in the archive; pass --files to list them.\n",
+                report.file_count
+            ));
+        }
+    }
+
+    out
+}

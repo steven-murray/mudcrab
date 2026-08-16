@@ -38,6 +38,8 @@ pub struct NewMod {
 /// Where a rendered block will be spliced in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Anchor {
+    /// Immediately before a named mod's block, wherever in the file it sits.
+    BeforeMod(String),
     /// After the last existing `[[mods]]` block carrying this section path.
     AfterSection(Vec<String>),
     /// Before the first block of a named section, for starting a new section
@@ -51,6 +53,7 @@ pub enum Anchor {
 impl std::fmt::Display for Anchor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Anchor::BeforeMod(id) => write!(f, "immediately before '{id}'"),
             Anchor::AfterSection(path) => {
                 write!(f, "after the last mod in section {}", path.join(" - "))
             }
@@ -60,6 +63,23 @@ impl std::fmt::Display for Anchor {
             Anchor::EndOfFile => f.write_str("at the end of the file"),
         }
     }
+}
+
+/// Where the caller wants the block, when the default -- end of its section --
+/// is not right.
+///
+/// Order within a section is MO2 install order, which decides who wins a file
+/// conflict, so "append to the section" is only correct for a mod the guide
+/// lists last. Anything else needs one of these.
+#[derive(Debug, Clone, Default)]
+pub struct Placement {
+    /// Insert directly before this mod id. Takes precedence over everything
+    /// else, and is how a row lands at the *start* of a section: name the row
+    /// that currently comes first.
+    pub before_mod: Option<String>,
+    /// Only consulted when the new mod's section has no entries yet: start the
+    /// section immediately before this existing one instead of at end of file.
+    pub before_section: Option<Vec<String>>,
 }
 
 /// A planned edit. Holds the full new text so `--dry-run` and the real write
@@ -124,21 +144,21 @@ pub fn render_block(new_mod: &NewMod) -> String {
 ///
 /// `mods` must come from parsing `text`; the two are cross-checked.
 pub fn plan_insertion(text: &str, mods: &[ModEntry], new_mod: &NewMod) -> anyhow::Result<Insertion> {
-    plan_insertion_before(text, mods, new_mod, None)
+    plan_insertion_at(text, mods, new_mod, &Placement::default())
 }
 
-/// As `plan_insertion`, but when the new mod's section does not exist yet the
-/// block goes immediately *before* `before_section` rather than at end of file.
+/// As `plan_insertion`, but honouring an explicit `Placement`.
 ///
-/// Section order in the file is section order in MO2, so a section that
-/// belongs in the middle of the guide cannot simply be appended. Part 5 (LOD)
-/// is exactly this case: it was skipped, so it must be inserted ahead of
-/// Part 6 rather than after it.
-pub fn plan_insertion_before(
+/// Section order in the file is section order in MO2, and order within a
+/// section is priority order, so neither "append to the file" nor "append to
+/// the section" is universally right. Part 5 (LOD) needed both escapes: the
+/// section itself had to land ahead of Part 6, and its first row had to land
+/// ahead of the nine already written.
+pub fn plan_insertion_at(
     text: &str,
     mods: &[ModEntry],
     new_mod: &NewMod,
-    before_section: Option<&[String]>,
+    placement: &Placement,
 ) -> anyhow::Result<Insertion> {
     let kinds = classify_lines(text);
 
@@ -158,6 +178,25 @@ pub fn plan_insertion_before(
         );
     }
 
+    // Named neighbour first: it says exactly where to go, so nothing else is
+    // consulted. Unknown ids are refused rather than quietly falling back to
+    // the section default, which would put the block in the wrong place.
+    let pinned = match &placement.before_mod {
+        Some(wanted) => {
+            let index = mods
+                .iter()
+                .position(|entry| entry.id.eq_ignore_ascii_case(wanted))
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "cannot place the new mod before '{wanted}': the modlist has no mod \
+                         with that id"
+                    )
+                })?;
+            Some((index, wanted.clone()))
+        }
+        None => None,
+    };
+
     let target = if new_mod.section.is_empty() {
         None
     } else {
@@ -168,14 +207,15 @@ pub fn plan_insertion_before(
     };
 
     // A section that does not exist yet, placed relative to one that does.
-    let before = before_section.and_then(|wanted| {
+    let before = placement.before_section.as_ref().and_then(|wanted| {
         mods.iter()
             .enumerate()
             .find(|(_, entry)| section_eq(&entry.section, wanted))
-            .map(|(index, _)| (index, wanted.to_vec()))
+            .map(|(index, _)| (index, wanted.clone()))
     });
 
-    if let Some(wanted) = before_section
+    if let Some(wanted) = &placement.before_section
+        && pinned.is_none()
         && target.is_none()
         && before.is_none()
     {
@@ -185,15 +225,18 @@ pub fn plan_insertion_before(
         );
     }
 
-    let (boundary, anchor) = match (target, before) {
-        // Inserting before an existing section means landing ahead of that
-        // block's own comment run, not between the comments and their block.
-        (None, Some((index, wanted))) => (
+    let (boundary, anchor) = match (pinned, target, before) {
+        // Landing ahead of a block means landing ahead of its own comment run
+        // too, not between the comments and the block they describe.
+        (Some((index, id)), _, _) => (
+            back_up_to_content(&kinds, mod_headers[index], true),
+            Anchor::BeforeMod(id),
+        ),
+        (None, None, Some((index, wanted))) => (
             back_up_to_content(&kinds, mod_headers[index], true),
             Anchor::BeforeSection(wanted),
         ),
-        (target, _) => match target {
-        Some(index) => {
+        (None, Some(index), _) => {
             let start = mod_headers[index];
             let boundary = kinds[start + 1..]
                 .iter()
@@ -202,14 +245,13 @@ pub fn plan_insertion_before(
                 .unwrap_or(kinds.len());
             (boundary, Anchor::AfterSection(new_mod.section.clone()))
         }
-        None => (kinds.len(), Anchor::EndOfFile),
-        },
+        (None, None, None) => (kinds.len(), Anchor::EndOfFile),
     };
 
     // Only a boundary that is an actual header can have comments belonging to
-    // it; a trailing comment at end of file belongs to the file. A
-    // BeforeSection boundary has already been backed up past its comments.
-    let insert_at = if matches!(anchor, Anchor::BeforeSection(_)) {
+    // it; a trailing comment at end of file belongs to the file. The
+    // insert-before boundaries have already been backed up past their comments.
+    let insert_at = if matches!(anchor, Anchor::BeforeSection(_) | Anchor::BeforeMod(_)) {
         boundary
     } else {
         back_up_to_content(&kinds, boundary, boundary < kinds.len())
@@ -474,6 +516,11 @@ pub struct OracleMeta {
     pub installation_file: Option<String>,
     /// `[General] version`.
     pub version: Option<String>,
+    /// `[General] nexusLastModified`, an ISO-8601 instant: when Nexus last
+    /// changed the file MO2 downloaded. Present for 704 of the Oracle's 745
+    /// mods, and the only date available for an archive whose filename carries
+    /// no Nexus timestamp.
+    pub nexus_last_modified: Option<String>,
 }
 
 /// Parse the handful of keys `add` needs out of a `meta.ini`.
@@ -506,6 +553,9 @@ pub fn parse_meta_ini(text: &str) -> OracleMeta {
         match (section.as_str(), key) {
             ("general", "modid") => meta.mod_id = value.parse().ok(),
             ("general", "version") if !value.is_empty() => meta.version = Some(value.to_string()),
+            ("general", "nexusLastModified") if !value.is_empty() => {
+                meta.nexus_last_modified = Some(value.to_string());
+            }
             ("general", "installationFile") if !value.is_empty() => {
                 meta.installation_file = Some(value.to_string());
             }
@@ -563,6 +613,20 @@ fn collect_plugins(current: &Path, root: &Path, found: &mut Vec<String>) {
 mod tests {
     use super::*;
 
+    fn before_section(name: &str) -> Placement {
+        Placement {
+            before_section: Some(vec![name.to_string()]),
+            ..Placement::default()
+        }
+    }
+
+    fn before_mod(id: &str) -> Placement {
+        Placement {
+            before_mod: Some(id.to_string()),
+            ..Placement::default()
+        }
+    }
+
     fn entry(id: &str, section: &[&str]) -> ModEntry {
         let toml = format!(
             "id = {}\nsection = [{}]\n",
@@ -619,11 +683,15 @@ mod tests {
 
     #[test]
     fn meta_ini_reads_modid_fileid_installation_file_and_version() {
-        let text = "[General]\ngameName=Oblivion\nmodid=43752\nversion=11.1.0.0\ncategory=\"7,\"\ninstallationFile=Blockhead-43752-11-1-1640043918.7z\n\n[installedFiles]\nsize=1\n1\\modid=43752\n1\\fileid=1000029844\n";
+        let text = "[General]\ngameName=Oblivion\nmodid=43752\nversion=11.1.0.0\ncategory=\"7,\"\ninstallationFile=Blockhead-43752-11-1-1640043918.7z\nnexusLastModified=2021-12-20T22:25:18Z\n\n[installedFiles]\nsize=1\n1\\modid=43752\n1\\fileid=1000029844\n";
         let meta = parse_meta_ini(text);
 
         assert_eq!(meta.mod_id, Some(43752));
         assert_eq!(meta.file_id, Some(1000029844));
+        assert_eq!(
+            meta.nexus_last_modified.as_deref(),
+            Some("2021-12-20T22:25:18Z")
+        );
         assert_eq!(meta.version.as_deref(), Some("11.1.0.0"));
         assert_eq!(
             meta.installation_file.as_deref(),
@@ -703,7 +771,7 @@ mod tests {
             non_nexus: false,
         };
 
-        let plan = plan_insertion_before(text, &mods, &new_mod, Some(&["6 - UI".to_string()]))
+        let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
             .expect("should plan");
         assert_eq!(plan.anchor, Anchor::BeforeSection(vec!["6 - UI".to_string()]));
 
@@ -727,7 +795,7 @@ mod tests {
             non_nexus: false,
         };
 
-        let err = plan_insertion_before(text, &mods, &new_mod, Some(&["9 - NOPE".to_string()]))
+        let err = plan_insertion_at(text, &mods, &new_mod, &before_section("9 - NOPE"))
             .expect_err("should refuse rather than silently append");
         assert!(err.to_string().contains("no mod in the modlist is in that section"), "{err}");
     }
@@ -748,7 +816,7 @@ mod tests {
             non_nexus: false,
         };
 
-        let plan = plan_insertion_before(text, &mods, &new_mod, Some(&["6 - UI".to_string()]))
+        let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
             .expect("should plan");
         assert_eq!(plan.anchor, Anchor::AfterSection(vec!["5 - LOD".to_string()]));
         let lod2 = plan.new_text.find("lod2").expect("added");
@@ -756,4 +824,79 @@ mod tests {
         assert!(lod2 < six);
     }
 
+    #[test]
+    fn before_mod_puts_a_row_at_the_start_of_its_section() {
+        // Part 5's row 1 was authored last, so it had to land ahead of the nine
+        // rows already written -- order within a section is MO2 priority order.
+        let text = "name = \"x\"\nplugins = []\n\n[[mods]]\nid = \"vwd\"\nsection = [\"5 - LOD\"]\n\n[[mods]]\nid = \"j3\"\nsection = [\"5 - LOD\"]\n";
+        let mods = vec![entry("vwd", &["5 - LOD"]), entry("j3", &["5 - LOD"])];
+        let new_mod = NewMod {
+            id: "evenstars".to_string(),
+            section: vec!["5 - LOD".to_string()],
+            ..NewMod::default()
+        };
+
+        let plan = plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd"))
+            .expect("should plan");
+
+        assert_eq!(plan.anchor, Anchor::BeforeMod("vwd".to_string()));
+        let added = plan.new_text.find("evenstars").expect("added");
+        let first = plan.new_text.find("id = \"vwd\"").expect("existing first row");
+        assert!(added < first, "the new row must precede the one it was placed before");
+    }
+
+    #[test]
+    fn before_mod_lands_ahead_of_that_mods_own_comments() {
+        let text = "name = \"x\"\nplugins = []\n\n# why vwd is odd\n[[mods]]\nid = \"vwd\"\nsection = [\"5 - LOD\"]\n";
+        let mods = vec![entry("vwd", &["5 - LOD"])];
+        let new_mod = NewMod {
+            id: "evenstars".to_string(),
+            section: vec!["5 - LOD".to_string()],
+            ..NewMod::default()
+        };
+
+        let plan = plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd"))
+            .expect("should plan");
+
+        assert!(
+            plan.new_text.contains("# why vwd is odd\n[[mods]]\nid = \"vwd\""),
+            "the comment must stay glued to the block it describes:\n{}",
+            plan.new_text
+        );
+    }
+
+    #[test]
+    fn before_mod_beats_the_section_default() {
+        // The new mod's own section exists and ends elsewhere; --before-mod
+        // must win rather than appending to it.
+        let text = "name = \"x\"\nplugins = []\n\n[[mods]]\nid = \"a\"\nsection = [\"S\"]\n\n[[mods]]\nid = \"b\"\nsection = [\"S\"]\n";
+        let mods = vec![entry("a", &["S"]), entry("b", &["S"])];
+        let new_mod = NewMod {
+            id: "c".to_string(),
+            section: vec!["S".to_string()],
+            ..NewMod::default()
+        };
+
+        let plan = plan_insertion_at(text, &mods, &new_mod, &before_mod("b")).expect("should plan");
+
+        let a = plan.new_text.find("id = \"a\"").expect("a");
+        let c = plan.new_text.find("id = \"c\"").expect("c");
+        let b = plan.new_text.find("id = \"b\"").expect("b");
+        assert!(a < c && c < b, "c belongs between a and b");
+    }
+
+    #[test]
+    fn before_mod_naming_an_unknown_id_is_an_error() {
+        let text = "name = \"x\"\nplugins = []\n\n[[mods]]\nid = \"a\"\nsection = [\"S\"]\n";
+        let mods = vec![entry("a", &["S"])];
+        let new_mod = NewMod {
+            id: "c".to_string(),
+            section: vec!["S".to_string()],
+            ..NewMod::default()
+        };
+
+        let err = plan_insertion_at(text, &mods, &new_mod, &before_mod("nope"))
+            .expect_err("should refuse rather than fall back to the section default");
+        assert!(err.to_string().contains("no mod with that id"), "{err}");
+    }
 }

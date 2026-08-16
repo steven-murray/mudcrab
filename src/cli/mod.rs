@@ -83,6 +83,14 @@ pub struct AddArgs {
     /// belonging mid-list cannot simply be appended.
     #[arg(long = "before-section", value_name = "NAME")]
     pub before_sections: Vec<String>,
+    /// Insert directly before this existing mod instead of at the end of the
+    /// section.
+    ///
+    /// Order within a section is MO2 priority order, which decides who wins a
+    /// file conflict. To put a row first in its section, name the row that
+    /// currently comes first.
+    #[arg(long = "before-mod", value_name = "MOD_ID")]
+    pub before_mod: Option<String>,
     /// Print the block and where it would go, and change nothing.
     #[arg(long)]
     pub dry_run: bool,
@@ -276,6 +284,14 @@ pub struct InstallArgs {
     /// and every source plugin are exactly as they were at the last build.
     #[arg(long)]
     pub force_merges: bool,
+    /// Reinstall every mod in scope, even one whose recorded definition is
+    /// unchanged.
+    ///
+    /// The skip fingerprint covers the plan, not mudcrab, so a mod is
+    /// otherwise skipped even when the code that installs it has changed --
+    /// a new layout, a fixed action. Implies --force-merges.
+    #[arg(long)]
+    pub force: bool,
     /// Print planned operations without applying them.
     #[arg(long)]
     pub dry_run: bool,
