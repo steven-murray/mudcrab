@@ -25,6 +25,9 @@ pub enum Command {
     Download(DownloadArgs),
     /// Validate cached archives and archive-backed file references without installing.
     Check(CheckArgs),
+    /// Report an archive's layout, FOMOD options and plugins, for writing its
+    /// modlist entry.
+    Inspect(InspectArgs),
     /// Install mods from downloaded archives.
     Install(InstallArgs),
     /// Compare an installed mods directory against a reference MO2 instance.
@@ -215,6 +218,33 @@ pub struct CheckArgs {
     pub archive_sources: ArchiveSourceArgs,
 }
 
+/// Read an archive and print what its `[[mods.archives]]` block needs to say.
+///
+/// Configuring a mod otherwise means extracting the archive by hand and
+/// transcribing `fomod/ModuleConfig.xml` into TOML, where a typo only surfaces
+/// at install time. Nothing is written and no plan is involved: this takes an
+/// archive path so it can be run on a download before the modlist mentions it.
+#[derive(Debug, Args)]
+pub struct InspectArgs {
+    /// Path to the archive to read. Only ever read from.
+    pub archive: PathBuf,
+    /// List every file in the archive. Off by default, because a texture pack
+    /// would otherwise bury the layout and FOMOD report under 4000 lines.
+    #[arg(long)]
+    pub files: bool,
+    /// Report format.
+    #[arg(long, value_enum, default_value_t = InspectFormat::Text)]
+    pub format: InspectFormat,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, clap::ValueEnum)]
+pub enum InspectFormat {
+    /// Report meant to be read, with a TOML snippet to paste.
+    Text,
+    /// The same data, structured.
+    Json,
+}
+
 #[derive(Debug, Args)]
 pub struct InstallArgs {
     /// Path to personalized install plan.
@@ -241,6 +271,11 @@ pub struct InstallArgs {
     /// Do not execute post-install actions.
     #[arg(long)]
     pub skip_actions: bool,
+    /// Rebuild every merge in scope, even one whose recorded inputs are
+    /// unchanged. Merges are otherwise skipped when the spec, the load order
+    /// and every source plugin are exactly as they were at the last build.
+    #[arg(long)]
+    pub force_merges: bool,
     /// Print planned operations without applying them.
     #[arg(long)]
     pub dry_run: bool,

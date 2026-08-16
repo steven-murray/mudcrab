@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
+use super::manifest::{hash_merge_inputs, should_skip_merge, BuiltMerge};
 use super::InstallSettings;
 
 /// A plugin hidden on behalf of a merge, recorded so it can be restored.
@@ -32,12 +33,22 @@ pub struct HiddenPlugin {
 /// `<id> - <profile>` to avoid clobbering another profile's copy.
 pub(crate) type InstalledPaths = HashMap<String, PathBuf>;
 
+/// What one `install` run's merge phase produced.
+pub(crate) struct MergeRunOutcome {
+    pub(crate) hidden: Vec<HiddenPlugin>,
+    /// Every merge the manifest should now claim as built, including the ones
+    /// this run skipped because they were already current.
+    pub(crate) built: Vec<BuiltMerge>,
+}
+
 pub(crate) fn run_merges(
     plan: &PersonalizedPlan,
     settings: &InstallSettings,
     installed: &InstalledPaths,
-) -> anyhow::Result<Vec<HiddenPlugin>> {
+    previous_built: &HashMap<String, BuiltMerge>,
+) -> anyhow::Result<MergeRunOutcome> {
     let mut hidden = Vec::new();
+    let mut built = Vec::new();
 
     for (mod_entry, spec) in plan.merges() {
         // A merge is a mod like any other, so the filter decides whether this
@@ -45,6 +56,12 @@ pub(crate) fn run_merges(
         // in scope can still consume plugins from mods an earlier run put on
         // disk; only a source that was never installed is an error.
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+            // Carried forward for the same reason a filtered-out mod's entry
+            // is: this run did not rebuild it, which is not the same as it
+            // no longer being built.
+            if let Some(previous) = previous_built.get(&mod_entry.id) {
+                built.push(previous.clone());
+            }
             tracing::debug!(
                 merge = %mod_entry.id,
                 "merge: skipped, excluded by --section/--only"
@@ -68,11 +85,57 @@ pub(crate) fn run_merges(
             continue;
         }
 
-        let report = build_merge(&mod_entry.id, spec, plan, settings, &target, installed)?;
+        let sources = locate_sources(&mod_entry.id, spec, settings, installed)?;
+        let input_hash = hash_merge_inputs(
+            &mod_entry.id,
+            spec,
+            &plan.plugins,
+            &sources.iter().map(|source| source.path.clone()).collect::<Vec<_>>(),
+            &settings.mods_dir,
+        )?;
+        let output_path = target.join(&spec.output);
+
+        // Rebuilding an 86-source merge is minutes of work to reproduce a file
+        // that is already on disk byte for byte. The sources are still hidden
+        // below either way, because hiding is what makes the merge take effect
+        // and it is idempotent.
+        if should_skip_merge(
+            &output_path,
+            &input_hash,
+            previous_built.get(&mod_entry.id),
+            settings.dry_run,
+            settings.force_merges,
+        ) {
+            tracing::info!(
+                merge = %mod_entry.id,
+                output = %spec.output,
+                sources = spec.sources.len(),
+                status = "skipped",
+                reason = "inputs unchanged since the last build",
+                "merge: status"
+            );
+            if spec.hide_sources {
+                hidden.extend(hide_sources(&mod_entry.id, spec, settings, installed)?);
+            }
+            built.push(BuiltMerge {
+                id: mod_entry.id.clone(),
+                input_hash,
+                output: spec.output.clone(),
+            });
+            continue;
+        }
+
+        let report = build_merge(&mod_entry.id, spec, plan, &target, sources)?;
 
         if spec.hide_sources {
             hidden.extend(hide_sources(&mod_entry.id, spec, settings, installed)?);
         }
+
+        built.push(BuiltMerge {
+            id: mod_entry.id.clone(),
+            input_hash,
+            output: spec.output.clone(),
+        });
 
         tracing::info!(
             merge = %mod_entry.id,
@@ -87,17 +150,20 @@ pub(crate) fn run_merges(
         );
     }
 
-    Ok(hidden)
+    Ok(MergeRunOutcome { hidden, built })
 }
 
-fn build_merge(
+/// Resolve every source plugin to a path on disk.
+///
+/// Split out of `build_merge` because the skip check needs the same paths --
+/// they are what the input hash is taken over -- and resolving them twice, or
+/// resolving them differently, would make the hash disagree with the build.
+fn locate_sources(
     merge_id: &str,
     spec: &MergeSpec,
-    plan: &PersonalizedPlan,
     settings: &InstallSettings,
-    target: &Path,
     installed: &InstalledPaths,
-) -> anyhow::Result<merge::MergeReport> {
+) -> anyhow::Result<Vec<MergeSource>> {
     let mut sources = Vec::with_capacity(spec.sources.len());
     for source in &spec.sources {
         let mod_dir = installed
@@ -117,7 +183,16 @@ fn build_merge(
             path,
         });
     }
+    Ok(sources)
+}
 
+fn build_merge(
+    merge_id: &str,
+    spec: &MergeSpec,
+    plan: &PersonalizedPlan,
+    target: &Path,
+    sources: Vec<MergeSource>,
+) -> anyhow::Result<merge::MergeReport> {
     let request = MergeRequest {
         name: merge_id.to_string(),
         output: spec.output.clone(),

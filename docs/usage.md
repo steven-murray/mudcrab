@@ -10,6 +10,9 @@ This guide describes the currently implemented command flow.
 4. Install staged mod archive layout from cache, then build any declared merges.
 5. Diff the result against a reference instance to verify the section.
 
+`inspect` sits before all of this: it reads an archive and prints the modlist
+entry it wants, so step 1 can be written without extracting anything by hand.
+
 ## Commands
 
 ## add
@@ -104,6 +107,11 @@ mudcrab download build/plan.json --cache .mudcrab-cache --retry 3
 
 Note: `--parallel` is accepted but currently downloads sequentially.
 
+A failed source does not stop the run. Every archive is attempted, the failures
+are reported together at the end and the exit code is non-zero -- the same shape
+as `check`. A section routinely contains more than one dead Nexus link, and
+aborting on the first one turned finding them into one round trip each.
+
 ## Using archives you already have
 
 Most of a large modlist is usually already on the machine, in an MO2 or
@@ -180,6 +188,7 @@ Install from a personalized plan and cache into a mods directory.
 
 ```bash
 mudcrab install <plan.json> --cache <dir> --mods-dir <mods_dir> [--dry-run] [--skip-actions]
+                [--force-merges]
                 [--section <name>]... [--only <mod id>]...
                 [--archive-search-path <dir>]...
 ```
@@ -210,6 +219,37 @@ Current behavior:
 Merges are built after all mods are installed and before LOOT sorts, so LOOT sees
 the merged plugin rather than the sources it replaced. Re-running `install` is safe:
 merges are rebuilt deterministically and hiding is idempotent.
+
+### What a re-run does not redo
+
+Building a list section by section means running `install` dozens of times over
+a plan that has barely changed, so the run is built to pay only for what moved.
+
+**Mods.** A mod is skipped when its definition hash still matches and its folder
+is on disk, as recorded in `install_manifest.json`.
+
+**Merges.** A merge is skipped when the recorded fingerprint of its inputs still
+matches *and* the plugin it produced is still there. The fingerprint covers the
+`[mods.merge]` spec (output name, method, and the ordered source list), the
+plan's `plugins` load order -- which decides the order of the merged plugin's
+master table, so a merge cached across a load-order change would be a
+plausible-looking file with the wrong header -- and, for each source plugin, its
+path, size and modification time. Source paths are recorded without any
+`.mohidden` suffix: a merge hides its own sources as its last step, and without
+that a merge could never be skipped, since building it would change its own
+inputs. Skipping the rebuild does not skip the hiding, which is idempotent and
+is what makes the merge take effect.
+
+`--force-merges` rebuilds every merge in scope regardless. Reach for it when a
+source plugin was changed in a way that left its size and timestamp alone.
+
+**The manifest** is written after each mod, not once at the end. A run that
+fails on mod 250 of 300 still records the 249 that succeeded, so the next run
+resumes rather than re-extracting all of them. A mod that is cleared and then
+fails to extract is dropped from the manifest instead, so it is retried rather
+than skipped over an empty folder. A filtered run still carries forward the
+entries of the mods it skipped, so installing section B after section A does not
+make A look uninstalled.
 
 ## merge
 
@@ -273,6 +313,54 @@ printed even when the check fails, since a failing run is the one whose report
 matters -- it is how a dead link is found before a later section depends on it.
 `check` only reports: it never adopts a locally resolvable archive into the
 cache.
+
+## inspect
+
+Read an archive and print what its `[[mods.archives]]` block has to say. Takes
+an archive path rather than a plan, so it can be run on a download before the
+modlist mentions it. Nothing is written and the archive is only ever read from.
+
+```bash
+mudcrab inspect <ARCHIVE_PATH> [--files] [--format text|json]
+```
+
+Example:
+
+```bash
+mudcrab inspect ~/Games/MO2/downloads/AWLS-19628-5-6-3.7z
+```
+
+Writing a mod's entry otherwise means downloading the archive, extracting it by
+hand, opening `fomod/ModuleConfig.xml` in a text editor and transcribing step,
+group and option names into TOML -- where a typo only surfaces at install time,
+part way through a run. `inspect` prints the same names the installer will look
+up, so they can be copied rather than retyped.
+
+The report covers, as applicable:
+
+- **Layout guess** -- FOMOD (has `fomod/ModuleConfig.xml`), BAIN (numbered
+  top-level directories like `00 Core`, `01 Option`), a plain data folder that
+  `install` finds on its own, or one nested somewhere that needs `data_folder`
+  -- followed by the TOML snippet to paste.
+- **FOMOD** -- every install step, its groups, each group's type
+  (`SelectExactlyOne`, `SelectAny`, ...) and its options with their types.
+  A `*` marks the option `install` picks for a group with no `fomod_selections`
+  entry, and those defaults are pre-filled into the snippet. Steps behind a
+  `<visible>` condition are shown either way and flagged, since whether they run
+  depends on the rest of the list.
+- **BAIN** -- the top-level subpackage directory names, for `bain_subpackages`.
+  All of them are listed: `01a`/`01b` style subpackages are alternatives to each
+  other and the ones you are not taking have to be deleted from the snippet.
+- **Plugins** -- every `.esp`/`.esm` in the archive, since those go into the
+  modlist's `plugins` load order by hand.
+
+The default report is a summary: a 4000-file texture pack prints its layout and
+a count, not 4000 lines. `--files` lists every path. `--format json` emits the
+same findings structured, for scripting.
+
+Only the FOMOD case unpacks anything, and then only `ModuleConfig.xml`; the
+layout guess, subpackages, plugins and file listing all come from the archive's
+entry headers.
 
 ## diff
 
