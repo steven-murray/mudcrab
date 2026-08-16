@@ -113,7 +113,7 @@ pub(crate) fn install_mod_archives(
 
         let path = archive.path.as_deref().unwrap_or_default();
         let cache_name = download::cache_file_name(&mod_entry.id, archive_index, path);
-        let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
+        let mut source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
             .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
 
         if !source.exists() {
@@ -122,18 +122,41 @@ pub(crate) fn install_mod_archives(
             // first one hides everything after it. `check` is the command that
             // verifies the cache; this one previews.
             if settings.dry_run {
-                tracing::warn!(
-                    mod_id = %mod_entry.id,
-                    archive = %source.display(),
-                    "install dry-run: archive is not cached, would need downloading"
-                );
+                // A dry run must not write, so it reports what adoption *would*
+                // find rather than linking it into the cache.
+                match download::find_local_archive(
+                    archive.file_name.as_deref(),
+                    &settings.archive_search_paths,
+                ) {
+                    Some(local) => tracing::info!(
+                        mod_id = %mod_entry.id,
+                        local = %local.display(),
+                        "install dry-run: archive would be adopted from a local search path"
+                    ),
+                    None => tracing::warn!(
+                        mod_id = %mod_entry.id,
+                        archive = %source.display(),
+                        "install dry-run: archive is not cached, would need downloading"
+                    ),
+                }
                 continue;
             }
-            anyhow::bail!(
-                "missing cached archive for mod {}: {}",
-                mod_entry.id,
-                source.display()
-            );
+
+            // Installing straight from archives already on disk is the point of
+            // --archive-search-path: no `download` run has to have happened.
+            match download::link_local_archive(
+                archive.file_name.as_deref(),
+                &settings.cache_dir,
+                &cache_name,
+                &settings.archive_search_paths,
+            )? {
+                Some(linked) => source = linked,
+                None => anyhow::bail!(
+                    "missing cached archive for mod {}: {}",
+                    mod_entry.id,
+                    source.display()
+                ),
+            }
         }
 
         // Game-root extraction pass: extract matching files to the game-root output folder.

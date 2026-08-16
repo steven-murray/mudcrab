@@ -22,6 +22,10 @@ pub struct InstallSettings {
     pub tools: ToolsConfig,
     /// Which mods this run installs. Empty means the whole plan.
     pub filter: ModFilter,
+    /// Read-only directories holding archives already on this machine. An
+    /// archive found here is adopted into the cache instead of downloaded, so a
+    /// list can be installed with no network access at all.
+    pub archive_search_paths: Vec<PathBuf>,
 }
 
 pub mod layout;
@@ -496,6 +500,7 @@ mod tests {
             merge: None,
             archives: vec![CompiledArchive {
                 path: Some(archive_path.to_string()),
+                file_name: None,
                 download_handler: None,
                 layout: None,
                 data_folder: None,
@@ -650,6 +655,7 @@ mod tests {
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
             path: Some("nexus:oblivion/1/1".to_string()),
+            file_name: None,
             download_handler: None,
             layout: Some(ArchiveLayout::Bain),
             data_folder: None,
@@ -695,6 +701,7 @@ mod tests {
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
             path: Some("nexus:oblivion/1/1".to_string()),
+            file_name: None,
             download_handler: None,
             layout: None,
             data_folder: Some("Mind Your Head - Signs Repositioned 1.3".to_string()),
@@ -786,6 +793,7 @@ mod tests {
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
             path: Some("local-fomod.zip".to_string()),
+            file_name: None,
             download_handler: None,
             layout: Some(ArchiveLayout::Fomod),
             data_folder: None,

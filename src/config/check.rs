@@ -10,18 +10,49 @@ pub struct CheckSettings {
     pub cache_dir: PathBuf,
     /// Which mods to check. Empty means the whole plan.
     pub filter: ModFilter,
+    /// Read-only directories holding archives already on this machine. An
+    /// archive found here needs no download, so `check` must count it as
+    /// satisfied or it would send the author hunting for links they already have.
+    pub archive_search_paths: Vec<PathBuf>,
+}
+
+/// Where an archive can be had from, best case first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchiveAvailability {
+    /// Already in the cache.
+    Cached,
+    /// Not cached, but sitting in one of the search paths.
+    Local,
+    /// Neither -- the network is the only way to get it.
+    MustDownload,
+}
+
+impl ArchiveAvailability {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Cached => "cached",
+            Self::Local => "resolvable locally",
+            Self::MustDownload => "MUST BE DOWNLOADED",
+        }
+    }
 }
 
 pub struct CheckReport {
     pub mods_checked: usize,
     pub archives_checked: usize,
     pub file_references_checked: usize,
+    pub archives_cached: usize,
+    pub archives_local: usize,
+    pub archives_must_download: usize,
 }
 
 pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::Result<CheckReport> {
     let mut mods_checked = 0usize;
     let mut archives_checked = 0usize;
     let mut file_references_checked = 0usize;
+    let mut archives_cached = 0usize;
+    let mut archives_local = 0usize;
+    let mut archives_must_download = 0usize;
     let mut errors = Vec::new();
 
     for mod_entry in &plan.mods {
@@ -32,6 +63,27 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
 
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             archives_checked += 1;
+
+            let availability = archive_availability(
+                mod_entry.id.as_str(),
+                archive_index,
+                archive,
+                settings,
+            );
+            match availability {
+                ArchiveAvailability::Cached => archives_cached += 1,
+                ArchiveAvailability::Local => archives_local += 1,
+                ArchiveAvailability::MustDownload => archives_must_download += 1,
+            }
+
+            tracing::info!(
+                mod_id = %mod_entry.id,
+                archive_index,
+                source = %archive.path.as_deref().unwrap_or("<build>"),
+                file_name = %archive.file_name.as_deref().unwrap_or("<unset>"),
+                availability = availability.label(),
+                "check: archive availability"
+            );
 
             let result = if archive.build.is_empty() {
                 check_single_archive(mod_entry.id.as_str(), archive_index, archive, settings)
@@ -53,6 +105,17 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
         }
     }
 
+    // Emitted before the bail: the run that fails is exactly the run whose
+    // summary the author needs, since it is the one that names a dead link.
+    tracing::info!(
+        mods_checked,
+        archives_checked,
+        cached = archives_cached,
+        resolvable_locally = archives_local,
+        must_be_downloaded = archives_must_download,
+        "check summary"
+    );
+
     if !errors.is_empty() {
         let joined = errors.join("\n");
         anyhow::bail!("check failed with {} issue(s):\n{joined}", errors.len());
@@ -62,7 +125,58 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
         mods_checked,
         archives_checked,
         file_references_checked,
+        archives_cached,
+        archives_local,
+        archives_must_download,
     })
+}
+
+/// Classify one archive without fetching or adopting anything.
+///
+/// `check` is a read-only report, so a locally resolvable archive is *not*
+/// linked into the cache here -- doing so would make a diagnostic command
+/// silently mutate the cache it is reporting on.
+fn archive_availability(
+    mod_id: &str,
+    archive_index: usize,
+    archive: &CompiledArchive,
+    settings: &CheckSettings,
+) -> ArchiveAvailability {
+    if !archive.build.is_empty() {
+        // Build layers have no declared filename to match a local copy against,
+        // so they are cached or they are not.
+        let all_cached = archive.build.iter().enumerate().all(|(layer_index, layer)| {
+            let cache_name = download::build_layer_cache_file_name(
+                mod_id,
+                archive_index,
+                layer_index,
+                &layer.path,
+            );
+            download::resolve_cache_path(&settings.cache_dir, &cache_name)
+                .is_some_and(|path| path.is_file())
+        });
+        return if all_cached {
+            ArchiveAvailability::Cached
+        } else {
+            ArchiveAvailability::MustDownload
+        };
+    }
+
+    let path = archive.path.as_deref().unwrap_or_default();
+    let cache_name = download::cache_file_name(mod_id, archive_index, path);
+    if download::resolve_cache_path(&settings.cache_dir, &cache_name)
+        .is_some_and(|path| path.is_file())
+    {
+        return ArchiveAvailability::Cached;
+    }
+
+    if download::find_local_archive(archive.file_name.as_deref(), &settings.archive_search_paths)
+        .is_some()
+    {
+        return ArchiveAvailability::Local;
+    }
+
+    ArchiveAvailability::MustDownload
 }
 
 fn check_single_archive(
@@ -73,11 +187,24 @@ fn check_single_archive(
 ) -> anyhow::Result<usize> {
     let path = archive.path.as_deref().unwrap_or_default();
     let cache_name = download::cache_file_name(mod_id, archive_index, path);
+    // Falling back to the search-path copy lets the contents be validated
+    // in place, so a not-yet-adopted archive is checked as thoroughly as a
+    // cached one -- and the search path is only ever read.
     let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
+        .or_else(|| {
+            download::find_local_archive(
+                archive.file_name.as_deref(),
+                &settings.archive_search_paths,
+            )
+        })
         .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
 
     if !source.exists() {
-        anyhow::bail!("missing cached archive: {}", source.display());
+        anyhow::bail!(
+            "archive must be downloaded; no cached copy at {} and no search path holds {}",
+            source.display(),
+            archive.file_name.as_deref().unwrap_or("it (no file_name declared)")
+        );
     }
     if source.is_dir() {
         anyhow::bail!("cached archive path is a directory: {}", source.display());

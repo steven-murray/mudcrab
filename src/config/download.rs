@@ -1,5 +1,6 @@
 use crate::config::filter::ModFilter;
 use crate::config::schema::PersonalizedPlan;
+use crate::util::fs::{find_child_case_insensitive, link_or_copy};
 use reqwest::Client;
 use std::path::{Path, PathBuf};
 
@@ -11,10 +12,15 @@ pub struct DownloadSettings {
     pub nexus_api_base: Option<String>,
     /// Which mods to fetch. Empty means the whole plan.
     pub filter: ModFilter,
+    /// Read-only directories that may already hold the archives, tried in order
+    /// before anything goes over the network. See `link_local_archive`.
+    pub archive_search_paths: Vec<PathBuf>,
 }
 
 enum DownloadOutcome {
     Cached(PathBuf),
+    /// Adopted from an `--archive-search-path` rather than fetched.
+    Local(PathBuf),
     Downloaded(PathBuf),
 }
 
@@ -45,9 +51,12 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                         layer_index,
                         &layer.path,
                     ));
+                    // Build layers carry no `file_name`, so there is nothing to
+                    // match a local copy against; they always take the network path.
                     let outcome = download_with_retry(
                         &client,
                         &layer.path,
+                        None,
                         layer.download_handler.as_deref(),
                         &destination,
                         settings,
@@ -64,6 +73,7 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                 let outcome = download_with_retry(
                     &client,
                     path,
+                    archive.file_name.as_deref(),
                     archive.download_handler.as_deref(),
                     &destination,
                     settings,
@@ -84,19 +94,32 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     Ok(())
 }
 
+/// Resolution order for one archive: cache, then the read-only search paths,
+/// then the network. The first two never touch the network at all, which is the
+/// whole point -- a large modlist is mostly archives the machine already has.
 async fn download_with_retry(
     client: &Client,
     path: &str,
+    file_name: Option<&str>,
     handler: Option<&str>,
     destination: &Path,
     settings: &DownloadSettings,
 ) -> anyhow::Result<DownloadOutcome> {
-    if let Some(existing) = resolve_cache_path(
-        destination.parent().unwrap_or_else(|| Path::new(".")),
-        destination.file_name().and_then(|name| name.to_str()).unwrap_or_default(),
-    ) {
+    let cache_dir = destination.parent().unwrap_or_else(|| Path::new("."));
+    let cache_name = destination
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default();
+
+    if let Some(existing) = resolve_cache_path(cache_dir, cache_name) {
         tracing::info!(source = %path, destination = %existing.display(), "archive already cached, skipping download");
         return Ok(DownloadOutcome::Cached(existing));
+    }
+
+    if let Some(linked) =
+        link_local_archive(file_name, cache_dir, cache_name, &settings.archive_search_paths)?
+    {
+        return Ok(DownloadOutcome::Local(linked));
     }
 
     let attempts = settings.retry.max(1);
@@ -186,6 +209,14 @@ fn log_download_outcome(mod_id: &str, source: &str, outcome: &DownloadOutcome) {
                 source,
                 destination = %p.display(),
                 "archive ready from cache"
+            );
+        }
+        DownloadOutcome::Local(p) => {
+            tracing::info!(
+                mod_id,
+                source,
+                destination = %p.display(),
+                "archive ready from a local search path"
             );
         }
         DownloadOutcome::Downloaded(p) => {
@@ -394,18 +425,114 @@ fn cache_original_name_path_for_destination(destination: &Path) -> PathBuf {
     PathBuf::from(sidecar)
 }
 
+/// Find an archive that is already on this machine, by its declared filename.
+///
+/// Search paths are read-only sources -- the user's existing MO2 and Wabbajack
+/// download folders -- so nothing here writes to, renames within, or deletes
+/// from them. They are tried in order and the first hit wins, which is what
+/// makes the ordering on the command line meaningful.
+///
+/// Matching is case-insensitive because these filenames are transcribed from
+/// Windows-authored mod pages onto a case-sensitive filesystem.
+pub fn find_local_archive(file_name: Option<&str>, search_paths: &[PathBuf]) -> Option<PathBuf> {
+    let file_name = file_name?.trim();
+    if file_name.is_empty() {
+        return None;
+    }
+
+    for directory in search_paths {
+        if let Some(found) = find_child_case_insensitive(directory, file_name)
+            && found.is_file()
+        {
+            return Some(found);
+        }
+    }
+
+    None
+}
+
+/// Adopt an archive found in a search path into the cache.
+///
+/// The cache is keyed by `cache_file_name`, a derived name that has nothing to
+/// do with what the archive is called on disk, so adopting one means placing it
+/// under the derived name *and* recording its real name in the `.orig-name`
+/// sidecar -- exactly the pair a download would have left behind, so everything
+/// downstream cannot tell the difference.
+///
+/// Hard-links where it can (the search paths are typically on the same
+/// filesystem as the cache), which is what keeps a second copy of ~50GB of
+/// archives off the disk.
+pub fn link_local_archive(
+    file_name: Option<&str>,
+    cache_dir: &Path,
+    cache_name: &str,
+    search_paths: &[PathBuf],
+) -> anyhow::Result<Option<PathBuf>> {
+    let Some(source) = find_local_archive(file_name, search_paths) else {
+        return Ok(None);
+    };
+    let original_name = file_name.unwrap_or_default().trim();
+
+    std::fs::create_dir_all(cache_dir).map_err(|err| {
+        anyhow::anyhow!("failed to create cache directory {}: {err}", cache_dir.display())
+    })?;
+
+    let destination =
+        cache_path_with_original_extension(&cache_dir.join(cache_name), original_name);
+    link_or_copy(&source, &destination)?;
+
+    let sidecar = cache_original_name_path_for_destination(&destination);
+    std::fs::write(&sidecar, original_name).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to write download filename metadata {}: {err}",
+            sidecar.display()
+        )
+    })?;
+
+    tracing::info!(
+        file_name = original_name,
+        source = %source.display(),
+        destination = %destination.display(),
+        "archive resolved from a local search path; no download needed"
+    );
+
+    Ok(Some(destination))
+}
+
 /// If the `destination` path doesn't already end with the extension from `original_name`, rename
 /// the file on disk to append it and return the new path.  This ensures cached archives are
 /// recognisable by external tools (e.g. `.7z`, `.zip`).  When the source URL already encoded the
 /// filename (e.g. `https://…/mod.7z`), `destination` will already have the correct extension and
 /// no rename is performed.
 fn append_extension_from_original_name(destination: &Path, original_name: &str) -> PathBuf {
-    let ext = match Path::new(original_name)
+    let new_path = cache_path_with_original_extension(destination, original_name);
+    if new_path == destination {
+        return new_path;
+    }
+
+    if let Err(err) = std::fs::rename(destination, &new_path) {
+        tracing::warn!(
+            from = %destination.display(),
+            to = %new_path.display(),
+            "failed to rename cached archive to include extension: {err}"
+        );
+        return destination.to_path_buf();
+    }
+    new_path
+}
+
+/// The cache path an archive belongs at, given what it was originally called.
+///
+/// Shared by the download path (which renames onto it) and by local adoption
+/// (which links straight to it), so a cached archive looks identical however it
+/// got there.
+fn cache_path_with_original_extension(destination: &Path, original_name: &str) -> PathBuf {
+    let Some(ext) = Path::new(original_name)
         .extension()
         .and_then(|e| e.to_str())
-    {
-        Some(e) => e.to_ascii_lowercase(),
-        None => return destination.to_path_buf(),
+        .map(|e| e.to_ascii_lowercase())
+    else {
+        return destination.to_path_buf();
     };
 
     let current_ext = destination
@@ -417,16 +544,7 @@ fn append_extension_from_original_name(destination: &Path, original_name: &str) 
         return destination.to_path_buf();
     }
 
-    let new_path = PathBuf::from(format!("{}.{ext}", destination.display()));
-    if let Err(err) = std::fs::rename(destination, &new_path) {
-        tracing::warn!(
-            from = %destination.display(),
-            to = %new_path.display(),
-            "failed to rename cached archive to include extension: {err}"
-        );
-        return destination.to_path_buf();
-    }
-    new_path
+    PathBuf::from(format!("{}.{ext}", destination.display()))
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -544,6 +662,7 @@ mod tests {
     fn resolves_nexus_handler_from_source_shape() {
         let explicit = CompiledArchive {
             path: Some("https://www.nexusmods.com/skyrimspecialedition/mods/1".to_string()),
+            file_name: None,
             download_handler: None,
             layout: None,
             data_folder: None,
@@ -559,6 +678,7 @@ mod tests {
 
         let scheme = CompiledArchive {
             path: Some("nexus:skyrimspecialedition/1/2".to_string()),
+            file_name: None,
             download_handler: None,
             layout: None,
             data_folder: None,
@@ -602,6 +722,7 @@ mod tests {
             nexus_api_key: Some("test-key".to_string()),
             nexus_api_base: Some(format!("{}/v1", server.uri())),
             filter: ModFilter::default(),
+            archive_search_paths: Vec::new(),
         };
 
         let plan = PersonalizedPlan {
@@ -620,6 +741,7 @@ mod tests {
                 merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
+                    file_name: None,
                     download_handler: Some("nexus".to_string()),
                     layout: None,
                     data_folder: None,
@@ -671,6 +793,7 @@ mod tests {
             nexus_api_key: None,
             nexus_api_base: None,
             filter: ModFilter::default(),
+            archive_search_paths: Vec::new(),
         };
 
         let plan = PersonalizedPlan {
@@ -689,6 +812,7 @@ mod tests {
                 merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
+                    file_name: None,
                     download_handler: Some("nexus".to_string()),
                     layout: None,
                     data_folder: None,
