@@ -32,6 +32,24 @@ pub enum Command {
     SetupTools(SetupToolsArgs),
     /// Restore plugins that were hidden to make room for a merge.
     UnhideMerges(UnhideMergesArgs),
+    /// Build merged plugins from an already-installed mods directory.
+    Merge(MergeArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct MergeArgs {
+    /// Modlist TOML declaring the merges to build.
+    pub input: PathBuf,
+    /// Directory holding the installed mod folders, e.g. an MO2 instance's mods/.
+    #[arg(long)]
+    pub mods_dir: PathBuf,
+    /// Where to write the merged plugins. Nothing outside this directory is
+    /// touched: source mods are read only, and no plugin is hidden.
+    #[arg(short, long)]
+    pub output: PathBuf,
+    /// Build only the merge with this mod id.
+    #[arg(long)]
+    pub only: Option<String>,
 }
 
 #[derive(Debug, Args)]
