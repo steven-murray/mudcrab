@@ -25,8 +25,6 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
         reject_escaping_pattern(cx.owner, pattern)?;
     }
 
-    let filters = ArchiveFilters::new(&action.paths, &[])?;
-
     if cx.settings.dry_run {
         tracing::info!(
             owner = cx.owner,
@@ -37,8 +35,39 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
         return Ok(());
     }
 
+    // One filter per pattern, so a pattern that matches nothing can be named.
+    // Cheap: the tree is walked once per pattern, and these trees are a staged
+    // mod, not a game install.
     let mut deleted = 0usize;
-    prune(mod_target, mod_target, &filters, &mut deleted)?;
+    let mut barren = Vec::new();
+    for pattern in &action.paths {
+        let filters = ArchiveFilters::new(&expand_directory_pattern(pattern), &[])?;
+        let mut matched = 0usize;
+        prune(mod_target, mod_target, &filters, &mut matched)?;
+        if matched == 0 {
+            barren.push(pattern.clone());
+        }
+        deleted += matched;
+    }
+
+    // A prune that deletes nothing is always a mistake, and a silent one: the
+    // install still succeeds and the loose files it was meant to remove stay in
+    // the VFS, shadowing whatever the mod packed. Found exactly that way -- the
+    // Oracle diff, not the install, is what noticed.
+    if !barren.is_empty() {
+        anyhow::bail!(
+            "{}: file_prune pattern{} {} matched nothing under {}. Patterns are matched \
+             against paths relative to the staged folder, case-sensitively.",
+            cx.owner,
+            if barren.len() == 1 { "" } else { "s" },
+            barren
+                .iter()
+                .map(|pattern| format!("'{pattern}'"))
+                .collect::<Vec<_>>()
+                .join(", "),
+            mod_target.display()
+        );
+    }
 
     tracing::info!(
         owner = cx.owner,
@@ -47,6 +76,20 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
         "pruned staged files"
     );
     Ok(())
+}
+
+/// A pattern naming a plain directory also matches everything below it.
+///
+/// `paths = ["meshes"]` means the folder, which is what the guide means every
+/// time it says "delete the loose meshes & textures folders". As a raw glob it
+/// would match only a *file* called `meshes` and silently delete nothing.
+/// Patterns carrying glob syntax are left exactly as written.
+fn expand_directory_pattern(pattern: &str) -> Vec<String> {
+    let trimmed = pattern.trim_end_matches('/');
+    if trimmed.is_empty() || trimmed.contains(['*', '?', '[', '{']) {
+        return vec![pattern.to_string()];
+    }
+    vec![trimmed.to_string(), format!("{trimmed}/**")]
 }
 
 /// Patterns are matched against paths relative to the staged folder, so a

@@ -6,7 +6,7 @@
 
 use super::ActionCx;
 use crate::config::schema::CreateDummyPluginAction;
-use crate::plugin::{FormId, MasterTable, Plugin, Record, Subrecord};
+use crate::plugin::{FormId, MasterTable, Plugin, PluginName, Record, Subrecord};
 use crate::util::fs::normalize_relative_path;
 
 pub(super) fn apply(action: &CreateDummyPluginAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
@@ -41,7 +41,7 @@ pub(super) fn apply(action: &CreateDummyPluginAction, cx: &ActionCx<'_>) -> anyh
     Ok(())
 }
 
-/// A TES4 header and nothing else: no masters, no records, no groups.
+/// A TES4 header and nothing else: no records, no groups.
 fn empty_plugin() -> Plugin {
     let mut hedr = Vec::with_capacity(12);
     hedr.extend_from_slice(&1.0f32.to_le_bytes());
@@ -50,16 +50,24 @@ fn empty_plugin() -> Plugin {
     hedr.extend_from_slice(&0u32.to_le_bytes());
     hedr.extend_from_slice(&0x800u32.to_le_bytes());
 
+    // Oblivion.esm as the sole master. Nothing here references it -- there are
+    // no records at all -- but a plugin with an empty master list is unusual
+    // enough that tools treat it as suspect, and every dummy plugin produced by
+    // Wrye Bash or xEdit declares it. Costs 25 bytes.
+    let master = PluginName::new("Oblivion.esm");
+
     let fields = vec![
         Subrecord::new(b"HEDR", hedr),
         Subrecord::new(b"CNAM", zstring("mudcrab")),
         Subrecord::new(b"SNAM", zstring("Dummy plugin so Oblivion loads the matching BSA")),
+        Subrecord::new(b"MAST", zstring(master.as_str())),
+        Subrecord::new(b"DATA", 0u64.to_le_bytes().to_vec()),
     ];
 
     Plugin {
         // No ESM flag: this is a plugin, not a master.
         header: Record::new(b"TES4", FormId::NULL, fields),
-        masters: MasterTable::new(Vec::new()),
+        masters: MasterTable::new(vec![master]),
         entries: Vec::new(),
     }
 }
