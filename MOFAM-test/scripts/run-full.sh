@@ -25,6 +25,13 @@ OUT_DIR="$TEST_DIR/output"
 TOOLS_CONFIG="$TEST_DIR/input/tools.toml"
 
 MO2_DIR="/home/steven/Games/Wabbajack/Oblivion/MudCrab Test"
+
+# The MO2 profile mudcrab owns. `install` rewrites this profile's modlist.txt
+# and plugins.txt from the plan on every run, which is what makes the profile
+# hold exactly what is built -- and means any profile named here is mudcrab's
+# to overwrite. MO2 auto-adds newly-found mod folders to *other* profiles as
+# disabled, so a profile mudcrab does not own will look mostly switched off.
+PROFILE="${MOFAM_PROFILE:-Default}"
 ORACLE_DIR="/home/steven/Games/Wabbajack/Oblivion/MOFAM-03.25/mods"
 
 # The cache stays where every previous run put it. Changing it mid-build would
@@ -86,7 +93,7 @@ echo "[4/6] check"
 
 echo "[5/6] install (MO2 export)"
 "${MUDCRAB[@]}" install "$OUT_DIR/plan.json" --cache "$CACHE_DIR" \
-	--mo2-instance-dir "$MO2_DIR" --profile-name "Default" \
+	--mo2-instance-dir "$MO2_DIR" --profile-name "$PROFILE" \
 	--game-dir "$GAME_DIR" --tools-config "$TOOLS_CONFIG" \
 	"${search_args[@]}" "${FILTERS[@]+"${FILTERS[@]}"}" "${INSTALL_ONLY[@]+"${INSTALL_ONLY[@]}"}"
 

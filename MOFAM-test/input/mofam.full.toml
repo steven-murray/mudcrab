@@ -164,6 +164,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/33248/88252"
+file_name = "AddActorValues-33248.rar"
 layout = "custom-data-folder"
 data_folder = "Oblivion/Data"
 exclude = [
@@ -193,6 +194,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/49105/1000022866"
+file_name = "Better Autowalk-49105-2-0-1567094636.zip"
 
 [[mods]]
 id = "Blue's Engine Fixes"
@@ -230,6 +232,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/49490/1000022513"
+file_name = "Console Numpad Support-49490-1-0-1562019580.zip"
 
 [[mods]]
 id = "Console Paste Support"
@@ -253,6 +256,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/47085/1000022995"
+file_name = "EngineBugFixes v2.22-47085-2-22-1569169531.7z"
 layout = "custom-data-folder"
 data_folder = "Data"
 
@@ -269,6 +273,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/50517/1000026121"
+file_name = "Faster Sleep Wait-50517-1-0-1605096377.zip"
 
 [[mods]]
 id = "FractionalMagicDamage"
@@ -276,6 +281,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/37717/77294"
+file_name = "FractionalMagicDamage-37717-1.rar"
 target_subdir = "OBSE/Plugins"
 include = ["**/*.dll"]
 
@@ -293,6 +299,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/49495/1000022536"
+file_name = "Jump While Blocking-49495-1-0-1562280616.zip"
 
 [[mods]]
 id = "List Missing Mods On Load"
@@ -300,6 +307,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/52717/1000033675"
+file_name = "List Missing Mods On Load-52717-1-0-1675772636.zip"
 
 [[mods]]
 id = "Map Menu Doesn't Click While Dragging (OBSE)"
@@ -307,6 +315,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/50537/1000026188"
+file_name = "Map Marker Drag Fix-50537-1-0-1605994918.zip"
 
 [[mods]]
 id = "Menu Alt-Tab Crash Fix"
@@ -333,6 +342,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/45870/1000009026"
+file_name = "MessageLogger v1.0-45870-1-0.7z"
 layout = "custom-data-folder"
 data_folder = "Data"
 
@@ -349,6 +359,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/52716/1000033673"
+file_name = "No Inventory On Alt-Tab-52716-1-0-1675771581.zip"
 
 [[mods]]
 id = "No Lockpick Activate"
@@ -440,6 +451,7 @@ section = ["OBSE PLUGINS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/49067/1000022312"
+file_name = "WalkBlessed-49067-Beta15-5-1560188414.7z"
 
 [[mods]]
 id = "Skyrim Camera for Walkblessed"
@@ -458,6 +470,7 @@ section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/5296/1000037331"
+file_name = "Unofficial Oblivion Patch-5296-3-5-8-1704317485.7z"
 exclude = ["**/UOP Vampire Aging & Face Fix.esp"]
 
 [[mods]]
@@ -466,6 +479,7 @@ section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/10739/1000037332"
+file_name = "Unofficial Shivering Isles Patch-10739-1-6-1-1704317720.7z"
 
 [[mods]]
 id = "Unofficial Oblivion DLC Patches - UODP"
@@ -473,6 +487,7 @@ section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/9969/1000037333"
+file_name = "Unofficial Oblivion DLC Patches-9969-26-1704317804.7z"
 
 [[mods]]
 id = "Unofficial Oblivion Tree Patch - UOTP"
@@ -480,6 +495,13 @@ section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/53079/1000035080"
+file_name = "Unofficial Oblivion Tree Patch-53079-1-0-1687285444.rar"
+# The archive wraps everything in <mod name>/Data/, and `trees/` is not one of
+# the folder names the auto layout recognises as game content, so nothing
+# unwraps it. Without this every file lands two levels too deep, and the patch
+# silently does nothing.
+layout = "custom-data-folder"
+data_folder = "Unofficial Oblivion Tree Patch/Data"
 
 [[mods]]
 id = "Unofficial Shivering Isles Tree Patch - USITP"
@@ -487,6 +509,13 @@ section = ["UNOFFICIAL PATCHES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/53101/1000035151"
+file_name = "Unofficial Shivering Isles Tree Patch-53101-1-0-1687786889.rar"
+# The archive wraps everything in <mod name>/Data/, and `trees/` is not one of
+# the folder names the auto layout recognises as game content, so nothing
+# unwraps it. Without this every file lands two levels too deep, and the patch
+# silently does nothing.
+layout = "custom-data-folder"
+data_folder = "Unofficial Shivering Isles Tree Patch/Data"
 
 # ------------------------------
 # Part 4 - TWEAKS AND FIXES
@@ -558,6 +587,7 @@ section = ["TWEAKS AND FIXES"]
 
 [[mods.archives]]
 path = "nexus:oblivion/48226/1000018326"
+file_name = "Thieves Den Barter for Upgrades-48226-1-0.zip"
 
 [[mods]]
 id = "No Annoying Conjurer Attack (Spell Tomes DLC fix)"
@@ -905,6 +935,7 @@ section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/53352/1000036221"
+file_name = "LinkPlusPlus_v0.1.4-53352-0-1-4-1695300268.7z"
 
 [[mods]]
 id = "DarnifiedUI FOMOD Conversion"
@@ -1050,6 +1081,7 @@ section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/48914/1000041957"
+file_name = "World Maps For All Worldspaces-48914-V5-1747691122.zip"
 
 [[mods]]
 id = "Marking the Landmarks"
@@ -1165,6 +1197,7 @@ section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/48479/1000019366"
+file_name = "Pick Me-48479-1.7z"
 
 [[mods]]
 id = "Enhanced Hotkeys"
@@ -1260,7 +1293,7 @@ path = "nexus:oblivion/51109/1000028004"
 layout = "bain"
 bain_subpackages = [
 	"MOO Themed Loading Screens",
-	"Vanilla Style Loading Screens Addon derpy",
+	"Vanilla Style Loading Screens Addon",
 ]
 
 # Guide 1a [MI]: the archive wraps everything in Data/, which the auto layout

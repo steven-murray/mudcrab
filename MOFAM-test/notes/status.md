@@ -7,6 +7,11 @@ Last updated: 2026-08-16.
 
 ## Done
 
+- **MO2 profile**: mudcrab owns `Default` in MudCrab Test, set by `PROFILE` in
+  `run-full.sh` (override with `MOFAM_PROFILE`). `install` rewrites that
+  profile's `modlist.txt` and `plugins.txt` every run. MO2 auto-adds new mod
+  folders to *other* profiles as disabled, so any other profile will look
+  mostly switched off -- that is MO2, not a build failure.
 - **Tooling (plan Phase 2) is complete.** `add`, `diff`, `inspect`,
   `--section`/`--only` filters, `--archive-search-path`, `install --force`,
   `add --before-mod`, `inspect` of a `.bsa`, native BSA reader/writer,
@@ -79,8 +84,15 @@ the game. Next section is Part 8 (Overhauls: Maskar).
 - BSArch deduplicates identical payloads within an archive; mudcrab's BSA
   writer does not. Costs ~2% on an archive with repeated files. Cosmetic, and
   the only reason a packed mod ever differs from the Oracle by size alone.
-- MudCrab Test has ~21 stale mod folders under pre-rename ids. They will show
-  as extras until cleaned up.
+- MudCrab Test has ~21 stale mod folders under pre-rename ids, now superseded
+  by correctly-named installs. Safe to delete, but they are the user's files --
+  ask first.
+- **Parts 2, 3, 4 and 6 were built before `diff` existed and have never been
+  fully verified.** The first full-instance diff found 37 differing mods; two
+  were broken installs, now fixed. See `earlier-sections-backlog.md`.
+- **`cache_file_name` embeds the mod id**, so renaming a mod orphans its cached
+  archive and two mods sharing an archive cache it twice. Worked around by
+  giving every entry a `file_name` for `--archive-search-path` to match.
 
 ## Working practice
 
