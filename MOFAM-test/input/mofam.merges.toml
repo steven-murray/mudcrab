@@ -11,10 +11,11 @@
 # hide_sources is false throughout: this file builds plugins for inspection and
 # must not rename anything in a real instance. The install path sets it true.
 #
-# NOTE: ORC.esp resolves to the v194 folder here, which is the upgraded mod.
-# The *installed* Prebash Merge was built from v180 and never rebuilt, so this
-# file will not reproduce it byte for byte -- that is intended, and the oracle
-# test pins v180 separately. See MOFAM-test/notes/zmerge-dangling-refs.md.
+# NOTE: Prebash deliberately contains NO ORC.esp. The Linux build uses ORC 315F
+# (ENB never worked here -- see the debugging notes), and 315F ships no plugin
+# at all. The installed Oracle merge was built from ORC v180 and so will not
+# match this one; the oracle test pins v180 separately to preserve that
+# comparison. See MOFAM-test/notes/zmerge-non-canonical-refs.md.
 
 name = "MOFAM merges"
 
@@ -101,7 +102,6 @@ plugins = [
   "DLCSpellTomes-No Attack.esp",
   "SM Plugin Refurbish Lite Knights Infamy.esp",
   "Bruma Frostcrag Spire LOD.esp",
-  "ORC.esp",
   "MehrunesDagonWalk.esp",
   "Better Traps.esp",
   "DaedricRequirements.esp",
@@ -628,9 +628,6 @@ id = "SM DLC Plugin Refurbish"
 id = "Oblivion Comprehensive Modding Guide by Dispensation (OCMG)"
 
 [[mods]]
-id = "Oblivion Reloaded Combined(ORC) v194"
-
-[[mods]]
 id = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation"
 
 [[mods]]
@@ -946,7 +943,6 @@ type = "merge"
     { mod = "No Annoying Conjurer Attack (Spell Tomes DLC fix)", plugin = "DLCSpellTomes-No Attack.esp" },
     { mod = "SM DLC Plugin Refurbish", plugin = "SM Plugin Refurbish Lite Knights Infamy.esp" },
     { mod = "Oblivion Comprehensive Modding Guide by Dispensation (OCMG)", plugin = "Bruma Frostcrag Spire LOD.esp" },
-    { mod = "Oblivion Reloaded Combined(ORC) v194", plugin = "ORC.esp" },
     { mod = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation", plugin = "MehrunesDagonWalk.esp" },
     { mod = "Better Traps", plugin = "Better Traps.esp" },
     { mod = "Fame Based Daedric Quest Requirements", plugin = "DaedricRequirements.esp" },
