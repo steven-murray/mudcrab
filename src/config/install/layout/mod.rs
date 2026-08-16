@@ -117,6 +117,18 @@ pub(crate) fn install_mod_archives(
             .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
 
         if !source.exists() {
+            // A dry run exists to show the whole plan, so an uncached archive
+            // is something to report and carry on from -- aborting on the
+            // first one hides everything after it. `check` is the command that
+            // verifies the cache; this one previews.
+            if settings.dry_run {
+                tracing::warn!(
+                    mod_id = %mod_entry.id,
+                    archive = %source.display(),
+                    "install dry-run: archive is not cached, would need downloading"
+                );
+                continue;
+            }
             anyhow::bail!(
                 "missing cached archive for mod {}: {}",
                 mod_entry.id,
