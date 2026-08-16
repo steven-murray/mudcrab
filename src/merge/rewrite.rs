@@ -3,6 +3,7 @@
 use super::alloc::Allocation;
 use crate::plugin::schema::{self, SchemaError};
 use crate::plugin::{Entry, FormId, MasterTable, PluginName};
+use std::cell::Cell;
 
 #[derive(Debug, thiserror::Error)]
 pub enum RewriteError {
@@ -13,12 +14,12 @@ pub enum RewriteError {
     },
 
     #[error(
-        "{plugin}: record {record} references {form_id}, whose mod index {mod_index} is beyond \
-         its {master_count} masters. The plugin is dirty; clean it in TES4Edit before merging."
+        "{plugin}: reference {form_id} names master index {mod_index} of {master_count}, but \
+         that master is missing from the merged plugin's master list.\n\
+         This is a mudcrab bug in merge::masters, not a problem with the input."
     )]
-    DanglingReference {
+    MasterNotInMergedList {
         plugin: PluginName,
-        record: FormId,
         form_id: FormId,
         mod_index: u8,
         master_count: usize,
@@ -32,6 +33,8 @@ pub struct Remapper<'a> {
     merged_masters: &'a MasterTable,
     merged_set: &'a [PluginName],
     allocation: &'a Allocation,
+    /// References whose mod index ran past the source's master list.
+    non_canonical: Cell<usize>,
 }
 
 impl<'a> Remapper<'a> {
@@ -48,7 +51,29 @@ impl<'a> Remapper<'a> {
             merged_masters,
             merged_set,
             allocation,
+            non_canonical: Cell::new(0),
         }
+    }
+
+    /// How many references used a mod index past the source's master list.
+    ///
+    /// They are translated correctly; this is worth surfacing because it says
+    /// the source was written by a tool that does not emit canonical indices.
+    pub fn non_canonical_count(&self) -> usize {
+        self.non_canonical.get()
+    }
+
+    /// Translate without counting, for callers asking *whether* a FormID
+    /// would change rather than performing the rewrite.
+    ///
+    /// `merge::audit` probes every SCRO value this way. Without this those
+    /// probes inflate the non-canonical tally with references that are also
+    /// counted for real moments later.
+    pub fn probe(&self, form_id: FormId) -> Result<FormId, RewriteError> {
+        let saved = self.non_canonical.get();
+        let mapped = self.map(form_id);
+        self.non_canonical.set(saved);
+        mapped
     }
 
     /// Translate one FormID.
@@ -59,7 +84,9 @@ impl<'a> Remapper<'a> {
     /// - a reference into a plugin that is being merged away (including this
     ///   plugin's own records): becomes an own-record of the merged plugin,
     ///   with the object index the allocator assigned
-    /// - anything else is dangling and is an error, never silently zeroed
+    /// - a master that survived but is missing from the merged master list:
+    ///   an error, because that is a bug in `masters::build` rather than
+    ///   anything the input did
     pub fn map(&self, form_id: FormId) -> Result<FormId, RewriteError> {
         if form_id.is_null() {
             return Ok(form_id);
@@ -69,15 +96,32 @@ impl<'a> Remapper<'a> {
         let own_index = self.source_masters.own_mod_index();
 
         // The plugin's own records.
-        if mod_index == own_index {
+        //
+        // `>=`, not `==`, is deliberate. A mod index *past* the master list is
+        // not a dangling reference: every TES4 reader clamps it to the
+        // plugin's own records, and real tools emit it -- zMerge writes 718 of
+        // them into one MOFAM merge, and TES4Edit resolves all 7913 records of
+        // that file with zero errors. Refusing here would mean mudcrab could
+        // not merge a zMerge output as a source, for the sake of a distinction
+        // nothing downstream makes.
+        //
+        // Counted rather than logged at the point of use: a per-reference
+        // warning would print hundreds of times for one plugin. The merge
+        // reports the total once.
+        // See MOFAM-test/notes/zmerge-non-canonical-refs.md.
+        if mod_index >= own_index {
+            if mod_index > own_index {
+                self.non_canonical.set(self.non_canonical.get() + 1);
+            }
             let object = self.allocation.map(self.plugin, form_id.object_index());
             return Ok(FormId::new(self.merged_masters.own_mod_index(), object));
         }
 
         let Some(master) = self.source_masters.get(mod_index) else {
-            return Err(RewriteError::DanglingReference {
+            // Unreachable: mod_index < own_index == masters.len(). Kept so a
+            // future change to MasterTable cannot turn this into a silent zero.
+            return Err(RewriteError::MasterNotInMergedList {
                 plugin: self.plugin.clone(),
-                record: form_id,
                 form_id,
                 mod_index,
                 master_count: self.source_masters.len(),
@@ -92,9 +136,8 @@ impl<'a> Remapper<'a> {
 
         // A surviving master: same record, new index.
         let Some(new_index) = self.merged_masters.index_of(master) else {
-            return Err(RewriteError::DanglingReference {
+            return Err(RewriteError::MasterNotInMergedList {
                 plugin: self.plugin.clone(),
-                record: form_id,
                 form_id,
                 mod_index,
                 master_count: self.source_masters.len(),
@@ -208,15 +251,50 @@ mod tests {
     }
 
     #[test]
-    fn dangling_references_are_an_error_not_a_zero() {
+    fn a_mod_index_past_the_master_list_is_read_as_an_own_record() {
+        // zMerge emits these and every TES4 reader clamps them, so refusing
+        // would make a zMerge output unmergeable. Same result as if the index
+        // had been the canonical own index.
         let (src, dst, set, alloc) = setup();
         let name: PluginName = "patch.esp".into();
         let r = Remapper::new(&name, &src, &dst, &set, &alloc);
-        // mod index 7 with only 2 masters and own index 2
-        assert!(matches!(
-            r.map(FormId(0x0700_0801)),
-            Err(RewriteError::DanglingReference { .. })
-        ));
+
+        let canonical = r.map(FormId(0x0200_0801)).unwrap();
+        let sloppy = r.map(FormId(0x0700_0801)).unwrap();
+        assert_eq!(sloppy, canonical);
+        assert_eq!(sloppy, FormId(0x0100_0802));
+    }
+
+    #[test]
+    fn probing_does_not_count() {
+        // merge::audit probes every SCRO value to ask whether the merge moves
+        // it. Counting those would double-count references that the rewrite
+        // pass counts for real moments later.
+        let (src, dst, set, alloc) = setup();
+        let name: PluginName = "patch.esp".into();
+        let r = Remapper::new(&name, &src, &dst, &set, &alloc);
+
+        r.probe(FormId(0x0700_0801)).unwrap();
+        r.probe(FormId(0x0900_0801)).unwrap();
+        assert_eq!(r.non_canonical_count(), 0, "probes must not count");
+
+        r.map(FormId(0x0700_0801)).unwrap();
+        assert_eq!(r.non_canonical_count(), 1, "the real rewrite still counts");
+    }
+
+    #[test]
+    fn only_the_non_canonical_ones_are_counted() {
+        let (src, dst, set, alloc) = setup();
+        let name: PluginName = "patch.esp".into();
+        let r = Remapper::new(&name, &src, &dst, &set, &alloc);
+
+        r.map(FormId(0x0200_0801)).unwrap(); // canonical own
+        r.map(FormId(0x0000_0014)).unwrap(); // master reference
+        assert_eq!(r.non_canonical_count(), 0);
+
+        r.map(FormId(0x0700_0801)).unwrap();
+        r.map(FormId(0x0900_0801)).unwrap();
+        assert_eq!(r.non_canonical_count(), 2);
     }
 
     #[test]

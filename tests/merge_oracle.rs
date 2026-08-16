@@ -583,3 +583,55 @@ fn reports_non_canonical_references_across_all_merges() {
          which is a real defect rather than a cosmetic one: {genuine:?}"
     );
 }
+
+/// A zMerge output must be usable as a merge *source*.
+///
+/// This is what the clamping in `Remapper::map` buys. Refusing a mod index
+/// past the master list would make every one of these files unmergeable --
+/// merging merges is an ordinary thing to want, and the indices resolve.
+#[test]
+fn a_zmerge_output_can_itself_be_merged() {
+    let Some(mods) = mods_dir() else {
+        eprintln!("skipping: set MUDCRAB_MOFAM_ROOT to run against the real install");
+        return;
+    };
+
+    // Unique Forts Merged is the worst offender: 718 non-canonical references.
+    let def = definition("Unique Forts Merged");
+    let path = mods.join(&def.name).join(&def.filename);
+
+    let request = MergeRequest {
+        name: "Remerge".to_string(),
+        output: "Remerge.esp".to_string(),
+        sources: vec![MergeSource {
+            plugin: PluginName::new(&def.filename),
+            path,
+        }],
+        load_order: vec![
+            PluginName::new("Oblivion.esm"),
+            PluginName::new("xulCloudtopMountains.esp"),
+            PluginName::new(&def.filename),
+        ],
+    };
+
+    let output = merge::run(&request).expect("a zMerge output must be mergeable");
+
+    assert_eq!(
+        output.report.non_canonical_inputs, 718,
+        "the source's non-canonical indices should be counted and reported"
+    );
+
+    // And the result must be clean: same records, canonical indices throughout.
+    assert_eq!(output.report.record_count, 7912);
+    let own_index = output.plugin.masters.own_mod_index();
+    let mut sloppy = 0usize;
+    for record in output.plugin.records() {
+        mudcrab::plugin::schema::visit_form_ids(record, |form_id| {
+            if !form_id.is_null() && form_id.mod_index() > own_index {
+                sloppy += 1;
+            }
+        })
+        .expect("schema coverage");
+    }
+    assert_eq!(sloppy, 0, "re-merging must produce canonical indices");
+}

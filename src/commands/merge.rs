@@ -91,6 +91,13 @@ pub async fn run(args: MergeArgs) -> anyhow::Result<()> {
         println!("  groups     {}", report.group_count);
         println!("  renumbered {}", report.remapped);
         println!("  clobbered  {}", report.clobbered);
+        if report.non_canonical_inputs > 0 {
+            println!(
+                "  note       {} source reference(s) used a mod index past their own",
+                report.non_canonical_inputs
+            );
+            println!("             master list; translated as own-record references");
+        }
         println!();
 
         tracing::info!(
