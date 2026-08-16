@@ -382,6 +382,15 @@ pub struct CompiledModlist {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledMod {
     pub id: String,
+    /// Section path, carried through from the source entry.
+    ///
+    /// The flattened separator names in `mo2_modlist_entries` are a rendering
+    /// of this, not a substitute for it: they cannot be matched back to a mod,
+    /// so anything that wants to act on one section of the list needs the path
+    /// itself. Defaulted so compiled artifacts written before this field
+    /// existed still parse.
+    #[serde(default)]
+    pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -454,6 +463,11 @@ impl PersonalizedPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonalizedMod {
     pub id: String,
+    /// Section path, carried through from the compiled entry so `download`,
+    /// `check` and `install` can be scoped to part of the list. Defaulted so
+    /// plans written before this field existed still parse.
+    #[serde(default)]
+    pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

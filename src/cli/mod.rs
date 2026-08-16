@@ -1,3 +1,4 @@
+use crate::config::filter::ModFilter;
 use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
@@ -92,6 +93,32 @@ pub struct QueryArgs {
     pub headless: bool,
 }
 
+/// Narrow a command to part of the modlist.
+///
+/// Shared by `download`, `check` and `install` so the three always agree on
+/// what a given pair of flags selects -- you can download a section, check it,
+/// then install it with the same arguments. `compile` and `query` deliberately
+/// have no filter: they are cheap, and a partial compiled artifact would make
+/// every later stage operate on a modlist that no longer describes the list.
+#[derive(Debug, Default, Args)]
+pub struct FilterArgs {
+    /// Only act on mods in this section. Matches any level of a mod's section
+    /// path, case-insensitively, so a parent section selects everything nested
+    /// under it. Repeatable.
+    #[arg(long = "section", value_name = "NAME")]
+    pub sections: Vec<String>,
+    /// Only act on this mod id, matched exactly. Repeatable, and unions with
+    /// --section rather than intersecting it.
+    #[arg(long = "only", value_name = "MOD_ID")]
+    pub only: Vec<String>,
+}
+
+impl FilterArgs {
+    pub fn to_mod_filter(&self) -> ModFilter {
+        ModFilter::new(&self.sections, &self.only)
+    }
+}
+
 #[derive(Debug, Args)]
 pub struct DownloadArgs {
     /// Path to personalized install plan.
@@ -105,6 +132,8 @@ pub struct DownloadArgs {
     /// Retry attempts per failed download.
     #[arg(long, default_value_t = 3)]
     pub retry: u32,
+    #[command(flatten)]
+    pub filter: FilterArgs,
 }
 
 #[derive(Debug, Args)]
@@ -114,6 +143,8 @@ pub struct CheckArgs {
     /// Cache directory for downloaded archives.
     #[arg(long)]
     pub cache: Option<PathBuf>,
+    #[command(flatten)]
+    pub filter: FilterArgs,
 }
 
 #[derive(Debug, Args)]
@@ -149,6 +180,8 @@ pub struct InstallArgs {
     /// Defaults to ~/.config/mudcrab/tools.toml (or %APPDATA%\mudcrab\tools.toml on Windows).
     #[arg(long)]
     pub tools_config: Option<PathBuf>,
+    #[command(flatten)]
+    pub filter: FilterArgs,
 }
 
 #[derive(Debug, Args)]

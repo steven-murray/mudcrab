@@ -16,7 +16,10 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         .cache
         .clone()
         .unwrap_or_else(|| PathBuf::from(".mudcrab-cache"));
-    let settings = config::check::CheckSettings { cache_dir };
+    let settings = config::check::CheckSettings {
+        cache_dir,
+        filter: args.filter.to_mod_filter(),
+    };
 
     let report = config::check::check_all(&plan, &settings)?;
 

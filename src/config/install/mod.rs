@@ -1,3 +1,4 @@
+use crate::config::filter::ModFilter;
 use crate::config::schema::
     {PersonalizedPlan, PostInstallAction};
 use crate::config::mo2::{
@@ -19,6 +20,8 @@ pub struct InstallSettings {
     pub execute_actions: bool,
     pub dry_run: bool,
     pub tools: ToolsConfig,
+    /// Which mods this run installs. Empty means the whole plan.
+    pub filter: ModFilter,
 }
 
 pub mod layout;
@@ -82,15 +85,20 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     } else {
         load_install_manifest(&manifest_path)?
     };
-    let previous_by_id: HashMap<String, InstalledMod> = previous_manifest
-        .map(|manifest| {
-            manifest
-                .installed_mods
-                .into_iter()
-                .map(|entry| (entry.id.clone(), entry))
-                .collect()
-        })
+    let (previous_installed, previous_hidden) = previous_manifest
+        .map(|manifest| (manifest.installed_mods, manifest.hidden_plugins))
         .unwrap_or_default();
+    let previous_by_id: HashMap<String, InstalledMod> = previous_installed
+        .into_iter()
+        .map(|entry| (entry.id.clone(), entry))
+        .collect();
+
+    if !settings.filter.is_empty() {
+        tracing::info!(
+            scope = %settings.filter.describe(),
+            "install: filtered run, only the selected mods will be installed"
+        );
+    }
 
     if settings.execute_actions {
         crate::config::actions::apply_all(
@@ -100,6 +108,24 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     }
 
     for mod_entry in &plan.mods {
+        if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+            // A filtered run narrows what is installed; it does not uninstall
+            // the rest. Carrying the previous entry forward keeps the manifest
+            // a record of everything on disk, so installing section B after
+            // section A does not make A look uninstalled -- which would delete
+            // it from the MO2 profile and reinstall it from scratch next time.
+            if let Some(previous) = previous_by_id.get(&mod_entry.id) {
+                installed_mods.push(previous.clone());
+            }
+            tracing::debug!(
+                mod_id = %mod_entry.id,
+                status = "skipped",
+                reason = "excluded by --section/--only",
+                "install: mod status"
+            );
+            continue;
+        }
+
         let mut mod_target = settings.mods_dir.join(safe_mod_dir_name(&mod_entry.id)?);
         let definition_hash = hash_personalized_mod(mod_entry)?;
         let previous = previous_by_id.get(&mod_entry.id);
@@ -208,9 +234,33 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             )
         })
         .collect();
-    let hidden_plugins = merge::run_merges(plan, settings, &installed_paths)?;
+    let mut hidden_plugins = merge::run_merges(plan, settings, &installed_paths)?;
+
+    // A merge the filter skipped was not rebuilt, so it also did not re-record
+    // what it hid. Without carrying those records forward the sources it hid on
+    // an earlier run would stay renamed with nothing left saying so, and
+    // `unhide-merges` could no longer restore them.
+    let skipped_merges: HashSet<&str> = plan
+        .merges()
+        .filter(|(entry, _)| !settings.filter.matches(&entry.section, &entry.id))
+        .map(|(entry, _)| entry.id.as_str())
+        .collect();
+    hidden_plugins.extend(
+        previous_hidden
+            .into_iter()
+            .filter(|entry| skipped_merges.contains(entry.merge.as_str())),
+    );
 
     if !settings.dry_run {
+        // With a filter active the MO2 profile must describe exactly what is on
+        // disk, which is what the manifest now records: this run's mods plus
+        // everything an earlier run installed.
+        let export_scope: Option<HashSet<String>> = if settings.filter.is_empty() {
+            None
+        } else {
+            Some(installed_mods.iter().map(|entry| entry.id.clone()).collect())
+        };
+
         let manifest = InstallManifest {
             name: plan.name.clone(),
             installed_mods,
@@ -225,7 +275,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         })?;
 
         if settings.mo2_instance_dir.is_some() {
-            export_mo2_instance(plan, settings)?;
+            export_mo2_instance(plan, settings, export_scope.as_ref())?;
         }
 
         if settings.execute_actions {
@@ -425,6 +475,7 @@ mod tests {
     fn sample_mod(id: &str, archive_path: &str) -> PersonalizedMod {
         PersonalizedMod {
             id: id.to_string(),
+            section: Vec::new(),
             mod_type: None,
             merge: None,
             archives: vec![CompiledArchive {

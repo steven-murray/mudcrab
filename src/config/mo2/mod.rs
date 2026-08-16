@@ -5,11 +5,21 @@
 
 use super::install::InstallSettings;
 use crate::config::download;
+use crate::config::install::is_plugin_file;
 use crate::config::schema::{Mo2ModlistEntry, PersonalizedPlan};
 use crate::util::fs::{find_child_case_insensitive, write_text_file};
+use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
+
+/// Which mods an export should describe.
+///
+/// `None` is the unfiltered install: the export covers the whole plan, exactly
+/// as it always has. `Some(ids)` is a filtered install, where the profile must
+/// describe only what is actually on disk -- this run's mods plus whatever an
+/// earlier run installed, as recorded in the install manifest.
+pub(crate) type ExportScope<'a> = Option<&'a HashSet<String>>;
 
 /// Suffix MO2 uses to hide a file from the virtual filesystem entirely.
 /// Its `skip_file_suffixes` default includes this; "Merge Plugins Hide" uses it
@@ -135,23 +145,69 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
     Ok(())
 }
 
-pub(crate) fn export_mo2_instance(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
+pub(crate) fn export_mo2_instance(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+    scope: ExportScope<'_>,
+) -> anyhow::Result<()> {
     let root = mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
-    export_downloads(plan, settings, &root.join("downloads"))?;
-    ensure_mo2_section_folders(plan, settings)?;
+    export_downloads(plan, settings, &root.join("downloads"), scope)?;
+    ensure_mo2_section_folders(plan, settings, scope)?;
 
     let profile_dir = mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
-    write_text_file(&profile_dir.join("modlist.txt"), &render_mo2_modlist(plan))?;
-    write_text_file(&profile_dir.join("plugins.txt"), &render_plugin_list(&plan.plugins))?;
-    write_text_file(&profile_dir.join("archives.txt"), &render_archive_list(plan, settings)?)?;
+    write_text_file(&profile_dir.join("modlist.txt"), &render_mo2_modlist(plan, scope))?;
+    write_text_file(
+        &profile_dir.join("plugins.txt"),
+        &render_plugin_list(&scoped_plugins(plan, settings, scope)?),
+    )?;
+    write_text_file(&profile_dir.join("archives.txt"), &render_archive_list(plan, settings, scope)?)?;
     Ok(())
 }
 
-pub(crate) fn export_downloads(plan: &PersonalizedPlan, settings: &InstallSettings, downloads_dir: &Path) -> anyhow::Result<()> {
+/// Whether a mod belongs in this export.
+fn in_scope(scope: ExportScope<'_>, mod_id: &str) -> bool {
+    scope.is_none_or(|ids| ids.contains(mod_id))
+}
+
+/// Separator names the in-scope mods need.
+///
+/// Built the same way `SourceModlist::mo2_modlist_entries` builds them -- one
+/// joined name per level of the path -- so a name computed here matches a
+/// `Mo2ModlistEntry::Section` exactly. Doing it from the mods' own section
+/// paths, rather than guessing which mods sit under a separator in the
+/// flattened list, is why `section` had to survive into the plan.
+fn scoped_section_names(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> Option<HashSet<String>> {
+    let ids = scope?;
+
+    let mut out = HashSet::new();
+    for mod_entry in &plan.mods {
+        if !ids.contains(&mod_entry.id) {
+            continue;
+        }
+        for depth in 0..mod_entry.section.len() {
+            out.insert(mod_entry.section[..=depth].join(" - "));
+        }
+    }
+
+    Some(out)
+}
+
+pub(crate) fn export_downloads(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+    downloads_dir: &Path,
+    scope: ExportScope<'_>,
+) -> anyhow::Result<()> {
     std::fs::create_dir_all(downloads_dir)
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", downloads_dir.display()))?;
 
     for mod_entry in &plan.mods {
+        // Out-of-scope mods were never downloaded, so demanding their cached
+        // archives here would make every filtered install fail.
+        if !in_scope(scope, &mod_entry.id) {
+            continue;
+        }
+
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             if !archive.build.is_empty() {
                 // Build archives have no single pre-built file to export; skip for now.
@@ -225,17 +281,29 @@ pub(crate) fn detect_archive_ext(path: &Path) -> &'static str {
     ""
 }
 
-pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan) -> String {
-    let selected: std::collections::HashSet<&str> = plan.selected_mods.iter().map(String::as_str).collect();
+pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> String {
+    let selected: HashSet<&str> = plan.selected_mods.iter().map(String::as_str).collect();
+    let sections = scoped_section_names(plan, scope);
+
     let mut out = String::new();
     for entry in plan.mo2_modlist_entries.iter().rev() {
         match entry {
             Mo2ModlistEntry::Mod { id } => {
+                if !in_scope(scope, id) {
+                    continue;
+                }
                 let prefix = if selected.contains(id.as_str()) { '+' } else { '-' };
                 out.push(prefix);
                 out.push_str(id);
             }
             Mo2ModlistEntry::Section { name } => {
+                // A separator with nothing under it yet is noise, so drop the
+                // ones whose mods this run has not installed.
+                if let Some(sections) = &sections
+                    && !sections.contains(name)
+                {
+                    continue;
+                }
                 out.push('-');
                 out.push_str(&mo2_section_mod_name(name));
             }
@@ -245,11 +313,22 @@ pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan) -> String {
     out
 }
 
-pub(crate) fn ensure_mo2_section_folders(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
+pub(crate) fn ensure_mo2_section_folders(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+    scope: ExportScope<'_>,
+) -> anyhow::Result<()> {
+    let sections = scoped_section_names(plan, scope);
+
     for entry in &plan.mo2_modlist_entries {
         let Mo2ModlistEntry::Section { name } = entry else {
             continue;
         };
+        if let Some(sections) = &sections
+            && !sections.contains(name)
+        {
+            continue;
+        }
 
         let path = settings.mods_dir.join(mo2_section_mod_name(name));
         std::fs::create_dir_all(&path)
@@ -272,10 +351,99 @@ pub(crate) fn render_plugin_list(plugins: &[String]) -> String {
     out
 }
 
-pub(crate) fn render_archive_list(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<String> {
+/// The load order, reduced to the plugins that will actually load.
+///
+/// Unfiltered, this is the declared order verbatim. Filtered, a plugin only
+/// belongs in the profile if its file is there to load: either inside an
+/// in-scope mod or in the game's own Data folder. The alternative -- trusting
+/// the declared list -- would name plugins from sections that have not been
+/// installed yet, which is precisely the state a section-at-a-time build is in.
+fn scoped_plugins(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+    scope: ExportScope<'_>,
+) -> anyhow::Result<Vec<String>> {
+    let Some(ids) = scope else {
+        return Ok(plan.plugins.clone());
+    };
+
+    let mut available: HashSet<String> = HashSet::new();
+    for mod_id in ids {
+        let mod_dir = settings.mods_dir.join(mod_id);
+        if !mod_dir.exists() {
+            continue;
+        }
+        collect_plugin_names(&mod_dir, &mut available)?;
+    }
+
+    // Base game masters belong to no mod, so they are found here or not at all.
+    if let Some(game_dir) = &settings.game_dir {
+        let data_dir = game_dir.join("Data");
+        if data_dir.is_dir() {
+            collect_plugin_names(&data_dir, &mut available)?;
+        }
+    }
+
+    let mut dropped = Vec::new();
+    let mut kept = Vec::new();
+    for plugin in &plan.plugins {
+        if available.contains(&plugin.trim().to_ascii_lowercase()) {
+            kept.push(plugin.clone());
+        } else {
+            dropped.push(plugin.as_str());
+        }
+    }
+
+    if !dropped.is_empty() {
+        tracing::info!(
+            count = dropped.len(),
+            plugins = ?dropped,
+            "mo2 export: omitting plugins from plugins.txt because they are not installed yet"
+        );
+    }
+
+    Ok(kept)
+}
+
+/// Lowercased names of every plugin file under a directory.
+fn collect_plugin_names(root: &Path, out: &mut HashSet<String>) -> anyhow::Result<()> {
+    for entry in std::fs::read_dir(root)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", root.display()))?
+    {
+        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", root.display()))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+
+        if file_type.is_dir() {
+            collect_plugin_names(&path, out)?;
+            continue;
+        }
+        if !file_type.is_file() || !is_plugin_file(&path) {
+            continue;
+        }
+
+        if let Some(name) = path.file_name().and_then(|name| name.to_str()) {
+            out.insert(name.to_ascii_lowercase());
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn render_archive_list(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+    scope: ExportScope<'_>,
+) -> anyhow::Result<String> {
     let mut out = String::new();
 
     for mod_id in &plan.mod_order {
+        if !in_scope(scope, mod_id) {
+            continue;
+        }
+
         let mod_dir = settings.mods_dir.join(mod_id);
         if !mod_dir.exists() {
             continue;

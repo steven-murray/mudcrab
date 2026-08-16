@@ -45,6 +45,7 @@ Download archives required by a personalized plan.
 
 ```bash
 mudcrab download <plan.json> [--cache <dir>] [--retry <n>] [--parallel <n>]
+                 [--section <name>]... [--only <mod id>]...
 ```
 
 Example:
@@ -54,6 +55,38 @@ mudcrab download build/plan.json --cache .mudcrab-cache --retry 3
 ```
 
 Note: `--parallel` is accepted but currently downloads sequentially.
+
+## Working on part of a modlist
+
+A large list is built a section at a time, so `download`, `check` and `install`
+all accept the same two flags:
+
+- `--section <name>` -- match any level of a mod's section path,
+  case-insensitively. `--section "5 - LOD"` selects `section = ["5 - LOD"]` and
+  everything nested under it, such as `section = ["5 - LOD", "Meshes"]`.
+- `--only <mod id>` -- match one mod id exactly.
+
+Both are repeatable and they union: a mod is in scope if it matches *either*.
+With neither flag the command processes the whole list, exactly as before.
+
+`compile` and `query` have no such flags on purpose. They are cheap, and a
+partial compiled artifact or plan would leave every later stage working from a
+document that no longer describes the modlist.
+
+```bash
+mudcrab download build/plan.json --cache .mudcrab-cache --section "5 - LOD"
+mudcrab install  build/plan.json --cache .mudcrab-cache \
+  --mo2-instance-dir ~/mo2/MOFAM --section "5 - LOD"
+```
+
+A filtered install narrows what is installed; it never uninstalls the rest.
+Mods skipped by the filter keep their existing `install_manifest.json` entries,
+so installing section B after section A leaves both recorded as installed. The
+MO2 profile is rewritten from that manifest, so `modlist.txt` lists the mods
+installed so far plus the separators for the sections they belong to, and
+`plugins.txt` lists only plugins that are actually on disk (in an installed mod
+or in the game's own `Data` folder). Sections you have not reached yet simply do
+not appear yet.
 
 ## validate
 
@@ -69,6 +102,7 @@ Install from a personalized plan and cache into a mods directory.
 
 ```bash
 mudcrab install <plan.json> --cache <dir> --mods-dir <mods_dir> [--dry-run] [--skip-actions]
+                [--section <name>]... [--only <mod id>]...
 ```
 
 Example:

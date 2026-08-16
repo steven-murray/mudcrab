@@ -40,6 +40,18 @@ pub(crate) fn run_merges(
     let mut hidden = Vec::new();
 
     for (mod_entry, spec) in plan.merges() {
+        // A merge is a mod like any other, so the filter decides whether this
+        // run builds it. Its *sources* are looked up in `installed`, so a merge
+        // in scope can still consume plugins from mods an earlier run put on
+        // disk; only a source that was never installed is an error.
+        if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+            tracing::debug!(
+                merge = %mod_entry.id,
+                "merge: skipped, excluded by --section/--only"
+            );
+            continue;
+        }
+
         let target = installed
             .get(&mod_entry.id)
             .cloned()
