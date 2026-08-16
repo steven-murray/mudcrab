@@ -521,7 +521,7 @@ path = "nexus:oblivion/51375/1000028986"
 
 [[mods]]
 id = "Imperial City Landscape Fix"
-oracle_name = "Market District Landscape Fix and Imperial City Landscape Fix"  # Oracle combines two mods
+oracle_name = "Market District Landscape Fix and Imperial City Landscape Fix"  # folder is named after the Nexus page; only its 1st main file is installed
 section = ["TWEAKS AND FIXES"]
 
 [[mods.archives]]

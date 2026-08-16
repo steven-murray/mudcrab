@@ -28,6 +28,37 @@ Deliverable:
 Translation rule:
 - Every mod row in condensed markdown must map to at least one TOML block.
 
+## Mod ids vs Nexus mod pages
+
+A mod id names **one installed thing**. A Nexus mod *page* often is not one
+thing, so the two do not reliably correspond and the id cannot be derived
+mechanically from the page name.
+
+Three cases, all of which occur in MOFAM:
+
+1. **One page, one archive** -- the ordinary case. Id = the mod name.
+2. **One page, several archives that are separate mods.** Each gets its own
+   `[[mods]]` entry with its own id. Example: page 50770 is called *"Market
+   District Landscape Fix and Imperial City Landscape Fix"* and offers both as
+   separate main files, but the guide says "only the 1st main file", so the
+   list contains **only** `Imperial City Landscape Fix`. Had it wanted both,
+   they would be two mods, not one.
+3. **One page, several archives combined into one mod.** Several
+   `[[mods.archives]]` under a single id -- the same shape used for the
+   combine/repack rows in Part 25.
+
+Consequences when authoring:
+
+- `add --from-oracle` defaults the id to the Oracle's **folder** name, which
+  MO2 takes from the page. That is right for case 1 and wrong for cases 2 and
+  3; override with `--id` and record the real folder name via `oracle_name`
+  so `diff` still matches.
+- The `fileid` is the thing that identifies what is actually installed. When
+  a name looks ambiguous, check `[installedFiles] 1\fileid` against ours
+  rather than trusting either name. That check is what caught a bad mapping
+  between `Diverse Effect Icons` (modid 10254) and `Diverse Effect Icons
+  OBSE` (modid 49511), which share a name prefix and nothing else.
+
 ## Step 3: Maintain Minimal High-Signal TOML
 
 Status: in progress. [input/mofam.minimal.toml](input/mofam.minimal.toml) and
