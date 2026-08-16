@@ -15,8 +15,8 @@ Last updated: 2026-08-16.
 - **Tooling (plan Phase 2) is complete.** `add`, `diff`, `inspect`,
   `--section`/`--only` filters, `--archive-search-path`, `install --force`,
   `add --before-mod`, `inspect` of a `.bsa`, native BSA reader/writer,
-  `pack_bsa` / `create_dummy_plugin` / `file_prune` / `file_hide`.
-  334 tests, clippy clean under `-D warnings`.
+  `pack_bsa` (with `prune_packed`) / `extract_bsa` / `create_dummy_plugin` /
+  `file_prune` / `file_hide` / `file_move`. 356 tests, clippy clean.
 - **Merges**: all six reproduce zMerge semantically. Unique Forts and TACE
   verified in game. Prebash rebuilt without `ORC.esp` for the Oracle.
 - **Parts 1, 2, 3, 4, 6** authored (105 mods, pre-existing).
@@ -67,10 +67,30 @@ This mod now diffs wholesale against the Oracle, like ORC.
 All 37 MOO settings were verified present in 4.9.4.2 before authoring and read
 back from the staged INI after install.
 
+## Part 9 (Overhauls: Oscuro) -- 11 of 14, two rows blocked
+
+5 identical, 6 differing and all explained; see `part-09-overhauls-oscuro.md`.
+The BSA round trip was routine. What stopped work was downloads:
+
+- **Row 7 (EVE)** -- only the `.omod` build is on this machine; the guide asks
+  for the BAIN archive. Needs a Nexus download.
+- **Row 11's Resources archive** -- the 3.5 GB download is **corrupt** (7z and
+  bsdtar both reject it). Needs re-downloading.
+
+Both need `NEXUS_API_KEY`, which is not set. Everything else in the section is
+built and verified.
+
+**Deferred by the guide itself**: OOO Enhanced's conflict-tab hiding and its
+textures repack reference mods from Parts 10 and 24, so they wait until after
+Part 24 -- the guide says so explicitly. Packing early would bake in the files
+the hiding removes.
+
+**Open**: `Seamless - HGEC Female` -- guide says C-Cup, the Oracle installed
+E-Cup. Following the guide. Visible in game; worth a look once EVE lands.
+
 ## Next sections
 
-Guide order from Part 9 (Oscuro), the hardest early section: BAE extraction,
-BSArch repacking and conflict-tab hiding. Most rows are trivial; the ones needing new features
+Guide order from Part 10 (WAC). Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at
@@ -81,7 +101,8 @@ also flushed out four real defects: 21 mods silently absent from the build, two
 tree patches installing two levels too deep, and the two INI bugs that made the
 UI unusable. See `earlier-sections-backlog.md`.
 
-**SP2 is after Part 9.**
+**SP2 is after Part 9** -- but hold it until the two blocked downloads land,
+since OOO Enhanced's resources are most of that section's content.
 
 ## Open threads
 

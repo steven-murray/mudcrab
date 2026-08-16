@@ -103,7 +103,27 @@ plugins = [
 	"BasicHarvest4MOO.esp",
 	"MOO Loading Screens - New Pics.esp",
 	"OCOv2 - MOO Patch.esp",
-	"MOO MOBS Patch.esp"
+	"MOO MOBS Patch.esp",
+	# Part 9. Oscuro's master leads; the OOO Adaptation plugins and the two
+	# OOO Enhanced patches are Part 36 merge sources, hidden in the Oracle and
+	# active here until that merge exists.
+	"Oscuro's_Oblivion_Overhaul.esm",
+	"Oscuro's_Oblivion_Overhaul.esp",
+	"Oscuro's_Oblivion_Overhaul - Knights of Nine.esp",
+	"EVE_StockEquipmentReplacer for OOO.esp",
+	"OOOShiveringIsles.esp",
+	"OOOShiveringIsles_OCO_Patch.esp",
+	"OOO Enhanced.esp",
+	"DLCHorseArmor - OOO Adaptation.esp",
+	"DLCOrrery - OOO Adaptation.esp",
+	"DLCVileLair - OOO Adaptation.esp",
+	"DLCMehrunesRazor - OOO Adaptation.esp",
+	"DLCThievesDen - OOO Adaptation.esp",
+	"DLCBattlehornCastle - OOO Adaptation.esp",
+	"DLCFrostcrag - OOO Adaptation.esp",
+	"Knights of Nine - OOO Enhanced Adaptation.esp",
+	"OOO Enhanced - Shivering Isles.esp",
+	"OOO Enhanced - Av Latta Magica Compatibility Patch.esp"
 ]
 
 post-install-actions = ["loot-sort"]
@@ -2161,3 +2181,182 @@ path = "nexus:oblivion/47473/1000015754"
 download_handler = "nexus"
 file_name = "MOBS 2.0a patch for MOO-47473-1-1.7z"
 # oracle version 1.1.0.0
+
+# Guide 1 + 3, as a single mod. The guide has you install the BSA, extract it
+# with BAE, install the voice files separately, paste them in, repack with
+# BSArchPro, delete the loose files, and disable the voice-file mod. That is one
+# mod assembled from two archives, so it is written as one -- and the
+# "disable the other mod" step disappears with it.
+#
+# mudcrab reads and writes BSAs natively, so no BAE and no BSArch under WINE.
+#
+# The Oracle keeps an empty `OOO Voice FIles` folder from having done it the
+# guide's way; `diff` reports that folder as missing from ours, correctly.
+[[mods]]
+id = "OOO - Oscuro's Oblivion Overhaul - Updated"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46199/1000043752"
+download_handler = "nexus"
+file_name = "OOO BSA-46199-1-7-1767121182.7z"
+
+# The voice files, guide row 3. They are pasted into this mod and repacked, so
+# they are a second layer of this mod rather than a mod of their own -- which is
+# also why the guide ends by telling you to disable the separate one.
+[[mods.archives]]
+path = "nexus:oblivion/46199/1000039030"
+download_handler = "nexus"
+file_name = "OOO Voice FIles-46199-1-0-1722704975.7z"
+
+# Unpack, so the voices staged above can join the archive's own contents...
+[[mods.actions]]
+action = "extract_bsa"
+archive = "Oscuro's_Oblivion_Overhaul.bsa"
+
+# ...and repack the lot under the same name, dropping the loose copies the
+# archive now holds. `prune_packed` deletes exactly what went in, which a
+# hand-written glob cannot: this row first guessed "menus" (not in the archive)
+# and "sound" (the staged tree has "Sound").
+[[mods.actions]]
+action = "pack_bsa"
+output = "Oscuro's_Oblivion_Overhaul.bsa"
+prune_packed = true
+# oracle version 1.7.0.0
+
+[[mods]]
+id = "OOO Esps"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46199/1000043840"
+download_handler = "nexus"
+file_name = "OOO Esps-46199-1-6-3-1768074545.7z"
+# oracle version 1.6.3.0
+
+[[mods]]
+id = "OOO - KotN Patch"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46199/1000037172"
+download_handler = "nexus"
+file_name = "OOO - KotN Patch-46199-1-0-1702397495.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "OOO Flavor Text for Extended UI"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51781/1000030785"
+download_handler = "nexus"
+file_name = "OOO Flavor Text for Extended UI 1.1-51781-1-1-1649435764.zip"
+# oracle version 1.1.0.0
+
+# Guide 6: BAIN, the OOO variant of five mutually exclusive body sets.
+[[mods]]
+id = "Seamless - Robert Male"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45864/1000022926"
+download_handler = "nexus"
+file_name = "SE-  Robert Male v5.2 all-in-1 Addons-45864-1-2-1567876771.7z"
+layout = "bain"
+bain_subpackages = ["50 Robert v5 Muscular OOO"]
+# oracle version 1.2.0.0
+
+# Guide 8: BAIN. The 10/15 groups are alternatives -- one cup size, one
+# lowerbody -- so exactly one of each is selected.
+[[mods]]
+id = "Seamless - HGEC Female"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45858/1000022934"
+download_handler = "nexus"
+file_name = "SE- HGEC OOO 24078-45858-1-1a-1568047983.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Core",
+  "10 Equipment Replacer Upperbody - Normal C-Cup",
+  "15 Equipment Replacer Lowerbody - Normal",
+]
+# oracle version 1.1.0.0a
+
+# Guide 9: move the optional Crucible edits plugin into `optional/`, MO2's
+# convention for a plugin kept but left out of the load order.
+[[mods]]
+id = "OOO Shivering Isles"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46508/1000043635"
+download_handler = "nexus"
+file_name = "1_OOO Shivering Isles-46508-V3-4-1765827274.7z"
+
+[[mods.actions]]
+action = "file_move"
+from = "OOOShiveringIsles_Optional_CrucibleEdits.esp"
+to = "optional/OOOShiveringIsles_Optional_CrucibleEdits.esp"
+# oracle version 3.4.0.0
+
+[[mods]]
+id = "OOO Shivering Isles - OCO Compatibility Patch"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46508/1000035536"
+download_handler = "nexus"
+file_name = "OOO Shivering Isles - OCO Compatibility Patch-46508-V3-1690506123.zip"
+# oracle version 3.0.0.0
+
+[[mods]]
+id = "OOO Shivering Isles - Exnem and HGEC models"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46508/1000035531"
+download_handler = "nexus"
+file_name = "OOO Shivering Isles - Exnem and HGEC models-46508-V3-1690505549.zip"
+# oracle version 3.0.0.0
+
+[[mods]]
+id = "Visually Improved Staffs for OOO"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41477/88476"
+download_handler = "nexus"
+file_name = "Visually Improved Staffs for OOO-41477-1-0.7z"
+# oracle version 1.0.0.0
+
+# Guide 11, first archive. Seven of fifteen subpackages; the guide writes
+# "00 Base" and "80 Av Latta Magicka" but the archive spells them
+# "00 Base (No resources)" and "80 Av Latta Magica".
+#
+# The 11/12/20 groups are alternatives (Vanilla vs Mod, OOO Enhanced vs Only
+# OOO), so one of each is chosen.
+#
+# The second archive of this row -- OOO Enhanced 5.3 Resources -- is NOT here:
+# the 3.5 GB download on this machine is corrupt. See notes/part-09-*.md.
+[[mods]]
+id = "OOO Enhanced"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47187/1000042164"
+download_handler = "nexus"
+file_name = "OOO Enhanced-47187-5-33-1748819433.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Base (No resources)",
+  "10 DLCs",
+  "11 DLCs - Frostcrag (Vanilla)",
+  "12 DLCs - Battlehorn Castle (Vanilla)",
+  "20 Knights of the Nine (OOO Enhanced)",
+  "30 Shivering Isles (REQUIRES OOO SI)",
+  "80 Av Latta Magica",
+]
+# oracle version 5.33.0.0

@@ -68,12 +68,104 @@ pub(super) fn apply(action: &PackBsaAction, cx: &ActionCx<'_>) -> anyhow::Result
         anyhow::anyhow!("{}: failed to write {}: {err}", cx.owner, output.display())
     })?;
 
+    let packed = archive.file_count();
+    let folders = archive.folders.len();
+
+    // Deleting what was just packed, from the pack's own file list rather than
+    // from a hand-written glob. Naming the folders by hand means guessing at
+    // the archive's top-level layout, and a guess that is wrong either deletes
+    // nothing or leaves loose copies shadowing the archive they came from.
+    let mut pruned = 0usize;
+    if action.prune_packed {
+        // Matched against what is on disk, not against the archive's own paths.
+        // A BSA stores names lowercased, so rejoining them to the staged folder
+        // finds nothing wherever the tree is actually cased -- which silently
+        // left OOO's 1554 `Sound/` files loose, shadowing the archive holding
+        // them, while reporting a healthy-looking 4406 deletions.
+        let packed: std::collections::HashSet<String> = archive
+            .files()
+            .map(|(folder, file)| file.path_in(folder).replace('\\', "/").to_ascii_lowercase())
+            .collect();
+        prune_matching(mod_target, mod_target, &packed, &mut pruned)?;
+        remove_empty_dirs(mod_target, mod_target)?;
+    }
+
     tracing::info!(
         owner = cx.owner,
         output = %output.display(),
-        files = archive.file_count(),
-        folders = archive.folders.len(),
+        files = packed,
+        folders,
+        pruned,
         "packed BSA"
     );
     Ok(())
+}
+
+/// Delete every staged file whose folder-relative path is in `packed`.
+fn prune_matching(
+    current: &std::path::Path,
+    root: &std::path::Path,
+    packed: &std::collections::HashSet<String>,
+    pruned: &mut usize,
+) -> anyhow::Result<()> {
+    let entries = std::fs::read_dir(current)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|err| anyhow::anyhow!("failed to stat {}: {err}", path.display()))?;
+
+        if file_type.is_dir() {
+            prune_matching(&path, root, packed, pruned)?;
+            continue;
+        }
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let relative = path
+            .strip_prefix(root)
+            .map_err(|_| anyhow::anyhow!("{} escaped {}", path.display(), root.display()))?
+            .to_string_lossy()
+            .replace('\\', "/")
+            .to_ascii_lowercase();
+
+        if packed.contains(&relative) {
+            std::fs::remove_file(&path)
+                .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", path.display()))?;
+            *pruned += 1;
+        }
+    }
+
+    Ok(())
+}
+
+/// Remove directories left empty, deepest first, without touching `root`.
+fn remove_empty_dirs(current: &std::path::Path, root: &std::path::Path) -> anyhow::Result<bool> {
+    let entries = std::fs::read_dir(current)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?;
+
+    let mut remaining = 0usize;
+    for entry in entries {
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
+        let path = entry.path();
+        let is_dir = entry
+            .file_type()
+            .map_err(|err| anyhow::anyhow!("failed to stat {}: {err}", path.display()))?
+            .is_dir();
+
+        if is_dir && remove_empty_dirs(&path, root)? {
+            std::fs::remove_dir(&path)
+                .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", path.display()))?;
+        } else {
+            remaining += 1;
+        }
+    }
+
+    Ok(remaining == 0 && current != root)
 }

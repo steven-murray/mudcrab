@@ -9,7 +9,8 @@ use mudcrab::bsa::Bsa;
 use mudcrab::config::actions::{apply_all, ActionCx};
 use mudcrab::config::install::InstallSettings;
 use mudcrab::config::schema::{
-    CreateDummyPluginAction, FileHideAction, FilePruneAction, ModAction, PackBsaAction,
+    CreateDummyPluginAction, ExtractBsaAction, FileHideAction, FileMoveAction, FilePruneAction,
+    ModAction, PackBsaAction,
 };
 use mudcrab::plugin::Plugin;
 use std::path::{Path, PathBuf};
@@ -67,6 +68,16 @@ fn pack(output: &str, include: &[&str], exclude: &[&str]) -> ModAction {
         output: output.to_string(),
         include: include.iter().map(|s| s.to_string()).collect(),
         exclude: exclude.iter().map(|s| s.to_string()).collect(),
+        prune_packed: false,
+    })
+}
+
+fn pack_and_prune(output: &str) -> ModAction {
+    ModAction::PackBsa(PackBsaAction {
+        output: output.to_string(),
+        include: Vec::new(),
+        exclude: Vec::new(),
+        prune_packed: true,
     })
 }
 
@@ -548,4 +559,229 @@ fn file_hide_changes_nothing_in_a_dry_run() {
     .expect("dry run");
 
     assert!(target.join("meshes/rocks/rock01.nif").exists());
+}
+
+// --- extract_bsa ------------------------------------------------------------
+
+fn extract(archive: &str, keep: bool) -> ModAction {
+    ModAction::ExtractBsa(ExtractBsaAction {
+        archive: archive.to_string(),
+        keep_archive: keep,
+    })
+}
+
+fn moves(from: &str, to: &str) -> ModAction {
+    ModAction::FileMove(FileMoveAction {
+        from: from.to_string(),
+        to: to.to_string(),
+    })
+}
+
+#[test]
+fn extract_bsa_unpacks_and_removes_the_archive() {
+    let (dir, target) = staged_mod();
+    // Pack, prune the loose originals, then extract: back where we started.
+    run(
+        &[
+            pack("Example.bsa", &["meshes/**", "textures/**"], &[]),
+            prune(&["meshes", "textures"]),
+        ],
+        dir.path(),
+        &target,
+    )
+    .expect("pack and prune");
+    assert!(!target.join("meshes").exists());
+
+    run(&[extract("Example.bsa", false)], dir.path(), &target).expect("extract");
+
+    assert_eq!(
+        std::fs::read_to_string(target.join("meshes/rocks/rock01.nif")).unwrap(),
+        "NIF DATA"
+    );
+    assert_eq!(
+        std::fs::read_to_string(target.join("textures/rocks/rock01.dds")).unwrap(),
+        "DDS DATA"
+    );
+    assert!(
+        !target.join("Example.bsa").exists(),
+        "the archive must go, or the next pack_bsa folds it into itself"
+    );
+}
+
+#[test]
+fn extract_bsa_can_keep_the_archive() {
+    let (dir, target) = staged_mod();
+    run(&[pack("Example.bsa", &["meshes/**"], &[])], dir.path(), &target).expect("pack");
+    run(&[extract("Example.bsa", true)], dir.path(), &target).expect("extract");
+
+    assert!(target.join("Example.bsa").exists());
+}
+
+#[test]
+fn extract_bsa_round_trips_through_pack_bsa() {
+    // The whole point of the pair: unpack an archive, add something, repack.
+    // This is Part 9's OOO voice files in miniature.
+    let (dir, target) = staged_mod();
+    run(
+        &[
+            pack("Example.bsa", &["meshes/**"], &[]),
+            prune(&["meshes"]),
+        ],
+        dir.path(),
+        &target,
+    )
+    .expect("initial pack");
+
+    std::fs::create_dir_all(target.join("sound/voice")).unwrap();
+    std::fs::write(target.join("sound/voice/line.mp3"), b"VOICE").unwrap();
+
+    run(
+        &[
+            extract("Example.bsa", false),
+            pack("Example.bsa", &[], &["readme.txt"]),
+            prune(&["meshes", "sound", "textures"]),
+        ],
+        dir.path(),
+        &target,
+    )
+    .expect("repack");
+
+    let bytes = std::fs::read(target.join("Example.bsa")).unwrap();
+    let archive = Bsa::parse(&bytes).unwrap();
+    let mut paths: Vec<String> = archive.paths().collect();
+    paths.sort();
+    assert!(
+        paths.contains(&"sound\\voice\\line.mp3".to_string()),
+        "the added file must be in the repacked archive: {paths:?}"
+    );
+    assert!(
+        paths.contains(&"meshes\\rocks\\rock01.nif".to_string()),
+        "and so must the originals: {paths:?}"
+    );
+}
+
+#[test]
+fn extract_bsa_fails_when_the_archive_is_not_there() {
+    let (dir, target) = staged_mod();
+    let err = run(&[extract("Missing.bsa", false)], dir.path(), &target).unwrap_err();
+    assert!(format!("{err:#}").contains("found no archive at"), "{err:#}");
+}
+
+// --- file_move --------------------------------------------------------------
+
+#[test]
+fn file_move_relocates_a_plugin_into_optional() {
+    let (dir, target) = staged_mod();
+    std::fs::write(target.join("Thing_Optional.esp"), b"plugin").unwrap();
+
+    run(
+        &[moves("Thing_Optional.esp", "optional/Thing_Optional.esp")],
+        dir.path(),
+        &target,
+    )
+    .expect("move");
+
+    assert!(!target.join("Thing_Optional.esp").exists());
+    assert_eq!(
+        std::fs::read(target.join("optional/Thing_Optional.esp")).unwrap(),
+        b"plugin"
+    );
+}
+
+#[test]
+fn file_move_matches_the_source_case_insensitively() {
+    let (dir, target) = staged_mod();
+    run(
+        &[moves("MESHES/rocks/ROCK01.nif", "optional/rock01.nif")],
+        dir.path(),
+        &target,
+    )
+    .expect("move");
+
+    assert!(target.join("optional/rock01.nif").exists());
+}
+
+#[test]
+fn file_move_fails_when_the_source_is_not_there() {
+    let (dir, target) = staged_mod();
+    let err = run(&[moves("nope.esp", "optional/nope.esp")], dir.path(), &target).unwrap_err();
+    assert!(format!("{err:#}").contains("found no 'nope.esp'"), "{err:#}");
+}
+
+#[test]
+fn pack_bsa_can_delete_exactly_what_it_packed() {
+    // The alternative is a file_prune naming the top-level folders by hand,
+    // which means guessing the archive's layout. Part 9's OOO row guessed
+    // "menus", which is not in that archive, and guessed "sound" where the
+    // staged tree had "Sound" -- one error each way in a single list.
+    let (dir, target) = staged_mod();
+    run(&[pack_and_prune("Example.bsa")], dir.path(), &target).expect("pack");
+
+    assert!(target.join("Example.bsa").is_file());
+    assert!(!target.join("meshes").exists(), "packed folders should be gone");
+    assert!(!target.join("textures").exists());
+    assert!(!target.join("sound").exists());
+    assert!(
+        target.join("readme.txt").is_file(),
+        "a root-level file is never packed, so it must not be deleted either"
+    );
+}
+
+#[test]
+fn pack_bsa_prune_leaves_anything_it_did_not_pack() {
+    let (dir, target) = staged_mod();
+    run(
+        &[ModAction::PackBsa(PackBsaAction {
+            output: "Example.bsa".to_string(),
+            include: vec!["meshes/**".to_string()],
+            exclude: Vec::new(),
+            prune_packed: true,
+        })],
+        dir.path(),
+        &target,
+    )
+    .expect("pack");
+
+    assert!(!target.join("meshes").exists(), "packed");
+    assert!(target.join("textures/rocks/rock01.dds").is_file(), "not packed");
+    assert!(target.join("sound/fx/thud.wav").is_file(), "not packed");
+}
+
+#[test]
+fn pack_bsa_prune_is_idempotent() {
+    let (dir, target) = staged_mod();
+    let actions = [pack_and_prune("Example.bsa")];
+    run(&actions, dir.path(), &target).expect("first");
+    let first = std::fs::metadata(target.join("Example.bsa")).unwrap().len();
+
+    // Second run has nothing loose left to pack, so it must fail loudly rather
+    // than silently write an empty archive over a good one.
+    let err = run(&actions, dir.path(), &target).unwrap_err();
+    assert!(format!("{err:#}").contains("matched no files"), "{err:#}");
+    assert_eq!(
+        std::fs::metadata(target.join("Example.bsa")).unwrap().len(),
+        first,
+        "the existing archive must survive a failed re-pack"
+    );
+}
+
+#[test]
+fn pack_bsa_prune_deletes_regardless_of_how_the_tree_is_cased() {
+    // A BSA stores names lowercased. Rejoining those to the staged folder finds
+    // nothing where the tree is cased differently, which is how OOO's 1554
+    // `Sound/` files survived a prune that reported 4406 deletions and left
+    // them shadowing the archive that held them.
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("mods/Example");
+    for path in ["Sound/Voice/Line.mp3", "MESHES/Rocks/Rock01.nif"] {
+        let full = target.join(path);
+        std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+        std::fs::write(full, b"data").unwrap();
+    }
+
+    run(&[pack_and_prune("Example.bsa")], dir.path(), &target).expect("pack");
+
+    assert!(!target.join("Sound").exists(), "mixed-case folders must go too");
+    assert!(!target.join("MESHES").exists());
+    assert!(target.join("Example.bsa").is_file());
 }
