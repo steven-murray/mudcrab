@@ -1,4 +1,5 @@
 pub mod archive;
+pub mod bsa;
 pub mod cli;
 pub mod commands;
 pub mod config;

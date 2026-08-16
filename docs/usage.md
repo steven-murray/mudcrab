@@ -251,6 +251,89 @@ than skipped over an empty folder. A filtered run still carries forward the
 entries of the mods it skipped, so installing section B after section A does not
 make A look uninstalled.
 
+## Actions
+
+Each mod may declare an ordered `actions` list, applied to its staged folder
+after extraction. Entries run **in declaration order**, which is the only
+sequencing mechanism involved. The `action` key selects the action; an
+unrecognised name is a parse error naming the supported values.
+
+All paths and globs are resolved relative to the mod's staged data folder and
+are rejected if they escape it. Every action honours `--dry-run`, logging what
+it would do and touching nothing.
+
+### ini_set
+
+```toml
+{ action = "ini_set", file = "Ini/Mod.ini", key = "bEnable", value = 0 }
+```
+
+`scope` is `"mod"` (default) or `"game"`; a game-scoped write goes to the MO2
+profile's copy, never the original `Oblivion.ini`. `format` is `"standard"`
+(`key = value`) or `"set-to"` (`set key to value`). `value` accepts any TOML
+scalar; booleans become `1`/`0`.
+
+### qac
+
+```toml
+{ action = "qac", plugins = ["*.esp"] }
+```
+
+Runs xEdit's Quick Auto Clean over the matching plugins. Requires `tes4edit` in
+`tools.toml`.
+
+### pack_bsa
+
+```toml
+{ action = "pack_bsa", output = "Example Mod.bsa", include = ["meshes/**"], exclude = ["*.esp"] }
+```
+
+Packs the staged files into a BSA using mudcrab's native writer -- no BSArch.exe
+under Wine. `include` defaults to everything; `exclude` is applied after it. The
+output archive always excludes itself, so re-running is idempotent rather than
+nesting the previous archive inside the new one.
+
+Payloads are stored uncompressed, which is what BSArch produces for Oblivion by
+default and what Oblivion requires for voice files.
+
+A BSA cannot address a file outside a folder, so files at the top level of the
+staged mod are left loose and logged. Fails if nothing matched, rather than
+writing an empty archive.
+
+### create_dummy_plugin
+
+```toml
+{ action = "create_dummy_plugin", output = "Example Mod.esp" }
+```
+
+Writes an empty plugin: a TES4 header with no masters, records or groups, built
+through the same writer that produces merged plugins. Oblivion loads `Foo.bsa`
+only when a plugin named `Foo.esp` is active, so a mod shipped as a bare archive
+needs one of these; give it the same stem as the BSA.
+
+### file_prune
+
+```toml
+{ action = "file_prune", paths = ["meshes/**", "textures/**"] }
+```
+
+Deletes staged files matching the globs, then removes any folders left empty.
+`paths` is required -- an empty list would match everything.
+
+This is a separate action rather than a `pack_bsa` option because it has to run
+*after* the archive is written: the loose files must still exist to be packed.
+The three compose in exactly that order:
+
+```toml
+actions = [
+  { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
+  { action = "create_dummy_plugin", output = "Example Mod.esp" },
+  { action = "file_prune", paths = ["meshes/**", "textures/**", "sound/**"] },
+]
+```
+
+leaving the mod folder holding just the `.bsa` and its `.esp`.
+
 ## merge
 
 Build merged plugins from an already-installed mods directory, without
