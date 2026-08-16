@@ -23,6 +23,9 @@ pub enum MergeError {
 
     #[error(transparent)]
     Rewrite(#[from] RewriteError),
+
+    #[error(transparent)]
+    Audit(#[from] super::audit::AuditError),
 }
 
 /// One plugin to merge, already located on disk.
@@ -70,9 +73,12 @@ pub fn run(request: &MergeRequest) -> Result<MergeOutput, MergeError> {
         });
     }
 
-    // 1. Load every source.
+    // 1. Load every source, refusing any that carries plugin-name-keyed or
+    //    FormID-keyed assets -- merging renames the plugin and renumbers its
+    //    FormIDs, so those lookups would silently stop resolving.
     let mut loaded: Vec<(PluginName, Plugin)> = Vec::with_capacity(request.sources.len());
     for source in &request.sources {
+        super::audit::audit_assets(&source.plugin, &source.path)?;
         let plugin = Plugin::read(&source.path).map_err(|err| MergeError::Plugin {
             name: request.name.clone(),
             source: err,
@@ -106,6 +112,11 @@ pub fn run(request: &MergeRequest) -> Result<MergeOutput, MergeError> {
             &merged_set,
             &allocation,
         );
+        // Check the out-of-scope assumptions before committing to the output,
+        // so a modlist that breaks one gets a refusal rather than a plugin
+        // that loads and then misbehaves. See merge::audit.
+        super::audit::audit_scripts(name, plugin, &remapper)?;
+
         rewrite_entries(&mut entries, &remapper)?;
         source_records += plugin.records().count();
         collected.absorb(entries);

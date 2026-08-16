@@ -6,9 +6,11 @@
 //! Design notes and the evidence behind them: `MOFAM-test/notes/merge-recon.md`.
 
 pub mod alloc;
-pub mod masters;
 pub mod assemble;
+pub mod audit;
+pub mod masters;
 pub mod rewrite;
 pub mod run;
 
+pub use audit::AuditError;
 pub use run::{run, MergeError, MergeOutput, MergeReport, MergeRequest, MergeSource};
