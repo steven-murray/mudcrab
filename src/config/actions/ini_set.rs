@@ -81,16 +81,27 @@ pub(crate) fn apply_ini_set(
         .map(ToString::to_string)
         .collect();
 
+    // Match the file's own spacing rather than imposing ours. Oblivion.ini is
+    // written `Key=Value`, and Oblivion's parser takes everything after the `=`
+    // literally -- so `SFontFile_1 = Data\Fonts\x.fnt` becomes a path with a
+    // leading space, the font fails to load, and the game silently falls back
+    // to vanilla. That is a broken UI produced by two space characters.
+    //
+    // The whole file's style decides, not the line being replaced, so a line
+    // written in the wrong style by an earlier version is repaired rather than
+    // preserved.
+    let spaced = dominant_spacing(&lines, format);
+
     let mut replaced = false;
     for line in &mut lines {
         if is_ini_key_line(line, key, format) {
-            *line = render_ini_assignment(key, value, format);
+            *line = render_ini_assignment(key, value, format, spaced);
             replaced = true;
         }
     }
 
     if !replaced {
-        lines.push(render_ini_assignment(key, value, format));
+        lines.push(render_ini_assignment(key, value, format, spaced));
     }
 
     let mut content = lines.join("\n");
@@ -102,11 +113,45 @@ pub(crate) fn apply_ini_set(
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
 }
 
-fn render_ini_assignment(key: &str, value: &str, format: IniSetFormat) -> String {
+fn render_ini_assignment(key: &str, value: &str, format: IniSetFormat, spaced: bool) -> String {
     match format {
-        IniSetFormat::Standard => format!("{key} = {value}"),
+        // `set X to Y` is a script command; its spacing is not optional.
         IniSetFormat::SetTo => format!("set {key} to {value}"),
+        IniSetFormat::Standard if spaced => format!("{key} = {value}"),
+        IniSetFormat::Standard => format!("{key}={value}"),
     }
+}
+
+/// Whether an assignment puts spaces around its `=`.
+///
+/// `None` for a line that is not an assignment of this format.
+fn line_is_spaced(line: &str, format: IniSetFormat) -> Option<bool> {
+    if format != IniSetFormat::Standard {
+        return None;
+    }
+    let (lhs, rhs) = line.split_once('=')?;
+    Some(lhs.ends_with(' ') || rhs.starts_with(' '))
+}
+
+/// The spacing style most of the file already uses, for a key being appended.
+///
+/// A file with no assignments at all gets the unspaced form, which is what
+/// every Bethesda INI uses and what the game's parser is least surprised by.
+fn dominant_spacing(lines: &[String], format: IniSetFormat) -> bool {
+    let mut spaced = 0usize;
+    let mut tight = 0usize;
+    for line in lines {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('#') || trimmed.starts_with(';') || trimmed.starts_with('[') {
+            continue;
+        }
+        match line_is_spaced(trimmed, format) {
+            Some(true) => spaced += 1,
+            Some(false) => tight += 1,
+            None => {}
+        }
+    }
+    spaced > tight
 }
 
 fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bool {

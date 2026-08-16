@@ -203,9 +203,24 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                 "install: mod status"
             );
 
-            if settings.execute_actions && !actions_applied && !settings.dry_run {
+            // A skipped mod still re-runs any action that writes outside its
+            // own folder, because "the mod is unchanged" says nothing about
+            // whether that target still holds the edit. Everything else is
+            // applied once and latched.
+            let pending: Vec<_> = if actions_applied {
+                mod_entry
+                    .actions
+                    .iter()
+                    .filter(|action| action.writes_outside_mod_folder())
+                    .cloned()
+                    .collect()
+            } else {
+                mod_entry.actions.clone()
+            };
+
+            if settings.execute_actions && !pending.is_empty() && !settings.dry_run {
                 crate::config::actions::apply_all(
-                &mod_entry.actions,
+                &pending,
                 &crate::config::actions::ActionCx {
                     owner: &mod_entry.id,
                     settings,
@@ -698,7 +713,85 @@ mod tests {
         apply_ini_set(&ini_path, "foo", "2", IniSetFormat::Standard).expect("ini_set should succeed");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
-        assert_eq!(content, "foo = 2\n");
+        assert_eq!(content, "foo = 2\n", "a wholly spaced file stays spaced");
+    }
+
+    #[test]
+    fn ini_set_keeps_bethesda_spacing_because_the_parser_is_literal() {
+        // Oblivion takes everything after the `=` literally, so writing
+        // `SFontFile_1 = Data\Fonts\x.fnt` into an INI that uses `Key=Value`
+        // yields a path with a leading space. The font then fails to load and
+        // the game falls back to vanilla -- a broken UI caused by two spaces.
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Oblivion.ini");
+        std::fs::write(
+            &ini_path,
+            "[Fonts]\nSFontFile_1=Data\\Fonts\\Kingthings_Regular.fnt\nSFontFile_2=Data\\Fonts\\Vanilla.fnt\n",
+        )
+        .expect("write ini");
+
+        apply_ini_set(
+            &ini_path,
+            "SFontFile_2",
+            "Data\\Fonts\\DarN_Kingthings_Petrock_14.fnt",
+            IniSetFormat::Standard,
+        )
+        .expect("ini_set should succeed");
+
+        let content = std::fs::read_to_string(&ini_path).expect("read ini");
+        assert!(
+            content.contains("SFontFile_2=Data\\Fonts\\DarN_Kingthings_Petrock_14.fnt"),
+            "no spaces should be introduced:\n{content}"
+        );
+        assert!(!content.contains("SFontFile_2 ="), "{content}");
+    }
+
+    #[test]
+    fn ini_set_repairs_a_line_an_earlier_version_wrote_with_the_wrong_spacing() {
+        // mudcrab used to write `Key = Value` unconditionally, which broke the
+        // DarNified font paths in a real install. Re-running must fix those
+        // lines, not preserve them, so the whole file's style decides.
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Oblivion.ini");
+        std::fs::write(
+            &ini_path,
+            "[Fonts]\na=1\nb=2\nc=3\nSFontFile_2 = Data\\Fonts\\Old.fnt\n",
+        )
+        .expect("write ini");
+
+        apply_ini_set(&ini_path, "SFontFile_2", "Data\\Fonts\\New.fnt", IniSetFormat::Standard)
+            .expect("ini_set");
+
+        let content = std::fs::read_to_string(&ini_path).expect("read ini");
+        assert!(content.contains("SFontFile_2=Data\\Fonts\\New.fnt"), "{content}");
+        assert!(!content.contains(" = "), "the spaced form should be gone:\n{content}");
+    }
+
+    #[test]
+    fn ini_set_appends_a_new_key_in_the_files_dominant_style() {
+        let temp = tempdir().expect("tempdir");
+
+        let tight = temp.path().join("tight.ini");
+        std::fs::write(&tight, "a=1\nb=2\nc=3\n").expect("write");
+        apply_ini_set(&tight, "d", "4", IniSetFormat::Standard).expect("ini_set");
+        assert!(
+            std::fs::read_to_string(&tight).unwrap().contains("d=4"),
+            "a file written Key=Value gets Key=Value"
+        );
+
+        let spaced = temp.path().join("spaced.ini");
+        std::fs::write(&spaced, "a = 1\nb = 2\nc = 3\n").expect("write");
+        apply_ini_set(&spaced, "d", "4", IniSetFormat::Standard).expect("ini_set");
+        assert!(
+            std::fs::read_to_string(&spaced).unwrap().contains("d = 4"),
+            "a file written Key = Value keeps that"
+        );
+
+        // Nothing to learn from: use the Bethesda form.
+        let empty = temp.path().join("empty.ini");
+        std::fs::write(&empty, "[Section]\n").expect("write");
+        apply_ini_set(&empty, "d", "4", IniSetFormat::Standard).expect("ini_set");
+        assert!(std::fs::read_to_string(&empty).unwrap().contains("d=4"));
     }
 
     #[test]

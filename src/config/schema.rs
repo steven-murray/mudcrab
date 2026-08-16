@@ -100,6 +100,26 @@ pub enum ModAction {
 }
 
 impl ModAction {
+    /// Whether this action writes somewhere other than the mod's staged folder.
+    ///
+    /// Actions are normally applied once and latched in the manifest, on the
+    /// grounds that a mod whose definition has not changed does not need its
+    /// staged folder rebuilt. That reasoning does not extend to an action whose
+    /// target is *outside* the folder: MO2 recreates a profile's `Oblivion.ini`
+    /// whenever it likes, so a game-scoped `ini_set` can be undone without
+    /// anything about the mod changing. Those run on every install.
+    pub fn writes_outside_mod_folder(&self) -> bool {
+        match self {
+            ModAction::IniSet(spec) => spec.scope == IniScope::Game,
+            // The rest write only into the staged folder.
+            ModAction::Qac(_)
+            | ModAction::PackBsa(_)
+            | ModAction::CreateDummyPlugin(_)
+            | ModAction::FilePrune(_)
+            | ModAction::FileHide(_) => false,
+        }
+    }
+
     /// Name as written in TOML, for logs and error messages.
     pub fn name(&self) -> &'static str {
         match self {
