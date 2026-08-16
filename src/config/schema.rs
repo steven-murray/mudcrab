@@ -97,6 +97,8 @@ pub enum ModAction {
     CreateDummyPlugin(CreateDummyPluginAction),
     FilePrune(FilePruneAction),
     FileHide(FileHideAction),
+    FileMove(FileMoveAction),
+    ExtractBsa(ExtractBsaAction),
 }
 
 impl ModAction {
@@ -116,7 +118,9 @@ impl ModAction {
             | ModAction::PackBsa(_)
             | ModAction::CreateDummyPlugin(_)
             | ModAction::FilePrune(_)
-            | ModAction::FileHide(_) => false,
+            | ModAction::FileHide(_)
+            | ModAction::FileMove(_)
+            | ModAction::ExtractBsa(_) => false,
         }
     }
 
@@ -129,6 +133,8 @@ impl ModAction {
             ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
             ModAction::FilePrune(_) => "file_prune",
             ModAction::FileHide(_) => "file_hide",
+            ModAction::FileMove(_) => "file_move",
+            ModAction::ExtractBsa(_) => "extract_bsa",
         }
     }
 }
@@ -151,6 +157,14 @@ pub struct PackBsaAction {
     /// Glob patterns excluded from packing, applied after `include`.
     #[serde(default)]
     pub exclude: Vec<String>,
+    /// Delete the loose files that were packed, once the archive is written.
+    ///
+    /// Equivalent to a `file_prune` listing exactly what went in, but taken
+    /// from the pack's own file list rather than from a glob written by hand --
+    /// so it cannot name a folder the archive does not have, or miss one it
+    /// does. Nothing outside the archive is touched.
+    #[serde(default)]
+    pub prune_packed: bool,
 }
 
 /// Write an empty plugin whose name matches a BSA.
@@ -190,6 +204,36 @@ pub struct FileHideAction {
     /// one is a file or folder the guide named, and one that is not there is an
     /// error rather than a silent skip.
     pub paths: Vec<String>,
+}
+
+/// Move a staged file or folder somewhere else inside the same mod.
+///
+/// The guide says "move X to the optional folder" for a plugin it does not want
+/// in the load order but does not want gone either.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileMoveAction {
+    /// Source path, relative to the staged folder, matched case-insensitively.
+    pub from: String,
+    /// Destination path, relative to the staged folder. Parent directories are
+    /// created.
+    pub to: String,
+}
+
+/// Unpack a BSA the mod ships, leaving its contents loose in the staged folder.
+///
+/// Paired with `pack_bsa` this replaces the guide's BAE-then-BSArch round trip,
+/// which exists only so that something can be merged into an existing archive.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ExtractBsaAction {
+    /// Archive to unpack, relative to the staged folder.
+    pub archive: String,
+    /// Keep the archive afterwards. Off by default: leaving it means a later
+    /// `pack_bsa` folds the old archive into the new one, and the loose files
+    /// are shadowed by the archive they came from.
+    #[serde(default)]
+    pub keep_archive: bool,
 }
 
 /// Set a key in an INI file.

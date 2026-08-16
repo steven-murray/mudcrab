@@ -137,11 +137,15 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
 
         let loot_started_at = std::time::SystemTime::now();
 
-        let status = cmd
+        let mut child = cmd
             .spawn()
-            .map_err(|err| anyhow::anyhow!("failed to execute LOOT: {err}"))?
-            .wait()
-            .map_err(|err| anyhow::anyhow!("failed to wait for LOOT: {err}"))?;
+            .map_err(|err| anyhow::anyhow!("failed to execute LOOT: {err}"))?;
+
+        // LOOT normally sorts this list in well under a minute. It can also sit
+        // in ppoll forever -- waiting on a masterlist fetch, or on a dialog that
+        // `--auto-sort` was supposed to avoid -- and a build that has already
+        // spent twenty minutes staging should not then hang silently on it.
+        let status = wait_with_timeout(&mut child, LOOT_TIMEOUT)?;
 
         if !status.success() {
             anyhow::bail!(
@@ -635,4 +639,40 @@ pub(crate) fn collect_plugin_paths_for_stage(
     }
 
     Ok(())
+}
+
+/// How long to let LOOT run before giving up on it.
+const LOOT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(180);
+
+/// Wait for `child`, killing it if it outlives `timeout`.
+///
+/// `std::process::Child` has no timed wait, so this polls. The interval is
+/// coarse because the thing being waited on takes tens of seconds when healthy.
+fn wait_with_timeout(
+    child: &mut std::process::Child,
+    timeout: std::time::Duration,
+) -> anyhow::Result<std::process::ExitStatus> {
+    let deadline = std::time::Instant::now() + timeout;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return Ok(status),
+            Ok(None) => {}
+            Err(err) => return Err(anyhow::anyhow!("failed to wait for LOOT: {err}")),
+        }
+
+        if std::time::Instant::now() >= deadline {
+            let _ = child.kill();
+            let _ = child.wait();
+            anyhow::bail!(
+                "LOOT did not finish within {}s and was killed. It sorts this list in \
+                 well under a minute when healthy, so a stall here usually means it is \
+                 waiting on something -- a masterlist download, or a dialog. Re-run, or \
+                 drop \"loot-sort\" from post-install-actions to get past it.",
+                timeout.as_secs()
+            );
+        }
+
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
 }
