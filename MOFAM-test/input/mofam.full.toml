@@ -102,7 +102,9 @@ post-install-actions = ["loot-sort"]
 # Run: mudcrab setup-tools MOFAM-test/input/mofam.full.toml
 #      to generate a tools.toml template for this modlist.
 
-[modlist."CLEANED MASTERS"."Cleaned DLC Masters"]
+[[mods]]
+id = "Cleaned DLC Masters"
+section = ["CLEANED MASTERS"]
 type = "build-from-files"
 files = [
 	"%GAME_DIR%/OriginalESPs/DLC*.esp",
@@ -111,7 +113,7 @@ files = [
 
 # Commenting this out for now to save time on re-builds
 # TODO: uncomment this at the end!
-# [[modlist."CLEANED MASTERS"."Cleaned DLC Masters".actions]]
+# [[mods.actions]]
 # action = "qac"
 # # Glob patterns are resolved relative to this mod's staged data folder.
 # plugins = ["DLC*.esp", "Knights.esp"]
@@ -123,16 +125,20 @@ files = [
 # 1. OBSE 22.11 Ini
 # Root DLLs/EXEs (obse_1_2_416.dll, obse_loader.exe, obse_steam_loader.dll, obse_editor_1_2.dll)
 # are placed in the game-root output folder. Data/OBSE/ content is installed as the mod.
-[modlist."OBSE PLUGINS"."xOBSE"]
+[[mods]]
+id = "xOBSE"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."xOBSE".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/37952/1000039932"
 data_folder = "Data"
 game_root_files = ["*.dll", "*.exe"]
 
-[modlist."OBSE PLUGINS"."Add Actor Values"]
+[[mods]]
+id = "Add Actor Values"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Add Actor Values".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/33248/88252"
 layout = "custom-data-folder"
 data_folder = "Oblivion/Data"
@@ -141,188 +147,246 @@ exclude = [
 	"**/AddActorValues_CS.dll",
 ]
 
-[modlist."OBSE PLUGINS"."AveSithis Engine Fixes"]
+[[mods]]
+id = "AveSithis Engine Fixes"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."AveSithis Engine Fixes".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53911/1000042755"
 
-[modlist."OBSE PLUGINS"."Base Object Swapper"]
+[[mods]]
+id = "Base Object Swapper"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Base Object Swapper".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53872/1000043885"
 layout = "custom-data-folder"
 data_folder = "BOS"
 
-[modlist."OBSE PLUGINS"."Better Auto-Walk OBSE"]
+[[mods]]
+id = "Better Auto-Walk OBSE"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Better Auto-Walk OBSE".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49105/1000022866"
 
-[modlist."OBSE PLUGINS"."Blue's Engine Fixes"]
+[[mods]]
+id = "Blue's Engine Fixes"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Blue's Engine Fixes".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52700/1000033585"
 
-[modlist."OBSE PLUGINS"."Blockhead"]
+[[mods]]
+id = "Blockhead"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Blockhead".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/43752/1000029844"
 
-[modlist."OBSE PLUGINS"."ConScribe"]
+[[mods]]
+id = "ConScribe"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."ConScribe".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/26510/1000001455"
 
-[modlist."OBSE PLUGINS"."Console Ignores Player"]
+[[mods]]
+id = "Console Ignores Player"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Console Ignores Player".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52721/1000033705"
 layout = "custom-data-folder"
 data_folder = "Non Selectable Player In Console"
 
-[modlist."OBSE PLUGINS"."Console Numpad Support OBSE"]
+[[mods]]
+id = "Console Numpad Support OBSE"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Console Numpad Support OBSE".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49490/1000022513"
 
-[modlist."OBSE PLUGINS"."Console Paste Support"]
+[[mods]]
+id = "Console Paste Support"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Console Paste Support".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49104/1000021160"
 
-[modlist."OBSE PLUGINS"."Crash Logger Improved"]
+[[mods]]
+id = "Crash Logger Improved"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Crash Logger Improved".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54527/1000043744"
 layout = "custom-data-folder"
 data_folder = "Crash Logger Improved"
 
-[modlist."OBSE PLUGINS"."Engine Bug Fixes"]
+[[mods]]
+id = "Engine Bug Fixes"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Engine Bug Fixes".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/47085/1000022995"
 layout = "custom-data-folder"
 data_folder = "Data"
 
-[modlist."OBSE PLUGINS"."Enchantment Cost Multiplier"]
+[[mods]]
+id = "Enchantment Cost Multiplier"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Enchantment Cost Multiplier".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50462/1000028626"
 
-[modlist."OBSE PLUGINS"."Faster Sleep Wait"]
+[[mods]]
+id = "Faster Sleep Wait"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Faster Sleep Wait".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50517/1000026121"
 
-[modlist."OBSE PLUGINS"."Fractional Magic Damage"]
+[[mods]]
+id = "Fractional Magic Damage"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Fractional Magic Damage".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/37717/77294"
 target_subdir = "OBSE/Plugins"
 include = ["**/*.dll"]
 
 
-[modlist."OBSE PLUGINS"."Instant Continue Button"]
+[[mods]]
+id = "Instant Continue Button"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Instant Continue Button".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49545/1000022702"
 
-[modlist."OBSE PLUGINS"."Jump While Blocking"]
+[[mods]]
+id = "Jump While Blocking"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Jump While Blocking".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49495/1000022536"
 
-[modlist."OBSE PLUGINS"."List Missing Mods on Load"]
+[[mods]]
+id = "List Missing Mods on Load"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."List Missing Mods on Load".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52717/1000033675"
 
-[modlist."OBSE PLUGINS"."Map Menu Doesn't Click While Dragging OBSE"]
+[[mods]]
+id = "Map Menu Doesn't Click While Dragging OBSE"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Map Menu Doesn't Click While Dragging OBSE".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50537/1000026188"
 
-[modlist."OBSE PLUGINS"."Menu Alt-Tab Crash Fix"]
+[[mods]]
+id = "Menu Alt-Tab Crash Fix"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Menu Alt-Tab Crash Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/47954/1000017462"
 layout = "custom-data-folder"
 data_folder = "Data"
 
-[modlist."OBSE PLUGINS"."MenuQue - OBSE Plugin"]
+[[mods]]
+id = "MenuQue - OBSE Plugin"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."MenuQue - OBSE Plugin".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/32200/1000004991"
 layout = "custom-data-folder"
 data_folder = "Data"
 exclude = ["**/OBSE_Kyoma_MenuQue.dll"]
 
-[modlist."OBSE PLUGINS"."Message Logger"]
+[[mods]]
+id = "Message Logger"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Message Logger".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/45870/1000009026"
 layout = "custom-data-folder"
 data_folder = "Data"
 
-[modlist."OBSE PLUGINS"."No Combat Music"]
+[[mods]]
+id = "No Combat Music"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."No Combat Music".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52723/1000033709"
 
-[modlist."OBSE PLUGINS"."No Inventory on Alt-Tab"]
+[[mods]]
+id = "No Inventory on Alt-Tab"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."No Inventory on Alt-Tab".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52716/1000033673"
 
-[modlist."OBSE PLUGINS"."No Lockpick Activate"]
+[[mods]]
+id = "No Lockpick Activate"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."No Lockpick Activate".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52719/1000033679"
 
-[modlist."OBSE PLUGINS"."OBL Mod Limit Fix"]
+[[mods]]
+id = "OBL Mod Limit Fix"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."OBL Mod Limit Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50066/1000024557"
 
-[modlist."OBSE PLUGINS"."OBSE -Elys- Universal Silent Voice"]
+[[mods]]
+id = "OBSE -Elys- Universal Silent Voice"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."OBSE -Elys- Universal Silent Voice".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/16622/27327"
 target_subdir = "OBSE/Plugins"
 
 
-[modlist."OBSE PLUGINS"."Oblivion Display Tweaks"]
+[[mods]]
+id = "Oblivion Display Tweaks"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Oblivion Display Tweaks".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50348/1000025586"
 
-[[modlist."OBSE PLUGINS"."Oblivion Display Tweaks".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "OBSE/Plugins/Oblivion_Display_Tweaks.ini"
 key = "bFPSFix"
 value = "0"
 
-[[modlist."OBSE PLUGINS"."Oblivion Display Tweaks".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "OBSE/Plugins/Oblivion_Display_Tweaks.ini"
 key = "iMaxFPSTolerance"
 value = "120"
 
-[[modlist."OBSE PLUGINS"."Oblivion Display Tweaks".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "bFull Screen"
 value = "0"
 
-[modlist."OBSE PLUGINS"."Oblivion Priority"]
+[[mods]]
+id = "Oblivion Priority"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Oblivion Priority".archives]]
+[[mods.archives]]
 path = "nexus:skyrimspecialedition/50129/210177"
 
-[modlist."OBSE PLUGINS"."Oblivion Magic Extender"]
+[[mods]]
+id = "Oblivion Magic Extender"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Oblivion Magic Extender".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/31981/68450"
 layout = "custom-data-folder"
 data_folder = "Oblivion/Data"
@@ -331,228 +395,308 @@ exclude = [
 	"**/OBME_CS.dll",
 ]
 
-[modlist."OBSE PLUGINS"."RuntimeEditorIDs"]
+[[mods]]
+id = "RuntimeEditorIDs"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."RuntimeEditorIDs".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/40132/92537"
 
-[modlist."OBSE PLUGINS"."SkyBSA"]
+[[mods]]
+id = "SkyBSA"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."SkyBSA".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49568/1000022815"
 
-[modlist."OBSE PLUGINS"."WalkBlessed OBSE Plugin"]
+[[mods]]
+id = "WalkBlessed OBSE Plugin"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."WalkBlessed OBSE Plugin".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49067/1000022312"
 
-[modlist."OBSE PLUGINS"."Skyrim Camera for Walkblessed"]
+[[mods]]
+id = "Skyrim Camera for Walkblessed"
+section = ["OBSE PLUGINS"]
 
-[[modlist."OBSE PLUGINS"."Skyrim Camera for Walkblessed".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/51244/1000028495"
 
 # ------------------------------
 # Part 3 - UNOFFICIAL PATCHES
 # ------------------------------
 
-[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion Patch"]
+[[mods]]
+id = "Unofficial Oblivion Patch"
+section = ["UNOFFICIAL PATCHES"]
 
-[[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion Patch".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/5296/1000037331"
 exclude = ["**/UOP Vampire Aging & Face Fix.esp"]
 
-[modlist."UNOFFICIAL PATCHES"."Unofficial Shivering Isles Patch"]
+[[mods]]
+id = "Unofficial Shivering Isles Patch"
+section = ["UNOFFICIAL PATCHES"]
 
-[[modlist."UNOFFICIAL PATCHES"."Unofficial Shivering Isles Patch".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/10739/1000037332"
 
-[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion DLC Patches"]
+[[mods]]
+id = "Unofficial Oblivion DLC Patches"
+section = ["UNOFFICIAL PATCHES"]
 
-[[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion DLC Patches".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/9969/1000037333"
 
-[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion Tree Patch"]
+[[mods]]
+id = "Unofficial Oblivion Tree Patch"
+section = ["UNOFFICIAL PATCHES"]
 
-[[modlist."UNOFFICIAL PATCHES"."Unofficial Oblivion Tree Patch".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53079/1000035080"
 
-[modlist."UNOFFICIAL PATCHES"."Unofficial Shivering Isles Tree Patch"]
+[[mods]]
+id = "Unofficial Shivering Isles Tree Patch"
+section = ["UNOFFICIAL PATCHES"]
 
-[[modlist."UNOFFICIAL PATCHES"."Unofficial Shivering Isles Tree Patch".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53101/1000035151"
 
 # ------------------------------
 # Part 4 - TWEAKS AND FIXES
 # ------------------------------
 
-[modlist."TWEAKS AND FIXES"."MigMaster Script Resources"]
+[[mods]]
+id = "MigMaster Script Resources"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."MigMaster Script Resources".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/45875/1000018402"
 exclude = ["**/SafeCloningFunction - Filter.esp"]
 
-[modlist."TWEAKS AND FIXES"."Migck's Miscellaneous fixes tweaks and additions"]
+[[mods]]
+id = "Migck's Miscellaneous fixes tweaks and additions"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Migck's Miscellaneous fixes tweaks and additions".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/42658/1000018337"
 
-[[modlist."TWEAKS AND FIXES"."Migck's Miscellaneous fixes tweaks and additions".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "Ini/MigMiscellanea.ini"
 format = "set-to"
 key = "zzzMigckQ.bBetterSkillup"
 value = "0"
 
-[modlist."TWEAKS AND FIXES"."SB Weapon Drop Fix"]
+[[mods]]
+id = "SB Weapon Drop Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."SB Weapon Drop Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50223/1000040671"
 
-[modlist."TWEAKS AND FIXES"."SB - Skill Bonus Items (Fix for Skeleton Key - Gray Princes Training - and Night Mother's Blessing)"]
+[[mods]]
+id = "SB - Skill Bonus Items (Fix for Skeleton Key - Gray Princes Training - and Night Mother's Blessing)"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."SB - Skill Bonus Items (Fix for Skeleton Key - Gray Princes Training - and Night Mother's Blessing)".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52984/1000034704"
 
-[modlist."TWEAKS AND FIXES"."Vile Lair DLC - Tweaks and Fixes"]
+[[mods]]
+id = "Vile Lair DLC - Tweaks and Fixes"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Vile Lair DLC - Tweaks and Fixes".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52213/1000031989"
 
-[modlist."TWEAKS AND FIXES"."Clickable Magic Gate"]
+[[mods]]
+id = "Clickable Magic Gate"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Clickable Magic Gate".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/51375/1000028986"
 
-[modlist."TWEAKS AND FIXES"."Imperial City Landscape Fix"]
+[[mods]]
+id = "Imperial City Landscape Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Imperial City Landscape Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50770/1000032758"
 layout="custom-data-folder"
 data_folder="Imperial City Landscape Fix 1.1/Imperial City Landscape Fix"
 
-[modlist."TWEAKS AND FIXES"."Thieves Den Barter For Upgrades"]
+[[mods]]
+id = "Thieves Den Barter For Upgrades"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Thieves Den Barter For Upgrades".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48226/1000018326"
 
-[modlist."TWEAKS AND FIXES"."No Annoying Conjurer Attack (Spell Tomes DLC fix)"]
+[[mods]]
+id = "No Annoying Conjurer Attack (Spell Tomes DLC fix)"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."No Annoying Conjurer Attack (Spell Tomes DLC fix)".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/47452/1000015679"
 
-[modlist."TWEAKS AND FIXES"."Goblin Tribes Fixed"]
+[[mods]]
+id = "Goblin Tribes Fixed"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Goblin Tribes Fixed".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52252/1000032043"
 
-[modlist."TWEAKS AND FIXES"."Less Maddening Shivering Isles Fetch Quests -- Place Matrices and Oddities in World"]
+[[mods]]
+id = "Less Maddening Shivering Isles Fetch Quests -- Place Matrices and Oddities in World"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Less Maddening Shivering Isles Fetch Quests -- Place Matrices and Oddities in World".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52621/1000033338"
 
-[modlist."TWEAKS AND FIXES"."Lava Does Fire Damage"]
+[[mods]]
+id = "Lava Does Fire Damage"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Lava Does Fire Damage".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/43046/93235"
 
-[modlist."TWEAKS AND FIXES"."Bibliophilia"]
+[[mods]]
+id = "Bibliophilia"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Bibliophilia".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/51251/1000028520"
 
-[modlist."TWEAKS AND FIXES"."Knights of the Nine - Improved Infamy System"]
+[[mods]]
+id = "Knights of the Nine - Improved Infamy System"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Knights of the Nine - Improved Infamy System".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50195/1000025055"
 
-[modlist."TWEAKS AND FIXES"."Guard Infamy Greeting Fix"]
+[[mods]]
+id = "Guard Infamy Greeting Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Guard Infamy Greeting Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52249/1000035615"
 
-[modlist."TWEAKS AND FIXES"."Collection of Cleaned - Updated - Fixed - UOP Compatible Mods"]
+[[mods]]
+id = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Collection of Cleaned - Updated - Fixed - UOP Compatible Mods".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52833/1000034573"
 exclude = ["**/ChapelMessageNotBox.esp"]
 
-[modlist."TWEAKS AND FIXES"."DLC Lore Books"]
+[[mods]]
+id = "DLC Lore Books"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."DLC Lore Books".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46715/1000012857"
 layout = "bain"
 bain_subpackages = ["00 Merged"]
 
-[modlist."TWEAKS AND FIXES"."Creature Fix Compendium"]
+[[mods]]
+id = "Creature Fix Compendium"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Creature Fix Compendium".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50100/1000028714"
 
-[modlist."TWEAKS AND FIXES"."Mesh Improvement Project"]
+[[mods]]
+id = "Mesh Improvement Project"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Mesh Improvement Project".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/44501/1000011376"
 layout = "bain"
 bain_subpackages = ["00 Core"]
 
-[modlist."TWEAKS AND FIXES"."No Havoc Objects - lamps"]
+[[mods]]
+id = "No Havoc Objects - lamps"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."No Havoc Objects - lamps".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46593/1000012453"
 
-[modlist."TWEAKS AND FIXES"."No Havoc Objects - cave roots"]
+[[mods]]
+id = "No Havoc Objects - cave roots"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."No Havoc Objects - cave roots".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46593/1000012318"
 
-[modlist."TWEAKS AND FIXES"."No Havoc Objects - signs"]
+[[mods]]
+id = "No Havoc Objects - signs"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."No Havoc Objects - signs".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46593/1000013433"
 
-[modlist."TWEAKS AND FIXES"."No Havoc Objects - dummies"]
+[[mods]]
+id = "No Havoc Objects - dummies"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."No Havoc Objects - dummies".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46593/1000012313"
 
-[modlist."TWEAKS AND FIXES"."Walk through Oblivion Gates"]
+[[mods]]
+id = "Walk through Oblivion Gates"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Walk through Oblivion Gates".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54076/1000038515"
 
-[modlist."TWEAKS AND FIXES"."Locked Fighters Guild Doors Bug Fix"]
+[[mods]]
+id = "Locked Fighters Guild Doors Bug Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Locked Fighters Guild Doors Bug Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53345/1000036048"
 
-[modlist."TWEAKS AND FIXES"."Uriel Septim Audio Cleanup"]
+[[mods]]
+id = "Uriel Septim Audio Cleanup"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Uriel Septim Audio Cleanup".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54428/1000039345"
 
-[modlist."TWEAKS AND FIXES"."Skingrad Statue Improved"]
+[[mods]]
+id = "Skingrad Statue Improved"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Skingrad Statue Improved".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/47055/1000014311"
 
-[modlist."TWEAKS AND FIXES"."Leyawiin Statue Base Mesh Fix"]
+[[mods]]
+id = "Leyawiin Statue Base Mesh Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Leyawiin Statue Base Mesh Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54381/1000039253"
 
-[modlist."TWEAKS AND FIXES"."UOP Talos Bridge Collision Fix"]
+[[mods]]
+id = "UOP Talos Bridge Collision Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."UOP Talos Bridge Collision Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53283/1000035773"
 
-[modlist."TWEAKS AND FIXES"."Minotaur Horn Drop Fix"]
+[[mods]]
+id = "Minotaur Horn Drop Fix"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Minotaur Horn Drop Fix".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54893/1000040868"
 
-[modlist."TWEAKS AND FIXES"."Mind your head - signs repositioned"]
+[[mods]]
+id = "Mind your head - signs repositioned"
+section = ["TWEAKS AND FIXES"]
 
-[[modlist."TWEAKS AND FIXES"."Mind your head - signs repositioned".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52551/1000041423"
 layout="custom-data-folder"
 data_folder="Mind Your Head - Signs Repositioned 1.3"
@@ -561,302 +705,368 @@ data_folder="Mind Your Head - Signs Repositioned 1.3"
 # Part 6 - UI & UX IMPROVEMENTS
 # ------------------------------
 
-[modlist."UI & UX IMPROVEMENTS"."T4UT - Menus Repolished"]
+[[mods]]
+id = "T4UT - Menus Repolished"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."T4UT - Menus Repolished".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/54904/1000041088"
 
-[modlist."UI & UX IMPROVEMENTS"."Link Plus Plus"]
+[[mods]]
+id = "Link Plus Plus"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Link Plus Plus".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53352/1000036221"
 
-[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion"]
+[[mods]]
+id = "DarnifiedUI FOMOD Conversion"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives]]
+[[mods.archives]]
 layout = "fomod"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.build]]
+[[mods.archives.build]]
 path = "nexus:oblivion/50176/1000024970"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.build]]
+[[mods.archives.build]]
 path = "nexus:oblivion/10763/34632"
 dest_prefix = "DarNified UI 132 FOMOD"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.fomod_selections]]
+[[mods.archives.fomod_selections]]
 step = "Fonts"
 group = "Font Size"
 options = ["Normal"]
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.fomod_selections]]
+[[mods.archives.fomod_selections]]
 step = "Fonts"
 group = "Font1 Options"
 options = ["Default (Kingthings)"]
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.fomod_selections]]
+[[mods.archives.fomod_selections]]
 step = "Custom Options"
 group = "Options"
 options = []
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".archives.fomod_selections]]
+[[mods.archives.fomod_selections]]
 step = "Compatibility Options"
 group = "Options"
 options = []
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "SFontFile_1"
 value = "Data\\Fonts\\Kingthings_Regular.fnt"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "SFontFile_2"
 value = "Data\\Fonts\\DarN_Kingthings_Petrock_14.fnt"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "SFontFile_3"
 value = "Data\\Fonts\\DarN_Kingthings_Petrock_16.fnt"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "SFontFile_4"
 value = "Data\\Fonts\\DarN_Oblivion_28.fnt"
 
-[[modlist."UI & UX IMPROVEMENTS"."DarnifiedUI FOMOD Conversion".actions]]
+[[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "SFontFile_5"
 value = "Data\\Fonts\\Handwritten.fnt"
 
-[modlist."UI & UX IMPROVEMENTS"."UHD Fonts for Darnified UI"]
+[[mods]]
+id = "UHD Fonts for Darnified UI"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."UHD Fonts for Darnified UI".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49266/1000040895"
 
-[modlist."UI & UX IMPROVEMENTS"."Darnified Animated Menus"]
+[[mods]]
+id = "Darnified Animated Menus"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Darnified Animated Menus".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50071/1000024573"
 layout = "bain"
 bain_subpackages = ["10 - Core Module - Main"]
 
-[modlist."UI & UX IMPROVEMENTS"."Achievements for Oblivion"]
+[[mods]]
+id = "Achievements for Oblivion"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Achievements for Oblivion".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52923/1000034997"
 
-[modlist."UI & UX IMPROVEMENTS"."Dynamic Map"]
+[[mods]]
+id = "Dynamic Map"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Dynamic Map".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/35969/85640"
 layout = "bain"
 bain_subpackages = ["00 Core", "01 Elven Map"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Dynamic Map".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "Ini/Dynamic Map.ini"
 format = "set-to"
 key = "tnoDM.zoomIn"
 value = "264"
 
-[[modlist."UI & UX IMPROVEMENTS"."Dynamic Map".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "Ini/Dynamic Map.ini"
 format = "set-to"
 key = "tnoDM.zoomOut"
 value = "265"
 
-[[modlist."UI & UX IMPROVEMENTS"."Dynamic Map".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "Ini/Dynamic Map.ini"
 format = "set-to"
 key = "tnoDM.zoomReset"
 value = "258"
 
-[modlist."UI & UX IMPROVEMENTS"."VKVII Oblivion Cyrodiil Map"]
+[[mods]]
+id = "VKVII Oblivion Cyrodiil Map"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."VKVII Oblivion Cyrodiil Map".archives]]
+[[mods.archives]]
 path = "https://www.moddb.com/downloads/start/218291?referer=https%3A%2F%2Fwww.moddb.com%2Fmods%2Fvkvii-oblivion-cyrodiil-map%2Fdownloads"
 
-[modlist."UI & UX IMPROVEMENTS"."Shivering Isles Map HD"]
+[[mods]]
+id = "Shivering Isles Map HD"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Shivering Isles Map HD".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/45768/1000008685"
 
-[modlist."UI & UX IMPROVEMENTS"."World Maps for All Worldspaces"]
+[[mods]]
+id = "World Maps for All Worldspaces"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."World Maps for All Worldspaces".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48914/1000041957"
 
-[modlist."UI & UX IMPROVEMENTS"."Marking the Landmarks"]
+[[mods]]
+id = "Marking the Landmarks"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Marking the Landmarks".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48892/1000020672"
 
-[modlist."UI & UX IMPROVEMENTS"."Map Marker Overhaul"]
+[[mods]]
+id = "Map Marker Overhaul"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Map Marker Overhaul".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/26389/86532"
 layout = "bain"
 bain_subpackages = ["00 Core", "02 SI additions", "01 Elven Icons"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Map Marker Overhaul".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "Ini/Map Marker Overhaul.ini"
 format = "set-to"
 key = "tnoMMO.visibleDistance"
 value = "0"
 
-[modlist."UI & UX IMPROVEMENTS"."Unknown Undiscovered Colored Map Markers"]
+[[mods]]
+id = "Unknown Undiscovered Colored Map Markers"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Unknown Undiscovered Colored Map Markers".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50326/1000029030"
 
-[modlist."UI & UX IMPROVEMENTS"."Loot Menu"]
+[[mods]]
+id = "Loot Menu"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Loot Menu".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48027/1000024916"
 
-[[modlist."UI & UX IMPROVEMENTS"."Loot Menu".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48027/1000018717"
 
-[modlist."UI & UX IMPROVEMENTS"."Loot Feed"]
+[[mods]]
+id = "Loot Feed"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Loot Feed".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52763/1000043793"
 
-[[modlist."UI & UX IMPROVEMENTS"."Loot Feed".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52763/1000037084"
 
-[modlist."UI & UX IMPROVEMENTS"."Follower Status"]
+[[mods]]
+id = "Follower Status"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Follower Status".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53074/1000038289"
 
-[[modlist."UI & UX IMPROVEMENTS"."Follower Status".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "ini/Follower Status - Config.ini"
 format = "set-to"
 key = "dsFSQ.iVisibility"
 value = "1"
 
-[modlist."UI & UX IMPROVEMENTS"."Extended UI"]
+[[mods]]
+id = "Extended UI"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Extended UI".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50135/1000037907"
 
-[[modlist."UI & UX IMPROVEMENTS"."Extended UI".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "ini/Extended UI.ini"
 format = "set-to"
 key = "ExUI.bEnableSpellFavourites"
 value = "0"
 
-[[modlist."UI & UX IMPROVEMENTS"."Extended UI".actions]]
+[[mods.actions]]
 action = "ini_set"
 file = "ini/Extended UI.ini"
 format = "set-to"
 key = "ExUI.bEnableCyclingQuicksave"
 value = "0"
 
-[modlist."UI & UX IMPROVEMENTS"."QZ Easy Menus Update"]
+[[mods]]
+id = "QZ Easy Menus Update"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."QZ Easy Menus Update".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/23404/68592"
 
-[modlist."UI & UX IMPROVEMENTS"."Display Stats"]
+[[mods]]
+id = "Display Stats"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Display Stats".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/31855/75079"
 layout = "bain"
 bain_subpackages = ["00 CORE", "01 Darnified UI"]
 
-[modlist."UI & UX IMPROVEMENTS"."Stats Checker"]
+[[mods]]
+id = "Stats Checker"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Stats Checker".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/44844/1000005987"
 
-[modlist."UI & UX IMPROVEMENTS"."Pick Me"]
+[[mods]]
+id = "Pick Me"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Pick Me".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/48479/1000019366"
 
-[modlist."UI & UX IMPROVEMENTS"."Enhanced Hotkeys"]
+[[mods]]
+id = "Enhanced Hotkeys"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Enhanced Hotkeys".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/34735/85297"
 
-[modlist."UI & UX IMPROVEMENTS"."Book Tracker Updated"]
+[[mods]]
+id = "Book Tracker Updated"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Book Tracker Updated".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49195/1000021601"
 
-[modlist."UI & UX IMPROVEMENTS"."Better Enemy Health"]
+[[mods]]
+id = "Better Enemy Health"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Better Enemy Health".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53605/1000037910"
 
-[[modlist."UI & UX IMPROVEMENTS"."Better Enemy Health".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/53605/1000036986"
 
-[modlist."UI & UX IMPROVEMENTS"."Icons for Alchemy Apparatus"]
+[[mods]]
+id = "Icons for Alchemy Apparatus"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Icons for Alchemy Apparatus".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/43782/1000002266"
 
-[modlist."UI & UX IMPROVEMENTS"."Quest Log Manager"]
+[[mods]]
+id = "Quest Log Manager"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Quest Log Manager".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/32266/71265"
 layout = "bain"
 bain_subpackages = ["00 CORE", "01 Darnified UI"]
 
-[modlist."UI & UX IMPROVEMENTS"."Dot Crosshair"]
+[[mods]]
+id = "Dot Crosshair"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Dot Crosshair".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/47325/1000031632"
 
-[modlist."UI & UX IMPROVEMENTS"."Diverse Effect Icons"]
+[[mods]]
+id = "Diverse Effect Icons"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Diverse Effect Icons".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/10254/18018"
 exclude = ["**/*.esp"]
 
-[modlist."UI & UX IMPROVEMENTS"."Diverse Effect Icons OBSE"]
+[[mods]]
+id = "Diverse Effect Icons OBSE"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Diverse Effect Icons OBSE".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/49511/1000022595"
 
-[modlist."UI & UX IMPROVEMENTS"."Better Letters"]
+[[mods]]
+id = "Better Letters"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Better Letters".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/5392/1000012637"
 
-[modlist."UI & UX IMPROVEMENTS"."Better Scroll Background"]
+[[mods]]
+id = "Better Scroll Background"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Better Scroll Background".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/27882/50366"
 
-[modlist."UI & UX IMPROVEMENTS"."Vanilla Style Loading Screens Addon"]
+[[mods]]
+id = "Vanilla Style Loading Screens Addon"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Vanilla Style Loading Screens Addon".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/50014/1000028016"
 layout = "bain"
 bain_subpackages = ["00 CORE"]
 
-[modlist."UI & UX IMPROVEMENTS"."Upscaled Vanilla Style Loading Screens and MOO Themed Loading Screens - 4k and 2k versions"]
+[[mods]]
+id = "Upscaled Vanilla Style Loading Screens and MOO Themed Loading Screens - 4k and 2k versions"
+section = ["UI & UX IMPROVEMENTS"]
 
-[[modlist."UI & UX IMPROVEMENTS"."Upscaled Vanilla Style Loading Screens and MOO Themed Loading Screens - 4k and 2k versions".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/51109/1000028004"
 layout = "bain"
 bain_subpackages = [

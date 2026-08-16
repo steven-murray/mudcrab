@@ -97,10 +97,11 @@ At minimum:
 ```toml
 name = "Example Modlist"
 
-[modlist.core]
+[[mods]]
+id = "core"
 dependencies = []
 
-[[modlist.core.archives]]
+[[mods.archives]]
 path = "https://example.com/mod.zip"
 download_handler = "http"
 ```
@@ -114,10 +115,12 @@ name = "Conditional Example"
 type = "bool"
 query = "Install HD textures?"
 
-[modlist.base]
+[[mods]]
+id = "base"
 dependencies = []
 
-[modlist.hd_pack]
+[[mods]]
+id = "hd_pack"
 dependencies = ["base"]
 if = "use_hd_textures"
 ```
@@ -126,8 +129,28 @@ if = "use_hd_textures"
 
 1. Query supports basic expressions: `flag`, `!flag`, `key == value`, `key != value`.
 2. Download `--parallel` is accepted but currently processed sequentially.
-3. Install MVP now unpacks `.zip`, `.tar`, `.tar.gz`, and `.tgz` archives into per-mod directories.
-4. `.7z` and `.rar` archive extraction is planned but not implemented yet.
+3. Install unpacks `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar` archives into per-mod directories.
+4. `.7z` and `.rar` extraction shells out to the system `bsdtar` (tried first) and `7z` (fallback) binaries -- see Requirements below.
+
+## Requirements
+
+`mudcrab` needs the following external tools available on `PATH` at install time:
+
+1. `bsdtar` -- used first to list/extract `.7z` and `.rar` archives (via libarchive).
+2. `7z` -- used as a fallback for `.7z` and `.rar` archives when `bsdtar` can't handle them.
+
+`.zip`, `.tar`, `.tar.gz`, and `.tgz` are handled with pure-Rust decoders and need no external tools.
+
+## Development
+
+There is no CI pipeline yet, so these checks are enforced by convention rather than automation. Before sending a change, run:
+
+```
+cargo test
+cargo clippy --all-targets -- -D warnings
+```
+
+Both must pass. The project does not use blanket `#[allow]` attributes to silence lints -- fix the lint or, if it's genuinely a false positive, suppress it narrowly at the site with a comment explaining why.
 
 ## Wishlist
 
@@ -136,9 +159,9 @@ These are features we want, but are intentionally deferred for later milestones.
 1. True concurrent downloads with bounded parallelism honoring `--parallel`.
 2. Download resume and stronger integrity verification (checksums/signatures).
 3. Full Nexus workflow polish (expanded metadata support and richer auth UX).
-4. Add `.7z` and `.rar` extraction support and expand archive-format coverage.
-5. Install layout handlers (e.g. FOMOD/custom data folder) and post-install actions.
-6. Export phase implementation (Markdown/HTML output from compiled plans).
+4. Export phase implementation (Markdown/HTML output from compiled plans).
+5. Composable/includable sub-modlists (see below).
+6. A `custom` mod type for arbitrary user-supplied build steps.
 
 `mudcrab` is **not** a mod manager. It doesn't replace Mod Organizer 2. 
 It's **more** like Wabbajack -- an automatic way to install an entire cohesive
@@ -223,10 +246,11 @@ Some Features Include:
    That is, you can conditionally include Mod B depending on if Mod A is included, even
    if Mod A is installed after Mod B (and therefore takes precedence in terms of file
    loading).
-2. It is composable. If a node in the modlist tree refers to an external file that has
-   the format of a modlist, that modlist will be included at that point in the tree. 
-   Thus, you can publish small, re-useable modlists that other lists can point to. 
-   This can be useful even for single mods that require non-standard installations.
+2. It is intended to be composable: if a node in the modlist tree refers to an external
+   file that has the format of a modlist, that modlist would be included at that point
+   in the tree, letting you publish small, re-useable modlists that other lists can
+   point to. **Not implemented yet** -- there is currently no include/composition
+   handling in the modlist schema; every modlist today is a single flat file.
 3. The ability to specify modding tools that must be installed alongside the mods
    (either simply for the benefit of the end-user, or as dependencies for the custom
    actions applied to the mods).
@@ -248,8 +272,9 @@ The modlist format is TOML with the following allowed fields:
 * `ini`: an optional table of game-scope `Oblivion.ini` edits to apply independently
    of any specific mod. Values must be scalar TOML values. Keys containing spaces must
    be quoted.
-* `modlist`: a table where each entry is either a mod, or a subsection containing
-   additional mod entries. Subsections may be nested arbitrarily deep.
+* `mods`: an ordered array of mod entries. Each entry has an `id` (unique; also the
+   mod's directory name) and an optional `section`, a list naming its MO2 separator
+   path from outermost to innermost. Every level of the path becomes a separator.
 * `plugins`: an ordered list of plugins. Each entry should be an exact filename. 
 * `post-install-actions`: optional ordered list of install-wide actions to run after
    extraction and MO2 export. Currently supports `"loot-sort"`.
@@ -259,13 +284,19 @@ Example with nested sections:
 ```toml
 name = "Nested Sections Example"
 
-[modlist.foundation.base]
+[[mods]]
+id = "base"
+section = ["foundation"]
 dependencies = []
 
-[modlist.gameplay.combat]
+[[mods]]
+id = "combat"
+section = ["gameplay"]
 dependencies = ["base"]
 
-[modlist.gameplay.magic]
+[[mods]]
+id = "magic"
+section = ["gameplay"]
 dependencies = ["base"]
 ```
 
@@ -297,9 +328,11 @@ For BAIN-style archives, use `layout = "bain"` and list the top-level package di
 Example:
 
 ```toml
-[modlist.example."DLC Lore Books"]
+[[mods]]
+id = "DLC Lore Books"
+section = ["example"]
 
-[[modlist.example."DLC Lore Books".archives]]
+[[mods.archives]]
 path = "nexus:oblivion/46715/1000012857"
 layout = "bain"
 bain_subpackages = ["00 Merged"]
@@ -313,56 +346,89 @@ If a BAIN archive contains:
 
 then selecting both `00 Option1` and `01 Option2` produces a mod root containing `plugin1.esp`, `plugin2.esp`, and `Textures/...` directly, without preserving the `00 ...` and `01 ...` folder names.
 
-Each `mod` in the `modlist` has the following format:
+Each entry in `mods` has the following format:
 
-```
-[modname]
-if: <conditional>  # only install this mod if conditional is true
+```toml
+[[mods]]
+id = "modname"
+if = "<conditional>"  # only install this mod if conditional is true
 
-[[archives]]
-[[<path/to/modarchive1>]]
-download_handler = nexus
-layout = fomod  # or 'simple' or 'custom-data-folder'
-queries = [
-    "FOMOD first question?", "True",
-    "FOMOD second question?", "Orange Styling",
-    ... etc
-]
-include = "Textures/*"
-exclude = "Meshes/*"
+[[mods.archives]]
+path = "nexus:oblivion/<mod_id>/<file_id>"
+download_handler = "nexus"
+layout = "fomod"  # or omit for a plain archive, or "custom-data-folder"/"bain"
+include = ["Textures/*"]
+exclude = ["Meshes/*"]
 
-[[<path/to/modarchive2>]]
-download_handler = nexus
+[[mods.archives.fomod_selections]]
+step = "Textures"
+group = "Resolution"
+options = ["2K"]
+
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Style"
+options = ["Orange Styling"]
+
+[[mods.archives]]
+download_handler = "nexus"
 layout = "custom-data-folder"
 data_folder = "."  # e.g. if layout='custom-data-folder' and the data/ folder is the root
-include = "Meshes/arg*"
-
-[actions]
-[actions.qac]  # Quick-Auto-Clean all esps (specify specific esps by giving args)
-[actions.bsa]  # Pack all Textures/ Meshes/ and Sound/ into a BSA archive.
+include = ["Meshes/arg*"]
 ```
 
-Along with standard "archive"-based mods, it is possible to specify custom mods that
-might depend on the other mods. For example, to create a new mod that contains a merged
-plugin:
+Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/per-mod
+via the `actions` machinery in `src/config/actions/` -- see `MOFAM-test/input/mofam.full.toml`
+for real examples.
 
-```
-[modname]
-dependencies = [
-    "mod A",
-    "mod B",
-]
-type = "zmerge"
-plugins = [
-    "modA.esp",
-    "modB.esp",
-]
+Along with standard archive-based mods, a mod can be **built** rather than extracted.
+Two `type` values do this today:
+
+- `"build-from-files"` assembles a mod's contents from local files and layers instead
+  of a downloaded archive (see `BuildLayer` in `src/config/schema.rs`).
+- `"merge"` produces a single merged plugin from several other mods' `.esp` files --
+  a headless, native replacement for zEdit's zMerge, so a modlist requiring merges can
+  be installed without driving a GUI tool.
+
+### Merges
+
+```toml
+[[mods]]
+id      = "Unique Forts Merged"
+section = ["36 - zMERGED PLUGINS"]
+type    = "merge"
+
+  [mods.merge]
+  output       = "Unique Forts Merged.esp"
+  method       = "clobber"   # the default; last source wins on conflicts
+  hide_sources = true        # the default
+  sources = [
+    { mod = "Better Fort Aurus",       plugin = "Unique Forts Fort Aurus.esp" },
+    { mod = "Better Fort Doublecross", plugin = "Unique Forts Fort Doublecross.esp" },
+    # ...
+  ]
 ```
 
-TO perform completely custom actions:
+`sources` is **ordered**: the order defines both clobber precedence and FormID
+allocation, so reordering changes the output. Each source names a **mod id**, not a
+data-folder path -- the path is resolved at install time, so it survives renames.
+There is no `load_order` field; the load order comes from the modlist's own `plugins`.
 
-```
-[modname]
+`hide_sources` renames each source plugin to `<name>.esp.mohidden`, which drops it from
+MO2's virtual filesystem while leaving its mod **enabled** so its meshes, textures and
+BSAs keep loading -- the same mechanism as MO2's "Merge Plugins Hide" plugin. Undo it
+with `mudcrab unhide-merges`.
+
+Because sources are hidden, the modlist's `plugins` list must contain the merge's
+`output` and must **not** contain any source plugin. `mudcrab validate` enforces that,
+along with: every source mod exists, no plugin is merged twice, and a merge mod
+declares no archives of its own.
+
+For fully custom actions (**not yet available**):
+
+```toml
+[[mods]]
+id = "modname"
 dependencies = [
     "mod A",
     "mod B",

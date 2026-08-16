@@ -12,10 +12,11 @@ type = "choice"
 query = "Choose UI variant"
 choices = ["default", "immersive"]
 
-[modlist.baseline]
+[[mods]]
+id = "baseline"
 dependencies = []
 
-[[modlist.baseline.archives]]
+[[mods.archives]]
 # Replace with real MOFAM source after extraction
 path = "nexus:oblivion/52949/000000"
 download_handler = "nexus"
@@ -23,21 +24,23 @@ layout = "simple"
 include = ["Data/**"]
 exclude = ["Docs/**"]
 
-[modlist.conditional_patch]
+[[mods]]
+id = "conditional_patch"
 dependencies = ["baseline"]
 if = "use_high_res"
 
-[[modlist.conditional_patch.archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52949/000001"
 download_handler = "nexus"
 layout = "simple"
 include = ["Data/**"]
 
-[modlist.needs_custom_action]
+[[mods]]
+id = "needs_custom_action"
 dependencies = ["baseline"]
 if = "ui_variant == immersive"
 
-[[modlist.needs_custom_action.archives]]
+[[mods.archives]]
 path = "nexus:oblivion/52949/000002"
 download_handler = "nexus"
 layout = "custom-data-folder"

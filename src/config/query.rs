@@ -24,7 +24,8 @@ pub fn build_plan(compiled: &CompiledModlist, headless: bool) -> anyhow::Result<
             selected_mods.push(entry.id.clone());
             mods.push(PersonalizedMod {
                 id: entry.id.clone(),
-                mod_type: entry.mod_type.clone(),
+                mod_type: entry.mod_type,
+                merge: entry.merge.clone(),
                 archives: entry.archives.clone(),
                 files: entry.files.clone(),
                 actions: entry.actions.clone(),
@@ -122,10 +123,10 @@ fn prompt_choice(query: &str, choices: &[String]) -> anyhow::Result<String> {
         io::stdin().read_line(&mut buf)?;
         let answer = buf.trim();
 
-        if let Ok(idx) = answer.parse::<usize>() {
-            if (1..=choices.len()).contains(&idx) {
-                return Ok(choices[idx - 1].clone());
-            }
+        if let Ok(idx) = answer.parse::<usize>()
+            && (1..=choices.len()).contains(&idx)
+        {
+            return Ok(choices[idx - 1].clone());
         }
 
         eprintln!("Please enter a valid selection index.");

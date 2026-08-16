@@ -1,0 +1,97 @@
+# Prebash Merge
+# Allocator input: each source plugin in merge order, followed by its own
+# object indices (ascending, deduplicated) as 6-hex values, one per line.
+# Generated from the real MOFAM install; the expected output is map.json.
+@Oblivion Citadel Door Fix.esp
+@UOPTalosBridgeCollisionFix.esp
+@DLCSpellTomes - Unofficial Patch.esp
+@Av Latta Magicka - Rebalance Complete.esp
+@MageGuild_simbol.esp
+@WeightlessAmmoConsumablesPotions.esp
+@weightlessstones.esp
+@aesrespawningamberstumpsandmadnessoredeposits.esp
+@aesrespawninggoldandsilverveins.esp
+@DLCVileLair - Tweaks.esp
+@DLCThievesDen - BarterForUpgrd.esp
+@FasterHorses.esp
+@Initial Glow Redux - Creatures.esp
+@Initial Glow Redux.esp
+@lGet rid of Small Souls - Soulgem Prices.esp
+@Bibliophilia.esp
+000ED3
+000ED4
+000ED8
+000ED9
+000EDA
+000EDB
+@Banes Steel Helm Replacer.esp
+@ReteroX_ClosedIronHelmet_v1.esp
+@ReteroX_ClosedEbonyHelmet_v1.esp
+@Imperial City Landscape Fix.esp
+@Alternate ghost shader.esp
+@Oblivion Content Restoration Project -- Knights.esp
+@DialogTweaksTweakedTrespassing.esp
+@00 Realistic Player Speech.esp
+@lVanilla Style Loading Screens Addon.esp
+@xxReworkedReedstand.esp
+@xxreworkedgottshaw.esp
+@xxreworkedSutch.esp
+@Louder Chapel Bells.esp
+@PinarusInventiusActualHunter.esp
+@Unused Magic Items Integrated.esp
+@Voices for Female Dremora NPCs.esp
+@The Ayleid Steps - Patches.esp
+@lLet there be Flowers.esp
+@GuardInfamyGreetingFix.esp
+@AyleidWellMessage.esp
+@GoblinTribesFixed.esp
+@ExpandedGreetings.esp
+@tbskGuardsFeaturesMergedVanillaAddons.esp
+@DLCSpellTomes-No Attack.esp
+@SM Plugin Refurbish Lite Knights Infamy.esp
+@Bruma Frostcrag Spire LOD.esp
+@ORC.esp
+002AE5
+@MehrunesDagonWalk.esp
+@Better Traps.esp
+@DaedricRequirements.esp
+@OCOv2 Beast Races Enhanced.esp
+@WAC - HGEC Equipment Replacer.esp
+@Wolf Animations Restored.esp
+@The Ayleid Steps - Voiced Addon.esp
+@Shivering Isles Female Armor Displays.esp
+@DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp
+@DispMiscPatch_Ducks and Swans - Reedstand Patch.esp
+@WAC Integration HGEC Gauntlets Patch.esp
+@The Lost Spires - NPC AI Addon.esp
+@Locked Fighters Guild Doors Bug Fix.esp
+@DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp
+@ApparatusIcons.esp
+@Harvest [Flora] - DLCFrostcrag.esp
+@Harvest [Flora] - DLCVileLair.esp
+@Harvest [Flora] - Shivering Isles.esp
+@Female Amulets.esp
+@more books teach.esp
+@Book Jackets Oblivion.esp
+@Knights - Book Jackets.esp
+@Book Jackets DLC Misc.esp
+@Alluring Wine Bottles.esp
+@Better minotaurs.esp
+@BetterLorgrenBenirus_NoStaffEdit.esp
+@KingofMisc.esp
+@BattlehornLich.esp
+@Weapon Improvement Project.esp
+@Goblin Totem Staff Icon.esp
+@PekCOBLBookJackets.esp
+@Improved Fires and Flames - Increased Sound.esp
+@Symphony of Violence.esp
+@Vicious Trolls Sound Attenuator.esp
+@PotionReplacer.esp
+@CoopArmoredLegionHorses.esp
+@DLCHorseArmor - Mane Enabled.esp
+@ShiveringIslesTrainersPartial.esp
+@SavillaStoneEnhanced.esp
+@DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp
+@AFK_Weye - Typo and Grammatical Patch.esp
+@Minotaur Horns Fix.esp
+@Merge Consistency Patch.esp

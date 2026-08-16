@@ -10,7 +10,7 @@ pub struct SourceModlist {
     #[serde(default)]
     pub ini: toml::Table,
     #[serde(default)]
-    pub modlist: IndexMap<String, ModNode>,
+    pub mods: Vec<ModEntry>,
     #[serde(default)]
     pub plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
@@ -18,21 +18,46 @@ pub struct SourceModlist {
 }
 
 impl SourceModlist {
-    pub fn flatten_mods(&self) -> anyhow::Result<IndexMap<String, ModSpec>> {
+    /// Mods keyed by id, in declaration order. Errors on duplicate ids.
+    pub fn flatten_mods(&self) -> anyhow::Result<IndexMap<String, ModEntry>> {
         let mut out = IndexMap::new();
-        for (key, node) in &self.modlist {
-            flatten_mod_node(node, key, &mut out)?;
+        for entry in &self.mods {
+            if out.contains_key(&entry.id) {
+                anyhow::bail!("duplicate mod id {}", entry.id);
+            }
+            out.insert(entry.id.clone(), entry.clone());
         }
         Ok(out)
     }
 
+    /// The MO2 modlist as an ordered mix of separators and mods.
+    ///
+    /// A separator is emitted for each level of a mod's section path at the
+    /// point that level first differs from the previous mod's, so
+    /// `section = ["OBSE PLUGINS", "Core"]` yields separators `OBSE PLUGINS`
+    /// and `OBSE PLUGINS - Core` before the mod itself.
     pub fn mo2_modlist_entries(&self) -> anyhow::Result<Vec<Mo2ModlistEntry>> {
         let mut out = Vec::new();
-        let mut seen_mod_ids = HashSet::new();
-        let mut section_path = Vec::new();
+        let mut seen_ids = HashSet::new();
+        let mut previous: Vec<String> = Vec::new();
 
-        for (key, node) in &self.modlist {
-            collect_mo2_entries(node, key, &mut section_path, &mut seen_mod_ids, &mut out)?;
+        for entry in &self.mods {
+            for depth in 0..entry.section.len() {
+                if previous.len() > depth && previous[..=depth] == entry.section[..=depth] {
+                    continue;
+                }
+                out.push(Mo2ModlistEntry::Section {
+                    name: entry.section[..=depth].join(" - "),
+                });
+            }
+            previous = entry.section.clone();
+
+            if !seen_ids.insert(entry.id.clone()) {
+                anyhow::bail!("duplicate mod id {}", entry.id);
+            }
+            out.push(Mo2ModlistEntry::Mod {
+                id: entry.id.clone(),
+            });
         }
 
         Ok(out)
@@ -40,6 +65,7 @@ impl SourceModlist {
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct InputSpec {
     #[serde(rename = "type")]
     pub input_type: InputType,
@@ -56,13 +82,6 @@ pub enum InputType {
     Text,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-pub enum ModNode {
-    Mod(ModSpec),
-    Section(IndexMap<String, ModNode>),
-}
-
 /// A per-mod action to execute during installation.
 ///
 /// Each entry is dispatched by `action` name. Additional parameters
@@ -70,24 +89,121 @@ pub enum ModNode {
 /// Glob patterns in action parameters (e.g. `plugins`) are resolved relative
 /// to the mod's own staged data folder, never against the raw game directory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ModAction {
-    pub action: String,
-    #[serde(flatten)]
-    pub params: toml::Table,
+#[serde(tag = "action", rename_all = "snake_case")]
+pub enum ModAction {
+    IniSet(IniSetAction),
+    Qac(QacAction),
 }
 
+impl ModAction {
+    /// Name as written in TOML, for logs and error messages.
+    pub fn name(&self) -> &'static str {
+        match self {
+            ModAction::IniSet(_) => "ini_set",
+            ModAction::Qac(_) => "qac",
+        }
+    }
+}
+
+/// Set a key in an INI file.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IniSetAction {
+    /// Path to the INI. Relative to the mod's staged data folder for
+    /// `scope = "mod"`, or to the game/profile INI location for `scope = "game"`.
+    pub file: String,
+    pub key: String,
+    pub value: IniValue,
+    #[serde(default)]
+    pub format: IniSetFormat,
+    #[serde(default)]
+    pub scope: IniScope,
+}
+
+/// Quick Auto Clean: run xEdit's QAC over the named plugins.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct QacAction {
+    /// Glob patterns resolved relative to the mod's staged data folder.
+    /// Required: a qac action with nothing to clean is always a mistake.
+    pub plugins: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum IniScope {
+    /// An INI shipped by the mod itself.
+    #[default]
+    Mod,
+    /// A game-scoped INI (Oblivion.ini). Never edited in place in the game
+    /// directory -- resolved to the MO2 profile-local copy.
+    Game,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum IniSetFormat {
+    /// `key = value`
+    #[default]
+    Standard,
+    /// `set key to value` -- used by Oblivion script-style INIs.
+    SetTo,
+}
+
+/// An INI value.
+///
+/// Accepts any TOML scalar and normalises to its string form, so `value = 0`,
+/// `value = "0"` and `value = false` are all accepted. Booleans become 1/0,
+/// matching Oblivion's INI conventions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(transparent)]
+pub struct IniValue(pub String);
+
+impl std::fmt::Display for IniValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for IniValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+        let value = toml::Value::deserialize(deserializer)?;
+        Ok(IniValue(match value {
+            toml::Value::String(text) => text,
+            toml::Value::Integer(number) => number.to_string(),
+            toml::Value::Float(number) => number.to_string(),
+            toml::Value::Boolean(flag) => if flag { "1" } else { "0" }.to_string(),
+            other => {
+                return Err(D::Error::custom(format!(
+                    "ini value must be a string, number or boolean, got {}",
+                    other.type_str()
+                )))
+            }
+        }))
+    }
+}
+
+/// One mod in the flat `[[mods]]` list.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ModSpec {
+pub struct ModEntry {
+    /// Unique id; also the mod's directory name.
+    pub id: String,
+    /// Section path, outermost first. Each level becomes an MO2 separator.
+    /// Always a list, so there is a single shape to read, write and test.
+    #[serde(default)]
+    pub section: Vec<String>,
     #[serde(default)]
     pub dependencies: Vec<String>,
     #[serde(rename = "if")]
     pub condition: Option<String>,
     #[serde(default)]
     pub archives: Vec<ArchiveSpec>,
-    /// Mod type. Currently supported: `"build-from-files"`.
     #[serde(rename = "type")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    /// Merge definition. Required when `type = "merge"`, rejected otherwise.
+    pub merge: Option<MergeSpec>,
     #[serde(default)]
     pub plugins: Vec<String>,
     /// Source file globs for mods of type `"build-from-files"`.
@@ -98,55 +214,60 @@ pub struct ModSpec {
     pub actions: Vec<ModAction>,
 }
 
-fn flatten_mod_node(
-    node: &ModNode,
-    key: &str,
-    out: &mut IndexMap<String, ModSpec>,
-) -> anyhow::Result<()> {
-    match node {
-        ModNode::Mod(spec) => {
-            if out.contains_key(key) {
-                anyhow::bail!("duplicate mod id {key}");
-            }
-            out.insert(key.to_string(), spec.clone());
-            Ok(())
-        }
-        ModNode::Section(children) => {
-            for (child_key, child_node) in children {
-                flatten_mod_node(child_node, child_key, out)?;
-            }
-            Ok(())
-        }
-    }
+/// A mod that is produced rather than extracted.
+///
+/// Absent means the ordinary case: a mod installed from its archives.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ModType {
+    /// Assembled from files already on disk, listed in `files`.
+    BuildFromFiles,
+    /// Produced by merging plugins from other mods; see `[mods.merge]`.
+    Merge,
 }
 
-fn collect_mo2_entries(
-    node: &ModNode,
-    key: &str,
-    section_path: &mut Vec<String>,
-    seen_mod_ids: &mut HashSet<String>,
-    out: &mut Vec<Mo2ModlistEntry>,
-) -> anyhow::Result<()> {
-    match node {
-        ModNode::Mod(_) => {
-            if !seen_mod_ids.insert(key.to_string()) {
-                anyhow::bail!("duplicate mod id {key}");
-            }
-            out.push(Mo2ModlistEntry::Mod { id: key.to_string() });
-            Ok(())
-        }
-        ModNode::Section(children) => {
-            section_path.push(key.to_string());
-            out.push(Mo2ModlistEntry::Section {
-                name: section_path.join(" - "),
-            });
-            for (child_key, child_node) in children {
-                collect_mo2_entries(child_node, child_key, section_path, seen_mod_ids, out)?;
-            }
-            section_path.pop();
-            Ok(())
-        }
-    }
+/// How overlapping records are resolved when two sources define the same one.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum MergeMethod {
+    /// Last writer wins, by source order. zMerge's "Clobber".
+    #[default]
+    Clobber,
+}
+
+/// One plugin to merge, named by the mod that owns it.
+///
+/// Naming the mod id rather than a data-folder path is the main improvement
+/// over zMerge's `merges.json`: the path is derived at install time, so it
+/// survives mod renames and does not encode a Windows drive letter.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MergeSource {
+    #[serde(rename = "mod")]
+    pub mod_id: String,
+    pub plugin: String,
+}
+
+/// A merge definition, attached to the mod that will contain the output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MergeSpec {
+    /// Filename of the merged plugin, written into this mod's folder.
+    pub output: String,
+    #[serde(default)]
+    pub method: MergeMethod,
+    /// Rename each source plugin to `<name>.mohidden` so MO2 drops it from the
+    /// virtual filesystem while leaving its mod enabled to serve assets.
+    #[serde(default = "default_true")]
+    pub hide_sources: bool,
+    /// Ordered: this defines both clobber precedence and FormID allocation
+    /// order, so reordering changes the output. There is deliberately no
+    /// `load_order` field -- it is derived from the modlist's `plugins`.
+    pub sources: Vec<MergeSource>,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -177,12 +298,28 @@ impl<'de> Deserialize<'de> for PostInstallAction {
     }
 }
 
+/// Declared archive layout. `None` means "detect automatically".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ArchiveLayout {
+    /// Archive root is the mod's data folder; copied as-is.
+    Simple,
+    /// FOMOD installer: driven by fomod/ModuleConfig.xml + fomod_selections.
+    Fomod,
+    /// BAIN package: selected top-level subpackages merged into the mod root.
+    Bain,
+    /// The mod's data folder is somewhere other than the archive root; the
+    /// location is given by `data_folder`, which is then required.
+    CustomDataFolder,
+}
+
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ArchiveSpec {
     #[serde(default)]
     pub path: Option<String>,
     pub download_handler: Option<String>,
-    pub layout: Option<String>,
+    pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
     #[serde(default)]
@@ -202,6 +339,7 @@ pub struct ArchiveSpec {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct FomodSelection {
     pub step: String,
     pub group: String,
@@ -210,6 +348,7 @@ pub struct FomodSelection {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
 pub struct BuildLayer {
     pub path: String,
     #[serde(default)]
@@ -228,8 +367,10 @@ pub struct CompiledModlist {
     pub mod_count: usize,
     pub plugin_count: usize,
     pub inputs: HashMap<String, InputSpec>,
+    /// Install-wide actions, currently only those desugared from the top-level
+    /// `[ini]` table. Same type as per-mod actions so there is one dispatcher.
     #[serde(default)]
-    pub actions: toml::Table,
+    pub actions: Vec<ModAction>,
     pub plugins: Vec<String>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
@@ -242,7 +383,9 @@ pub struct CompiledModlist {
 pub struct CompiledMod {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
     pub archives: Vec<CompiledArchive>,
     pub condition: Option<String>,
@@ -257,7 +400,7 @@ pub struct CompiledArchive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
     pub download_handler: Option<String>,
-    pub layout: Option<String>,
+    pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
     #[serde(default)]
@@ -287,7 +430,7 @@ pub struct PersonalizedPlan {
     pub mod_order: Vec<String>,
     pub selected_mods: Vec<String>,
     #[serde(default)]
-    pub actions: toml::Table,
+    pub actions: Vec<ModAction>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
     #[serde(default)]
@@ -296,11 +439,25 @@ pub struct PersonalizedPlan {
     pub plugins: Vec<String>,
 }
 
+impl PersonalizedPlan {
+    /// Selected merges, in modlist order.
+    ///
+    /// Derived rather than stored: a second list would be a second source of
+    /// truth that could disagree with `mods` after conditions are resolved.
+    pub fn merges(&self) -> impl Iterator<Item = (&PersonalizedMod, &MergeSpec)> {
+        self.mods
+            .iter()
+            .filter_map(|entry| entry.merge.as_ref().map(|merge| (entry, merge)))
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonalizedMod {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub mod_type: Option<String>,
+    pub mod_type: Option<ModType>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub merge: Option<MergeSpec>,
     pub archives: Vec<CompiledArchive>,
     #[serde(default)]
     pub files: Vec<String>,

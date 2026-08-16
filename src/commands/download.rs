@@ -3,7 +3,6 @@ use crate::config;
 use std::path::PathBuf;
 
 pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
-    let game_dir = super::require_game_dir(None)?;
     let raw = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
     let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(|err| {
@@ -33,7 +32,6 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
     tracing::info!(
         input = %args.input.display(),
         cache = ?args.cache.as_ref().map(|p| p.display().to_string()),
-        game_dir = %game_dir.display(),
         parallel = args.parallel,
         retry = args.retry,
         "download requested"

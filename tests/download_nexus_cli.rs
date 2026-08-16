@@ -33,7 +33,7 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
-    let source = "name = \"Nexus CLI Test\"\n\n[modlist.core]\ndependencies = []\n\n[[modlist.core.archives]]\npath = \"nexus:skyrimspecialedition/1234/5678\"\ndownload_handler = \"nexus\"\n";
+    let source = "name = \"Nexus CLI Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:skyrimspecialedition/1234/5678\"\ndownload_handler = \"nexus\"\n";
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
     Command::cargo_bin("mudcrab")

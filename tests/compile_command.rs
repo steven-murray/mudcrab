@@ -44,7 +44,7 @@ fn compile_flattens_nested_mod_sections() {
 
     std::fs::write(
         &modlist,
-        "name = \"Nested Compile\"\n\n[modlist.foundation.base]\ndependencies = []\n\n[modlist.gameplay.combat]\ndependencies = [\"base\"]\n\n[modlist.gameplay.magic]\ndependencies = [\"base\"]\n",
+        "name = \"Nested Compile\"\n\n[[mods]]\nid = \"base\"\nsection = [\"foundation\"]\ndependencies = []\n\n[[mods]]\nid = \"combat\"\nsection = [\"gameplay\"]\ndependencies = [\"base\"]\n\n[[mods]]\nid = \"magic\"\nsection = [\"gameplay\"]\ndependencies = [\"base\"]\n",
     )
     .expect("fixture should be written");
 

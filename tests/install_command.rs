@@ -25,7 +25,7 @@ fn install_unpacks_zip_archives_for_each_selected_mod() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install Test\"\n\n[modlist.core]\ndependencies = []\n\n[[modlist.core.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Install Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -112,7 +112,7 @@ fn install_extracts_game_root_files_to_game_root_dir_and_excludes_from_mod_folde
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Game Root Test\"\n\n[modlist.core]\ndependencies = []\n\n[[modlist.core.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ngame_root_files = [\"*.exe\"]\n",
+        "name = \"Game Root Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ngame_root_files = [\"*.exe\"]\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -201,7 +201,7 @@ fn install_fails_when_ini_set_target_file_is_missing() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install Missing Ini Target Test\"\n\n[modlist.core]\ndependencies = []\n\n[[modlist.core.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[modlist.core.actions]]\naction = \"ini_set\"\nfile = \"Data/missing.ini\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
+        "name = \"Install Missing Ini Target Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods.actions]]\naction = \"ini_set\"\nfile = \"Data/missing.ini\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -277,7 +277,7 @@ fn install_auto_detects_supported_archive_layouts_without_arguments() {
     );
 
     let source = format!(
-        "name = \"Auto Layout Test\"\n\n[modlist.root]\ndependencies = []\n\n[[modlist.root.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[modlist.data]\ndependencies = []\n\n[[modlist.data.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[modlist.modonly]\ndependencies = []\n\n[[modlist.modonly.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[modlist.moddata]\ndependencies = []\n\n[[modlist.moddata.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Auto Layout Test\"\n\n[[mods]]\nid = \"root\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"data\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"modonly\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"moddata\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
         root_zip.display(),
         data_zip.display(),
         mod_zip.display(),
@@ -351,7 +351,7 @@ fn install_rejects_noncanonical_plugin_layouts() {
     make_zip_with_files(&archive, &[("foo/bar/plugin_bad.esp", b"bad")]);
 
     let source = format!(
-        "name = \"Bad Layout Test\"\n\n[modlist.bad]\ndependencies = []\n\n[[modlist.bad.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Bad Layout Test\"\n\n[[mods]]\nid = \"bad\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");

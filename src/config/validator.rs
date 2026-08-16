@@ -1,6 +1,6 @@
-use crate::config::schema::{InputType, ModSpec, SourceModlist};
+use crate::config::schema::{InputType, ModEntry, ModType, SourceModlist};
 use indexmap::IndexMap;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
     if modlist.name.trim().is_empty() {
@@ -60,7 +60,100 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
         }
     }
 
+    validate_merges(modlist, &flattened_mods)?;
     detect_cycles(&flattened_mods)?;
+
+    Ok(())
+}
+
+/// Check every merge against the rest of the modlist.
+///
+/// A merge is only correct in the context of the whole list -- its sources must
+/// exist, its output must be in the load order, and the plugins it consumes
+/// must *not* be, because hiding them is what makes the merge take effect. All
+/// of those are cheap to check here and expensive to discover in game.
+fn validate_merges(
+    modlist: &SourceModlist,
+    mods: &IndexMap<String, ModEntry>,
+) -> anyhow::Result<()> {
+    let in_load_order = |plugin: &str| {
+        modlist
+            .plugins
+            .iter()
+            .any(|entry| entry.eq_ignore_ascii_case(plugin))
+    };
+
+    // Plugin -> the merge that already consumes it. Merging one plugin twice
+    // would duplicate every record it contains.
+    let mut claimed: HashMap<String, String> = HashMap::new();
+
+    for (mod_id, spec) in mods {
+        match (spec.mod_type, &spec.merge) {
+            (Some(ModType::Merge), None) => anyhow::bail!(
+                "mod {mod_id} has type = \"merge\" but no [mods.merge] section saying what to merge"
+            ),
+            (mod_type, Some(_)) if mod_type != Some(ModType::Merge) => anyhow::bail!(
+                "mod {mod_id} has a [mods.merge] section but is not type = \"merge\", so the \
+                 merge would never run"
+            ),
+            _ => {}
+        }
+
+        let Some(merge) = &spec.merge else { continue };
+
+        if !spec.archives.is_empty() || !spec.files.is_empty() {
+            anyhow::bail!(
+                "merge {mod_id} also declares archives or files; a merge mod contains only its \
+                 merged output"
+            );
+        }
+
+        if !is_plugin_filename(&merge.output) {
+            anyhow::bail!("merge {mod_id} has invalid output filename {}", merge.output);
+        }
+        if !in_load_order(&merge.output) {
+            anyhow::bail!(
+                "merge {mod_id} produces {} which is missing from the global plugins load order",
+                merge.output
+            );
+        }
+
+        if merge.sources.is_empty() {
+            anyhow::bail!("merge {mod_id} lists no source plugins");
+        }
+
+        for source in &merge.sources {
+            if !mods.contains_key(&source.mod_id) {
+                anyhow::bail!(
+                    "merge {mod_id} sources plugin {} from unknown mod {}",
+                    source.plugin,
+                    source.mod_id
+                );
+            }
+            if !is_plugin_filename(&source.plugin) {
+                anyhow::bail!(
+                    "merge {mod_id} sources invalid plugin filename {}",
+                    source.plugin
+                );
+            }
+            if merge.hide_sources && in_load_order(&source.plugin) {
+                anyhow::bail!(
+                    "merge {mod_id} sources {}, which is still in the global plugins load order. \
+                     Merged sources are hidden from the plugin list; remove it from `plugins`.",
+                    source.plugin
+                );
+            }
+
+            let key = source.plugin.to_ascii_lowercase();
+            if let Some(other) = claimed.insert(key, mod_id.clone()) {
+                anyhow::bail!(
+                    "plugin {} is merged by both {other} and {mod_id}; every record in it would \
+                     appear twice",
+                    source.plugin
+                );
+            }
+        }
+    }
 
     Ok(())
 }
@@ -70,7 +163,7 @@ fn is_plugin_filename(value: &str) -> bool {
     lower.ends_with(".esp") || lower.ends_with(".esm")
 }
 
-fn detect_cycles(mods: &IndexMap<String, ModSpec>) -> anyhow::Result<()> {
+fn detect_cycles(mods: &IndexMap<String, ModEntry>) -> anyhow::Result<()> {
     let mut visiting = HashSet::new();
     let mut visited = HashSet::new();
 
@@ -82,7 +175,7 @@ fn detect_cycles(mods: &IndexMap<String, ModSpec>) -> anyhow::Result<()> {
 }
 
 fn visit(
-    mods: &IndexMap<String, ModSpec>,
+    mods: &IndexMap<String, ModEntry>,
     mod_id: &str,
     visiting: &mut HashSet<String>,
     visited: &mut HashSet<String>,

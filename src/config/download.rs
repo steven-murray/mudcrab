@@ -277,16 +277,15 @@ fn derive_server_filename(response: &reqwest::Response) -> Option<String> {
         .headers()
         .get(reqwest::header::CONTENT_DISPOSITION)
         .and_then(|v| v.to_str().ok())
+        && let Some(name) = filename_from_content_disposition(value)
     {
-        if let Some(name) = filename_from_content_disposition(value) {
-            return Some(name);
-        }
+        return Some(name);
     }
 
     response
         .url()
         .path_segments()
-        .and_then(|segments| segments.last())
+        .and_then(|mut segments| segments.next_back())
         .and_then(sanitize_filename_component)
 }
 
@@ -298,10 +297,10 @@ fn filename_from_content_disposition(value: &str) -> Option<String> {
                 return Some(name);
             }
         }
-        if let Some(raw) = part.strip_prefix("filename=") {
-            if let Some(name) = sanitize_filename_component(raw.trim_matches('"')) {
-                return Some(name);
-            }
+        if let Some(raw) = part.strip_prefix("filename=")
+            && let Some(name) = sanitize_filename_component(raw.trim_matches('"'))
+        {
+            return Some(name);
         }
     }
     None
@@ -363,12 +362,12 @@ pub fn resolve_cache_path(cache_dir: &Path, cache_name: &str) -> Option<PathBuf>
         // Accept "{cache_name}.{ext}" where ext is all alphanumeric (e.g. "7z", "zip", "rar").
         // This matches files that were renamed post-download to include the archive extension,
         // while excluding sidecar files like "…orig-name".
-        if extension_match.is_none() {
-            if let Some(suffix) = candidate_lower.strip_prefix(&format!("{name_lower}.")) {
-                if !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_alphanumeric()) {
-                    extension_match = Some(entry.path());
-                }
-            }
+        if extension_match.is_none()
+            && let Some(suffix) = candidate_lower.strip_prefix(&format!("{name_lower}."))
+            && !suffix.is_empty()
+            && suffix.chars().all(|c| c.is_ascii_alphanumeric())
+        {
+            extension_match = Some(entry.path());
         }
     }
 
@@ -596,12 +595,13 @@ mod tests {
             responses: std::collections::HashMap::new(),
             mod_order: vec!["core".to_string()],
             selected_mods: vec!["core".to_string()],
-            actions: toml::Table::new(),
+            actions: Vec::new(),
             post_install_actions: vec![],
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 mod_type: None,
+                merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     download_handler: Some("nexus".to_string()),
@@ -662,12 +662,13 @@ mod tests {
             responses: std::collections::HashMap::new(),
             mod_order: vec!["core".to_string()],
             selected_mods: vec!["core".to_string()],
-            actions: toml::Table::new(),
+            actions: Vec::new(),
             post_install_actions: vec![],
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 mod_type: None,
+                merge: None,
                 archives: vec![CompiledArchive {
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     download_handler: Some("nexus".to_string()),
