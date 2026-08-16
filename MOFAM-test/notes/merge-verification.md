@@ -34,6 +34,45 @@ visibly broken. It is not — see `zmerge-non-canonical-refs.md`. Its value here
 is as the most reference-dense location in the merge, not as a controlled
 comparison.
 
+## TACE Merge — verified 2026-08-16
+
+Built with `mudcrab merge`, installed as a lower-priority MO2 mod, tested via
+`coc AnvilMagesGuild` and a walk around Anvil.
+
+- 8533 records / 1170 renumbered / 282 clobbered — exact oracle match
+- No merge-attributable problems
+
+One missing mesh was found in Anvil. It is **missing in the Oracle too**, so
+it predates any mudcrab involvement and is tracked separately.
+
+## Prebash Merge (no ORC) — built, in-game result inconclusive
+
+4499 records; the 33-record delta from the ORC-inclusive build is exactly ORC
+v194's whole contribution, with the clobber count unchanged. See the commit.
+
+In game it shows heavy visual artifacts — glowing trees, purple sky. These are
+**not attributable to the merge**: they are ORC 3.1.5f's own rendering, and
+later ORC versions have a reputation for instability. Nothing about a plugin
+merge produces sky colour. Separately tunable via ORC's INI, and out of scope
+here.
+
+## ORC: the Oracle and MudCrab Test deliberately diverge
+
+Worth stating plainly, because the two builds now want *different* Prebash
+merges:
+
+- **The Oracle** (this user's personal Linux install) runs **ORC 3.1.5f**,
+  which ships no plugin, because ENB never worked on this machine and ORC is
+  carrying the visuals alone. Its Prebash therefore has **no ORC.esp** — that
+  is what `MOFAM-test/input/mofam.merges.toml` builds.
+- **MudCrab Test**, which reproduces the *guide*, should use **ORC v1.8.0** as
+  the guide specifies. v1.8.0 **does** ship `ORC.esp`, so its Prebash merge
+  **must include it** — 86 sources, not 85.
+
+So `mofam.merges.toml` as it stands is the Oracle's shape, not the guide's.
+When Part 36 is authored into `mofam.full.toml`, its Prebash must list
+`ORC.esp` from the v180 folder. Do not copy the merge block across unchanged.
+
 ## Not yet verified in game
 
 - The other five merges. TACE is the next most interesting: it is the only
