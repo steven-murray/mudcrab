@@ -52,6 +52,8 @@ pub mod hash;
 pub mod reader;
 pub mod writer;
 
+pub mod file_flags;
+
 pub use hash::{hash_file_name, hash_folder_name};
 
 use std::borrow::Cow;

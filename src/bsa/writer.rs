@@ -188,12 +188,21 @@ pub(super) fn from_directory(
         .collect();
     folders.sort_by_key(|folder| hash_folder_name(&folder.name));
 
+    // Oblivion uses the asset-kind flags to decide whether this archive can
+    // serve a given kind of request, so an archive of meshes that declares none
+    // is invisible to the game while still parsing and extracting perfectly.
+    // Every archive in the corpus sets them; none is zero.
+    let file_flags = super::file_flags::derive(folders.iter().flat_map(|folder| {
+        folder
+            .files
+            .iter()
+            .map(move |file| format!("{}\\{}", folder.name, file.name))
+    }).collect::<Vec<_>>().iter().map(String::as_str));
+
     Ok(Bsa {
         // Names present, nothing compressed.
         archive_flags: FLAG_FOLDER_NAMES | FLAG_FILE_NAMES,
-        // Oblivion recomputes the asset-kind flags from the contents, and every
-        // tool that writes Oblivion archives leaves them at zero or guesses.
-        file_flags: 0,
+        file_flags,
         folders,
         source: None,
     })

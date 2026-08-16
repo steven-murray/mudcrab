@@ -270,3 +270,73 @@ fn recomputed_hashes_reproduce_the_real_record_ordering() {
         problems.iter().take(20).cloned().collect::<Vec<_>>().join("\n  ")
     );
 }
+
+/// The asset-kind flags mudcrab derives, checked against what real archives
+/// declare.
+///
+/// Exact agreement is not the bar and cannot be: real archives disagree with
+/// each other. Bethesda's own ship junk in the high bits (`Oblivion -
+/// Voices2.bsa` declares `0x3a8d0010`), and authors split on whether a `.lip`
+/// file is a sound or a voice. What matters is the low byte, and specifically
+/// that mudcrab never declares *fewer* kinds than an archive's contents call
+/// for -- an under-declared kind is an asset the engine will not look for.
+///
+/// The tolerated shortfalls are the reverse case: archives declaring a kind
+/// they do not contain.
+#[test]
+fn derived_file_flags_cover_what_real_archives_declare() {
+    let Some(mods) = mofam_mods() else {
+        eprintln!("skipping: set MUDCRAB_MOFAM_ROOT to run the real-archive gate");
+        return;
+    };
+
+    let mut archives = Vec::new();
+    collect_archives(&mods, &mut archives);
+    assert!(!archives.is_empty(), "no .bsa found under {}", mods.display());
+
+    // Archives whose declared kinds are not present in their own contents.
+    // Named so that a new shortfall is a test failure rather than a shrug.
+    const OVER_DECLARED: &[&str] = &[
+        "character customization expanded.bsa",
+        "mergedlod - lods.bsa",
+        "dlcfrostcrag.bsa",
+        "oblivion - misc.bsa",
+    ];
+
+    let mut exact = 0usize;
+    let mut superset = 0usize;
+    for path in &archives {
+        let bytes = std::fs::read(path).expect("read archive");
+        let archive = Bsa::parse(&bytes).expect("parse archive");
+
+        let paths: Vec<String> = archive.paths().collect();
+        let derived = mudcrab::bsa::file_flags::derive(paths.iter().map(String::as_str));
+        // Low byte plus the miscellaneous bit; above that is tool noise.
+        let declared = archive.file_flags & 0x1ff;
+
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_ascii_lowercase();
+
+        if derived == declared {
+            exact += 1;
+        } else if derived & declared == declared {
+            superset += 1;
+        } else {
+            assert!(
+                OVER_DECLARED.contains(&name.as_str()),
+                "{}: declares {declared:#06x} but its contents derive {derived:#06x}, \
+                 so mudcrab would under-declare a kind that is really there",
+                path.display()
+            );
+        }
+    }
+
+    eprintln!(
+        "file flags: {} archives, {exact} exact, {superset} superset, {} known over-declared",
+        archives.len(),
+        OVER_DECLARED.len()
+    );
+}

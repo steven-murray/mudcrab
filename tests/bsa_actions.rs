@@ -28,6 +28,7 @@ fn settings(root: &Path) -> InstallSettings {
         filter: Default::default(),
         archive_search_paths: Vec::new(),
         force_merges: false,
+        force: false,
     }
 }
 
@@ -204,7 +205,18 @@ fn create_dummy_plugin_writes_a_valid_empty_plugin() {
     let plugin = Plugin::parse(&bytes).expect("parses as a TES4 plugin");
 
     assert_eq!(&plugin.header.signature, b"TES4");
-    assert!(plugin.masters.is_empty(), "a dummy plugin has no masters");
+    // Oblivion.esm and nothing else. Nothing here references it -- there are no
+    // records at all -- but a plugin declaring no masters is unusual enough that
+    // tools treat it as suspect, so the dummy looks like every other plugin.
+    assert_eq!(
+        plugin
+            .masters
+            .masters()
+            .iter()
+            .map(|master| master.as_str())
+            .collect::<Vec<_>>(),
+        ["Oblivion.esm"]
+    );
     assert_eq!(plugin.records().count(), 0);
     assert_eq!(plugin.record_and_group_count(), 0);
     assert!(plugin.header.field(b"HEDR").is_some());
@@ -245,6 +257,43 @@ fn file_prune_removes_folders_left_empty() {
     assert!(!target.join("textures").exists());
     assert!(!target.join("sound").exists());
     assert!(target.join("readme.txt").exists());
+}
+
+#[test]
+fn file_prune_treats_a_bare_directory_name_as_the_whole_folder() {
+    // What the guide means every time it says "delete the loose meshes &
+    // textures folders". As a raw glob, `meshes` matches only a file called
+    // `meshes` -- so this silently deleted nothing until it was expanded.
+    let (dir, target) = staged_mod();
+    run(&[prune(&["meshes", "textures"])], dir.path(), &target).expect("prune");
+
+    assert!(!target.join("meshes").exists(), "the meshes folder should be gone");
+    assert!(!target.join("textures").exists(), "the textures folder should be gone");
+    assert!(target.join("sound/fx/thud.wav").exists(), "unrelated folders survive");
+    assert!(target.join("readme.txt").exists());
+}
+
+#[test]
+fn file_prune_accepts_a_directory_name_with_a_trailing_slash() {
+    let (dir, target) = staged_mod();
+    run(&[prune(&["meshes/"])], dir.path(), &target).expect("prune");
+
+    assert!(!target.join("meshes").exists());
+    assert!(target.join("textures/rocks/rock01.dds").exists());
+}
+
+#[test]
+fn file_prune_fails_when_a_pattern_matches_nothing() {
+    // A prune that deletes nothing leaves the loose files it was meant to
+    // remove shadowing whatever was packed, and the install still reports
+    // success. It has to be loud.
+    let (dir, target) = staged_mod();
+    let err = run(&[prune(&["meshes", "Meshes"])], dir.path(), &target)
+        .expect_err("a pattern matching nothing should fail");
+
+    let message = format!("{err:#}");
+    assert!(message.contains("'Meshes'"), "the failing pattern must be named: {message}");
+    assert!(!message.contains("'meshes'"), "the matching pattern must not be: {message}");
 }
 
 #[test]
