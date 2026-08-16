@@ -389,6 +389,49 @@ Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/p
 via the `actions` machinery in `src/config/actions/` -- see `MOFAM-test/input/mofam.full.toml`
 for real examples.
 
+### Actions
+
+`actions` is an **ordered** list; each entry runs in the order it is declared. The
+`action` key selects which one, and the rest of the table carries its parameters. An
+unrecognised name is a parse error naming the supported values, not a silent skip.
+
+| `action` | What it does |
+| --- | --- |
+| `ini_set` | Set a key in an INI file (`scope = "mod"` or `"game"`). |
+| `qac` | Run xEdit's Quick Auto Clean over the named plugins. |
+| `pack_bsa` | Pack the mod's staged files into a BSA. |
+| `create_dummy_plugin` | Write an empty `.esp` so Oblivion loads a BSA of the same name. |
+| `file_prune` | Delete staged files matching globs. |
+
+The last three exist to be composed, in this order, for mods that ship loose assets
+the guide wants archived:
+
+```toml
+[[mods]]
+id = "Example Mod"
+
+actions = [
+  { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
+  { action = "create_dummy_plugin", output = "Example Mod.esp" },
+  { action = "file_prune", paths = ["meshes/**", "textures/**", "sound/**"] },
+]
+```
+
+`file_prune` is a separate action rather than a `pack_bsa` option because it has to run
+*after* the archive is written -- the loose files must still exist to be packed. Ordering
+is the only mechanism involved.
+
+Oblivion loads `Foo.bsa` only when a plugin named `Foo.esp` is active, which is what
+`create_dummy_plugin` is for: a mod distributed as a bare archive needs an empty plugin
+beside it. The plugin is built through mudcrab's own plugin writer, so it is a real TES4
+file rather than a blob of hand-written bytes.
+
+Paths in all three are relative to the mod's staged data folder and may not escape it.
+A BSA cannot store a file outside a folder, so anything at the top level of the staged
+mod (a readme, a plugin) is left loose and logged rather than packed.
+
+Packing and unpacking are native -- see `src/bsa/` -- so no BSArch.exe under Wine.
+
 Along with standard archive-based mods, a mod can be **built** rather than extracted.
 Two `type` values do this today:
 

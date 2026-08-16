@@ -93,6 +93,9 @@ pub enum InputType {
 pub enum ModAction {
     IniSet(IniSetAction),
     Qac(QacAction),
+    PackBsa(PackBsaAction),
+    CreateDummyPlugin(CreateDummyPluginAction),
+    FilePrune(FilePruneAction),
 }
 
 impl ModAction {
@@ -101,8 +104,54 @@ impl ModAction {
         match self {
             ModAction::IniSet(_) => "ini_set",
             ModAction::Qac(_) => "qac",
+            ModAction::PackBsa(_) => "pack_bsa",
+            ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
+            ModAction::FilePrune(_) => "file_prune",
         }
     }
+}
+
+/// Pack the mod's staged files into a BSA.
+///
+/// Runs in declaration order alongside the other actions, so a `file_prune`
+/// listed after it deletes the loose copies it just packed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PackBsaAction {
+    /// Archive name, relative to the mod's staged data folder. Oblivion loads
+    /// `Foo.bsa` only when a `Foo.esp` is in the load order, so this normally
+    /// shares its stem with a `create_dummy_plugin` output.
+    pub output: String,
+    /// Glob patterns selecting what to pack, relative to the staged folder.
+    /// Empty means everything.
+    #[serde(default)]
+    pub include: Vec<String>,
+    /// Glob patterns excluded from packing, applied after `include`.
+    #[serde(default)]
+    pub exclude: Vec<String>,
+}
+
+/// Write an empty plugin whose name matches a BSA.
+///
+/// Oblivion only loads an archive when a plugin of the same stem is active, so
+/// a mod shipped as a bare BSA needs one of these next to it.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateDummyPluginAction {
+    /// Plugin name, relative to the mod's staged data folder.
+    pub output: String,
+}
+
+/// Delete staged files matching globs.
+///
+/// This is the post-install ordered deletion that `pack_bsa`'s `exclude`
+/// cannot express, because it has to run *after* the archive is written.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FilePruneAction {
+    /// Glob patterns resolved relative to the mod's staged data folder.
+    /// Required: a prune with nothing to delete is always a mistake.
+    pub paths: Vec<String>,
 }
 
 /// Set a key in an INI file.

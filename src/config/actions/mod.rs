@@ -9,7 +9,10 @@
 //! currently only those desugared from the top-level `[ini]` table), so there
 //! is one dispatcher rather than two implementations that drifted apart.
 
+pub mod create_dummy_plugin;
+pub mod file_prune;
 pub mod ini_set;
+pub mod pack_bsa;
 pub mod qac;
 
 use crate::config::install::InstallSettings;
@@ -38,6 +41,9 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     match action {
         ModAction::IniSet(spec) => ini_set::apply(spec, cx),
         ModAction::Qac(spec) => qac::apply(spec, cx),
+        ModAction::PackBsa(spec) => pack_bsa::apply(spec, cx),
+        ModAction::CreateDummyPlugin(spec) => create_dummy_plugin::apply(spec, cx),
+        ModAction::FilePrune(spec) => file_prune::apply(spec, cx),
     }
 }
 
@@ -54,7 +60,15 @@ mod tests {
         let err = parse(r#"action = "definitely_not_real""#).unwrap_err();
         let msg = err.to_string();
         // Previously this warned at install time and silently skipped the action.
-        assert!(msg.contains("ini_set") && msg.contains("qac"), "{msg}");
+        for expected in [
+            "ini_set",
+            "qac",
+            "pack_bsa",
+            "create_dummy_plugin",
+            "file_prune",
+        ] {
+            assert!(msg.contains(expected), "{expected} missing from: {msg}");
+        }
     }
 
     #[test]
@@ -125,6 +139,58 @@ mod tests {
         };
         assert_eq!(spec.scope, IniScope::Game);
         assert_eq!(spec.format, IniSetFormat::SetTo);
+    }
+
+    #[test]
+    fn pack_bsa_requires_an_output_and_defaults_to_packing_everything() {
+        let err = parse(r#"action = "pack_bsa""#).unwrap_err();
+        assert!(err.to_string().contains("output"), "{err}");
+
+        let ModAction::PackBsa(spec) =
+            parse("action=\"pack_bsa\"\noutput=\"Example.bsa\"").unwrap()
+        else {
+            panic!("expected pack_bsa");
+        };
+        assert_eq!(spec.output, "Example.bsa");
+        assert!(spec.include.is_empty(), "no include means everything");
+        assert!(spec.exclude.is_empty());
+    }
+
+    #[test]
+    fn create_dummy_plugin_requires_an_output() {
+        let err = parse(r#"action = "create_dummy_plugin""#).unwrap_err();
+        assert!(err.to_string().contains("output"), "{err}");
+    }
+
+    #[test]
+    fn file_prune_without_paths_is_a_parse_error() {
+        // Matching the qac rule: a prune with nothing to delete is a mistake.
+        let err = parse(r#"action = "file_prune""#).unwrap_err();
+        assert!(err.to_string().contains("paths"), "{err}");
+    }
+
+    #[test]
+    fn bsa_actions_round_trip_through_json() {
+        // compiled.json / plan.json carry these between pipeline stages, and
+        // the ordering they preserve is what file_prune depends on.
+        let actions: Vec<ModAction> = vec![
+            parse("action=\"pack_bsa\"\noutput=\"E.bsa\"\nexclude=[\"*.esp\"]").unwrap(),
+            parse("action=\"create_dummy_plugin\"\noutput=\"E.esp\"").unwrap(),
+            parse("action=\"file_prune\"\npaths=[\"meshes/**\"]").unwrap(),
+        ];
+
+        let json = serde_json::to_string(&actions).unwrap();
+        let back: Vec<ModAction> = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(
+            back.iter().map(ModAction::name).collect::<Vec<_>>(),
+            vec!["pack_bsa", "create_dummy_plugin", "file_prune"],
+            "declaration order must survive the pipeline"
+        );
+        let ModAction::PackBsa(spec) = &back[0] else {
+            panic!("expected pack_bsa");
+        };
+        assert_eq!(spec.exclude, vec!["*.esp".to_string()]);
     }
 
     #[test]
