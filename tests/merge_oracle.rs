@@ -19,7 +19,7 @@
 //! file and report a spurious difference. The fixture pins ORC to **v180**
 //! even though merges.json names v194: the definition was updated when the ORC
 //! upgrade began, but the installed Prebash merge was built from v180 and never
-//! rebuilt. See MOFAM-test/notes/zmerge-dangling-refs.md.
+//! rebuilt. See MOFAM-test/notes/zmerge-non-canonical-refs.md.
 
 use mudcrab::merge::{self, MergeRequest, MergeSource};
 use mudcrab::plugin::{FormId, MasterTable, Origin, Plugin, PluginName, Record};
@@ -98,10 +98,27 @@ struct Inverse {
     kept: BTreeMap<u32, (String, u32)>,
 }
 
+/// Resolve a FormID the way xEdit does, **including its tolerance for a mod
+/// index past the end of the master list**.
+///
+/// This tolerance is not a detail. zMerge writes such indices in four of the
+/// six merges, and TES4Edit's Check for Errors resolves every one of them:
+/// 7913 records, 0 errors. So an out-of-range index is not a dangling
+/// reference -- it is a non-canonical way of writing "my own record", and both
+/// xEdit and the game engine read it as such.
+///
+/// Modelling that here is what lets the comparison below demand an *exact*
+/// graph match rather than excusing a class of difference.
 fn canonicalize(form_id: FormId, masters: &MasterTable, inverse: &Inverse) -> Canon {
     if form_id.is_null() {
         return Canon::Null;
     }
+    let own = masters.own_mod_index();
+    let form_id = if form_id.mod_index() > own {
+        FormId::new(own, form_id.object_index())
+    } else {
+        form_id
+    };
     match masters.resolve(form_id) {
         Some(Origin::Master { plugin, object_index }) => Canon::Master {
             plugin: plugin.as_str().to_ascii_lowercase(),
@@ -147,18 +164,18 @@ struct Verdict {
     records: usize,
     clobbered: usize,
     remapped: usize,
-    /// References in *zMerge's* output whose mod index is greater than its own,
-    /// so they address a master that does not exist.
-    beyond_masters: usize,
-    /// References in zMerge's output that claim to be its own records but name
-    /// an object index it never allocated. A different defect from the above,
-    /// and worth counting separately -- conflating them hides the pattern.
+    /// References in *zMerge's* output whose mod index exceeds its own. These
+    /// resolve correctly (xEdit reads them as own-record references) but are
+    /// not how the format is meant to be written; we emit the canonical form.
+    non_canonical: usize,
+    /// References naming an own-record object index that was never allocated.
+    /// This one *would* be a genuine defect. Measured zero everywhere.
     unknown_own: usize,
 }
 
 /// Classify every reference in zMerge's output that resolves to nothing.
 ///
-/// Returns `(beyond_masters, unknown_own, samples)`. The samples exist so the
+/// Returns `(non_canonical: beyond_masters, unknown_own, samples)`. The samples exist so the
 /// claim "zMerge is wrong here" can be checked by hand in TES4Edit rather than
 /// taken on trust -- being different from a suspect oracle is not the same as
 /// being right.
@@ -398,35 +415,33 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
         "{name}: merged output defines the same FormID more than once: {dupes:?}"
     );
 
-    // --- our output must contain no dangling references -----------------
+    // --- our output must use canonical mod indices ----------------------
     //
-    // zMerge's Unique Forts output fails this: 718 of its references carry the
-    // source plugin's *load order position* as their mod index instead of the
-    // merged plugin's own index, so they point past the master list at
-    // nothing. Those are excluded from the comparison below by count rather
-    // than allowed to mask a real difference, and this assertion keeps us
-    // honest about our own side.
-    // See MOFAM-test/notes/zmerge-dangling-refs.md.
+    // zMerge's output does not satisfy this in four of the six merges: it
+    // writes the source plugin's *load order position* as the mod index. Those
+    // still resolve -- readers clamp an out-of-range index to "own record", so
+    // `canonicalize` above does too, and the graphs match exactly. But we
+    // should emit the form the spec describes, and this keeps us to it.
+    // See MOFAM-test/notes/zmerge-non-canonical-refs.md.
     let our_own_index = ours.masters.own_mod_index();
-    let mut our_dangling = Vec::new();
+    let mut ours_non_canonical = Vec::new();
     for record in ours.records() {
         mudcrab::plugin::schema::visit_form_ids(record, |form_id| {
             if !form_id.is_null() && form_id.mod_index() > our_own_index {
-                our_dangling.push(format!("{} -> {form_id}", record.form_id));
+                ours_non_canonical.push(format!("{} -> {form_id}", record.form_id));
             }
         })
         .expect("schema coverage");
     }
     assert!(
-        our_dangling.is_empty(),
-        "{name}: our merged output has {} dangling reference(s): {:?}",
-        our_dangling.len(),
-        &our_dangling[..our_dangling.len().min(5)]
+        ours_non_canonical.is_empty(),
+        "{name}: our merged output has {} non-canonical mod index/indices: {:?}",
+        ours_non_canonical.len(),
+        &ours_non_canonical[..ours_non_canonical.len().min(5)]
     );
 
     // --- tier 2: the reference graphs must match ------------------------
     let mut mismatched = Vec::new();
-    let mut zmerge_dangling = 0usize;
     for (canon, our_record) in &our_records {
         let their_record = &their_records[canon];
         if our_record.signature != their_record.signature {
@@ -434,33 +449,7 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
             continue;
         }
         let ours_edges = reference_edges(our_record, &ours.masters, &inverse);
-        let mut theirs_edges = reference_edges(their_record, &theirs.masters, &inverse);
-
-        // Drop zMerge's broken references, and the matching count of ours, so
-        // its defect cannot hide a real disagreement in the rest.
-        let broken = theirs_edges
-            .iter()
-            .filter(|e| matches!(e, Canon::Unresolved(_)))
-            .count();
-        if broken > 0 {
-            zmerge_dangling += broken;
-            theirs_edges.retain(|e| !matches!(e, Canon::Unresolved(_)));
-            let mut kept = ours_edges.clone();
-            for edge in &theirs_edges {
-                if let Some(pos) = kept.iter().position(|e| e == edge) {
-                    kept.remove(pos);
-                }
-            }
-            // whatever ours has beyond theirs should be exactly the repaired refs
-            if kept.len() != broken {
-                mismatched.push(format!(
-                    "{canon:?} ({}): zMerge has {broken} broken ref(s) but ours differs by {}",
-                    our_record.sig_str(),
-                    kept.len()
-                ));
-            }
-            continue;
-        }
+        let theirs_edges = reference_edges(their_record, &theirs.masters, &inverse);
 
         if ours_edges != theirs_edges {
             let only_ours: Vec<_> = ours_edges
@@ -491,11 +480,6 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
     );
 
     let (beyond_masters, unknown_own, samples) = zmerge_broken_references(&theirs, &inverse, &def);
-    assert_eq!(
-        beyond_masters + unknown_own,
-        zmerge_dangling,
-        "{name}: the two ways of counting zMerge's broken references disagree"
-    );
     eprintln!(
         "{name}: tier 2 passed -- {} records, reference graphs identical; \
          zMerge broken refs: {beyond_masters} beyond masters, {unknown_own} unknown own",
@@ -510,7 +494,7 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
         records: our_records.len(),
         clobbered: report.clobbered,
         remapped: report.remapped,
-        beyond_masters,
+        non_canonical: beyond_masters,
         unknown_own,
     })
 }
@@ -537,14 +521,21 @@ oracle_test!(merges_late_loaders, "Late Loaders Merged");
 oracle_test!(merges_ooo_patches, "OOO Patches Merged");
 oracle_test!(merges_prebash, "Prebash Merge");
 
-/// Answer the open question in MOFAM-test/notes/zmerge-dangling-refs.md: is
-/// zMerge's dangling-reference defect confined to Unique Forts, confined to
-/// the two merges that renumber FormIDs, or systemic?
+/// Report how often zMerge writes a mod index past its own master list.
 ///
-/// This is a report, not a pass/fail assertion -- it prints a table. The
-/// per-merge tests above are what gate correctness.
+/// This is a **hygiene** measure, not a correctness one, and the distinction
+/// was learned the hard way: these were first read as dangling references and
+/// reported as an in-game fault, until TES4Edit resolved all 7913 records of
+/// the worst-affected merge with zero errors. They resolve. We write the
+/// canonical form instead, which is why tier 3 (byte-exact) stays out of
+/// reach, but nothing is broken by them.
+///
+/// `unknown_own` is the column that *would* mean a real defect: a reference to
+/// an own-record object index that was never allocated. It is zero everywhere.
+///
+/// A report, not an assertion -- the per-merge tests above gate correctness.
 #[test]
-fn reports_zmerge_dangling_references_across_all_merges() {
+fn reports_non_canonical_references_across_all_merges() {
     if mods_dir().is_none() {
         eprintln!("skipping: set MUDCRAB_MOFAM_ROOT to run against the real install");
         return;
@@ -557,10 +548,10 @@ fn reports_zmerge_dangling_references_across_all_merges() {
         }
     }
 
-    eprintln!("\n=== zMerge dangling references ===");
+    eprintln!("\n=== zMerge non-canonical mod indices (resolve correctly; cosmetic) ===");
     eprintln!(
         "{:<22} {:>8} {:>9} {:>9} {:>9} {:>9}",
-        "merge", "records", "remapped", "clobbered", "beyond", "unknown"
+        "merge", "records", "remapped", "clobbered", "noncanon", "unknown"
     );
     for (name, verdict) in &rows {
         eprintln!(
@@ -569,35 +560,26 @@ fn reports_zmerge_dangling_references_across_all_merges() {
             verdict.records,
             verdict.remapped,
             verdict.clobbered,
-            verdict.beyond_masters,
+            verdict.non_canonical,
             verdict.unknown_own
         );
     }
 
     let affected: Vec<&str> = rows
         .iter()
-        .filter(|(_, v)| v.beyond_masters + v.unknown_own > 0)
+        .filter(|(_, v)| v.non_canonical > 0)
         .map(|(name, _)| name.as_str())
         .collect();
-    let renumbering: Vec<&str> = rows
+    let genuine: Vec<&str> = rows
         .iter()
-        .filter(|(_, v)| v.remapped > 0)
+        .filter(|(_, v)| v.unknown_own > 0)
         .map(|(name, _)| name.as_str())
         .collect();
 
-    eprintln!("\naffected:    {affected:?}");
-    eprintln!("renumbering: {renumbering:?}");
-    eprintln!(
-        "verdict:     {}",
-        if affected.is_empty() {
-            "no defect reproduced".to_string()
-        } else if affected == renumbering {
-            "confined to the merges that renumber FormIDs -- points at zMerge's \
-             renumbering path".to_string()
-        } else if affected.len() == rows.len() {
-            "systemic across all merges".to_string()
-        } else {
-            format!("confined to {affected:?} -- no clean pattern; investigate individually")
-        }
+    eprintln!("\nnon-canonical in: {affected:?}");
+    assert!(
+        genuine.is_empty(),
+        "these merges reference own-record indices that were never allocated, \
+         which is a real defect rather than a cosmetic one: {genuine:?}"
     );
 }
