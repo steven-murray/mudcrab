@@ -1,0 +1,1090 @@
+//! Comparing an install we produced against a reference ("Oracle") MO2 instance.
+//!
+//! Reproducing a 700-mod list is only tractable if each section can be checked
+//! the moment it is built, while the handful of decisions that produced it are
+//! still fresh. `check` validates the archives we are about to install from;
+//! this validates what actually landed on disk, against a known-good instance.
+//!
+//! Two properties shape the whole module:
+//!
+//! * The trees come from Windows-authored archives, so path comparison is
+//!   case-insensitive and `\` is folded to `/`. Two files that Windows would
+//!   consider the same file must compare as the same file, or every mod would
+//!   look like it had renamed half its textures.
+//! * The Oracle is 40GB. Content is therefore established lazily -- size first,
+//!   bytes only when the sizes agree, and nothing at all is read for a mod that
+//!   exists on only one side.
+
+use crate::config::add::parse_meta_ini;
+use crate::config::filter::ModFilter;
+use crate::config::schema::PersonalizedPlan;
+use serde::Serialize;
+use sha2::{Digest, Sha256};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+/// MO2's own bookkeeping file. Ours will never have one, so comparing it would
+/// report a difference on every single mod and drown out the real ones.
+const MO2_META_FILE: &str = "meta.ini";
+
+/// MO2 renames a file to `<name>.mohidden` to drop it out of the virtual file
+/// system. A plugin hidden on behalf of a merge is the same file under a
+/// different name, not a missing file and not an extra one.
+const MO2_HIDDEN_SUFFIX: &str = ".mohidden";
+
+/// Publication date of the MOFAM guide, 2025-03-01T00:00:00Z.
+///
+/// The guide frequently says only "use the top file on the page", so an Oracle
+/// archive stamped after this date is a file the guide never actually named --
+/// drift the author has to consciously accept rather than assume.
+const GUIDE_CUTOFF: i64 = 1_740_787_200;
+
+/// Plausible range for a Unix timestamp embedded in a Nexus filename: 2001-09
+/// to 2100. Nexus also puts bare mod ids in those filenames (`...-19039.7z`),
+/// and a five-digit mod id read as a timestamp would date the mod to 1970.
+const TIMESTAMP_MIN: i64 = 1_000_000_000;
+const TIMESTAMP_MAX: i64 = 4_102_444_800;
+
+/// Read buffer for byte comparison and hashing.
+const CHUNK: usize = 128 * 1024;
+
+/// Guard against a symlink loop turning the walk into an infinite descent.
+const MAX_DEPTH: usize = 64;
+
+/// MO2 keeps its list separators as empty mod folders. They carry no files, so
+/// diffing them says nothing about whether a section was built correctly -- and
+/// an install that has not exported to MO2 yet has none of them at all.
+const SEPARATOR_SUFFIX: &str = "_separator";
+
+pub struct DiffSettings {
+    /// The install we produced.
+    pub mods_dir: PathBuf,
+    /// The reference MO2 instance's mods directory. Only ever read from.
+    pub oracle_dir: PathBuf,
+    /// Which mods to compare. Empty means every directory in either tree.
+    pub filter: ModFilter,
+    /// Section paths and declared archive names, when a plan was supplied.
+    pub plan: Option<PlanIndex>,
+}
+
+/// What a plan tells us about a mod that the directories themselves cannot.
+///
+/// A mod folder on disk knows its name and its files. It does not know which
+/// section of the list it belongs to, nor which archive we intended to install
+/// it from, so `--section` filtering and archive comparison both need the plan.
+#[derive(Debug, Default)]
+pub struct PlanIndex {
+    /// Keyed by lowercased id, because the directory on disk may not match the
+    /// plan's spelling even though MO2 and Windows consider them the same.
+    entries: HashMap<String, PlanEntry>,
+    /// Distinct section paths in plan order, so the report is grouped the way
+    /// the modlist is written rather than alphabetically.
+    order: Vec<Vec<String>>,
+}
+
+#[derive(Debug, Clone, Default)]
+struct PlanEntry {
+    section: Vec<String>,
+    file_names: Vec<String>,
+}
+
+impl PlanIndex {
+    pub fn from_plan(plan: &PersonalizedPlan) -> Self {
+        let mut entries = HashMap::new();
+        let mut order: Vec<Vec<String>> = Vec::new();
+
+        for mod_entry in &plan.mods {
+            if !order.iter().any(|seen| seen == &mod_entry.section) {
+                order.push(mod_entry.section.clone());
+            }
+            entries.insert(
+                mod_entry.id.to_lowercase(),
+                PlanEntry {
+                    section: mod_entry.section.clone(),
+                    file_names: mod_entry
+                        .archives
+                        .iter()
+                        .filter_map(|archive| archive.file_name.clone())
+                        .collect(),
+                },
+            );
+        }
+
+        Self { entries, order }
+    }
+
+    fn get(&self, id: &str) -> Option<&PlanEntry> {
+        self.entries.get(&id.to_lowercase())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Presence {
+    /// The mod folder exists in both trees.
+    Both,
+    /// We installed something the Oracle does not have.
+    OursOnly,
+    /// The Oracle has it and we have not built it yet.
+    OracleOnly,
+}
+
+/// One file that exists on both sides but is not the same file.
+#[derive(Debug, Clone, Serialize)]
+pub struct ContentDiff {
+    /// Folder-relative path, as spelled in our tree.
+    pub path: String,
+    pub ours_size: u64,
+    pub oracle_size: u64,
+    /// Digests are filled in only when the sizes matched and the bytes were
+    /// then found to differ: hashing is how a difference gets *described*, not
+    /// how it gets detected, so identical files are never hashed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ours_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_sha256: Option<String>,
+}
+
+/// How old the Oracle's archive is relative to the guide.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "status", rename_all = "snake_case")]
+pub enum GuideAge {
+    /// The archive postdates the guide, so "the top file on the page" in March
+    /// 2025 was not this file.
+    PostGuide { timestamp: i64, date: String },
+    /// The archive predates the guide and is what the guide would have named.
+    PreGuide { timestamp: i64, date: String },
+    /// No timestamp could be read. Reported rather than assumed to be fine.
+    Unknown { reason: String },
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct VersionInfo {
+    /// `[General] version` from the Oracle's meta.ini, for the author's eyes:
+    /// MO2 records it as a free-form string, so it is shown, not compared.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_version: Option<String>,
+    /// `[General] installationFile` -- the archive the Oracle was built from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_installation_file: Option<String>,
+    /// The archive our plan declares, when a plan was supplied.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub plan_file_name: Option<String>,
+    /// True when the plan names an archive and it is not the one the Oracle
+    /// recorded installing. This is a real difference and gates the exit code.
+    pub archive_mismatch: bool,
+    pub guide_age: GuideAge,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ModDiff {
+    pub id: String,
+    pub section: Vec<String>,
+    pub presence: Presence,
+    /// Folder-relative paths present only in our tree.
+    pub only_in_ours: Vec<String>,
+    /// Folder-relative paths present only in the Oracle's tree.
+    pub only_in_oracle: Vec<String>,
+    pub content_differs: Vec<ContentDiff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version: Option<VersionInfo>,
+    /// Anything that went wrong reading either tree. Recorded per mod rather
+    /// than aborting: one unreadable file should not cost the whole report.
+    pub errors: Vec<String>,
+}
+
+impl ModDiff {
+    /// Whether this mod reproduces the Oracle.
+    ///
+    /// A `POST-GUIDE` flag deliberately does *not* count: it describes the
+    /// Oracle's own archive being newer than the guide, which is a fact about
+    /// the reference, not a fault in our copy of it. Gating on it would fail
+    /// every run for something no install could fix.
+    pub fn is_identical(&self) -> bool {
+        self.presence == Presence::Both
+            && self.only_in_ours.is_empty()
+            && self.only_in_oracle.is_empty()
+            && self.content_differs.is_empty()
+            && self.errors.is_empty()
+            && !self.version.as_ref().is_some_and(|v| v.archive_mismatch)
+    }
+
+    /// Whether this mod has something to say under "version notes", even when
+    /// its files reproduce the Oracle exactly.
+    fn has_version_note(&self) -> bool {
+        self.version.as_ref().is_some_and(|version| {
+            version.archive_mismatch || !matches!(version.guide_age, GuideAge::PreGuide { .. })
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SectionReport {
+    /// Section path joined for display, or a placeholder when a mod has none.
+    pub name: String,
+    pub path: Vec<String>,
+    pub compared: usize,
+    pub identical: usize,
+    pub mods: Vec<ModDiff>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DiffSummary {
+    pub mods_compared: usize,
+    pub identical: usize,
+    pub differing: usize,
+    /// In the Oracle but not in ours -- sections still to build.
+    pub missing: usize,
+    /// In ours but not in the Oracle.
+    pub extra: usize,
+    /// Mods whose Oracle archive postdates the guide.
+    pub post_guide: usize,
+    /// Mods whose Oracle archive carries no readable timestamp.
+    pub unknown_archive_age: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DiffReport {
+    pub ours: String,
+    pub oracle: String,
+    pub scope: String,
+    pub summary: DiffSummary,
+    pub sections: Vec<SectionReport>,
+}
+
+impl DiffReport {
+    /// Whether the run found anything that should gate a section.
+    pub fn has_differences(&self) -> bool {
+        self.summary.differing > 0 || self.summary.missing > 0 || self.summary.extra > 0
+    }
+}
+
+/// Compare every in-scope mod folder, in parallel across mods.
+pub fn diff_all(settings: &DiffSettings) -> anyhow::Result<DiffReport> {
+    let ours = list_mod_dirs(&settings.mods_dir)?;
+    let oracle = list_mod_dirs(&settings.oracle_dir)?;
+
+    let candidates = union_candidates(&ours, &oracle, settings);
+    let diffs = compare_in_parallel(&candidates);
+
+    Ok(assemble_report(diffs, settings))
+}
+
+/// A mod folder to compare, resolved on both sides before any IO is done.
+struct Candidate {
+    /// Display id: our spelling where we have it, the Oracle's otherwise.
+    id: String,
+    section: Vec<String>,
+    ours: Option<PathBuf>,
+    oracle: Option<PathBuf>,
+    plan_file_names: Vec<String>,
+}
+
+/// Directory names in a mods folder, keyed by lowercased name.
+///
+/// A missing directory is not an error: comparing against a section that has
+/// not been built yet is exactly what this command is for.
+fn list_mod_dirs(root: &Path) -> anyhow::Result<BTreeMap<String, PathBuf>> {
+    let mut found = BTreeMap::new();
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(found),
+        Err(err) => anyhow::bail!("failed to read mods directory {}: {err}", root.display()),
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if name.to_lowercase().ends_with(SEPARATOR_SUFFIX) {
+            continue;
+        }
+        found.insert(name.to_lowercase(), path);
+    }
+
+    Ok(found)
+}
+
+fn union_candidates(
+    ours: &BTreeMap<String, PathBuf>,
+    oracle: &BTreeMap<String, PathBuf>,
+    settings: &DiffSettings,
+) -> Vec<Candidate> {
+    let mut keys: Vec<&String> = ours.keys().chain(oracle.keys()).collect();
+    keys.sort_unstable();
+    keys.dedup();
+
+    let mut candidates = Vec::new();
+    for key in keys {
+        let ours_path = ours.get(key);
+        let oracle_path = oracle.get(key);
+        let id = ours_path
+            .or(oracle_path)
+            .and_then(|path| path.file_name())
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_else(|| key.clone());
+
+        let entry = settings.plan.as_ref().and_then(|plan| plan.get(&id));
+        let section = entry.map(|entry| entry.section.clone()).unwrap_or_default();
+
+        if !settings.filter.matches(&section, &id) {
+            continue;
+        }
+
+        candidates.push(Candidate {
+            id,
+            section,
+            ours: ours_path.cloned(),
+            oracle: oracle_path.cloned(),
+            plan_file_names: entry.map(|entry| entry.file_names.clone()).unwrap_or_default(),
+        });
+    }
+
+    candidates
+}
+
+/// Spread the mods across a small worker pool.
+///
+/// Work per mod varies by three orders of magnitude -- an empty tweak folder
+/// against a 2GB texture pack -- so the cursor hands out mods one at a time
+/// rather than slicing the list up front and leaving one thread with all the
+/// texture packs. Results are written back by index so the report is
+/// deterministic regardless of who finished first.
+fn compare_in_parallel(candidates: &[Candidate]) -> Vec<ModDiff> {
+    if candidates.is_empty() {
+        return Vec::new();
+    }
+
+    // Capped: past a handful of readers this is bound by the disk, and more
+    // threads just multiply seeking between two 40GB trees.
+    let workers = std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1)
+        .clamp(1, 8)
+        .min(candidates.len());
+
+    let cursor = AtomicUsize::new(0);
+    let collected = Mutex::new(Vec::with_capacity(candidates.len()));
+
+    std::thread::scope(|scope| {
+        for _ in 0..workers {
+            scope.spawn(|| {
+                let mut local = Vec::new();
+                loop {
+                    let index = cursor.fetch_add(1, Ordering::Relaxed);
+                    let Some(candidate) = candidates.get(index) else {
+                        break;
+                    };
+                    local.push((index, compare_mod(candidate)));
+                }
+                collected
+                    .lock()
+                    .expect("diff collector should not be poisoned")
+                    .extend(local);
+            });
+        }
+    });
+
+    let mut collected = collected
+        .into_inner()
+        .expect("diff collector should not be poisoned");
+    // Sorted back into candidate order: the report must not depend on which
+    // worker happened to finish first.
+    collected.sort_by_key(|(index, _)| *index);
+    collected.into_iter().map(|(_, diff)| diff).collect()
+}
+
+fn compare_mod(candidate: &Candidate) -> ModDiff {
+    let mut diff = ModDiff {
+        id: candidate.id.clone(),
+        section: candidate.section.clone(),
+        presence: match (&candidate.ours, &candidate.oracle) {
+            (Some(_), Some(_)) => Presence::Both,
+            (Some(_), None) => Presence::OursOnly,
+            _ => Presence::OracleOnly,
+        },
+        only_in_ours: Vec::new(),
+        only_in_oracle: Vec::new(),
+        content_differs: Vec::new(),
+        version: None,
+        errors: Vec::new(),
+    };
+
+    if let Some(oracle_dir) = &candidate.oracle {
+        diff.version = Some(read_version_info(oracle_dir, &candidate.plan_file_names));
+    }
+
+    // Nothing is read for a mod that exists on only one side: there is no
+    // comparison to make, and the whole point of a section-by-section diff is
+    // that the sections you have not built yet cost nothing to skip.
+    let (Some(ours_dir), Some(oracle_dir)) = (&candidate.ours, &candidate.oracle) else {
+        return diff;
+    };
+
+    let ours_tree = match walk_mod_tree(ours_dir) {
+        Ok(tree) => tree,
+        Err(err) => {
+            diff.errors.push(err.to_string());
+            return diff;
+        }
+    };
+    let oracle_tree = match walk_mod_tree(oracle_dir) {
+        Ok(tree) => tree,
+        Err(err) => {
+            diff.errors.push(err.to_string());
+            return diff;
+        }
+    };
+
+    for (key, ours_file) in &ours_tree {
+        let Some(oracle_file) = oracle_tree.get(key) else {
+            diff.only_in_ours.push(ours_file.display.clone());
+            continue;
+        };
+
+        match compare_files(ours_file, oracle_file) {
+            Ok(Some(content)) => diff.content_differs.push(content),
+            Ok(None) => {}
+            Err(err) => diff.errors.push(err),
+        }
+    }
+
+    for (key, oracle_file) in &oracle_tree {
+        if !ours_tree.contains_key(key) {
+            diff.only_in_oracle.push(oracle_file.display.clone());
+        }
+    }
+
+    diff
+}
+
+struct FileEntry {
+    /// Folder-relative path with `/` separators, in its on-disk spelling.
+    display: String,
+    path: PathBuf,
+    size: u64,
+}
+
+/// Walk a mod folder into a map from comparison key to file.
+///
+/// The key is lowercased, `/`-separated and stripped of any `.mohidden`
+/// suffix, which is what makes `Textures\Foo.DDS` and `textures/foo.dds` the
+/// same file and `Fort Aurus.esp.mohidden` the same file as `Fort Aurus.esp`.
+fn walk_mod_tree(root: &Path) -> anyhow::Result<BTreeMap<String, FileEntry>> {
+    let mut files = BTreeMap::new();
+    collect_files(root, root, 0, &mut files)?;
+    Ok(files)
+}
+
+fn collect_files(
+    current: &Path,
+    root: &Path,
+    depth: usize,
+    files: &mut BTreeMap<String, FileEntry>,
+) -> anyhow::Result<()> {
+    if depth > MAX_DEPTH {
+        anyhow::bail!("directory nesting exceeded {MAX_DEPTH} levels at {}", current.display());
+    }
+
+    let entries = std::fs::read_dir(current)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?;
+
+    // Sorted so a case-only collision resolves to the same winner every run
+    // rather than to whatever order the filesystem happened to return.
+    let mut children: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+    children.sort();
+
+    for path in children {
+        let Some(name) = path.file_name().map(|name| name.to_string_lossy().into_owned()) else {
+            continue;
+        };
+
+        // Follows symlinks deliberately: an install may hard- or symlink its
+        // files in from a cache, and what matters is the content they resolve to.
+        let metadata = match std::fs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(err) => {
+                anyhow::bail!("failed to stat {}: {err}", path.display());
+            }
+        };
+
+        if metadata.is_dir() {
+            collect_files(&path, root, depth + 1, files)?;
+            continue;
+        }
+
+        if depth == 0 && name.eq_ignore_ascii_case(MO2_META_FILE) {
+            continue;
+        }
+
+        let relative = path.strip_prefix(root).unwrap_or(&path);
+        let display = relative.to_string_lossy().replace('\\', "/");
+        let key = comparison_key(&display);
+
+        files.entry(key).or_insert(FileEntry {
+            display,
+            path: path.clone(),
+            size: metadata.len(),
+        });
+    }
+
+    Ok(())
+}
+
+/// Fold a folder-relative path to the form both trees agree on.
+fn comparison_key(relative: &str) -> String {
+    let normalized = relative.replace('\\', "/");
+    let (head, name) = match normalized.rsplit_once('/') {
+        Some((head, name)) => (Some(head), name),
+        None => (None, normalized.as_str()),
+    };
+
+    let name = strip_hidden_suffix(name);
+    let joined = match head {
+        Some(head) => format!("{head}/{name}"),
+        None => name.to_string(),
+    };
+    joined.to_lowercase()
+}
+
+fn strip_hidden_suffix(name: &str) -> &str {
+    if name.len() > MO2_HIDDEN_SUFFIX.len()
+        && name[name.len() - MO2_HIDDEN_SUFFIX.len()..].eq_ignore_ascii_case(MO2_HIDDEN_SUFFIX)
+    {
+        &name[..name.len() - MO2_HIDDEN_SUFFIX.len()]
+    } else {
+        name
+    }
+}
+
+/// Decide whether two files differ, doing as little IO as the answer allows.
+///
+/// Different sizes settle it outright, and no byte is read. Equal sizes are
+/// compared chunk by chunk with an early exit on the first mismatch, so a file
+/// that differs in its header costs one read rather than a full pass over a
+/// multi-GB archive. Only once a difference is confirmed -- for the handful of
+/// files that actually differ -- are digests computed, to name the difference
+/// in the report. Identical files are therefore never hashed at all, which is
+/// what keeps a whole-instance run bound by a single sequential read.
+fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentDiff>, String> {
+    if ours.size != oracle.size {
+        return Ok(Some(ContentDiff {
+            path: ours.display.clone(),
+            ours_size: ours.size,
+            oracle_size: oracle.size,
+            ours_sha256: None,
+            oracle_sha256: None,
+        }));
+    }
+
+    let same = bytes_equal(&ours.path, &oracle.path).map_err(|err| {
+        format!(
+            "failed to compare {} with {}: {err}",
+            ours.path.display(),
+            oracle.path.display()
+        )
+    })?;
+    if same {
+        return Ok(None);
+    }
+
+    let ours_sha256 = sha256_file(&ours.path)
+        .map_err(|err| format!("failed to hash {}: {err}", ours.path.display()))?;
+    let oracle_sha256 = sha256_file(&oracle.path)
+        .map_err(|err| format!("failed to hash {}: {err}", oracle.path.display()))?;
+
+    Ok(Some(ContentDiff {
+        path: ours.display.clone(),
+        ours_size: ours.size,
+        oracle_size: oracle.size,
+        ours_sha256: Some(ours_sha256),
+        oracle_sha256: Some(oracle_sha256),
+    }))
+}
+
+fn bytes_equal(left: &Path, right: &Path) -> std::io::Result<bool> {
+    let mut left = std::io::BufReader::with_capacity(CHUNK, std::fs::File::open(left)?);
+    let mut right = std::io::BufReader::with_capacity(CHUNK, std::fs::File::open(right)?);
+
+    let mut left_buf = vec![0u8; CHUNK];
+    let mut right_buf = vec![0u8; CHUNK];
+
+    loop {
+        let read = read_full(&mut left, &mut left_buf)?;
+        let other = read_full(&mut right, &mut right_buf)?;
+        if read != other {
+            return Ok(false);
+        }
+        if read == 0 {
+            return Ok(true);
+        }
+        if left_buf[..read] != right_buf[..read] {
+            return Ok(false);
+        }
+    }
+}
+
+/// Fill `buf` as far as the reader allows, so both sides are compared over the
+/// same window even when one of them returns short reads.
+fn read_full(reader: &mut impl Read, buf: &mut [u8]) -> std::io::Result<usize> {
+    let mut filled = 0;
+    while filled < buf.len() {
+        match reader.read(&mut buf[filled..])? {
+            0 => break,
+            count => filled += count,
+        }
+    }
+    Ok(filled)
+}
+
+fn sha256_file(path: &Path) -> std::io::Result<String> {
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha256::new();
+    let mut buf = vec![0u8; CHUNK];
+    loop {
+        let read = file.read(&mut buf)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionInfo {
+    let meta = std::fs::read_to_string(oracle_dir.join(MO2_META_FILE))
+        .ok()
+        .map(|text| parse_meta_ini(&text))
+        .unwrap_or_default();
+
+    let installation_file = meta.installation_file.clone();
+    let plan_file_name = plan_file_names.first().cloned();
+
+    // Only a plan that actually declares an archive can disagree with the
+    // Oracle; a mod we build from loose files or a merge has nothing to compare.
+    let archive_mismatch = match (&plan_file_name, &installation_file) {
+        (Some(ours), Some(theirs)) => !ours.eq_ignore_ascii_case(theirs),
+        _ => false,
+    };
+
+    VersionInfo {
+        oracle_version: meta.version,
+        guide_age: classify_guide_age(installation_file.as_deref()),
+        oracle_installation_file: installation_file,
+        plan_file_name,
+        archive_mismatch,
+    }
+}
+
+/// Date the Oracle's archive from the timestamp Nexus embeds in its filename.
+///
+/// Nexus names downloads `<title>-<modid>-<version parts>-<unix timestamp>.7z`,
+/// but only for files uploaded since it started doing so: older archives end in
+/// the bare mod id, and hand-named ones end in nothing useful. An unreadable
+/// timestamp is reported as unreadable, because "no timestamp" and "old enough"
+/// are very different answers to "did the guide mean this file?".
+pub fn classify_guide_age(installation_file: Option<&str>) -> GuideAge {
+    let Some(name) = installation_file.map(str::trim).filter(|name| !name.is_empty()) else {
+        return GuideAge::Unknown {
+            reason: "the Oracle's meta.ini records no installationFile".to_string(),
+        };
+    };
+
+    let Some(timestamp) = parse_trailing_timestamp(name) else {
+        return GuideAge::Unknown {
+            reason: format!("no Unix timestamp in '{name}'"),
+        };
+    };
+
+    let date = format_date(timestamp);
+    if timestamp >= GUIDE_CUTOFF {
+        GuideAge::PostGuide { timestamp, date }
+    } else {
+        GuideAge::PreGuide { timestamp, date }
+    }
+}
+
+fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
+    // The last `-` separated field, cut at its first non-digit. This survives
+    // multi-part extensions (`...-1647873144.7z.001`) without special-casing
+    // every archive suffix Nexus serves.
+    let tail = file_name.rsplit('-').next()?;
+    let digits: String = tail.chars().take_while(char::is_ascii_digit).collect();
+    if digits.is_empty() {
+        return None;
+    }
+
+    let value: i64 = digits.parse().ok()?;
+    (TIMESTAMP_MIN..=TIMESTAMP_MAX).contains(&value).then_some(value)
+}
+
+/// Render a Unix timestamp as `YYYY-MM-DD` (UTC).
+///
+/// Hand-rolled rather than pulling in a date crate for one format string.
+fn format_date(timestamp: i64) -> String {
+    let days = timestamp.div_euclid(86_400);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let day_of_era = z.rem_euclid(146_097);
+    let year_of_era =
+        (day_of_era - day_of_era / 1460 + day_of_era / 36_524 - day_of_era / 146_096) / 365;
+    let year = year_of_era + era * 400;
+    let day_of_year = day_of_era - (365 * year_of_era + year_of_era / 4 - year_of_era / 100);
+    let shifted_month = (5 * day_of_year + 2) / 153;
+    let day = day_of_year - (153 * shifted_month + 2) / 5 + 1;
+    let month = if shifted_month < 10 {
+        shifted_month + 3
+    } else {
+        shifted_month - 9
+    };
+    let year = if month <= 2 { year + 1 } else { year };
+
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn assemble_report(diffs: Vec<ModDiff>, settings: &DiffSettings) -> DiffReport {
+    let mut summary = DiffSummary {
+        mods_compared: diffs.len(),
+        identical: 0,
+        differing: 0,
+        missing: 0,
+        extra: 0,
+        post_guide: 0,
+        unknown_archive_age: 0,
+    };
+
+    for diff in &diffs {
+        match diff.presence {
+            Presence::OursOnly => summary.extra += 1,
+            Presence::OracleOnly => summary.missing += 1,
+            Presence::Both => {
+                if diff.is_identical() {
+                    summary.identical += 1;
+                } else {
+                    summary.differing += 1;
+                }
+            }
+        }
+        match diff.version.as_ref().map(|version| &version.guide_age) {
+            Some(GuideAge::PostGuide { .. }) => summary.post_guide += 1,
+            Some(GuideAge::Unknown { .. }) => summary.unknown_archive_age += 1,
+            _ => {}
+        }
+    }
+
+    let mut grouped: BTreeMap<Vec<String>, Vec<ModDiff>> = BTreeMap::new();
+    for diff in diffs {
+        grouped.entry(diff.section.clone()).or_default().push(diff);
+    }
+
+    // Plan order first, so the report reads in modlist order; anything the plan
+    // does not mention follows, sorted, rather than being dropped.
+    let mut ordered: Vec<Vec<String>> = Vec::new();
+    if let Some(plan) = &settings.plan {
+        for section in &plan.order {
+            if grouped.contains_key(section) && !ordered.contains(section) {
+                ordered.push(section.clone());
+            }
+        }
+    }
+    let seen: HashSet<&Vec<String>> = ordered.iter().collect();
+    let mut rest: Vec<Vec<String>> = grouped
+        .keys()
+        .filter(|section| !seen.contains(section))
+        .cloned()
+        .collect();
+    rest.sort();
+    ordered.extend(rest);
+
+    let sections = ordered
+        .into_iter()
+        .filter_map(|path| {
+            let mods = grouped.remove(&path)?;
+            let identical = mods.iter().filter(|diff| diff.is_identical()).count();
+            Some(SectionReport {
+                name: describe_section(&path),
+                path,
+                compared: mods.len(),
+                identical,
+                mods,
+            })
+        })
+        .collect();
+
+    DiffReport {
+        ours: settings.mods_dir.display().to_string(),
+        oracle: settings.oracle_dir.display().to_string(),
+        scope: settings.filter.describe(),
+        summary,
+        sections,
+    }
+}
+
+fn describe_section(path: &[String]) -> String {
+    if path.is_empty() {
+        "(no section)".to_string()
+    } else {
+        path.join(" / ")
+    }
+}
+
+/// How many entries of a list to print before summarising the rest.
+///
+/// A mod installed with the wrong layout differs in every one of its files, and
+/// a report that prints five thousand paths is one nobody reads. The JSON
+/// output carries the full list for anything that needs it.
+const LIST_LIMIT: usize = 20;
+
+/// Render the report as the compact per-section text an agent can paste back.
+pub fn render_text(report: &DiffReport) -> String {
+    let mut out = String::new();
+    out.push_str("mudcrab diff\n");
+    out.push_str(&format!("  ours:   {}\n", report.ours));
+    out.push_str(&format!("  oracle: {}\n", report.oracle));
+    out.push_str(&format!("  scope:  {}\n\n", report.scope));
+
+    let summary = &report.summary;
+    out.push_str(&format!(
+        "summary: {} compared, {} identical, {} differing, {} missing from ours, {} extra in ours\n",
+        summary.mods_compared, summary.identical, summary.differing, summary.missing, summary.extra
+    ));
+
+    if report.summary.mods_compared == 0 {
+        out.push_str("\nnothing in scope: no mod folder matched the filter in either tree\n");
+        return out;
+    }
+
+    for section in &report.sections {
+        out.push_str(&format!("\n[{}]\n", section.name));
+        out.push_str(&format!(
+            "  {} of {} identical\n",
+            section.identical, section.compared
+        ));
+
+        for diff in &section.mods {
+            if diff.is_identical() {
+                continue;
+            }
+            render_mod(&mut out, diff);
+        }
+    }
+
+    render_version_notes(&mut out, report);
+    out
+}
+
+fn render_mod(out: &mut String, diff: &ModDiff) {
+    match diff.presence {
+        Presence::OracleOnly => {
+            out.push_str(&format!("  - {}  (missing from ours)\n", diff.id));
+            return;
+        }
+        Presence::OursOnly => {
+            out.push_str(&format!("  + {}  (not in the Oracle)\n", diff.id));
+            return;
+        }
+        Presence::Both => out.push_str(&format!("  ~ {}\n", diff.id)),
+    }
+
+    if !diff.content_differs.is_empty() {
+        out.push_str(&format!(
+            "      content differs ({}):\n",
+            diff.content_differs.len()
+        ));
+        for entry in diff.content_differs.iter().take(LIST_LIMIT) {
+            if entry.ours_size == entry.oracle_size {
+                out.push_str(&format!(
+                    "        {}  (same size {} B, sha256 {} vs {})\n",
+                    entry.path,
+                    entry.ours_size,
+                    short_hash(entry.ours_sha256.as_deref()),
+                    short_hash(entry.oracle_sha256.as_deref()),
+                ));
+            } else {
+                out.push_str(&format!(
+                    "        {}  (ours {} B, oracle {} B)\n",
+                    entry.path, entry.ours_size, entry.oracle_size
+                ));
+            }
+        }
+        render_overflow(out, diff.content_differs.len());
+    }
+
+    render_paths(out, "only in ours", &diff.only_in_ours);
+    render_paths(out, "only in the Oracle", &diff.only_in_oracle);
+
+    if let Some(version) = &diff.version
+        && version.archive_mismatch
+    {
+        out.push_str(&format!(
+            "      archive mismatch: plan has '{}', Oracle installed '{}'\n",
+            version.plan_file_name.as_deref().unwrap_or("<unset>"),
+            version.oracle_installation_file.as_deref().unwrap_or("<unset>"),
+        ));
+    }
+
+    for error in &diff.errors {
+        out.push_str(&format!("      error: {error}\n"));
+    }
+}
+
+fn render_paths(out: &mut String, label: &str, paths: &[String]) {
+    if paths.is_empty() {
+        return;
+    }
+    out.push_str(&format!("      {label} ({}):\n", paths.len()));
+    for path in paths.iter().take(LIST_LIMIT) {
+        out.push_str(&format!("        {path}\n"));
+    }
+    render_overflow(out, paths.len());
+}
+
+fn render_overflow(out: &mut String, total: usize) {
+    if total > LIST_LIMIT {
+        out.push_str(&format!("        ... and {} more\n", total - LIST_LIMIT));
+    }
+}
+
+fn short_hash(hash: Option<&str>) -> String {
+    hash.map(|value| value.chars().take(12).collect())
+        .unwrap_or_else(|| "?".to_string())
+}
+
+fn render_version_notes(out: &mut String, report: &DiffReport) {
+    let notable: Vec<&ModDiff> = report
+        .sections
+        .iter()
+        .flat_map(|section| section.mods.iter())
+        .filter(|diff| diff.has_version_note())
+        .collect();
+
+    if notable.is_empty() {
+        return;
+    }
+
+    let post_guide: Vec<&&ModDiff> = notable
+        .iter()
+        .filter(|diff| {
+            matches!(
+                diff.version.as_ref().map(|v| &v.guide_age),
+                Some(GuideAge::PostGuide { .. })
+            )
+        })
+        .collect();
+    let unknown: Vec<&&ModDiff> = notable
+        .iter()
+        .filter(|diff| {
+            matches!(
+                diff.version.as_ref().map(|v| &v.guide_age),
+                Some(GuideAge::Unknown { .. })
+            )
+        })
+        .collect();
+
+    out.push_str("\nversion notes:\n");
+
+    if !post_guide.is_empty() {
+        out.push_str(&format!(
+            "  POST-GUIDE ({}): the Oracle's archive is newer than the March 2025 guide,\n  so \"the top file on the page\" is not what it installed.\n",
+            post_guide.len()
+        ));
+        for diff in &post_guide {
+            let version = diff.version.as_ref().expect("post-guide implies version info");
+            let GuideAge::PostGuide { date, .. } = &version.guide_age else {
+                continue;
+            };
+            out.push_str(&format!(
+                "    ! {}  dated {}  ({}){}\n",
+                diff.id,
+                date,
+                version.oracle_installation_file.as_deref().unwrap_or("<unset>"),
+                version
+                    .oracle_version
+                    .as_deref()
+                    .map(|value| format!("  version {value}"))
+                    .unwrap_or_default(),
+            ));
+        }
+    }
+
+    if !unknown.is_empty() {
+        out.push_str(&format!(
+            "  UNKNOWN AGE ({}): no timestamp could be read, so whether the guide named\n  this file cannot be determined from the filename alone.\n",
+            unknown.len()
+        ));
+        for diff in &unknown {
+            let version = diff.version.as_ref().expect("unknown implies version info");
+            let GuideAge::Unknown { reason } = &version.guide_age else {
+                continue;
+            };
+            out.push_str(&format!("    ? {}  {}\n", diff.id, reason));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn comparison_key_folds_case_separators_and_hidden_suffix() {
+        assert_eq!(comparison_key("Textures\\Foo.DDS"), "textures/foo.dds");
+        assert_eq!(comparison_key("textures/foo.dds"), "textures/foo.dds");
+        assert_eq!(comparison_key("Fort Aurus.esp.mohidden"), "fort aurus.esp");
+        assert_eq!(comparison_key("Fort Aurus.esp.MOHIDDEN"), "fort aurus.esp");
+        // A file actually named ".mohidden" keeps its name: stripping it would
+        // leave an empty path.
+        assert_eq!(comparison_key(".mohidden"), ".mohidden");
+    }
+
+    #[test]
+    fn trailing_timestamps_are_read_only_when_plausible() {
+        assert_eq!(
+            parse_trailing_timestamp("Better Fort Aurus-50682-1-1-1647873144.7z"),
+            Some(1_647_873_144)
+        );
+        assert_eq!(
+            parse_trailing_timestamp("Something-1-0-1647873144.7z.001"),
+            Some(1_647_873_144)
+        );
+        // A bare Nexus mod id is not a timestamp.
+        assert_eq!(parse_trailing_timestamp("Anvil Morning Glory-19039.7z"), None);
+        assert_eq!(parse_trailing_timestamp("DarNified UI 132 FOMOD - Merged.7z"), None);
+        assert_eq!(parse_trailing_timestamp(""), None);
+    }
+
+    #[test]
+    fn guide_age_splits_on_the_march_2025_cutoff() {
+        assert_eq!(
+            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z")),
+            GuideAge::PreGuide {
+                timestamp: 1_647_873_144,
+                date: "2022-03-21".to_string()
+            }
+        );
+        assert_eq!(
+            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z")),
+            GuideAge::PostGuide {
+                timestamp: 1_750_000_000,
+                date: "2025-06-15".to_string()
+            }
+        );
+        assert!(matches!(
+            classify_guide_age(Some("Anvil Morning Glory-19039.7z")),
+            GuideAge::Unknown { .. }
+        ));
+        assert!(matches!(classify_guide_age(None), GuideAge::Unknown { .. }));
+    }
+
+    #[test]
+    fn the_cutoff_constant_is_the_guides_publication_date() {
+        assert_eq!(format_date(GUIDE_CUTOFF), "2025-03-01");
+        assert_eq!(format_date(GUIDE_CUTOFF - 1), "2025-02-28");
+        assert_eq!(format_date(0), "1970-01-01");
+    }
+}

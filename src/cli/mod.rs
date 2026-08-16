@@ -27,6 +27,8 @@ pub enum Command {
     Check(CheckArgs),
     /// Install mods from downloaded archives.
     Install(InstallArgs),
+    /// Compare an installed mods directory against a reference MO2 instance.
+    Diff(DiffArgs),
     /// Validate a source modlist without producing compiled output.
     Validate(ValidateArgs),
     /// Export documentation or reports from a compiled modlist.
@@ -250,6 +252,39 @@ pub struct InstallArgs {
     pub filter: FilterArgs,
     #[command(flatten)]
     pub archive_sources: ArchiveSourceArgs,
+}
+
+/// Compare what we installed against a reference ("Oracle") MO2 instance.
+///
+/// Verification is per section, not per list: a 700-mod list is only
+/// reproducible if each section can be signed off as it is built, while the
+/// decisions that produced it are still fresh.
+#[derive(Debug, Args)]
+pub struct DiffArgs {
+    /// Installation directory holding the mod folders we produced.
+    #[arg(long)]
+    pub mods_dir: PathBuf,
+    /// The reference instance's mods directory. Only ever read from.
+    #[arg(long)]
+    pub oracle: PathBuf,
+    /// Personalized install plan, which supplies each mod's section and the
+    /// archive it was meant to come from. Without it every directory present in
+    /// either tree is compared, and `--section` has nothing to match against.
+    #[arg(long)]
+    pub plan: Option<PathBuf>,
+    /// Report format.
+    #[arg(long, value_enum, default_value_t = DiffFormat::Text)]
+    pub format: DiffFormat,
+    #[command(flatten)]
+    pub filter: FilterArgs,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, clap::ValueEnum)]
+pub enum DiffFormat {
+    /// Compact per-section report meant to be read, or pasted into a review.
+    Text,
+    /// The same data, structured.
+    Json,
 }
 
 #[derive(Debug, Args)]
