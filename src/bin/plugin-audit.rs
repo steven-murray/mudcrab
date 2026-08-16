@@ -27,10 +27,10 @@ fn main() -> std::process::ExitCode {
 
     let mut only: Vec<String> = Vec::new();
     while let Some(arg) = args.next() {
-        if arg == "--plugin" {
-            if let Some(name) = args.next() {
-                only.push(name.to_ascii_lowercase());
-            }
+        if arg == "--plugin"
+            && let Some(name) = args.next()
+        {
+            only.push(name.to_ascii_lowercase());
         }
     }
 

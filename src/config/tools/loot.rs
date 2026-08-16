@@ -275,13 +275,9 @@ pub(crate) fn resolve_oblivion_game_dir(preferred: &Path) -> Option<PathBuf> {
         candidates.push(home.join(".steam/steam/steamapps/common/Oblivion"));
     }
 
-    for candidate in candidates {
-        if candidate.join("Oblivion.exe").exists() {
-            return Some(candidate);
-        }
-    }
-
-    None
+    candidates
+        .into_iter()
+        .find(|candidate| candidate.join("Oblivion.exe").exists())
 }
 
 pub(crate) fn write_plugin_list_file(path: &Path, plugins: &[String]) -> anyhow::Result<()> {

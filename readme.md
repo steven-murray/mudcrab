@@ -141,6 +141,17 @@ if = "use_hd_textures"
 
 `.zip`, `.tar`, `.tar.gz`, and `.tgz` are handled with pure-Rust decoders and need no external tools.
 
+## Development
+
+There is no CI pipeline yet, so these checks are enforced by convention rather than automation. Before sending a change, run:
+
+```
+cargo test
+cargo clippy --all-targets -- -D warnings
+```
+
+Both must pass. The project does not use blanket `#[allow]` attributes to silence lints -- fix the lint or, if it's genuinely a false positive, suppress it narrowly at the site with a comment explaining why.
+
 ## Wishlist
 
 These are features we want, but are intentionally deferred for later milestones.

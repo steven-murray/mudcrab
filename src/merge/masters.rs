@@ -35,7 +35,7 @@ pub fn build(
     load_order: &[PluginName],
 ) -> Result<MasterTable, MasterError> {
     let merged: Vec<&PluginName> = sources.iter().map(|(name, _)| name).collect();
-    let is_merged = |name: &PluginName| merged.iter().any(|m| *m == name);
+    let is_merged = |name: &PluginName| merged.contains(&name);
 
     let mut required: Vec<PluginName> = Vec::new();
     let push = |name: &PluginName, required: &mut Vec<PluginName>| {
@@ -172,7 +172,7 @@ mod tests {
         let many: Vec<String> = (0..300).map(|i| format!("m{i}.esm")).collect();
         let refs: Vec<&str> = many.iter().map(String::as_str).collect();
         let sources = vec![("a.esp".into(), plugin_with_masters(&refs))];
-        let mut load_order: Vec<PluginName> = many.iter().map(|m| PluginName::new(m)).collect();
+        let mut load_order: Vec<PluginName> = many.iter().map(PluginName::new).collect();
         load_order.push("a.esp".into());
         assert!(matches!(
             build(&sources, &load_order).unwrap_err(),

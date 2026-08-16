@@ -14,15 +14,15 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
 
     let plan = config::query::build_plan(&compiled, args.headless)?;
 
-    if let Some(parent) = args.output.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|err| {
-                anyhow::anyhow!(
-                    "failed to create output directory {}: {err}",
-                    parent.display()
-                )
-            })?;
-        }
+    if let Some(parent) = args.output.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to create output directory {}: {err}",
+                parent.display()
+            )
+        })?;
     }
 
     let data = serde_json::to_string_pretty(&plan)

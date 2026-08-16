@@ -351,22 +351,22 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
 
     // bsdtar -tf prints one path per line
-    if let Ok(output) = Command::new("bsdtar").args(["-t", "-f", src]).output() {
-        if output.status.success() {
-            let text = String::from_utf8_lossy(&output.stdout);
-            let mut out = Vec::new();
-            for line in text.lines() {
-                let p = Path::new(line.trim());
-                if line.trim().ends_with('/') {
-                    continue; // directory entry
-                }
-                let normalized = normalize_archive_path(p)?;
-                if !normalized.is_empty() {
-                    out.push(normalized);
-                }
+    if let Ok(output) = Command::new("bsdtar").args(["-t", "-f", src]).output()
+        && output.status.success()
+    {
+        let text = String::from_utf8_lossy(&output.stdout);
+        let mut out = Vec::new();
+        for line in text.lines() {
+            let p = Path::new(line.trim());
+            if line.trim().ends_with('/') {
+                continue; // directory entry
             }
-            return Ok(out);
+            let normalized = normalize_archive_path(p)?;
+            if !normalized.is_empty() {
+                out.push(normalized);
+            }
         }
+        return Ok(out);
     }
 
     // Fall back to `7z l -slt` which emits "Path = ..." lines
@@ -392,24 +392,24 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         } else if line.starts_with("Attributes = D") || line == "Folder = +" {
             current_is_dir = true;
         } else if line.is_empty() {
-            if let Some(path) = current_path.take() {
-                if !current_is_dir {
-                    let normalized = normalize_archive_path(Path::new(&path))?;
-                    if !normalized.is_empty() {
-                        out.push(normalized);
-                    }
+            if let Some(path) = current_path.take()
+                && !current_is_dir
+            {
+                let normalized = normalize_archive_path(Path::new(&path))?;
+                if !normalized.is_empty() {
+                    out.push(normalized);
                 }
             }
             current_is_dir = false;
         }
     }
     // flush final entry if file didn't end with blank line
-    if let Some(path) = current_path {
-        if !current_is_dir {
-            let normalized = normalize_archive_path(Path::new(&path))?;
-            if !normalized.is_empty() {
-                out.push(normalized);
-            }
+    if let Some(path) = current_path
+        && !current_is_dir
+    {
+        let normalized = normalize_archive_path(Path::new(&path))?;
+        if !normalized.is_empty() {
+            out.push(normalized);
         }
     }
 
@@ -484,10 +484,9 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
+        && status.success()
     {
-        if status.success() {
-            return Ok(());
-        }
+        return Ok(());
     }
 
     // Fall back to 7z

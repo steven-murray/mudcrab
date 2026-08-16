@@ -43,6 +43,14 @@ pub fn exterior_block(x: i32, y: i32) -> ((i16, i16), (i16, i16)) {
     (block, sub_block)
 }
 
+/// Exterior cells for one worldspace, keyed by cell FormID, each paired with
+/// its grid coordinates.
+type ExteriorCellMap = IndexMap<FormId, (CellBundle, (i32, i32))>;
+
+/// Exterior cells re-bucketed into the block/sub-block grid the game expects,
+/// each sub-block holding the entries for its cells in order.
+type ExteriorBlockMap = IndexMap<(i16, i16), IndexMap<(i16, i16), Vec<Entry>>>;
+
 /// A cell plus the children that travel with it.
 struct CellBundle {
     cell: Record,
@@ -145,7 +153,7 @@ pub struct Collected {
     /// Interior cells.
     interior_cells: IndexMap<FormId, CellBundle>,
     /// Exterior cells, grouped by their worldspace.
-    exterior_cells: IndexMap<FormId, IndexMap<FormId, (CellBundle, (i32, i32))>>,
+    exterior_cells: IndexMap<FormId, ExteriorCellMap>,
     /// Worldspace records themselves.
     worlds: IndexMap<FormId, Record>,
     /// Dialogue topics and their INFO children.
@@ -266,10 +274,10 @@ impl Collected {
         // there first so the later source wins outright.
         if let Entry::Record(record) = &child {
             let form_id = record.form_id;
-            if let Some(previous) = self.child_parent.get(&form_id).copied() {
-                if previous != parent {
-                    self.remove_child(previous, form_id);
-                }
+            if let Some(previous) = self.child_parent.get(&form_id).copied()
+                && previous != parent
+            {
+                self.remove_child(previous, form_id);
             }
             self.child_parent.insert(form_id, parent);
         }
@@ -388,13 +396,13 @@ impl Collected {
                 b"WRLD" => out.extend(self.build_worldspaces()),
                 b"DIAL" => out.extend(self.build_dialogue()),
                 _ => {
-                    if let Some(records) = self.by_signature.get(signature) {
-                        if !records.is_empty() {
-                            out.push(Entry::Group(Group::new(
-                                GroupType::TopLevel(*signature),
-                                records.values().cloned().map(Entry::Record).collect(),
-                            )));
-                        }
+                    if let Some(records) = self.by_signature.get(signature)
+                        && !records.is_empty()
+                    {
+                        out.push(Entry::Group(Group::new(
+                            GroupType::TopLevel(*signature),
+                            records.values().cloned().map(Entry::Record).collect(),
+                        )));
                     }
                 }
             }
@@ -455,8 +463,7 @@ impl Collected {
                 continue;
             };
 
-            let mut blocks: IndexMap<(i16, i16), IndexMap<(i16, i16), Vec<Entry>>> =
-                IndexMap::new();
+            let mut blocks: ExteriorBlockMap = IndexMap::new();
             for (bundle, (x, y)) in cells.values() {
                 let (block, sub_block) = exterior_block(*x, *y);
                 blocks

@@ -6,15 +6,15 @@ pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
     config::validator::validate(&source)?;
     let compiled = config::compiler::compile(source)?;
 
-    if let Some(parent) = args.output.parent() {
-        if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|err| {
-                anyhow::anyhow!(
-                    "failed to create output directory {}: {err}",
-                    parent.display()
-                )
-            })?;
-        }
+    if let Some(parent) = args.output.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        std::fs::create_dir_all(parent).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to create output directory {}: {err}",
+                parent.display()
+            )
+        })?;
     }
 
     let data = serde_json::to_string_pretty(&compiled)

@@ -106,10 +106,10 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
 
 
         // If this mod was previously installed, use its stored installed_path (in case it was renamed).
-        if let Some(prev) = previous {
-            if !prev.installed_path.is_empty() {
-                mod_target = settings.mods_dir.join(&prev.installed_path);
-            }
+        if let Some(prev) = previous
+            && !prev.installed_path.is_empty()
+        {
+            mod_target = settings.mods_dir.join(&prev.installed_path);
         }
         // Handle mod conflicts: if another mod target exists but belongs to a different profile
         // with a different version, rename current profile's target to avoid collision.

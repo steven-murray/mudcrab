@@ -22,7 +22,7 @@ use tempfile::{tempdir, TempDir};
 fn scripted_plugin(form_id: u32, refs: &[u32], bytecode: &[u8]) -> Vec<u8> {
     let mut fields = vec![
         esp::field(b"EDID", &esp::zstring("TestScript")),
-        esp::field(b"SCHR", &vec![0u8; 20]),
+        esp::field(b"SCHR", &[0u8; 20]),
         esp::field(b"SCDA", bytecode),
     ];
     for reference in refs {

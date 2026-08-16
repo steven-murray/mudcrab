@@ -123,10 +123,10 @@ fn prompt_choice(query: &str, choices: &[String]) -> anyhow::Result<String> {
         io::stdin().read_line(&mut buf)?;
         let answer = buf.trim();
 
-        if let Ok(idx) = answer.parse::<usize>() {
-            if (1..=choices.len()).contains(&idx) {
-                return Ok(choices[idx - 1].clone());
-            }
+        if let Ok(idx) = answer.parse::<usize>()
+            && (1..=choices.len()).contains(&idx)
+        {
+            return Ok(choices[idx - 1].clone());
         }
 
         eprintln!("Please enter a valid selection index.");

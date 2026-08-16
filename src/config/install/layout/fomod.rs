@@ -109,12 +109,11 @@ pub(crate) fn apply_fomod_from_staging(
 
     if let Some(steps) = find_child_element(root, "installSteps") {
         for step in child_elements(steps, "installStep") {
-            if let Some(visible) = find_child_element(step, "visible") {
-                if let Some(deps) = find_child_element(visible, "dependencies") {
-                    if !fomod_dependencies_match(deps, active_plugins, &flags)? {
-                        continue;
-                    }
-                }
+            if let Some(visible) = find_child_element(step, "visible")
+                && let Some(deps) = find_child_element(visible, "dependencies")
+                && !fomod_dependencies_match(deps, active_plugins, &flags)?
+            {
+                continue;
             }
 
             let step_name = step.attribute("name").unwrap_or("");
