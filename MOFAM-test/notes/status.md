@@ -37,8 +37,10 @@ differing, all explained** in `part-07-character-and-npcs.md`:
   correspondence is exact -- of the 13 plugins the Oracle hides in this
   section, precisely the 3 that are *not* merge sources are the 3 the guide
   gives an explicit hide/delete instruction for.
-- **1** is a guide/Oracle conflict on 4 files, unresolved, following the guide.
-  Needs an in-game look at a Khajiit head at SP1.
+- **1** is a **known Oracle error**, confirmed by the user: row 21 removed the
+  standard Khajiit head instead of the Nuska variant. Our build follows the
+  guide and is correct; those four lines stay in `diff` until the Oracle is
+  repaired by hand.
 - **1** is a readme sitting outside the archive's `Data/` folder.
 
 Added `file_hide` (MO2's rename-to-`.mohidden`, for the guide's constant "hide
@@ -83,7 +85,9 @@ the game. Next section is Part 8 (Overhauls: Maskar).
 ## Working practice
 
 - **Read the guide and the archive, not just the Oracle.** The Oracle is one
-  person's manual build and can be wrong. `mofam-source.md` is the
+  person's manual build and can be wrong -- Part 7 row 21 is a confirmed case,
+  found by noticing the guide was internally consistent about two sibling
+  folders while the Oracle treated them as one. `mofam-source.md` is the
   instruction; the archive's own `Wizard.txt` / `ModuleConfig.xml` is the
   authority on what an installer offers. Deriving from the Oracle's output
   risks encoding its mistakes as intent.

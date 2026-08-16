@@ -5,7 +5,8 @@ separately" and become two or three entries each. Built 2026-08-16 with
 `./MOFAM-test/scripts/run-full.sh --section "7 - CHARACTER AND NPCS"`.
 
 **Result: 38 compared, 26 identical, 12 differing — all 12 explained below.
-Nothing missing, nothing extra.**
+Nothing missing, nothing extra. No defects on our side: ten differences clear
+at Part 36, one is a known Oracle error, one is a readme.**
 
 Ten of the twelve are one expected thing repeated. The real content is the
 other two.
@@ -40,34 +41,41 @@ those three are precisely the three the guide gives an explicit instruction for
 `DispMiscPatch_OCOv2 - VKVII Argonian and Khajiit Patch.esp`). Guide and Oracle
 agree completely on which plugins Part 7 itself should hide.
 
-## 2. Guide and Oracle disagree — `OCOv2 Enhanced Beast Races patch`
+## 2. A known Oracle error — `OCOv2 Enhanced Beast Races patch`
 
-**Unresolved. Following the guide; four files differ from the Oracle.**
+**Resolved 2026-08-16: the guide is right and the Oracle is wrong.** Confirmed
+by the user, who built the Oracle: the standard Khajiit head was removed instead
+of the Nuska variant.
 
 Guide row 21 says to remove, among other things:
 
 > Textures > Characters > Nuska > Khajiit > headkhajiit (x2 files)
 
 The Oracle instead hid `textures/characters/khajiit/headkhajiit.dds` and
-`headkhajiit_n.dds`, and left the `nuska/khajiit` pair visible. Both pairs exist
-in the archive. Every other item on row 21's list matches the Oracle exactly,
-including the neighbouring `khajiit/earkhajiit.dds (x2)`, which the guide lists
-separately and *without* the Nuska prefix — so the guide is drawing a
-distinction between the two folders deliberately, not loosely.
+`headkhajiit_n.dds`, leaving the `nuska/khajiit` pair visible. Both pairs exist
+in the archive. The tell was already in the guide: it lists the neighbouring
+`khajiit/earkhajiit.dds (x2)` separately and *without* the Nuska prefix, so it
+distinguishes the two folders deliberately.
 
-Nothing in the files decides it. Following the guide, per the working practice
-that the Oracle is one person's manual build. `diff` reports the four:
+**This build is correct. These four lines in `diff` are permanent** until the
+Oracle is repaired, and are not a defect on our side:
 
 ```
-textures/characters/khajiit/headkhajiit.dds        (hidden in the Oracle)
-textures/characters/khajiit/headkhajiit_n.dds      (hidden in the Oracle)
-textures/characters/nuska/khajiit/headkhajiit.dds  (hidden in ours)
+textures/characters/khajiit/headkhajiit.dds         (hidden in the Oracle)
+textures/characters/khajiit/headkhajiit_n.dds       (hidden in the Oracle)
+textures/characters/nuska/khajiit/headkhajiit.dds   (hidden in ours)
 textures/characters/nuska/khajiit/headkhajiit_n.dds (hidden in ours)
 ```
 
-**For the user to settle in game at SP1**: look at a Khajiit's head. If it is
-wrong here and right in the Oracle, the guide's line is a typo and this row
-should follow the Oracle instead.
+To repair the Oracle by hand in MO2: un-hide
+`textures/characters/khajiit/headkhajiit.dds` and `headkhajiit_n.dds`, and hide
+`textures/characters/nuska/khajiit/headkhajiit.dds` and `headkhajiit_n.dds`.
+Doing so makes the row match exactly.
+
+This is the first case where following the guide over the Oracle was tested and
+came out right. It is the reason for the practice, and it is worth remembering
+that the reading which found it was noticing the guide's own internal
+consistency, not anything in the installed files.
 
 ## 3. `Oblivion Character Overhaul version 2` — a readme
 
