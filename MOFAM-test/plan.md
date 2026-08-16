@@ -53,6 +53,13 @@ Consequences when authoring:
   MO2 takes from the page. That is right for case 1 and wrong for cases 2 and
   3; override with `--id` and record the real folder name via `oracle_name`
   so `diff` still matches.
+- **A Nexus file has two names.** `meta.ini`'s `installationFile=` is the CDN
+  *filename*; the guide quotes the *display name* shown on the mod page,
+  which MO2 records as `name=` in the `.meta` sidecar beside the download.
+  They frequently differ -- file 1000024819 is displayed as "2 VWD Ships -
+  KatKat74's Textures" and downloads as "VWD Ships - KatKat74's Mod
+  Patch-50111-1-01-1590117997.zip". A mismatch between the two is not
+  evidence of anything.
 - The `fileid` is the thing that identifies what is actually installed. When
   a name looks ambiguous, check `[installedFiles] 1\fileid` against ours
   rather than trusting either name. That check is what caught a bad mapping
