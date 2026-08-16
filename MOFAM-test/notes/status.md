@@ -53,16 +53,35 @@ or delete"), and fixed `diff` being blind to hiding -- it stripped `.mohidden`
 from filenames only, and never reported a hidden-state mismatch at all. Without
 that fix this section would have reported 37 of 38 identical and been wrong.
 
+## Done: Part 8 (Overhauls: Maskar)
+
+11 mods (10 guide rows). **8 identical, 3 differing, all explained** in
+`part-08-overhauls-maskar.md`. Two are Part 36 merge-source plugin hides.
+
+The third is a deliberate divergence: the guide pins MOO to **OLD FILES
+4.9.4.2** and the Oracle runs 5.0.5. Built 4.9.4.2, per the user. The deciding
+evidence was that 5.x dropped `ini_levelscaling_npc_overridden`, so one of the
+guide's 37 INI settings would silently do nothing there; 4.9.4.2 has all 37.
+This mod now diffs wholesale against the Oracle, like ORC.
+
+All 37 MOO settings were verified present in 4.9.4.2 before authoring and read
+back from the staged INI after install.
+
 ## Next sections
 
-Guide order from Part 7. Most rows are trivial; the ones needing new features
+Guide order from Part 9 (Oscuro), the hardest early section: BAE extraction,
+BSArch repacking and conflict-tab hiding. Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at
 Part 25, which is modelled as one mod with several archives.
 
-**Stop-point SP1 (Parts 5-7) is now complete** -- ready for the user to load
-the game. Next section is Part 8 (Overhauls: Maskar).
+**SP1 (Parts 5-7) passed** -- the user confirmed the game runs. Getting there
+also flushed out four real defects: 21 mods silently absent from the build, two
+tree patches installing two levels too deep, and the two INI bugs that made the
+UI unusable. See `earlier-sections-backlog.md`.
+
+**SP2 is after Part 9.**
 
 ## Open threads
 
