@@ -18,6 +18,10 @@ Status: in progress. Parts 1, 2, 3, 4, and 6 are fully translated in
 `output/mo2-instance` and `output/vkvii-install.log`). Remaining Parts (5, 7-40)
 are not yet translated.
 
+Note: Part 5 (LOD) was skipped, not just deferred — it sits *behind* the
+current frontier and is the next section to be built (needs BSA packing and
+dummy plugin creation, GAP-005 / GAP-006).
+
 Deliverable:
 - [input/mofam.full.toml](input/mofam.full.toml)
 

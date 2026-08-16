@@ -14,6 +14,8 @@ This folder tracks a practical translation pipeline from human instructions to m
   [input/mofam.full.toml](input/mofam.full.toml) and have been installed end-to-end
   (see [output/mo2-instance](output/mo2-instance) and the install logs under `output/`).
   The remaining Parts are not yet translated.
+- Known hole: Part 5 (LOD) was skipped, not deferred ahead — it sits *behind*
+  the current frontier and is the next section to be built.
 
 ## Workflow
 
