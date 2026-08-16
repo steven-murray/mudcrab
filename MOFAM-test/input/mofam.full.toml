@@ -8,6 +8,7 @@ name = "MOFAM Full"
 
 plugins = [
 	"Oblivion.esm",
+	"MergedLOD.esm",
 	"DLCHorseArmor.esp",
 	"DLCOrrery.esp",
 	"DLCVileLair.esp",
@@ -73,7 +74,11 @@ plugins = [
 	"QZ Easy Menus.esp", 
 	"Quest Log Manager.esp", 
 	"WorldMapsForAllWorldspaces.esp", 
-	"lVanilla Style Loading Screens Addon.esp"
+	"lVanilla Style Loading Screens Addon.esp",
+	"Bruma Frostcrag Spire LOD.esp",
+	"lVWD for Leyawiin.esp",
+	"IC LOD.esp",
+	"MergedLOD.esp"
 ]
 
 post-install-actions = ["loot-sort"]
@@ -707,6 +712,132 @@ data_folder="Mind Your Head - Signs Repositioned 1.3"
 # ------------------------------
 # Part 6 - UI & UX IMPROVEMENTS
 # ------------------------------
+
+[[mods]]
+id = "VWD for Leyawiin"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50052/1000024547"
+download_handler = "nexus"
+file_name = "VWD for Leyawiin-50052-1-1-1587511322.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "VWD for Town Houses"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50073/1000024591"
+download_handler = "nexus"
+file_name = "VWD for Town Houses-50073-1-0-1587862794.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "VWD Ships"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50111/1000024819"
+download_handler = "nexus"
+file_name = "VWD Ships - KatKat74's Mod Patch-50111-1-01-1590117997.zip"
+# oracle version f1.01
+
+[[mods]]
+id = "J3 Atlassed VWD 2"
+section = ["5 - LOD"]
+
+# Guide: BAIN Wizard -> Options -> "Performance (no rocks)". A BAIN wizard
+# only drives plain subpackages, so the preset is expressed directly here.
+# Taken from the archive's own Wizard.txt, which does DeSelectAll, then
+# selects 00 and 01 unconditionally, then these 12 for that preset. The
+# Oracle's 394 installed files match the resulting 14 exactly.
+[[mods.archives]]
+path = "nexus:oblivion/51732/1000033848"
+download_handler = "nexus"
+file_name = "J3 Atlassed VWD 2 - Cyrodiil - BAIN installer-51732-1-15-1677615141.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 cyrodiil - normal map",
+  "01 cyrodiil - atlas - vanilla",
+  "02 cyrodiil - fars - vanilla",
+  "03 cyrodiil - fars - frostcrag spire",
+  "04 cyrodiil - fars - battlehorn castle",
+  "05 cyrodiil - fars - cloud ruler temple",
+  "09 cyrodiil - fars - ayleid ruins",
+  "10 cyrodiil - fars - fort ruins",
+  "13 cyrodiil - fars - magical stone glyphs",
+  "15 cyrodiil - fars - wilderness houses",
+  "17 cyrodiil - fars - wilderness structures",
+  "19 cyrodiil - fars - wayshrines",
+  "21 cyrodiil - fars - deadricstatues",
+  "24 cyrodiil - fars - city extra",
+]
+# oracle version 1.15.0.0
+
+[[mods]]
+id = "J3 Atlassed VWD 2 - SI"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51732/1000031605"
+download_handler = "nexus"
+file_name = "J3 Atlassed VWD 2 - Shivering Isles - Bomret's Texture Pack for Shivering Isles-51732-1-0-1655751776.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Bruma Frostcrag Spire LOD"
+oracle_name = "Oblivion Comprehensive Modding Guide by Dispensation (OCMG)"  # optional file on the guide's own mod page
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49898/1000033650"
+download_handler = "nexus"
+file_name = "Bruma Frostcrag Spire LOD-49898-1-0-1675648698.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Landscape LOD Textures by Xerus"
+section = ["5 - LOD"]
+
+# Guide: expand Shivering Isles, drag its Textures over Cyrodiil, then set
+# Cyrodiil as the data directory. That is the union of the two folders rooted
+# at Cyrodiil: 50 Cyrodiil files + 8 Shivering Isles files, no overlap,
+# matching the Oracle's 58 exactly. Same archive twice; SI overlays Cyrodiil.
+[[mods.archives]]
+path = "nexus:oblivion/17300/25150"
+download_handler = "nexus"
+file_name = "Landscape LOD Textures by Xerus-17300.7z"
+layout = "custom-data-folder"
+data_folder = "Landscape LOD Textures by Xerus/Cyrodiil"
+
+[[mods.archives]]
+path = "nexus:oblivion/17300/25150"
+download_handler = "nexus"
+file_name = "Landscape LOD Textures by Xerus-17300.7z"
+layout = "custom-data-folder"
+data_folder = "Landscape LOD Textures by Xerus/Shivering Isles"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "Imperial City LOD - Performance Edition"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54402/1000039296"
+download_handler = "nexus"
+file_name = "Imperial City LOD - Performance Edition-54402-1-0-1725502140.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Merged LOD"
+section = ["5 - LOD"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041296"
+download_handler = "nexus"
+file_name = "Merged LOD-52949-03-25-1743347429.zip"
+# oracle version 3.25.0.0
 
 [[mods]]
 id = "T4UT - Menus Repolished"
