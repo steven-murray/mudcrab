@@ -75,6 +75,30 @@ archive is downloadable again.
 This also answers the plan's open question about conflict-tab hiding needing a
 whole-modlist design pass. It does — but not yet, and not for this section.
 
+## OOO Enhanced: the two halves must be the same version
+
+Row 11 installs two archives, plugins and resources, and they have to match.
+This was got wrong first time and is worth recording, because the mistake came
+from trusting the wrong source.
+
+`add --from-oracle` took the plugin half from the Oracle's `meta.ini`, which
+records **5.33**. The guide asks for **"5.3 - PreRelease & 5.3b Resources"**.
+Nobody noticed until the resources half arrived as 5.3b and the diff showed 197
+differing meshes — a mismatched pair, 5.33 plugins against 5.3b resources, which
+is a combination neither the guide nor the Oracle ever ran.
+
+The Oracle runs a coherent updated pair (5.33 + 5.33). That is not available:
+**5.33 has since been pulled from Nexus.** So this list uses the guide's exact
+pair, 5.3 PreRelease + 5.3b, and diverges from the Oracle on both halves the way
+MOO did before the Oracle was downgraded to match.
+
+The subpackage names are identical between 5.3 and 5.33, so the seven
+selections are unchanged.
+
+The lesson is the one from Part 7 restated: `--from-oracle` is a scaffold for
+provenance, not an authority on *which file the guide meant*. Where a guide row
+names a version, the row's version comes from the guide.
+
 ## Guide and Oracle disagree — `Seamless - HGEC Female` cup size
 
 **Unresolved. Following the guide; 32 meshes differ from the Oracle.**

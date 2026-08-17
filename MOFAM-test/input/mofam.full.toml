@@ -2269,6 +2269,31 @@ bain_subpackages = ["50 Robert v5 Muscular OOO"]
 
 # Guide 8: BAIN. The 10/15 groups are alternatives -- one cup size, one
 # lowerbody -- so exactly one of each is selected.
+# Guide 7 [QAC]: the BAIN build, which is what the guide names. The Oracle
+# installed the OMOD build of the same mod instead -- a format mudcrab does not
+# read, and does not need to when the guide asks for a plain 7z.
+#
+# QAC is deferred, as it is for Cleaned DLC Masters in Part 1 -- see the TODO
+# there. Both want running in one pass at the end.
+[[mods]]
+id = "EVE HGEC Equipment Replacer for OOO"
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/24078/42364"
+download_handler = "nexus"
+file_name = "EVE for Oscuro Oblivion Overhaul 1_3 BAIN-24078.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Core",
+  "10 Equipment Replacer Upperbody - Normal C-Cup",
+  "15 Equipment Replacer Lowerbody - Normal",
+]
+
+# [[mods.actions]]
+# action = "qac"
+# plugins = ["EVE_StockEquipmentReplacer for OOO.esp"]
+
 [[mods]]
 id = "Seamless - HGEC Female"
 section = ["9 - OVERHAULS OSCURO"]
@@ -2360,3 +2385,23 @@ bain_subpackages = [
   "80 Av Latta Magica",
 ]
 # oracle version 5.33.0.0
+
+# Guide 11, second archive: "5.3b Resources". The 3.5 GB
+# OOO Enhanced-47187-5-33-1748819369.7z on this machine is a corrupt download of
+# a different build; this is the file the guide actually names.
+#
+# The guide's next step -- hide the files that conflict with Colourful Clothing
+# and WAC, delete them, then pack the remaining textures into OOO Enhanced.bsa --
+# is NOT here. It references mods from Parts 10 and 24, and the guide says to
+# return after Part 24. Packing now would archive exactly the files that step
+# removes. Until then the textures stay loose, and this mod's `textures/` shows
+# against the Oracle's packed `OOO Enhanced.bsa`.
+[[mods]]
+id = "OOO Enhanced 5.3 (03.25) - Resources"
+oracle_name = "OOO Enhanced 5.3b - Resources"  # renamed when the Oracle moved to 5.3b
+section = ["9 - OVERHAULS OSCURO"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47187/1000041194"
+download_handler = "nexus"
+file_name = "OOO Enhanced - Resources-47187-5-3b-1742488154.7z"
