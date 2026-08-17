@@ -123,3 +123,33 @@ undecided plugin. The Oracle hides it; a `file_hide` now does too.
 **The general case is pinned.** mudcrab already *notices* these (the load-order
 step warns about "discovered plugins not listed in top-level plugins") and does
 nothing about them. Auto-hiding is probably right and is a behaviour change.
+
+
+## `--from-oracle` scaffolds provenance; it does not establish it
+
+Three separate failures now trace to treating the Oracle's `meta.ini` as
+authoritative about *what a mod is made of*:
+
+1. **Part 9**: `--from-oracle` gave OOO Enhanced 5.33 against 5.3b resources —
+   a mismatched pair neither the guide nor anyone else ever ran.
+2. **Part 13/15/16**: `modid` values of 7, 1 and 1 for tesall.ru, ModDB and
+   MediaFire downloads. MO2 writes a mod id regardless of where the file came
+   from.
+3. **Part 16**: `installationFile` records the **last** archive installed into a
+   folder, not all of them. T4UTXL's City Gates is built from two archives and
+   the Oracle names one, which is why building from it produced 5 files against
+   the Oracle's 11.
+
+The rule that has held: **`meta.ini` is a starting point for a lookup, and the
+archive is the authority.** Every BAIN/FOMOD selection in this run has been
+checked against `mudcrab inspect` rather than trusted from `meta.ini`, and that
+is why the section diffs have been clean.
+
+## Guide instructions phrased as keep-lists are written as keep-lists
+
+"Delete everything except X" becomes `include = [X]`, not a `file_prune`
+enumerating everything else. Three occurrences in Part 16 and one in Part 15.
+
+Besides being the direct translation, it cannot go stale: a prune listing what
+to remove silently under-deletes if the archive ever gains a file, while a
+keep-list stays correct.
