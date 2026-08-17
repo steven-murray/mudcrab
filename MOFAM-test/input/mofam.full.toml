@@ -3473,3 +3473,145 @@ path = "nexus:oblivion/50903/1000029872"
 download_handler = "nexus"
 file_name = "Whiteflame Fix-50903-1-0-1640491351.7z"
 # oracle version 1.0.0.0
+
+[[mods]]
+id = "Gecko's Fort Interior Textures"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45996/1000009808"
+download_handler = "nexus"
+file_name = "Gecko's Fort Interior Textures (2K Version)-45996-1.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Gecko's Imperial Dungeon Textures - 2K Parallax"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46864/1000013451"
+download_handler = "nexus"
+file_name = "Geckos Imperial Dungeon Textures 2K Parallax-46864-1-0.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "High Fantasy Cyrodiil Caves"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50017/1000024475"
+download_handler = "nexus"
+file_name = "High Fantasy Cyrodiil Caves-50017-1-1-1586685421.zip"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Oblivion 2020 Retexture Project - Caves"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49933/1000033817"
+download_handler = "nexus"
+file_name = "2020 Retexture Project - Caves-49933-1-1-1677358379.7z"
+# Guide 4: "Once installed delete every file except textures > dungeons >
+# caves > cavefungus01* and cavefungus02*. This will leave 5 files remaining."
+# Stated as what to keep rather than what to delete -- an `include` filter is
+# the direct translation, and it cannot go stale if the archive gains files.
+include = ["textures/dungeons/caves/cavefungus0[12]*"]
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Ruined Ruins"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44697/1000007248"
+download_handler = "nexus"
+file_name = "Completely Ruined Ruins v03-44697-03.7z"
+# oracle version 3.0.0.0
+
+[[mods]]
+id = "Ruined Ruins - Skirting"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44697/1000007421"
+download_handler = "nexus"
+file_name = "Completely Ruined Ruins v03 skirting-44697-v03.7z"
+# oracle version 3.0.0.0
+
+[[mods]]
+id = "AI Enhanced - Ruined Ruins"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52851/1000034142"
+download_handler = "nexus"
+file_name = "AI Enhanced - Ruined Ruins-52851-1-0-1679629391.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Bettys Sewer Textures"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47316/1000015331"
+download_handler = "nexus"
+file_name = "Wet Version Update1-47316-.zip"
+# oracle version 0.0.0.0-1477593794
+
+[[mods]]
+id = "VKVII_Oblivion_Cathedrals"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:VKVII_Oblivion_Cathedrals.1.7z"
+file_name = "VKVII_Oblivion_Cathedrals.1.7z"
+# Guide 8: hosted on ModDB, not Nexus --
+# https://www.moddb.com/mods/vkvii-oblivion-cathedrals (medium). The Oracle's
+# meta.ini says modid=1, which is MO2 bookkeeping rather than provenance.
+# oracle version 0.0.0.0
+
+[[mods]]
+id = "Faster Dungeon Doors"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46889/1000013545"
+download_handler = "nexus"
+file_name = "Faster Dungeon Doors-46889-.zip"
+# oracle version 0.0.0.0-1461057492
+
+[[mods]]
+id = "HD Cobwebs"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50488/1000026010"
+download_handler = "nexus"
+file_name = "HD Cobwebs-50488-1-0-1603993466.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Double Sided Cobwebs"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46264/1000010882"
+download_handler = "nexus"
+file_name = "Double Sided Cobwebs-46264-1-0.7z"
+# Guide: "Use the 'Main files > data' folder as the data directory." The archive
+# also holds an `Optional Textures/data`, which is why auto-detection refuses to
+# choose.
+layout = "custom-data-folder"
+data_folder = "Double Sided Cobwebs/Main files/data"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Improved Candles"
+section = ["15 - INTERIOR RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/34410/67667"
+download_handler = "nexus"
+file_name = "Improved Candles v1-34410.rar"
+# oracle version d2026.1.24.0
