@@ -5,6 +5,7 @@ pub mod compiler;
 pub mod diff;
 pub mod download;
 pub mod filter;
+pub mod identify;
 pub mod inspect;
 pub mod install;
 pub mod mo2;

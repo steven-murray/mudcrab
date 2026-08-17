@@ -14,7 +14,8 @@ use build::extract_build_archive;
 use fomod::extract_archive_with_fomod_layout;
 
 use crate::util::fs::{
-    copy_filtered_tree, normalize_relative_path, resolve_existing_path_case_insensitive,
+    copy_filtered_tree_folded, lowercase_path, normalize_relative_path,
+    resolve_existing_path_case_insensitive,
     staging_dir_for,
 };
 use std::collections::HashSet;
@@ -55,7 +56,9 @@ pub(crate) fn destination_for(
     target_subdir: Option<&str>,
 ) -> anyhow::Result<PathBuf> {
     match target_subdir {
-        Some(subdir) => Ok(target_root.join(normalize_relative_path(subdir)?)),
+        // Every component here is a directory, so all of them fold. See
+        // `lowercase_dir_components`.
+        Some(subdir) => Ok(target_root.join(lowercase_path(&normalize_relative_path(subdir)?))),
         None => Ok(target_root.to_path_buf()),
     }
 }
@@ -419,11 +422,11 @@ pub(crate) fn extract_archive(
 
     let mut destination_root = target_root.to_path_buf();
     if let Some(target_subdir) = archive.target_subdir.as_deref() {
-        let rel = normalize_relative_path(target_subdir)?;
+        let rel = lowercase_path(&normalize_relative_path(target_subdir)?);
         destination_root = destination_root.join(rel);
     }
 
-    let copy_result = copy_filtered_tree(&source_root, &destination_root, filters);
+    let copy_result = copy_filtered_tree_folded(&source_root, &destination_root, filters);
     let _ = std::fs::remove_dir_all(&staging_dir);
     copy_result
 }

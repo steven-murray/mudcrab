@@ -147,15 +147,88 @@ pub fn link_or_copy(source: &Path, destination: &Path) -> anyhow::Result<()> {
     }
 }
 
+/// Lowercase every directory component of a relative path, leaving the file
+/// name alone.
+///
+/// Oblivion and MO2 both treat asset paths case-insensitively, and mod archives
+/// are authored on Windows where that is free. On Linux it is not: two archives
+/// contributing `Sound/` and `sound/` to the same mod produce two directories
+/// that never overlay, and the game sees whichever one it happens to look in.
+/// Part 9's OOO voice files hit exactly this, twice.
+///
+/// Staging everything into lowercase directories makes the overlay behave the
+/// way the mod authors assumed it would. File names are left as they are: they
+/// are what BSA packing and the Oracle comparison both key on, and nothing
+/// merges two files whose names differ only in case.
+pub fn lowercase_dir_components(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    let mut components: Vec<_> = path.components().collect();
+    let file_name = components.pop();
+
+    for component in components {
+        out.push(component.as_os_str().to_string_lossy().to_lowercase());
+    }
+    if let Some(file_name) = file_name {
+        out.push(file_name.as_os_str());
+    }
+    out
+}
+
+/// Lowercase every component of a relative path that names only directories.
+pub fn lowercase_path(path: &Path) -> PathBuf {
+    path.components()
+        .map(|component| component.as_os_str().to_string_lossy().to_lowercase())
+        .collect()
+}
+
+/// Whether a copy folds directory names to lowercase as it goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DirCase {
+    /// Copy paths exactly as they are.
+    ///
+    /// Required anywhere the tree will be *read again* -- unpacking into a
+    /// staging directory, or assembling build layers -- because FOMOD and BAIN
+    /// scripts name their sources in the archive's own casing, and folding it
+    /// first makes them unfindable.
+    Preserve,
+    /// Fold directory names to lowercase.
+    ///
+    /// Used on the last hop, into the mod's own folder, where nothing reads the
+    /// tree by name again. That is where two archives contributing `Sound/` and
+    /// `sound/` otherwise become two directories that never overlay.
+    Fold,
+}
+
 /// Recursively copy `source_root` into `destination_root`, applying `filters`
 /// to each file's root-relative path. Returns the number of files copied.
+///
+/// Paths are copied as they are; see `copy_filtered_tree_folded` for the
+/// variant that lowercases directory names.
 pub fn copy_filtered_tree(
     source_root: &Path,
     destination_root: &Path,
     filters: &ArchiveFilters,
 ) -> anyhow::Result<usize> {
+    copy_filtered_tree_with_case(source_root, destination_root, filters, DirCase::Preserve)
+}
+
+/// As `copy_filtered_tree`, folding every directory name to lowercase.
+pub fn copy_filtered_tree_folded(
+    source_root: &Path,
+    destination_root: &Path,
+    filters: &ArchiveFilters,
+) -> anyhow::Result<usize> {
+    copy_filtered_tree_with_case(source_root, destination_root, filters, DirCase::Fold)
+}
+
+pub fn copy_filtered_tree_with_case(
+    source_root: &Path,
+    destination_root: &Path,
+    filters: &ArchiveFilters,
+    case: DirCase,
+) -> anyhow::Result<usize> {
     let mut copied = 0usize;
-    copy_tree_recursive(source_root, source_root, destination_root, filters, &mut copied)?;
+    copy_tree_recursive(source_root, source_root, destination_root, filters, case, &mut copied)?;
     Ok(copied)
 }
 
@@ -164,6 +237,7 @@ fn copy_tree_recursive(
     source_root: &Path,
     destination_root: &Path,
     filters: &ArchiveFilters,
+    case: DirCase,
     copied: &mut usize,
 ) -> anyhow::Result<()> {
     for entry in std::fs::read_dir(current)
@@ -178,7 +252,7 @@ fn copy_tree_recursive(
         })?;
 
         if file_type.is_dir() {
-            copy_tree_recursive(&path, source_root, destination_root, filters, copied)?;
+            copy_tree_recursive(&path, source_root, destination_root, filters, case, copied)?;
             continue;
         }
         if !file_type.is_file() {
@@ -196,7 +270,10 @@ fn copy_tree_recursive(
             continue;
         }
 
-        let destination = destination_root.join(rel);
+        let destination = match case {
+            DirCase::Preserve => destination_root.join(rel),
+            DirCase::Fold => destination_root.join(lowercase_dir_components(rel)),
+        };
         if let Some(parent) = destination.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
@@ -217,6 +294,39 @@ fn copy_tree_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn lowercase_dir_components_leaves_the_file_name_alone() {
+        assert_eq!(
+            lowercase_dir_components(Path::new("Sound/Voice/Line.mp3")),
+            PathBuf::from("sound/voice/Line.mp3")
+        );
+        assert_eq!(
+            lowercase_dir_components(Path::new("MESHES/Characters/_Male/skeleton.nif")),
+            PathBuf::from("meshes/characters/_male/skeleton.nif")
+        );
+        // A bare file name has no directories to fold.
+        assert_eq!(
+            lowercase_dir_components(Path::new("Readme.txt")),
+            PathBuf::from("Readme.txt")
+        );
+        assert_eq!(lowercase_dir_components(Path::new("")), PathBuf::from(""));
+    }
+
+    #[test]
+    fn lowercase_dir_components_is_for_relative_paths_only() {
+        // Applying it to an absolute destination folds the tempdir and the mod
+        // folder along with the asset directories, and the copy then lands
+        // somewhere that does not exist. Callers must fold the relative part and
+        // join it, never fold the joined result.
+        let folded = lowercase_dir_components(Path::new("/tmp/MyInstance/Mods/Example/Textures/a.dds"));
+        assert_eq!(
+            folded,
+            PathBuf::from("/tmp/myinstance/mods/example/textures/a.dds"),
+            "documents the hazard: every component folds, including ones that are \
+             not the mod's own asset directories"
+        );
+    }
 
     #[test]
     fn normalize_rejects_escapes_and_absolutes() {

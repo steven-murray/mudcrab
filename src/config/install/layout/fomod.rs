@@ -3,7 +3,9 @@
 use super::{destination_for, with_staged_archive};
 use crate::archive::ArchiveFilters;
 use crate::config::schema::{CompiledArchive, FomodSelection};
-use crate::util::fs::{copy_filtered_tree, normalize_relative_path};
+use crate::util::fs::{
+    copy_filtered_tree_folded, lowercase_dir_components, lowercase_path, normalize_relative_path,
+};
 use roxmltree::{Document, Node};
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -531,7 +533,7 @@ pub(crate) fn apply_fomod_entries(
 
                 let source_path = content_root.join(&rel_source);
                 let rel_dest = normalize_fomod_relative_path(destination)?;
-                let destination_path = destination_root.join(rel_dest);
+                let destination_path = destination_root.join(lowercase_dir_components(&rel_dest));
                 copy_fomod_file(&source_path, &destination_path)?;
                 copied += 1;
             }
@@ -543,8 +545,8 @@ pub(crate) fn apply_fomod_entries(
                 let source_rel = normalize_fomod_relative_path(source)?;
                 let source_root = content_root.join(&source_rel);
                 let destination_rel = normalize_fomod_relative_path_allow_empty(destination)?;
-                let destination = destination_root.join(destination_rel);
-                copied += copy_filtered_tree(&source_root, &destination, filters)?;
+                let destination = destination_root.join(lowercase_path(&destination_rel));
+                copied += copy_filtered_tree_folded(&source_root, &destination, filters)?;
             }
         }
     }

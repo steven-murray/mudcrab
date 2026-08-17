@@ -860,7 +860,10 @@ mod tests {
         assert_eq!(extracted, 3);
         assert!(target_root.join("plugin1.esp").exists());
         assert!(target_root.join("plugin2.esp").exists());
-        assert!(target_root.join("Textures/foo.dds").exists());
+        // Staged directories fold to lowercase; the file name does not. The
+        // archive spells this folder "Textures".
+        assert!(target_root.join("textures/foo.dds").exists());
+        assert!(!target_root.join("Textures").exists());
         assert!(!target_root.join("plugin3.esp").exists());
     }
 
@@ -1009,7 +1012,7 @@ mod tests {
         assert_eq!(extracted, 2);
         assert_eq!(std::fs::read_to_string(target_root.join("base.txt")).expect("base read"), "base");
         assert_eq!(std::fs::read_to_string(target_root.join("font.txt")).expect("font read"), "large");
-        assert!(!target_root.join("Docs/readme.txt").exists());
+        assert!(!target_root.join("docs/readme.txt").exists());
     }
 }
 
