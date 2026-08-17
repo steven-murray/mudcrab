@@ -17,6 +17,10 @@ nothing rather than failing.
 | AI Enhanced - Colourful Clothing - Upperclass + Middleclass | `AI Enhanced - Colorful Clothing - Upperclass` **and** `- Middleclass` — two mods, American spelling | Part 9 conflict pass came up short |
 | Waalx's Animals and Creatures | `WAC Waalx Animals & Creatures` | same |
 | 01 Maskar's Oblivion Overhaul INI Files | `01 Maskar's Oblivion Overhaul patch and INI files` — and it ships a **plugin** the short name hides | Part 10, caught by `inspect` |
+| Brunbek Yellow Multi-Colour (Recommended) | **Brumbek** Yellow Multi-**Color** (Recommended) | Part 17 AWLS |
+| Blue-purple (Recommended) | Blue-**P**urple (Recommended) | Part 17 AWLS |
+| More Colours (Recommended) | More Col**o**rs (Recommended) | Part 17 AWLS |
+| Cava Obscura - Filter Patch for Mods.esp | `...Filter Patch **F**or Mods.esp` | Part 12 |
 
 **Counter-example worth recording**: `Colourful Clothing - Collection - Seamless
 OCOv2` *is* the mod's exact name, British spelling and suffix included. Having
@@ -25,6 +29,10 @@ until Part 10 checked the actual mod list. **The guide being wrong twice is not
 evidence it is wrong a third time.**
 
 ---
+
+**The pattern**: a human clicking the nearest visible match never notices any of
+these. An exact-match selector fails on every one. Nine occurrences so far, and
+they are the single most common way this guide breaks a compiler.
 
 ## The guide contradicting itself
 

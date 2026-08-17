@@ -136,6 +136,25 @@ parts. Ours has 13.
 See report 2 for why this was easy to get wrong: the Oracle's `meta.ini` records
 only the *last* archive installed into a folder.
 
+### D10. AWLS installer answers — the biggest single disagreement
+**[decide — needs your eye]**  *Part 17 row 1*
+
+25 files in one mod: 20 differing in content, 2 only in ours, 3 only in the
+Oracle. All are window textures or Shivering Isles meshes.
+
+Our build uses the guide's 13 stated FOMOD answers, written out in full. The
+Oracle answered at least one group differently — the tell is that the guide says
+*Imperial City Temple: Blue*, which is the option that installs **nothing**,
+yet the Oracle has two `ictemplewindow01L` files only a non-Blue answer creates.
+
+**MO2 does not record FOMOD choices in `meta.ini`** (it records BAIN ones), so
+the Oracle's answers cannot be read back — reconstructing them would mean
+guessing across 13 groups from the installed files.
+
+**Your call, and it is a look-at-the-screen decision**: either the Oracle gets
+reinstalled to the guide's answers, or the guide's list is stale for AWLS 5.6.3
+and the Oracle's appearance is the one you want.
+
 ---
 
 ## Resolved — recorded because the reasoning matters
