@@ -88,7 +88,9 @@ async fn identify_can_write_the_meta_sidecar_mo2_would_have() {
 }
 
 #[tokio::test]
-async fn an_archive_nexus_does_not_know_is_reported_not_guessed() {
+async fn an_archive_with_no_mod_id_in_its_name_says_what_to_pass() {
+    // A 404 from the hash index is not the end: the fallback searches the mod's
+    // file list. That needs a mod id, and a hand-named archive carries none.
     let server = MockServer::start().await;
     Mock::given(method("GET"))
         .respond_with(ResponseTemplate::new(404))
@@ -110,7 +112,94 @@ async fn an_archive_nexus_does_not_know_is_reported_not_guessed() {
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8");
     assert!(stderr.contains("does not recognise"), "{stderr}");
     assert!(
-        stderr.contains("repacked after download"),
-        "the likely cause is worth naming:\n{stderr}"
+        stderr.contains("--mod-id"),
+        "the way forward should be in the message:\n{stderr}"
     );
+}
+
+#[tokio::test]
+async fn an_old_file_missing_from_the_md5_index_is_found_by_name() {
+    // Nexus does not index every file it serves by hash. A download moved to a
+    // mod's OLD FILES section typically has no entry -- OOO Enhanced 5.3
+    // PreRelease is exactly that, and MO2 cannot identify it either, recording
+    // fileID=0. The mod's published file list still lists it.
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/v1/games/oblivion/mods/md5_search/{ABC_MD5}.json"
+        )))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/games/oblivion/mods/47187/files.json"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            r#"{"files":[
+                {"file_id": 1000041194, "file_name": "OOO Enhanced - Resources-47187-5-3b-1742488154.7z", "name": "Resources", "version": "5.3b"},
+                {"file_id": 1000040001, "file_name": "OOO Enhanced-47187-5-3-Pre-release-1740353484.rar", "name": "OOO Enhanced", "version": "5.3"}
+            ]}"#,
+            "application/json",
+        ))
+        .mount(&server)
+        .await;
+
+    let dir = tempdir().expect("temp dir");
+    // The mod id is read out of the filename, so no --mod-id is needed.
+    let archive = dir.path().join("OOO Enhanced-47187-5-3-Pre-release-1740353484.rar");
+    std::fs::write(&archive, b"abc").expect("fixture archive");
+
+    let assert = Command::cargo_bin("mudcrab")
+        .expect("binary builds")
+        .env("NEXUS_API_KEY", "test-key")
+        .args(["identify", archive.to_str().unwrap()])
+        .args(["--api-base", &format!("{}/v1", server.uri())])
+        .assert()
+        .success();
+
+    let stdout = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
+    assert!(
+        stdout.contains(r#"path = "nexus:oblivion/47187/1000040001""#),
+        "should pick the entry whose filename matches, not the first:\n{stdout}"
+    );
+
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8");
+    assert!(
+        stderr.contains("not in the MD5 index"),
+        "a name match rests on weaker evidence than a hash match, so say so:\n{stderr}"
+    );
+}
+
+#[tokio::test]
+async fn a_file_in_neither_the_hash_index_nor_the_mods_file_list_is_reported() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path(format!(
+            "/v1/games/oblivion/mods/md5_search/{ABC_MD5}.json"
+        )))
+        .respond_with(ResponseTemplate::new(404))
+        .mount(&server)
+        .await;
+    Mock::given(method("GET"))
+        .and(path("/v1/games/oblivion/mods/47187/files.json"))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_raw(r#"{"files":[]}"#, "application/json"),
+        )
+        .mount(&server)
+        .await;
+
+    let dir = tempdir().expect("temp dir");
+    let archive = dir.path().join("Renamed By Hand-47187-1-0.7z");
+    std::fs::write(&archive, b"abc").expect("fixture archive");
+
+    let assert = Command::cargo_bin("mudcrab")
+        .expect("binary builds")
+        .env("NEXUS_API_KEY", "test-key")
+        .args(["identify", archive.to_str().unwrap()])
+        .args(["--api-base", &format!("{}/v1", server.uri())])
+        .assert()
+        .failure();
+
+    let stderr = String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8");
+    assert!(stderr.contains("publishes no file with that name"), "{stderr}");
+    assert!(stderr.contains("renamed"), "renaming is a likely cause:\n{stderr}");
 }
