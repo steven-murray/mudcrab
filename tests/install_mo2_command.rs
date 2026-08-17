@@ -114,6 +114,49 @@ fn install_exports_modorganizer2_instance_structure() {
     let game_ini = std::fs::read_to_string(game_dir.join("Oblivion.ini"))
         .expect("game oblivion.ini should still exist");
     assert!(game_ini.contains("bFull Screen = 1"));
+
+    // A second run must not throw the first run's edits away.
+    //
+    // This used to copy the game's Oblivion.ini over the profile's on every
+    // install, so a section-by-section build ended up with only the LAST
+    // section's settings. Six of eighteen were wrong on disk when it was
+    // found, including the DarNified font paths -- a broken UI.
+    //
+    // Simulated with a comment line no action would reproduce: if the file is
+    // reseeded, the marker is gone. A comment rather than an assignment so it
+    // cannot perturb the spacing heuristic and change what the assertion below
+    // is really testing.
+    let profile_ini_path = profile_dir.join("oblivion.ini");
+    let edited = format!(
+        "{}\n; sEarlierSectionMarker=kept\n",
+        std::fs::read_to_string(&profile_ini_path).expect("read profile ini")
+    );
+    std::fs::write(&profile_ini_path, &edited).expect("write profile ini");
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .arg("install")
+        .arg(&plan)
+        .arg("--cache")
+        .arg(&cache)
+        .arg("--mo2-instance-dir")
+        .arg(&instance_dir)
+        .arg("--profile-name")
+        .arg("test-profile")
+        .arg("--game-dir")
+        .arg(&game_dir)
+        .assert()
+        .success();
+
+    let after = std::fs::read_to_string(&profile_ini_path).expect("read profile ini again");
+    assert!(
+        after.contains("; sEarlierSectionMarker=kept"),
+        "a second install reseeded the profile INI and discarded earlier edits:\n{after}"
+    );
+    assert!(
+        after.contains("bFull Screen = 0"),
+        "this run's own ini_set should still be applied:\n{after}"
+    );
 }
 
 #[test]

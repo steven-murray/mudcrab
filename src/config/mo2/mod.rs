@@ -126,14 +126,39 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
                 game_dir.display()
             )
         })?;
+        // Seed it once; never clobber it afterwards.
+        //
+        // This used to copy unconditionally on every run, which quietly made
+        // the profile INI hold only the *last* section's edits: build Part 11
+        // and the [Grass] block lands, build Part 12 and the file is reset to
+        // vanilla with nothing to re-apply it. Six of eighteen game-scoped
+        // settings were wrong on disk when this was found -- including the
+        // DarNified font paths, which is a broken UI, and the exact failure
+        // that cost a play session earlier in this build.
+        //
+        // `ini_set` is idempotent and edits in place, so an existing file is
+        // the accumulated result of every section built so far. That is the
+        // thing worth keeping.
         let destination = profile_dir.join("oblivion.ini");
-        std::fs::copy(&source, &destination).map_err(|err| {
-            anyhow::anyhow!(
-                "failed to copy {} to {}: {err}",
-                source.display(),
-                destination.display()
-            )
-        })?;
+        if destination.exists() {
+            tracing::debug!(
+                ini = %destination.display(),
+                "profile Oblivion.ini already exists; keeping the edits it carries"
+            );
+        } else {
+            std::fs::copy(&source, &destination).map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to copy {} to {}: {err}",
+                    source.display(),
+                    destination.display()
+                )
+            })?;
+            tracing::info!(
+                source = %source.display(),
+                destination = %destination.display(),
+                "seeded the MO2 profile's Oblivion.ini from the game directory"
+            );
+        }
     }
 
     // MO2 profile expects this file; keep it empty by default.
