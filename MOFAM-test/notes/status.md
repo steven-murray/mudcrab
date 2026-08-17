@@ -113,9 +113,39 @@ first archive that nothing can fetch.
 `textures\textures\…`, so all 3580 textures in it are unreachable by the game.
 See `part-09-overhauls-oscuro.md`.
 
+## Part 11 (Baseline Textures) — complete
+
+23 mods, 13 identical, 10 differing and all ten explained: five BSA-packed mods
+(identical contents, BSArch dedup on size, plus the deliberate dummy-plugin
+difference from Part 5), three Part 36 merge-source hides, one deferred QAC, and
+five documentation files that sit outside a mod's data folder. Details in
+`part-11-baseline-textures.md`.
+
+Guide rows 1-5 have no mod of their own — they are one mod, `OUT Essentials`,
+built from five archives. The Oracle's five folders hold nothing but a meta.ini,
+the guide's own optional cleanup, so `diff` reporting them missing is correct.
+
+Two `file_prune` bugs found, in opposite directions: `NoMushroomStalks` matched
+nothing (staged directories are lowercased) and `textures/rocks/*.dds` matched
+too much (globset's `*` crosses `/`, so it deleted the `underwater` folder the
+guide says to keep). The second was silent — only the Oracle diff caught it.
+Both fixed by giving `file_prune` staged-tree glob semantics; archive extraction
+filters are deliberately unchanged.
+
+`ini_set` is now section-aware, which was the plan's flagged latent bug.
+
+## Known recurring difference
+
+**Files beside the data folder are dropped.** When an archive has `Data/` (or a
+wrapper plus `Data/`), unwrapping takes the data folder as the mod root and
+root-level siblings — readmes, settings images — never come across. MO2 keeps
+them. Four occurrences so far (Part 9's readme; Part 11's Improved Doors and
+Flora, Improved Trees and Flora, HD Photorealistic Ivy). Harmless, but worth
+fixing rather than re-explaining each section.
+
 ## Next sections
 
-Guide order from **Part 11 (Baseline Textures)**. Most rows are trivial; the ones needing new features
+Guide order from **Part 12 (Weather & Lighting)**. Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at

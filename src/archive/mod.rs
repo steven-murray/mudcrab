@@ -1,5 +1,5 @@
 use flate2::read::GzDecoder;
-use globset::{Glob, GlobSet, GlobSetBuilder};
+use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -52,6 +52,28 @@ impl ArchiveFilters {
         Ok(Self {
             include: compile_globset(include)?,
             exclude: compile_globset(exclude)?,
+        })
+    }
+
+    /// Filters for matching against a staged tree rather than an archive.
+    ///
+    /// Two differences from `new`, both because the patterns come from a guide
+    /// describing folders on disk rather than from archive-entry names:
+    ///
+    /// * `/` is a real separator, so `textures/rocks/*.dds` means the files
+    ///   directly in that folder. Under globset's default a bare `*` also
+    ///   matches `/`, so that pattern swallowed `textures/rocks/underwater/`
+    ///   whole -- ten files the guide explicitly says to keep. Nothing failed;
+    ///   only the Oracle diff noticed.
+    /// * matching is case-insensitive, because staged directories are folded to
+    ///   lowercase while guides spell folders the way the archive does.
+    ///
+    /// `**` still crosses separators, which is what `expand_directory_pattern`
+    /// relies on to turn a folder name into the folder and all of its contents.
+    pub fn new_for_staged_tree(include: &[String], exclude: &[String]) -> anyhow::Result<Self> {
+        Ok(Self {
+            include: compile_staged_globset(include)?,
+            exclude: compile_staged_globset(exclude)?,
         })
     }
 
@@ -517,6 +539,28 @@ fn compile_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
     let mut builder = GlobSetBuilder::new();
     for pattern in patterns {
         let glob = Glob::new(pattern)
+            .map_err(|err| anyhow::anyhow!("invalid glob pattern '{}': {err}", pattern))?;
+        builder.add(glob);
+    }
+
+    Ok(Some(
+        builder
+            .build()
+            .map_err(|err| anyhow::anyhow!("failed to build globset: {err}"))?,
+    ))
+}
+
+fn compile_staged_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
+    if patterns.is_empty() {
+        return Ok(None);
+    }
+
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        let glob = GlobBuilder::new(pattern)
+            .literal_separator(true)
+            .case_insensitive(true)
+            .build()
             .map_err(|err| anyhow::anyhow!("invalid glob pattern '{}': {err}", pattern))?;
         builder.add(glob);
     }

@@ -41,7 +41,12 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
     let mut deleted = 0usize;
     let mut barren = Vec::new();
     for pattern in &action.paths {
-        let filters = ArchiveFilters::new(&expand_directory_pattern(pattern), &[])?;
+        // Staged-tree semantics, not archive-entry semantics: `/` separates,
+        // and case does not matter. Both differences bit in Part 11 --
+        // `NoMushroomStalks` matched nothing against the folded folder on disk,
+        // and `textures/rocks/*.dds` matched straight through into the
+        // `underwater/` folder the guide says to keep.
+        let filters = ArchiveFilters::new_for_staged_tree(&expand_directory_pattern(pattern), &[])?;
         let mut matched = 0usize;
         prune(mod_target, mod_target, &filters, &mut matched)?;
         if matched == 0 {
@@ -57,7 +62,7 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
     if !barren.is_empty() {
         anyhow::bail!(
             "{}: file_prune pattern{} {} matched nothing under {}. Patterns are matched \
-             against paths relative to the staged folder, case-sensitively.",
+             against paths relative to the staged folder, case-insensitively.",
             cx.owner,
             if barren.len() == 1 { "" } else { "s" },
             barren

@@ -130,7 +130,22 @@ plugins = [
 	"WACIntegration.esp",
 	"WACIntegration - MOO Patch.esp",
 	"WAC - HGEC Equipment Replacer.esp",
-	"WAC Integration HGEC Gauntlets Patch.esp"
+	"WAC Integration HGEC Gauntlets Patch.esp",
+	# Part 11. The first five are dummy plugins mudcrab writes, existing only so
+	# Oblivion loads the BSA of the same stem. `lLet there be Flowers.esp` is
+	# spelled with the author's leading `l`. The Harvest [Flora] add-ons and
+	# Let there be Flowers are Part 36 merge sources, hidden in the Oracle and
+	# active here until that merge exists.
+	"OUT Essentials.esp",
+	"OUT Dungeons.esp",
+	"Really Textured Normal Maps.esp",
+	"Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.esp",
+	"AI Powered Landscape Retexture.esp",
+	"lLet there be Flowers.esp",
+	"Harvest [Flora].esp",
+	"Harvest [Flora] - DLCFrostcrag.esp",
+	"Harvest [Flora] - DLCVileLair.esp",
+	"Harvest [Flora] - Shivering Isles.esp"
 ]
 
 post-install-actions = ["loot-sort"]
@@ -2511,3 +2526,470 @@ file_name = "WAC HGEC Gauntlets Conversion 1.0-53357-1-0-1694365770.rar"
 layout = "custom-data-folder"
 data_folder = "WAC HGEC Gauntlets Conversion 1.0/Data"
 # oracle version 1.0.0.0
+
+# Guide 1-6: "Create the empty mod 'OUT Essentials' and download & install mods
+# 1-5 whilst copying their contents to this empty mod... Once all of mods 1-5
+# have been copied here, pack the mod through BSArch."
+#
+# That is one mod assembled from five archives, which is the same archetype as
+# Part 9's OOO + voice files. Writing it that way makes the copying step vanish:
+# the five archives layer into one staged folder, `pack_bsa` writes the archive,
+# `prune_packed` removes exactly what went in, and `create_dummy_plugin` gives
+# Oblivion the plugin it needs to load a BSA at all.
+#
+# The guide's rows 1-5 therefore have no mod of their own here. They exist in
+# the Oracle as five folders holding nothing but a meta.ini -- the guide's own
+# optional step, "I also delete mods 1-5 after this step to save on instance
+# space" -- so `diff` reports them as missing from ours. They are: an empty MO2
+# folder is bookkeeping, not a build artifact, and every file they once held is
+# in OUT Essentials.bsa.
+[[mods]]
+id = "OUT Essentials"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]   # guide 1
+path = "nexus:oblivion/49351/1000022285"
+download_handler = "nexus"
+file_name = "2x Clothes-49351-2-1-1559861273.7z"
+
+[[mods.archives]]   # guide 2 -- the page offers two identical downloads; this is 'yeeeet'
+path = "nexus:oblivion/49351/1000022287"
+download_handler = "nexus"
+file_name = "2x Weapons-49351-2-1-1559863627.7z"
+
+[[mods.archives]]   # guide 3
+path = "nexus:oblivion/49351/1000022284"
+download_handler = "nexus"
+file_name = "2x Armor-49351-2-1-1559860730.7z"
+
+[[mods.archives]]   # guide 4
+path = "nexus:oblivion/49645/1000023018"
+download_handler = "nexus"
+file_name = "kart_SIUT_clothes_2x-49645-1-1569650528.7z"
+
+[[mods.archives]]   # guide 5
+path = "nexus:oblivion/49645/1000023004"
+download_handler = "nexus"
+file_name = "2x Weapons-49645-1-1569455463.7z"
+
+# Pack before the dummy plugin exists, or the plugin ends up inside the archive
+# it is meant to load.
+[[mods.actions]]
+action = "pack_bsa"
+output = "OUT Essentials.bsa"
+prune_packed = true
+
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "OUT Essentials.esp"
+
+[[mods]]
+id = "Oblivion Upscaled Textures (OUT) - 2x Dungeons"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49351/1000022363"
+download_handler = "nexus"
+file_name = "2x Dungeons-49351-2-0-1-1560513516.7z"
+# oracle version 2.0.1.0
+
+# Guide 8: "pack this mod using BSArch the provided dummy plugin & ensure the
+# bsa naming matches 'OUT - Dungeons'". The guide contradicts itself -- row 7
+# calls the mod "OUT Dungeons" with no hyphen -- and only the .bsa/.esp stems
+# matching each other is load-bearing, so the Oracle's unhyphenated choice is
+# followed here.
+[[mods.actions]]
+action = "pack_bsa"
+output = "OUT Dungeons.bsa"
+prune_packed = true
+
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "OUT Dungeons.esp"
+
+[[mods]]
+id = "Really Textured Normal Maps - Updated"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50088/1000024630"
+download_handler = "nexus"
+file_name = "Really Textured Normal Maps - Updated-50088-1-0-1588502179.7z"
+# oracle version 1.0.0.0
+
+# Guide 9: "pack the mod through BSArch... then delete the loose textures
+# folder." Only textures -- the archive's `docs/` is not game content and the
+# Oracle keeps it loose, so `include` limits what is packed and `prune_packed`
+# then removes exactly that.
+[[mods.actions]]
+action = "pack_bsa"
+output = "Really Textured Normal Maps.bsa"
+include = ["textures/**"]
+prune_packed = true
+
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "Really Textured Normal Maps.esp"
+
+[[mods]]
+id = "Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46162/1000010426"
+download_handler = "nexus"
+file_name = "Bomret's Texture Pack for Shivering Isles with meshes from USIP-46162-1-0.7z"
+# oracle version 1.0.0.0
+
+# Guide 10: "delete the loose meshes & textures folders" -- both, unlike row 9.
+# `Docs/` stays, as in the Oracle.
+[[mods.actions]]
+action = "pack_bsa"
+output = "Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.bsa"
+include = ["meshes/**", "textures/**"]
+prune_packed = true
+
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.esp"
+
+[[mods]]
+id = "DLC Upscaled Textures (DLCUT)"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49798/1000023597"
+download_handler = "nexus"
+file_name = "kart_DLCUT_2x-49798-1-1-1577800533.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "DLC Upscaled Textures (KNUT)"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49798/1000023612"
+download_handler = "nexus"
+file_name = "kart_KNUT_2x-49798-1-1577965315.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "AI Powered Landscape Retexture"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53871/1000037954"
+download_handler = "nexus"
+file_name = "file-53871-1-1-1709842888.7z"
+# The guide's "the mod has been packaged incorrectly" step: create Textures,
+# create Landscape inside it, drag everything in. The archive really is 243
+# bare .dds files at its root, which is why auto-detection calls it
+# unrecognised -- there is no game-content folder to recognise.
+target_subdir = "Textures/Landscape"
+# oracle version 1.1.0.0
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "AI Powered Landscape Retexture.bsa"
+prune_packed = true
+
+[[mods.actions]]
+action = "create_dummy_plugin"
+output = "AI Powered Landscape Retexture.esp"
+
+[[mods]]
+id = "Daydream - Grass Texture Atlas"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49346/1000025083"
+download_handler = "nexus"
+file_name = "Daydream Grass Texture Atlas-49346-1-1-1592835355.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Let there be Flowers"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49616/1000022895"
+download_handler = "nexus"
+file_name = "Let there be Flowers-49616-1-0-1567346470.7z"
+# oracle version 1.0.0.0
+
+# Guide 14: the [Grass] block, set with MO2's INI editor. Every key is named
+# with its section: these live only under [Grass] today, but naming it is what
+# makes the edit survive another section acquiring a key of the same name --
+# and Oblivion.ini omits [Grass] entirely when it has no non-default keys, in
+# which case ini_set creates it.
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "bDrawShaderGrass"
+value = "1"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "bGrassPointLighting"
+value = "0"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fGrassEndDistance"
+value = "8000.0000"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fGrassStartFadeDistance"
+value = "7000.0000"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fGrassWindMagnitudeMax"
+value = "125.0000"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fGrassWindMagnitudeMin"
+value = "5.0000"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fTexturePctThreshold"
+value = "0.3000"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "fWaveOffsetRange"
+value = "1.7500"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "iGrassDensityEvalSize"
+value = "2"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "iMaxGrassTypesPerTexure"
+value = "5"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Grass"
+key = "iMinGrassSize"
+value = "80"
+
+[[mods]]
+id = "Improved Doors and Flora"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/8298/6830"
+download_handler = "nexus"
+file_name = "Improved Doors and Flora-8298.7z"
+# oracle version 0.0.0.0-1199748914
+
+[[mods]]
+id = "Improved Doors and Flora Update"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/8298/30899"
+download_handler = "nexus"
+file_name = "IDFUpdate-8298.7z"
+# oracle version 0.0.0.0-1221556108
+
+[[mods]]
+id = "Improved Trees and Flora"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/8500/6993"
+download_handler = "nexus"
+file_name = "Improved Trees and Flora-8500.7z"
+# oracle version 0.0.0.0-1199747834
+
+[[mods]]
+id = "Improved Trees and Flora 2"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/11891/12150"
+download_handler = "nexus"
+file_name = "Improved Trees and Flora 2-11891.7z"
+# oracle version 0.0.0.0-1199747712
+
+[[mods]]
+id = "Improved Trees and Flora 2 Update"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/11891/30898"
+download_handler = "nexus"
+file_name = "ITF2Update-11891.7z"
+# oracle version 0.0.0.0-1221543094
+
+# Guide, after row 19: "hide Meshes > Plants > bwcattail01 + 02.nif's." Hidden
+# rather than deleted, matching the Oracle -- MO2 keeps them recoverable.
+[[mods.actions]]
+action = "file_hide"
+paths = [
+  "meshes/plants/bwcattail01.nif",
+  "meshes/plants/bwcattail02.nif",
+]
+
+[[mods]]
+id = "Arboretum - retexture for a tree-hugging crowd"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45521/1000039400"
+download_handler = "nexus"
+file_name = "Arboretum updated September 2024-45521-1-2-1726719946.7z"
+# oracle version 1.2.0.0
+
+[[mods]]
+id = "Oblivion 2020 Retexture Project - Tree Shadows"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49933/1000024369"
+download_handler = "nexus"
+file_name = "2020 Retexture Project - Tree Shadows-49933-1-1-1585694100.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "HD Photorealistic Ivy by greenback12 for Oblivion"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54754/1000040346"
+download_handler = "nexus"
+file_name = "HD Photorealistic Ivy for Oblivion 2K  1K normals-54754-1-00-1736106741.zip"
+# oracle version f1.00
+
+[[mods]]
+id = "Harvest Flora"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/2037/21250"
+download_handler = "nexus"
+file_name = "Harvest Flora v3_0_1-2037.zip"
+# oracle version 0.0.0.0-1204537463
+
+# Guide 23, first step: "Delete the NoMushroomStalks folder" -- an alternative
+# mesh set the guide does not want, 36 files.
+[[mods.actions]]
+action = "file_prune"
+paths = ["NoMushroomStalks"]
+
+# Guide 23, remaining steps -- deferred, as every QAC so far has been:
+#   - Run Harvest [Flora] - DLCFrostcrag.esp through QAC
+#   - Run Harvest [Flora] - Shivering Isles.esp through QAC
+#   - Open Harvest [Flora] - DLCFrostcrag.esp in xEdit & remove the Worldspace group
+#
+# The QACs join the batch run at the end of the build. The Worldspace removal is
+# a different thing -- scripted record deletion, which mudcrab cannot do yet and
+# which Parts 26a #6 and 26b #12 also need. Both plugins are Part 36 merge
+# sources, so nothing downstream depends on them until that merge is built.
+# TODO(qac): Harvest [Flora] - DLCFrostcrag.esp, Harvest [Flora] - Shivering Isles.esp
+# TODO(xedit): remove the Worldspace group from Harvest [Flora] - DLCFrostcrag.esp
+
+[[mods]]
+id = "Improved Flora Harvest Fix"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/20109/31598"
+download_handler = "nexus"
+file_name = "Improved Flora Harvest Fix-20109.7z"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "TreeOPT"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49150/1000021301"
+download_handler = "nexus"
+file_name = "Treeopt-49150-1-0-1549567280.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Rocks retexture"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45881/1000009120"
+download_handler = "nexus"
+file_name = "Rocks retexture 1k-45881-1-0.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Oblivion 2020 Retexture Project - Landscapes and Rocks"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49933/1000033622"
+download_handler = "nexus"
+file_name = "2020 Retexture Project - Landscapes and Rocks-49933-3-0-1675498718.7z"
+# oracle version 3.0.0.0
+
+# Guide 27: "We use a very small fraction of this mod to focus on the coast-side
+# rocks, so once installed delete... meshes, textures > dungeons, textures >
+# landscape, textures > rocks > everything except underwater folder."
+#
+# The "everything except" needs no new machinery: under textures/rocks there is
+# exactly one other directory and 28 loose .dds files, so naming them is both
+# shorter and more honest than an exception rule. 286 files in, 10 left.
+[[mods.actions]]
+action = "file_prune"
+paths = [
+  "meshes",
+  "textures/dungeons",
+  "textures/landscape",
+  "textures/rocks/westweald",
+  "textures/rocks/*.dds",
+]
+
+[[mods]]
+id = "Nice Ice a.k.a. The Hills Have Ice"
+section = ["11 - BASELINE TEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45342/1000007472"
+download_handler = "nexus"
+file_name = "Nice Ice - Icing on the Cake-45342-03.7z"
+# oracle version 3.0.0.0

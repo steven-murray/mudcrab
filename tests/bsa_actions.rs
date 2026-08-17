@@ -290,6 +290,54 @@ fn file_prune_treats_a_bare_directory_name_as_the_whole_folder() {
     assert!(target.join("readme.txt").exists());
 }
 
+/// Guides name folders the way the archive spells them; staging folds them to
+/// lowercase. Matching case-sensitively means every capitalised folder in every
+/// guide instruction fails, which is what Part 11's `NoMushroomStalks` did.
+#[test]
+fn file_prune_matches_a_folder_whose_case_staging_has_already_folded() {
+    let (dir, target) = staged_mod();
+    std::fs::create_dir_all(target.join("nomushroomstalks/meshes")).expect("mkdir");
+    std::fs::write(target.join("nomushroomstalks/meshes/stalk.nif"), b"x").expect("write");
+
+    // The guide's spelling, against the folded folder on disk.
+    run(&[prune(&["NoMushroomStalks"])], dir.path(), &target).expect("prune");
+
+    assert!(!target.join("nomushroomstalks").exists());
+    assert!(target.join("readme.txt").exists(), "unrelated files survive");
+
+    // And the reverse direction: a lowercase pattern against a folder that
+    // kept its capitals, as a mod-supplied path can.
+    let (dir, target) = staged_mod();
+    std::fs::create_dir_all(target.join("Docs")).expect("mkdir");
+    std::fs::write(target.join("Docs/readme.html"), b"x").expect("write");
+    run(&[prune(&["docs"])], dir.path(), &target).expect("prune");
+    assert!(!target.join("Docs").exists());
+}
+
+/// Guide 27 of Part 11: delete everything under `textures/rocks` *except* the
+/// `underwater` folder. `*` must stop at the separator, or the exception is
+/// swallowed -- which is what happened, silently, until the Oracle diff showed
+/// ten files missing that the guide explicitly keeps.
+#[test]
+fn file_prune_star_does_not_reach_into_subfolders() {
+    let (dir, target) = staged_mod();
+    std::fs::create_dir_all(target.join("textures/rocks/underwater")).expect("mkdir");
+    std::fs::write(target.join("textures/rocks/loose01.dds"), b"x").expect("write");
+    std::fs::write(target.join("textures/rocks/underwater/keep.dds"), b"x").expect("write");
+
+    run(&[prune(&["textures/rocks/*.dds"])], dir.path(), &target).expect("prune");
+
+    assert!(!target.join("textures/rocks/loose01.dds").exists(), "direct children go");
+    assert!(
+        target.join("textures/rocks/underwater/keep.dds").exists(),
+        "a file one level deeper is not a direct child and must survive"
+    );
+
+    // `**` still crosses, which is what a bare folder name expands to.
+    run(&[prune(&["textures/rocks/underwater"])], dir.path(), &target).expect("prune");
+    assert!(!target.join("textures/rocks/underwater").exists());
+}
+
 #[test]
 fn file_prune_accepts_a_directory_name_with_a_trailing_slash() {
     let (dir, target) = staged_mod();
