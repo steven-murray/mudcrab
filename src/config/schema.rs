@@ -243,6 +243,15 @@ pub struct IniSetAction {
     /// Path to the INI. Relative to the mod's staged data folder for
     /// `scope = "mod"`, or to the game/profile INI location for `scope = "game"`.
     pub file: String,
+    /// `[Section]` the key belongs to, without the brackets.
+    ///
+    /// Omit it and the key is matched anywhere in the file, which is right for
+    /// the many keys that occur exactly once. When a key occurs in more than
+    /// one section -- Part 14's `Fog.ini` has `Amount` under both `[World]` and
+    /// `[Interior]` -- omitting it is an error rather than a silent write to
+    /// both, because there is no reading of "set Amount" that means both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section: Option<String>,
     pub key: String,
     pub value: IniValue,
     #[serde(default)]

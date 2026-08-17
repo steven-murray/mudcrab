@@ -51,7 +51,47 @@ pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<
         return Ok(());
     }
 
-    apply_ini_set(&ini_path, &action.key, &action.value.0, action.format)
+    apply_ini_set_in_section(
+        &ini_path,
+        action.section.as_deref(),
+        &action.key,
+        &action.value.0,
+        action.format,
+    )
+}
+
+/// The `[Section]` name a header line declares, if it is one.
+fn section_header(line: &str) -> Option<&str> {
+    let trimmed = line.trim();
+    trimmed
+        .strip_prefix('[')
+        .and_then(|rest| rest.strip_suffix(']'))
+}
+
+/// Line range of `[section]`'s body: from just after its header to just before
+/// the next header (or end of file). `None` when the file has no such section.
+///
+/// Trailing blank lines are excluded, so a key appended to a section lands
+/// against the last real entry rather than after the gap that separates it from
+/// the next header.
+fn section_body(lines: &[String], section: &str) -> Option<(usize, usize)> {
+    let start = lines.iter().position(|line| {
+        section_header(line).is_some_and(|name| name.eq_ignore_ascii_case(section))
+    })? + 1;
+
+    let mut end = lines.len();
+    for (offset, line) in lines[start..].iter().enumerate() {
+        if section_header(line).is_some() {
+            end = start + offset;
+            break;
+        }
+    }
+
+    while end > start && lines[end - 1].trim().is_empty() {
+        end -= 1;
+    }
+
+    Some((start, end))
 }
 
 /// Locate a game-scoped INI.
@@ -69,8 +109,20 @@ pub(crate) fn resolve_game_scoped_ini_path(
     Some(settings.game_dir.as_ref()?.join(rel))
 }
 
+/// Section-less shim, kept for the tests that predate sections.
+#[cfg(test)]
 pub(crate) fn apply_ini_set(
     path: &Path,
+    key: &str,
+    value: &str,
+    format: IniSetFormat,
+) -> anyhow::Result<()> {
+    apply_ini_set_in_section(path, None, key, value, format)
+}
+
+pub(crate) fn apply_ini_set_in_section(
+    path: &Path,
+    section: Option<&str>,
     key: &str,
     value: &str,
     format: IniSetFormat,
@@ -91,19 +143,71 @@ pub(crate) fn apply_ini_set(
     // written in the wrong style by an earlier version is repaired rather than
     // preserved.
     let spaced = dominant_spacing(&lines, format);
+    let rendered = render_ini_assignment(key, value, format, spaced);
 
-    let mut replaced = false;
-    for line in &mut lines {
-        if is_ini_key_line(line, key, format) {
-            *line = render_ini_assignment(key, value, format, spaced);
-            replaced = true;
+    // Which lines this edit is allowed to touch, and where a missing key would
+    // be appended. Without a section that is the whole file and the end of it;
+    // with one it is that section's body, so a key the section lacks is added
+    // *inside* it rather than after the last section in the file -- where the
+    // game would read it as belonging to something else entirely.
+    let (range, append_at) = match section {
+        None => (0..lines.len(), lines.len()),
+        Some(name) => match section_body(&lines, name) {
+            Some((start, end)) => (start..end, end),
+            // A section the file does not have yet is created rather than
+            // treated as an error: Oblivion.ini omits sections it has no
+            // non-default keys for, and the guide still asks for keys in them.
+            None => {
+                if lines.last().is_some_and(|line| !line.trim().is_empty()) {
+                    lines.push(String::new());
+                }
+                lines.push(format!("[{name}]"));
+                lines.push(rendered);
+                return write_ini_lines(path, &lines);
+            }
+        },
+    };
+
+    let matches: Vec<usize> = range
+        .filter(|&index| is_ini_key_line(&lines[index], key, format))
+        .collect();
+
+    // Two matches means two different settings that happen to share a name, and
+    // nothing in the request says which was meant. Writing both was the old
+    // behaviour and is never what an author wants -- Part 14's Fog.ini has
+    // `Amount` under both [World] and [Interior], and setting the interior fog
+    // would silently have changed the weather.
+    if matches.len() > 1 && section.is_none() {
+        let sections = matches
+            .iter()
+            .map(|&index| enclosing_section(&lines, index).unwrap_or("(no section)"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        anyhow::bail!(
+            "ini_set '{key}' matches {} lines in {} (sections: {sections}). \
+             Add `section = \"<name>\"` to say which one is meant.",
+            matches.len(),
+            path.display(),
+        );
+    }
+
+    if matches.is_empty() {
+        lines.insert(append_at, rendered);
+    } else {
+        for index in matches {
+            lines[index] = rendered.clone();
         }
     }
 
-    if !replaced {
-        lines.push(render_ini_assignment(key, value, format, spaced));
-    }
+    write_ini_lines(path, &lines)
+}
 
+/// The `[Section]` a line sits under, for error messages.
+fn enclosing_section(lines: &[String], index: usize) -> Option<&str> {
+    lines[..index].iter().rev().find_map(|line| section_header(line))
+}
+
+fn write_ini_lines(path: &Path, lines: &[String]) -> anyhow::Result<()> {
     let mut content = lines.join("\n");
     if !content.ends_with('\n') {
         content.push('\n');

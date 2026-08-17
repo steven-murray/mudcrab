@@ -90,6 +90,11 @@ fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
             ModAction::IniSet(IniSetAction {
                 scope: IniScope::Game,
                 file: "Oblivion.ini".to_string(),
+                // The top-level `[ini]` table is a flat key/value map with no
+                // way to name a section. That is fine while every key it sets
+                // is unique in the file, and `apply_ini_set_in_section` now
+                // errors rather than guessing if one ever is not.
+                section: None,
                 key: key.clone(),
                 value: IniValue(ini_value_to_string(value)),
                 format: IniSetFormat::Standard,
