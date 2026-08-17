@@ -87,10 +87,16 @@ is worth reading in full because most of what it cost was learning, not typing.
   with the Oracle.
 - **The deferred conflict-hiding is fully specified**: 1024 paths recorded in
   `ooo-enhanced-conflict-hidden-files.txt`. The follow-up after Part 24 is a
-  `file_prune` of those, then `pack_bsa --prune_packed` — no conflict-tab logic
-  needed. Note the guide's "Enable Parsing of Archives" line is load-bearing:
-  WAC ships its assets inside a BSA, and without it two of the three conflict
-  categories look like they do not apply.
+  `file_prune` of those, then `pack_bsa --prune_packed`. Note the guide's
+  "Enable Parsing of Archives" line is load-bearing: WAC ships its assets
+  inside a BSA, and without it two of the three conflict categories look like
+  they do not apply.
+- **…but reading that list off the Oracle is a stopgap, not the mechanism.** A
+  real build has no Oracle. Because the modlist is declarative, the list is
+  derivable from the upcoming mods before anything installs — designed in
+  `conflict-resolution-design.md`, to be built by Part 18. The 1024 paths
+  become its test fixture, which is a rare luxury: a new feature with a
+  known-correct expected output.
 
 ## Next sections
 

@@ -101,3 +101,31 @@ Loop:
 3. Implement missing feature in mudcrab.
 4. Re-run until green.
 5. Promote behavior to full TOML translation.
+
+## Step 6: Derive conflict file lists from the modlist, not the Oracle
+
+Status: designed, not built. Design in
+[notes/conflict-resolution-design.md](notes/conflict-resolution-design.md).
+
+Several guide rows say "open the Conflicts tab and hide the files that conflict
+with X" (Part 9 #11, 18 #7, 21 #3, 22 #2). Part 9's was answered by reading the
+answer off the Oracle, which a real build cannot do. Because the modlist is
+declarative, the list is derivable from the upcoming mods before anything is
+installed.
+
+Three pieces, in order:
+
+1. **Staged file index** — "which paths would mod X contribute", including
+   inside a BSA it ships. Built by making layout a *path planner* that install
+   and the index share, so there is one implementation and no extraction; only
+   FOMOD needs a single small file pulled out of the archive.
+2. **`conflicts_with` selector** on `file_prune` / `file_hide`, naming mudcrab
+   mod ids so `validate` catches typos. Direction is declared, not derived —
+   MO2's loose-beats-BSA rule makes priority order an unreliable guide, and
+   Part 9 #11 repacks its own textures mid-row.
+3. **Resolve to explicit paths in a lockfile**, so the build is reproducible
+   and the list is reviewable.
+
+Validate against the 1024 paths already recorded in
+`notes/ooo-enhanced-conflict-hidden-files.txt` — a known-correct expected
+output for a feature that would otherwise be a guess.
