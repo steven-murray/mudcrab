@@ -44,12 +44,19 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
             new_mod.id
         );
     }
-    if new_mod.non_nexus {
-        eprintln!(
+    match (new_mod.non_nexus, new_mod.known_mod_id) {
+        (true, Some(mod_id)) => eprintln!(
+            "warning: '{}' is Nexus mod {mod_id}, but its meta.ini records no file id, so the \
+             descriptor cannot be built. Written as a manual archive with a TODO; resolve the \
+             file id and replace the `path`.",
+            new_mod.id
+        ),
+        (true, None) => eprintln!(
             "warning: '{}' has modid=0 in its meta.ini, so it did not come from Nexus. \
              The block is written with no `path` and a TODO; fill in the source yourself.",
             new_mod.id
-        );
+        ),
+        (false, _) => {}
     }
 
     if let Some(dir) = &mod_dir {
@@ -136,6 +143,7 @@ fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<N
         section: args.sections.clone(),
         file_name,
         version: meta.version.clone(),
+        non_nexus: args.manual,
         ..NewMod::default()
     };
 
@@ -145,9 +153,18 @@ fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<N
             new_mod.download_handler = Some("nexus".to_string());
         }
         NexusSource::NotNexus => new_mod.non_nexus = true,
+        // A real mod id with no file id. Erroring is right when someone is
+        // sitting there to answer it, but the archive is usually already on
+        // disk and the build can proceed without the descriptor -- so --manual
+        // records what is known, flags what is not, and carries on.
+        NexusSource::MissingFileId { mod_id } if args.manual => {
+            new_mod.non_nexus = true;
+            new_mod.known_mod_id = Some(mod_id);
+        }
         NexusSource::MissingFileId { mod_id } => anyhow::bail!(
             "{} has modid={mod_id} but no `1\\fileid` under [installedFiles], so the download \
-             URL cannot be built. Add it with --nexus {mod_id}/<fileid> instead.",
+             URL cannot be built. Add it with --nexus {mod_id}/<fileid>, or with --manual to \
+             record it as a hand-fetched archive and move on.",
             meta_path.display()
         ),
     }
@@ -199,6 +216,7 @@ fn from_nexus(spec: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
         file_name: args.file_name.clone(),
         version: None,
         non_nexus: false,
+        known_mod_id: None,
     })
 }
 

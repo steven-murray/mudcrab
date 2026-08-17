@@ -800,6 +800,7 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
             installation_file.as_deref(),
             meta.nexus_last_modified.as_deref(),
             meta.mod_id,
+            meta.file_id,
         ),
         oracle_installation_file: installation_file,
         plan_file_name,
@@ -826,6 +827,7 @@ pub fn classify_guide_age(
     installation_file: Option<&str>,
     nexus_last_modified: Option<&str>,
     mod_id: Option<u64>,
+    file_id: Option<u64>,
 ) -> GuideAge {
     let name = installation_file.map(str::trim).filter(|name| !name.is_empty());
 
@@ -835,10 +837,14 @@ pub fn classify_guide_age(
     // stamped 2026-01-25 because that is when it was installed here, and duly
     // reported as POST-GUIDE. The archive filename is still fair evidence when
     // it carries a Unix timestamp, so only the Nexus-derived date is dropped.
-    let nexus_last_modified = match mod_id {
-        Some(0) | None => None,
-        Some(_) => nexus_last_modified,
-    };
+    // The date is evidence only if MO2 actually recorded a Nexus *file*. A
+    // missing file id means it did not, whatever the mod id says -- Part 13's
+    // `Oblivion Landskape` is a tesall.ru download whose meta.ini claims
+    // modid=7, which is MO2 bookkeeping rather than provenance, and which slid
+    // straight past a mod-id-only check to be flagged POST-GUIDE.
+    let from_nexus = !matches!(mod_id, Some(0) | None) && !matches!(file_id, Some(0) | None);
+    let nexus_last_modified_raw = nexus_last_modified;
+    let nexus_last_modified = if from_nexus { nexus_last_modified } else { None };
 
     let Some(name) = name else {
         // Without an `installationFile` there is no archive to date. MO2 still
@@ -858,10 +864,14 @@ pub fn classify_guide_age(
         return classify_timestamp(timestamp);
     }
 
-    if matches!(mod_id, Some(0) | None) {
+    // Only worth saying when a date was actually discarded. With no
+    // `nexusLastModified` at all, the filename is the whole story and the
+    // message below says so more usefully.
+    if !from_nexus && nexus_last_modified_raw.is_some() {
         return GuideAge::Unknown {
             reason: format!(
-                "'{name}' is not from Nexus (modid=0), so there is no reliable date for it"
+                "'{name}' has no recorded Nexus file, so its meta.ini date is not \
+                 evidence about the archive"
             ),
         };
     }
@@ -1288,24 +1298,24 @@ mod tests {
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
         assert_eq!(
-            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682)),
+            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(1)),
             GuideAge::PreGuide {
                 timestamp: 1_647_873_144,
                 date: "2022-03-21".to_string()
             }
         );
         assert_eq!(
-            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234)),
+            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(1)),
             GuideAge::PostGuide {
                 timestamp: 1_750_000_000,
                 date: "2025-06-15".to_string()
             }
         );
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039)),
+            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(1)),
             GuideAge::Unknown { .. }
         ));
-        assert!(matches!(classify_guide_age(None, None, Some(1)), GuideAge::Unknown { .. }));
+        assert!(matches!(classify_guide_age(None, None, Some(1), Some(1)), GuideAge::Unknown { .. }));
     }
 
     fn compare_trees(ours: &Path, oracle: &Path) -> ModDiff {
@@ -1373,10 +1383,11 @@ mod tests {
             Some("Evenstar CW LOD-42190-1-2.7z"),
             Some("2012-05-20T03:59:22Z"),
             Some(42190),
+            Some(1),
         );
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"), Some(1));
+        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"), Some(1), Some(1));
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
     }
 
@@ -1385,10 +1396,10 @@ mod tests {
         // A hand-installed mod has no `installationFile`, and MO2's
         // `nexusLastModified` is then just when the folder was written. Reading
         // it would date a 2019 archive to today and flag it POST-GUIDE.
-        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1));
+        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(1));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1));
+        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(1));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 
@@ -1398,24 +1409,36 @@ mod tests {
         // modid=0. MO2 still wrote nexusLastModified=2026-01-25 -- the day it
         // was installed here, not the day the file was published -- and reading
         // it flagged a fifteen-year-old archive as newer than the guide.
-        let age = classify_guide_age(Some("WACv_1beta.7z"), Some("2026-01-25T20:19:46Z"), Some(0));
+        let age = classify_guide_age(Some("WACv_1beta.7z"), Some("2026-01-25T20:19:46Z"), Some(0), Some(0));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
         match age {
-            GuideAge::Unknown { reason } => assert!(reason.contains("not from Nexus"), "{reason}"),
+            GuideAge::Unknown { reason } => assert!(reason.contains("no recorded Nexus file"), "{reason}"),
             other => panic!("expected Unknown, got {other:?}"),
         }
+
+        // Part 13's `Oblivion Landskape`: a tesall.ru download whose meta.ini
+        // claims modid=7 and records no file id. A mod-id-only check let this
+        // through and flagged a hand-downloaded archive POST-GUIDE.
+        let age = classify_guide_age(
+            Some("Oblivion landskape.7z"),
+            Some("2026-01-25T20:19:46Z"),
+            Some(7),
+            None,
+        );
+        assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
         // The same date on a real Nexus mod is still usable.
         let age = classify_guide_age(
             Some("WACv_1beta.7z"),
             Some("2026-01-25T20:19:46Z"),
             Some(1318),
+            Some(1),
         );
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
 
         // A filename timestamp names *this file* whoever hosted it, so it
         // survives modid=0 -- only the Nexus-derived date is dropped.
-        let age = classify_guide_age(Some("Mod-1-0-1647873144.7z"), None, Some(0));
+        let age = classify_guide_age(Some("Mod-1-0-1647873144.7z"), None, Some(0), Some(0));
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
@@ -1427,6 +1450,7 @@ mod tests {
             Some("Better Fort Aurus-50682-1-1-1647873144.7z"),
             Some("2026-01-01T00:00:00Z"),
             Some(50682),
+            Some(1),
         );
         match age {
             GuideAge::PreGuide { date, .. } => assert_eq!(date, "2022-03-21"),
@@ -1437,7 +1461,7 @@ mod tests {
     #[test]
     fn an_unparseable_meta_ini_date_leaves_the_age_unknown() {
         for value in ["", "not a date", "2012-13-01T00:00:00Z", "2012-05-32"] {
-            let age = classify_guide_age(Some("Hand Named.7z"), Some(value), Some(1));
+            let age = classify_guide_age(Some("Hand Named.7z"), Some(value), Some(1), Some(1));
             assert!(
                 matches!(age, GuideAge::Unknown { .. }),
                 "'{value}' should not parse as a date, got {age:?}"

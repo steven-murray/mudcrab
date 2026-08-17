@@ -33,6 +33,9 @@ pub struct NewMod {
     /// The source is not on Nexus: emit the block with no `path` and a TODO, so
     /// the gap is visible in the file rather than filled with a guessed URL.
     pub non_nexus: bool,
+    /// A Nexus mod id known without a file id, so the descriptor cannot be
+    /// built yet. Recorded in the TODO so the lookup has somewhere to start.
+    pub known_mod_id: Option<u64>,
 }
 
 /// Where a rendered block will be spliced in.
@@ -136,12 +139,22 @@ pub fn render_block(new_mod: &NewMod) -> String {
             .as_deref()
             .map(|name| format!("path = \"manual:{name}\""))
             .unwrap_or_else(|| "path = \"manual:<archive filename>\"".to_string());
-        lines.push(format!(
-            "# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use\n\
-             # {hint}\n\
-             # and record where to get it in a comment. A local path plus download_handler \
-             also works."
-        ));
+        match new_mod.known_mod_id {
+            // Half-recorded: the mod id is real, only the file id is missing.
+            // Saying so turns the TODO into a lookup rather than a search.
+            Some(mod_id) => lines.push(format!(
+                "# TODO: Nexus mod {mod_id}, file id not recorded by MO2, so the descriptor\n\
+                 # cannot be built. Resolve it (`mudcrab identify`, or the mod's files tab)\n\
+                 # and replace with path = \"nexus:oblivion/{mod_id}/<fileid>\". Until then:\n\
+                 # {hint}"
+            )),
+            None => lines.push(format!(
+                "# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use\n\
+                 # {hint}\n\
+                 # and record where to get it in a comment. A local path plus download_handler \
+                 also works."
+            )),
+        }
     }
     if let Some(version) = &new_mod.version {
         lines.push(format!("# oracle version {version}"));
@@ -779,6 +792,7 @@ mod tests {
             file_name: None,
             version: None,
             non_nexus: false,
+            known_mod_id: None,
         };
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
@@ -803,6 +817,7 @@ mod tests {
             file_name: None,
             version: None,
             non_nexus: false,
+            known_mod_id: None,
         };
 
         let err = plan_insertion_at(text, &mods, &new_mod, &before_section("9 - NOPE"))
@@ -824,6 +839,7 @@ mod tests {
             file_name: None,
             version: None,
             non_nexus: false,
+            known_mod_id: None,
         };
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
