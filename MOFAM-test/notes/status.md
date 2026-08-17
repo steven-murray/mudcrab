@@ -3,7 +3,7 @@
 Rolling status. Update it when a section moves; it exists so a fresh context
 can pick up without re-reading the transcript.
 
-Last updated: 2026-08-16.
+Last updated: 2026-08-17.
 
 ## Done
 
@@ -16,7 +16,9 @@ Last updated: 2026-08-16.
   `--section`/`--only` filters, `--archive-search-path`, `install --force`,
   `add --before-mod`, `inspect` of a `.bsa`, native BSA reader/writer,
   `pack_bsa` (with `prune_packed`) / `extract_bsa` / `create_dummy_plugin` /
-  `file_prune` / `file_hide` / `file_move`. 356 tests, clippy clean.
+  `file_prune` / `file_hide` / `file_move`, and `identify` (Nexus descriptor
+  from an archive's MD5, with a file-list fallback for OLD FILES downloads).
+  367 tests, clippy clean.
 - **Merges**: all six reproduce zMerge semantically. Unique Forts and TACE
   verified in game. Prebash rebuilt without `ORC.esp` for the Oracle.
 - **Parts 1, 2, 3, 4, 6** authored (105 mods, pre-existing).
@@ -67,30 +69,33 @@ This mod now diffs wholesale against the Oracle, like ORC.
 All 37 MOO settings were verified present in 4.9.4.2 before authoring and read
 back from the staged INI after install.
 
-## Part 9 (Overhauls: Oscuro) -- 11 of 14, two rows blocked
+## Done: Part 9 (Overhauls: Oscuro) — 13 mods
 
-5 identical, 6 differing and all explained; see `part-09-overhauls-oscuro.md`.
-The BSA round trip was routine. What stopped work was downloads:
+Both download blockers cleared. See `part-09-overhauls-oscuro.md`; the section
+is worth reading in full because most of what it cost was learning, not typing.
 
-- **Row 7 (EVE)** -- only the `.omod` build is on this machine; the guide asks
-  for the BAIN archive. Needs a Nexus download.
-- **Row 11's Resources archive** -- the 3.5 GB download is **corrupt** (7z and
-  bsdtar both reject it). Needs re-downloading.
-
-Both need `NEXUS_API_KEY`, which is not set. Everything else in the section is
-built and verified.
-
-**Deferred by the guide itself**: OOO Enhanced's conflict-tab hiding and its
-textures repack reference mods from Parts 10 and 24, so they wait until after
-Part 24 -- the guide says so explicitly. Packing early would bake in the files
-the hiding removes.
-
-**Open**: `Seamless - HGEC Female` -- guide says C-Cup, the Oracle installed
-E-Cup. Following the guide. Visible in game; worth a look once EVE lands.
+- Rows 1+3 are the **combine/repack archetype** the plan predicted: one mod from
+  two archives, `extract_bsa` then `pack_bsa --prune_packed`. No BAE, no BSArch,
+  no WINE. 4406 + 1554 = the Oracle's 5960 files in its 721 folders.
+- **OOO Enhanced is pinned to the guide's pair**, 5.3 PreRelease
+  (`47187/1000040942`) + 5.3b Resources (`47187/1000041194`). 5.33 has been
+  pulled from Nexus. `--from-oracle` had given 5.33 for the plugin half, which
+  is how the halves ended up mismatched — a reminder that it is a scaffold for
+  provenance, not an authority on which file the guide meant.
+- **EVE and Seamless are both C-Cup**, from the BAIN build. The Oracle has been
+  reinstalled to match, so the guide has now won both disagreements it has had
+  with the Oracle.
+- **The deferred conflict-hiding is fully specified**: 1024 paths recorded in
+  `ooo-enhanced-conflict-hidden-files.txt`. The follow-up after Part 24 is a
+  `file_prune` of those, then `pack_bsa --prune_packed` — no conflict-tab logic
+  needed. Note the guide's "Enable Parsing of Archives" line is load-bearing:
+  WAC ships its assets inside a BSA, and without it two of the three conflict
+  categories look like they do not apply.
 
 ## Next sections
 
-Guide order from Part 10 (WAC). Most rows are trivial; the ones needing new features
+Guide order from **Part 10 (WAC)**. Worth doing early in it: re-check the WAC
+side of Part 9's conflict list, since WAC is what makes those files visible. Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at
@@ -112,9 +117,15 @@ since OOO Enhanced's resources are most of that section's content.
 - `Bruma Frostcrag Spire LOD.esp` is in `plugins` for now. Part 36 merges it
   into Prebash, and the validator will then require its removal. The same
   applies to 9 of Part 7's 14 plugins -- see that section's notes.
-- Section names are inconsistent: Parts 5 and 7 use the Oracle's numbered
-  separators (`7 - CHARACTER AND NPCS`), Parts 1-4 and 6 use bare names. Worth
-  one normalising pass, not worth churning mid-build.
+- Section names are inconsistent: Parts 5, 7, 8 and 9 use the Oracle's numbered
+  separators, Parts 1-4 and 6 use bare names. Worth one normalising pass, not
+  worth churning mid-build.
+- **Staged directories are lowercase everywhere** (3866 of them, verified). The
+  rule: fold on the last hop into the mod's own folder, preserve in staging,
+  because FOMOD and BAIN scripts name their sources in the archive's casing.
+- **LOOT has a 180s timeout.** It opens a GUI needing manual sorting, so an
+  unattended run stalls on it; the timeout turns a silent hang into an error.
+  Doing the sort through libloot instead is the real fix, and is not done.
 - Six mods legitimately have no Oracle counterpart and show as extras in
   `diff`: `xOBSE`, four `No Havoc Objects` splits, `T4UT - Menus Repolished`.
 - 51 Oracle mods post-date the March 2025 guide; `diff` flags them

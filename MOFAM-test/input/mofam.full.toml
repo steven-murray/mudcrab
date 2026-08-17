@@ -2371,9 +2371,9 @@ id = "OOO Enhanced"
 section = ["9 - OVERHAULS OSCURO"]
 
 [[mods.archives]]
-path = "nexus:oblivion/47187/1000042164"
+path = "nexus:oblivion/47187/1000040942"
 download_handler = "nexus"
-file_name = "OOO Enhanced-47187-5-33-1748819433.7z"
+file_name = "OOO Enhanced-47187-5-3-Pre-release-1740353484.rar"
 layout = "bain"
 bain_subpackages = [
   "00 Base (No resources)",
@@ -2384,7 +2384,7 @@ bain_subpackages = [
   "30 Shivering Isles (REQUIRES OOO SI)",
   "80 Av Latta Magica",
 ]
-# oracle version 5.33.0.0
+# guide version 5.3 Pre-release; 5.33 has been pulled from Nexus
 
 # Guide 11, second archive: "5.3b Resources". The 3.5 GB
 # OOO Enhanced-47187-5-33-1748819369.7z on this machine is a corrupt download of

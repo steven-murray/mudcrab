@@ -5,103 +5,115 @@ early section and it was, though not for the reasons expected: the BSA round
 trip turned out to be routine, and the two things that actually stopped work
 were a missing download and a corrupt one.
 
-**Status: 11 of 14 mods authored and installed — 5 identical, 6 differing and
+**Status: 13 mods, 8 byte-for-byte identical — 5 identical, 6 differing and
 all six explained. Two rows blocked on downloads, one step deferred by the
 guide's own instruction.**
 
 | difference | mods | why |
 |---|---|---|
-| plugin hidden in the Oracle | 3 (10 plugins) | Part 36 merge sources, as in Parts 7-8 |
-| `Oscuro's_Oblivion_Overhaul.bsa` size | 1 | no payload dedup — contents identical |
+| plugin hidden in the Oracle | 2 | Part 36 merge sources, as in Parts 7-8 |
+| `Oscuro's_Oblivion_Overhaul.bsa` size | 1 | no payload dedup — same 5960 files, same payload bytes, same flags |
+| loose textures vs a packed BSA | 1 | the repack is deferred until after Part 24, deliberately |
 | a readme | 1 | dropped when the `Data/` wrapper is unwrapped |
-| 32 body meshes | 1 | guide says C-Cup, Oracle used E-Cup — see below |
 
-## Blocked: two rows need Nexus downloads
+## Both download blockers are resolved
 
-Neither is a modelling problem. Both need `NEXUS_API_KEY` set, or the files
-fetched by hand.
+Two rows were blocked on downloads; both are in.
 
-### Row 7 — EVE HGEC Equipment Replacer for OOO
-
-The guide asks for **"EVE for Oscuro Oblivion Overhaul 1_3 BAIN"**. The only
-copy on this machine is
-`EVE for Oscuros Oblivion Overhaul 1_3 OMOD-24078.omod` — the **OMOD** build of
-the same mod, which is what the Oracle installed.
-
-An OMOD is a zip holding `data` (one concatenated 7z blob of every file),
-`data.crc` (the manifest), `plugins`, `config` and a `script`. Reading one means
-implementing OBMM's container format: splitting the blob by the CRC manifest's
-sizes. That is real work for a single mod, and pointless when the guide asks for
-the BAIN archive anyway — which is a plain 7z that mudcrab already handles.
-
-**Action: download the BAIN file from mod 24078.** Then the row is an ordinary
-three-subpackage BAIN entry (00 Core, 10 Equipment Replacer Upperbody - Normal
-C-Cup, 15 Equipment Replacer Lowerbody - Normal), identical in shape to row 8.
-
-### Row 11, second archive — OOO Enhanced 5.3 Resources
-
-`OOO Enhanced-47187-5-33-1748819369.7z`, 3.5 GB, **is corrupt**:
-
-```
-7z:      Headers Error / There are data after the end of archive
-bsdtar:  Unexpected Property ID = 73
-```
-
-Two independent readers reject it, so this is the download and not a tool
-quirk. `fileID=1000042163` on mod 47187.
-
-**Action: re-download.** Until then the OOO Enhanced row installs only its first
-archive, and the Oracle's `OOO Enhanced 5.3 (03.25) - Resources` folder (3633
-files) has no counterpart on our side.
-
-## Deferred by the guide: OOO Enhanced's conflict-hiding and repack
-
-Row 11's post-install block hides files that lose conflicts against
-**Colourful Clothing** (Part 24) and win over **Waalx's Animals and Creatures**
-(Part 10), deletes the hidden ones, then packs the remaining textures into
-`OOO Enhanced.bsa`.
-
-None of those mods exist yet, so the step cannot be performed now — and the
-guide says as much itself:
-
-> Note we will return to this install of the Resources to optimise the build
-> later, a REMINDER! will be added once Colourful Clothing Collection in Part 24
-> has been concluded.
-
-The packing has to wait with it: packing first would bake in exactly the files
-the hiding is meant to remove. **Revisit after Part 24**, once the Resources
-archive is downloadable again.
-
-This also answers the plan's open question about conflict-tab hiding needing a
-whole-modlist design pass. It does — but not yet, and not for this section.
+- **Row 7 (EVE)** now uses the BAIN build the guide names,
+  `nexus:oblivion/24078/42364`. The Oracle had installed the **OMOD** build; it
+  has since been reinstalled from the same BAIN with the same three
+  subpackages, so the two agree.
+- **Row 11's Resources** is `nexus:oblivion/47187/1000041194`, the 5.3b file.
+  The 3.5 GB `OOO Enhanced-47187-5-33-...7z` on this machine is a **corrupt**
+  download of a different build; 7z reports a headers error and bsdtar an
+  unexpected property id. It is not used.
 
 ## OOO Enhanced: the two halves must be the same version
 
 Row 11 installs two archives, plugins and resources, and they have to match.
-This was got wrong first time and is worth recording, because the mistake came
-from trusting the wrong source.
+Getting it wrong is easy and the diff is what caught it.
 
 `add --from-oracle` took the plugin half from the Oracle's `meta.ini`, which
-records **5.33**. The guide asks for **"5.3 - PreRelease & 5.3b Resources"**.
-Nobody noticed until the resources half arrived as 5.3b and the diff showed 197
-differing meshes — a mismatched pair, 5.33 plugins against 5.3b resources, which
-is a combination neither the guide nor the Oracle ever ran.
+recorded **5.33**. The guide asks for **"5.3 - PreRelease & 5.3b Resources"**.
+That went unnoticed until the resources half arrived as 5.3b and the diff showed
+197 differing meshes — a mismatched pair that neither the guide nor the Oracle
+ever ran.
 
-The Oracle runs a coherent updated pair (5.33 + 5.33). That is not available:
-**5.33 has since been pulled from Nexus.** So this list uses the guide's exact
-pair, 5.3 PreRelease + 5.3b, and diverges from the Oracle on both halves the way
-MOO did before the Oracle was downgraded to match.
+**Resolved**: 5.33 has since been pulled from Nexus, so the guide's pair is the
+only coherent option. Both halves are now 5.3 PreRelease
+(`nexus:oblivion/47187/1000040942`) plus 5.3b Resources, and the Oracle was
+moved to match. Subpackage names are identical between 5.3 and 5.33, so the
+seven selections are unchanged.
 
-The subpackage names are identical between 5.3 and 5.33, so the seven
-selections are unchanged.
+The plugin half is the one archive here that neither MO2 nor a hash lookup could
+identify — it lives in the mod's OLD FILES section, which Nexus's MD5 index does
+not cover, and MO2 recorded `fileID=0`. That is what `identify`'s file-list
+fallback exists for.
 
-The lesson is the one from Part 7 restated: `--from-oracle` is a scaffold for
-provenance, not an authority on *which file the guide meant*. Where a guide row
-names a version, the row's version comes from the guide.
+The lesson restates Part 7's: **`--from-oracle` is a scaffold for provenance,
+not an authority on which file the guide meant.** Where a guide row names a
+version, the version comes from the guide.
+
+## The conflict-hiding step, and what it actually removes
+
+Row 11's post-install block hides files conflicting with **Colorful Clothing**
+(Part 24) and **WAC** (Part 10), deletes them, then packs the remaining textures
+into `OOO Enhanced.bsa`. Neither mod exists in our build yet, and the guide says
+to return after Part 24, so **this stays deferred** — packing early would archive
+exactly the files the hiding removes.
+
+The Oracle has now performed it, so the answer is read off rather than guessed.
+Against the 5.3b archive's 8427 files, **1024 are removed**, listed in
+`ooo-enhanced-conflict-hidden-files.txt`:
+
+| files | area | conflicting mod |
+|---|---|---|
+| 472 | `textures/clothes` | Colorful Clothing (AI Enhanced upper/middleclass, and the Collection) |
+| 321 | `textures/menus` | WAC |
+| 196 | `textures/realswords` | WAC |
+| 28 | `textures/menus50`, `menus80` | WAC |
+| 7 | creatures, clutter, armor | WAC |
+
+Plus 13 genuine deletions, mostly `thumbs.db`.
+
+That makes our follow-up much simpler than the plan feared: a `file_prune` of
+1024 recorded paths, then `pack_bsa` with `prune_packed`. **No conflict-tab
+logic is needed, because the answer is already written down.** The plan's open
+question about conflict hiding requiring a whole-modlist design pass is answered
+for this section: not needed.
+
+### "Enable Parsing of Archives" is the load-bearing detail
+
+The guide mentions it in passing and it decides whether this step works at all.
+**WAC ships its assets inside a BSA**, so without archive parsing MO2's conflict
+tabs show nothing against it, and two of the guide's three categories look like
+they simply do not apply. A first pass found only the clothing conflicts for
+exactly that reason.
+
+### The guide's mod names do not match the mods
+
+The other reason a first pass comes up short, and a trap that will recur:
+
+| the guide says | the mod is actually called |
+|---|---|
+| AI Enhanced - Colourful Clothing - Upperclass + Middleclass | `AI Enhanced - Colorful Clothing - Upperclass` **and** `- Middleclass` (two mods, American spelling) |
+| Colourful Clothing - Collection - Seamless OCOv2 | `Colorful Clothing - Collection` (no `- Seamless OCOv2` suffix) |
+| Waalx's Animals and Creatures | `WAC Waalx Animals & Creatures` |
+
+### Hide, then delete, *then* pack
+
+The ordering matters: *"search for 'mohidden' & delete the files. **Lastly**,
+BSArch the textures folder"*. Packing before deleting puts the hidden files
+*into* the archive. It still works — the game asks for `x.dds` and the archive
+holds `x.dds.mohidden` — but the archive carries them. On the first attempt that
+was **1024 of 4604 files, about 467 MiB of a 1892 MiB archive**, unreachable.
+Since repacked.
 
 ## Guide and Oracle disagree — `Seamless - HGEC Female` cup size
 
-**Unresolved. Following the guide; 32 meshes differ from the Oracle.**
+**Resolved: the guide was right.** The Oracle has been reinstalled with C-Cup on
+both EVE and Seamless, from the BAIN build, so the two now agree.
 
 Guide row 8 lists three subpackages, the same three as row 7:
 
@@ -121,9 +133,9 @@ Oracle used E-Cup in row 8 and installed row 7 from an OMOD whose own script
 chose, leaving no record of what it picked. Comparing meshes cannot settle it:
 Seamless replaces EVE's files outright, so their sizes differ either way.
 
-Following the guide, as in Part 7's Khajiit head, which the user later confirmed
-the guide had right. **This one is visible in game on female NPCs wearing the
-affected armours**, so it is worth a look once row 7's EVE download lands.
+Followed the guide, as in Part 7's Khajiit head. That is now two out of two for
+the guide over the Oracle where the two disagreed, which is the whole reason for
+the practice.
 
 ## Rows 1 + 3 as one mod: the combine/repack archetype
 
@@ -200,3 +212,14 @@ stall silently on the last step, with no way to tell a hang from slow progress.
   optional folder". Row 9 parks
   `OOOShiveringIsles_Optional_CrucibleEdits.esp` in `optional/`, MO2's
   convention for a plugin kept but out of the load order.
+
+## A side effect of reinstalling in the Oracle
+
+Reinstalling `OOO Enhanced` cleared its eight `.mohidden` plugins, because a
+fresh install has none. All eight are Prebash merge sources, so the Oracle now
+has both the merge *and* its sources active — which double-loads those records
+until the hides are reapplied or the merge is rebuilt.
+
+Harmless for our comparison (it makes that mod match ours exactly, since ours
+are active too), but worth knowing before playing the Oracle. The same applies
+to any Oracle mod reinstalled after its merge was built.
