@@ -67,6 +67,9 @@ cannot go stale:
 (MediaFire, linked directly from the guide), and `TD_aesthetics` (a blogspot
 page). All `manual:`.
 
-`TD_Unique_Skingrad` also needed a layout: the archive holds three data folders
-(`Data`, `Eng/Data`, `TD_Unique_Skingrad_BC patch/Data`) and auto-detection
-correctly refuses to guess. The Oracle installed the plain top-level `Data`.
+`TD_Unique_Skingrad` also needed a layout: the archive scatters plugins across
+**four** locations — `Data/`, `Eng/Data/`, `TD_Unique_Skingrad_BC patch/Data/`,
+and `Eng/TD_Unique_Skingrad_BC patch/`, the last with its `.esp` sitting
+directly in the folder rather than under a `Data/` of its own. Auto-detection
+correctly refuses to guess between them. The Oracle installed the plain
+top-level `Data`.
