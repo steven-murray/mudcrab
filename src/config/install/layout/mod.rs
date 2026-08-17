@@ -378,6 +378,20 @@ pub(crate) fn extract_archive(
         return extract_archive_with_bain_layout(source, target_root, archive, filters);
     }
 
+    // `simple` says the archive root *is* the data folder, on the author's
+    // authority. It used to fall through to auto-detection, which made the
+    // setting silently inert -- and worse than inert for an archive auto
+    // detection cannot classify, since declaring the answer explicitly still
+    // got you the guess. Part 10's WAC archive is exactly that: its plugins sit
+    // in a `WAC_Natural_Habitat_by_Max_Tael/` subfolder that matches none of
+    // the layouts detection knows, so it is rejected outright even though the
+    // two files this list wants are plainly at the root.
+    if archive.layout == Some(ArchiveLayout::Simple) {
+        return with_staged_archive(source, target_root, |staging_dir| {
+            copy_filtered_tree_folded(staging_dir, target_root, filters)
+        });
+    }
+
     let has_data_folder = archive
         .data_folder
         .as_ref()

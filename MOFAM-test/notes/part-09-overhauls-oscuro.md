@@ -63,25 +63,63 @@ into `OOO Enhanced.bsa`. Neither mod exists in our build yet, and the guide says
 to return after Part 24, so **this stays deferred** — packing early would archive
 exactly the files the hiding removes.
 
-The Oracle has now performed it, so the answer is read off rather than guessed.
-Against the 5.3b archive's 8427 files, **1024 are removed**, listed in
-`ooo-enhanced-conflict-hidden-files.txt`:
+The Oracle has now performed it, so the answer can be read off. **The first
+attempt at reading it off was wrong in three separate ways**, all corrected
+during Part 10 once WAC was installed and the two sides could actually be
+intersected. Recorded here because each mistake has a lesson.
 
-| files | area | conflicting mod |
+Against the 5.3b archive's 8427 files, **1738 are removed** — not 1024. The
+recomputation walks both installs, strips the Oracle BSA's doubled prefix (see
+below), and lands with **nothing unaccounted for**:
+
+| files | area | claimed by |
 |---|---|---|
-| 472 | `textures/clothes` | Colorful Clothing (AI Enhanced upper/middleclass, and the Collection) |
-| 321 | `textures/menus` | WAC |
-| 196 | `textures/realswords` | WAC |
-| 28 | `textures/menus50`, `menus80` | WAC |
-| 7 | creatures, clutter, armor | WAC |
+| 466 | `meshes/realswords` (270), `textures/realswords` (196) | WAC |
+| 98 | `textures/menus` | WAC |
+| 13 | creatures, clutter, armor, idleobjects | WAC |
+| 898 | `meshes/clothes` (425), `textures/clothes` (473) | the three clothing mods |
+| 250 | `textures/menus`, `menus50`, `menus80` | the three clothing mods |
+| 13 | `thumbs.db` | nobody — plain junk |
 
-Plus 13 genuine deletions, mostly `thumbs.db`.
+**577 to WAC, 1148 to clothing, 13 to neither.** The conflict set (1725) is in
+`ooo-enhanced-conflict-hidden-files.txt`; the `thumbs.db` are separate, in
+`ooo-enhanced-thumbs-db.txt`, because they are not conflict-driven and a
+`conflicts_with` selector will never produce them.
 
-That makes our follow-up much simpler than the plan feared: a `file_prune` of
-1024 recorded paths, then `pack_bsa` with `prune_packed`. **No conflict-tab
-logic is needed, because the answer is already written down.** The plan's open
-question about conflict hiding requiring a whole-modlist design pass is answered
-for this section: not needed.
+### What the first pass got wrong
+
+**1. The count was never in the file.** The notes said 1024 paths; the file has
+only ever held 247. Nobody checked the number against the artefact it described.
+This is Part 9's own lesson — *a plausible number is not a verified one* —
+recurring one level up, in the notes rather than the code.
+
+**2. Meshes were missed entirely.** The original table lists only textures. 701
+of the 1738 removals are meshes (`meshes/clothes`, `meshes/realswords`,
+`meshes/creatures`, `meshes/idleobjects`). The guide's closing step says to pack
+"the textures folder", which is easy to read backwards as "textures are all this
+step touches" — but the hiding happens across the whole mod.
+
+**3. `Colourful Clothing - Collection - Seamless OCOv2` is the mod's real
+name**, spelled exactly as the guide spells it, suffix and British spelling and
+all. The table below used to claim the suffix did not exist. It does; only the
+two `AI Enhanced` mods use the American spelling. Correcting that took the
+unexplained remainder from 926 to 13.
+
+The follow-up after Part 24 is unchanged in shape — prune, then `pack_bsa` with
+`prune_packed` — but this list is now a **test fixture, not the mechanism**. See
+`conflict-resolution-design.md`: a real build has no Oracle, and the derivation
+below shows the intended mechanism working.
+
+### Deriving it instead of reading it — validated in Part 10
+
+With WAC installed, the WAC half stops being something to look up. Intersect
+OOO Enhanced's file set with WAC's BSA contents and **577 files fall out** — the
+exact set the Oracle removed under "Winning File conflicts → Overwritten mods".
+Do the same against the three clothing mods and the other **1148** fall out. The
+only residue is 13 `thumbs.db`.
+
+That is precisely the `conflicts_with` selector's algorithm, run by hand. The
+design is sound; what remains is to build it.
 
 ### "Enable Parsing of Archives" is the load-bearing detail
 
@@ -98,8 +136,13 @@ The other reason a first pass comes up short, and a trap that will recur:
 | the guide says | the mod is actually called |
 |---|---|
 | AI Enhanced - Colourful Clothing - Upperclass + Middleclass | `AI Enhanced - Colorful Clothing - Upperclass` **and** `- Middleclass` (two mods, American spelling) |
-| Colourful Clothing - Collection - Seamless OCOv2 | `Colorful Clothing - Collection` (no `- Seamless OCOv2` suffix) |
 | Waalx's Animals and Creatures | `WAC Waalx Animals & Creatures` |
+
+`Colourful Clothing - Collection - Seamless OCOv2` was listed here as a third
+mismatch. It is not one — that is the mod's exact name. Assuming the guide was
+wrong a third time, because it had been wrong twice, put 926 files in the
+"unexplained" pile until Part 10 checked the mod list instead of the memory of
+it.
 
 ### Hide, then delete, *then* pack
 
@@ -212,6 +255,33 @@ stall silently on the last step, with no way to tell a hang from slow progress.
   optional folder". Row 9 parks
   `OOOShiveringIsles_Optional_CrucibleEdits.esp` in `optional/`, MO2's
   convention for a plugin kept but out of the load order.
+
+## The Oracle's `OOO Enhanced.bsa` is packed one level too deep
+
+Found while recomputing the numbers above, and it affects the Oracle in play,
+not just our comparison.
+
+Every path inside the Oracle's `OOO Enhanced.bsa` is stored as
+`textures\textures\...`. A known-good archive from the same install stores
+`meshes\...` with no doubling, so this is not how mudcrab reads BSAs — it is
+what the file contains:
+
+```
+Oscuro's_Oblivion_Overhaul.bsa   meshes\alexanderw\impwings.nif
+OOO Enhanced.bsa                 textures\textures\akcreatures\lichking\boots.dds
+```
+
+Oblivion asks the archive for `textures\<path>`. Nothing answers to
+`textures\textures\<path>`, so **all 3580 textures in that archive are
+unreachable** and the game silently falls back to whatever else provides them.
+The cause is BSArch being pointed one directory above the one intended, so the
+`textures` folder name is included *and* prefixed.
+
+Worth knowing before playing the Oracle, alongside the merge-source note below.
+Our own `pack_bsa` writes paths relative to the folder it is given, so the
+deferred repack after Part 24 will not reproduce it — but this is exactly the
+kind of error a size-only comparison would never catch, which is why the
+recomputation walked paths rather than counting bytes.
 
 ## A side effect of reinstalling in the Oracle
 

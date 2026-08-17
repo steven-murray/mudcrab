@@ -17,6 +17,7 @@ pub struct DownloadSettings {
     pub archive_search_paths: Vec<PathBuf>,
 }
 
+#[derive(Debug)]
 enum DownloadOutcome {
     Cached(PathBuf),
     /// Adopted from an `--archive-search-path` rather than fetched.
@@ -156,6 +157,21 @@ async fn download_with_retry(
         return Ok(DownloadOutcome::Local(linked));
     }
 
+    // A manual archive is one no automated fetch can reach -- a login-walled
+    // forum host, a dead link, a file the author distributes by hand. The two
+    // steps above are the only ones that can ever satisfy it, so fail here
+    // rather than falling into the retry loop: retrying a fetch that does not
+    // exist just delays the same message three times over.
+    if resolve_handler(path, handler) == "manual" {
+        anyhow::bail!(
+            "archive '{}' must be downloaded by hand -- it is not fetchable from any \
+             automated source. Put it in one of the --archive-search-path directories \
+             (or the download cache) and re-run. Searched: {}",
+            file_name.unwrap_or(path),
+            describe_search_paths(&settings.archive_search_paths),
+        );
+    }
+
     let attempts = settings.retry.max(1);
 
     for attempt in 1..=attempts {
@@ -214,6 +230,13 @@ async fn download_once(
             copy_local(path, destination)?;
             Ok(None)
         }
+        // Unreachable in the normal flow: download_with_retry bails on manual
+        // before the retry loop. Stated anyway so a future caller that reaches
+        // download_once directly gets the same answer rather than "unsupported".
+        "manual" => anyhow::bail!(
+            "archive {} is marked manual and cannot be fetched automatically",
+            path
+        ),
         "http" => download_http(client, path, destination).await,
         "nexus" => download_nexus(client, path, destination, settings).await,
         other => anyhow::bail!("unsupported download handler {other} for source {}", path),
@@ -228,11 +251,31 @@ fn resolve_handler<'a>(path: &str, handler: Option<&'a str>) -> &'a str {
     if path.starts_with("nexus:") || path.contains("nexusmods.com") {
         return "nexus";
     }
+    if path.starts_with("manual:") {
+        return "manual";
+    }
     if path.starts_with("http://") || path.starts_with("https://") {
         return "http";
     }
 
     "local"
+}
+
+/// The search paths as the user would have to type them, for error messages.
+///
+/// An empty list is its own diagnosis: the archive is unfetchable *and* nothing
+/// was configured to look for it in, which is a different mistake from "looked
+/// and did not find it" and should not read the same.
+fn describe_search_paths(paths: &[std::path::PathBuf]) -> String {
+    if paths.is_empty() {
+        return "(no --archive-search-path was given)".to_string();
+    }
+
+    paths
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn log_download_outcome(mod_id: &str, source: &str, outcome: &DownloadOutcome) {
@@ -725,6 +768,59 @@ mod tests {
             game_root_files: vec![],
         };
         assert_eq!(resolve_handler(scheme.path.as_deref().unwrap_or_default(), scheme.download_handler.as_deref()), "nexus");
+    }
+
+    #[test]
+    fn resolves_manual_handler_from_scheme_and_from_explicit_setting() {
+        assert_eq!(resolve_handler("manual:WACv_1beta.7z", None), "manual");
+        assert_eq!(resolve_handler("WACv_1beta.7z", Some("manual")), "manual");
+
+        // A bare filename with no handler is still `local`; `manual` has to be
+        // asked for, or every unresolvable path would claim to need a human.
+        assert_eq!(resolve_handler("WACv_1beta.7z", None), "local");
+    }
+
+    #[tokio::test]
+    async fn manual_archive_missing_from_every_search_path_names_the_file_and_the_paths() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let cache = temp.path().join("cache");
+        let searched = temp.path().join("downloads");
+        std::fs::create_dir_all(&cache).expect("cache dir");
+        std::fs::create_dir_all(&searched).expect("search dir");
+
+        let settings = DownloadSettings {
+            cache_dir: cache.clone(),
+            archive_search_paths: vec![searched.clone()],
+            ..Default::default()
+        };
+
+        let err = download_with_retry(
+            &Client::new(),
+            "manual:WACv_1beta.7z",
+            Some("WACv_1beta.7z"),
+            None,
+            &cache.join("WAC_0_manual"),
+            &settings,
+        )
+        .await
+        .expect_err("a manual archive that is not on disk cannot succeed");
+
+        let message = err.to_string();
+        // The file name, not the descriptor: it is what the user has to go and
+        // find, and it is what `link_local_archive` matches on.
+        assert!(message.contains("WACv_1beta.7z"), "{message}");
+        assert!(message.contains(&searched.display().to_string()), "{message}");
+        // No retry wrapper -- a hand-fetched file will not appear on attempt 2.
+        assert!(!message.contains("attempt(s)"), "{message}");
+    }
+
+    #[test]
+    fn search_path_description_separates_none_configured_from_none_matched() {
+        assert!(describe_search_paths(&[]).contains("no --archive-search-path"));
+        assert_eq!(
+            describe_search_paths(&[PathBuf::from("/a"), PathBuf::from("/b")]),
+            "/a, /b"
+        );
     }
 
     #[tokio::test]

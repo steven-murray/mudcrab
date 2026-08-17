@@ -85,23 +85,37 @@ is worth reading in full because most of what it cost was learning, not typing.
 - **EVE and Seamless are both C-Cup**, from the BAIN build. The Oracle has been
   reinstalled to match, so the guide has now won both disagreements it has had
   with the Oracle.
-- **The deferred conflict-hiding is fully specified**: 1024 paths recorded in
-  `ooo-enhanced-conflict-hidden-files.txt`. The follow-up after Part 24 is a
-  `file_prune` of those, then `pack_bsa --prune_packed`. Note the guide's
-  "Enable Parsing of Archives" line is load-bearing: WAC ships its assets
-  inside a BSA, and without it two of the three conflict categories look like
-  they do not apply.
-- **…but reading that list off the Oracle is a stopgap, not the mechanism.** A
-  real build has no Oracle. Because the modlist is declarative, the list is
+- **The deferred conflict-hiding is specified and now verified**: **1725**
+  conflict paths in `ooo-enhanced-conflict-hidden-files.txt`, plus 13
+  `thumbs.db` listed separately. The follow-up after Part 24 is a `file_prune`
+  of those, then `pack_bsa --prune_packed`. The guide's "Enable Parsing of
+  Archives" line is load-bearing: WAC ships its assets inside a BSA, and
+  without it two of the three conflict categories look like they do not apply.
+- **The first cut of that list was wrong three ways** — claimed 1024, held 247,
+  and covered textures only when 701 of the removals are meshes. Corrected in
+  Part 10 by intersecting the two installs; see `part-09-overhauls-oscuro.md`.
+- **…and reading it off the Oracle is a stopgap, not the mechanism.** A real
+  build has no Oracle. Because the modlist is declarative, the list is
   derivable from the upcoming mods before anything installs — designed in
-  `conflict-resolution-design.md`, to be built by Part 18. The 1024 paths
-  become its test fixture, which is a rare luxury: a new feature with a
-  known-correct expected output.
+  `conflict-resolution-design.md`, to be built by Part 18. Part 10 ran the
+  algorithm by hand and it accounts for all 1738 removals exactly, so the list
+  is now a test fixture with a known-correct expected output.
+
+## Part 10 (Overhauls: WAC) — complete
+
+5 mods, every file byte-for-byte identical; the 3 reported as differing carry
+only Part 36 merge-source plugin hides. Details in `part-10-overhauls-wac.md`.
+Two latent bugs fixed on the way (`layout = "simple"` was never honoured; `diff`
+flagged any non-Nexus mod as POST-GUIDE), and `manual:` was added for the list's
+first archive that nothing can fetch.
+
+**Before playing the Oracle**: its `OOO Enhanced.bsa` stores every path as
+`textures\textures\…`, so all 3580 textures in it are unreachable by the game.
+See `part-09-overhauls-oscuro.md`.
 
 ## Next sections
 
-Guide order from **Part 10 (WAC)**. Worth doing early in it: re-check the WAC
-side of Part 9's conflict list, since WAC is what makes those files visible. Most rows are trivial; the ones needing new features
+Guide order from **Part 11 (Baseline Textures)**. Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at

@@ -127,11 +127,21 @@ pub fn render_block(new_mod: &NewMod) -> String {
     }
 
     if new_mod.non_nexus {
-        lines.push(
-            "# TODO: non-Nexus source -- no `path` yet. Add one (or a local archive path plus \
-             download_handler) before installing."
-                .to_string(),
-        );
+        // `manual:` is the host-agnostic answer and the one to reach for first:
+        // it keeps the modlist portable, resolves from --archive-search-path,
+        // and fails with a message naming the file when the archive is absent.
+        // An absolute local path works too but bakes this machine into the list.
+        let hint = new_mod
+            .file_name
+            .as_deref()
+            .map(|name| format!("path = \"manual:{name}\""))
+            .unwrap_or_else(|| "path = \"manual:<archive filename>\"".to_string());
+        lines.push(format!(
+            "# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use\n\
+             # {hint}\n\
+             # and record where to get it in a comment. A local path plus download_handler \
+             also works."
+        ));
     }
     if let Some(version) = &new_mod.version {
         lines.push(format!("# oracle version {version}"));

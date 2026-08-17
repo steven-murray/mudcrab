@@ -123,7 +123,14 @@ plugins = [
 	"DLCFrostcrag - OOO Adaptation.esp",
 	"Knights of Nine - OOO Enhanced Adaptation.esp",
 	"OOO Enhanced - Shivering Isles.esp",
-	"OOO Enhanced - Av Latta Magica Compatibility Patch.esp"
+	"OOO Enhanced - Av Latta Magica Compatibility Patch.esp",
+	# Part 10. WAC's master leads. The other three are Part 36 merge sources,
+	# hidden in the Oracle and active here until that merge exists.
+	"Waalx Animals & Creatures.esm",
+	"WACIntegration.esp",
+	"WACIntegration - MOO Patch.esp",
+	"WAC - HGEC Equipment Replacer.esp",
+	"WAC Integration HGEC Gauntlets Patch.esp"
 ]
 
 post-install-actions = ["loot-sort"]
@@ -2405,3 +2412,102 @@ section = ["9 - OVERHAULS OSCURO"]
 path = "nexus:oblivion/47187/1000041194"
 download_handler = "nexus"
 file_name = "OOO Enhanced - Resources-47187-5-3b-1742488154.7z"
+
+# Guide 1: "Download this file > WACv_1beta.7z only", then "Install manually &
+# deselect everything except: Waalx Animals & Creatures.esm, WAC.bsa".
+#
+# WAC is hosted on TES Alliance behind a login, not Nexus, so there is nothing
+# to fetch automatically -- `manual:` says so and resolves the file from
+# --archive-search-path. Source:
+# https://tesalliance.org/forums/index.php?/files/file/1318-wac-waalx-animals-creatures/
+#
+# layout = "simple" is load-bearing, not decoration. The archive has 18 plugins,
+# two of them inside `WAC_Natural_Habitat_by_Max_Tael/`, which auto-detection
+# cannot classify and so rejects the whole archive. `simple` states what the
+# archive plainly is -- root = data folder -- and `include` keeps the two files
+# the guide asks for out of the other 61.
+[[mods]]
+id = "WAC Waalx Animals & Creatures"
+section = ["10 - OVERHAULS WAC"]
+
+[[mods.archives]]
+path = "manual:WACv_1beta.7z"
+file_name = "WACv_1beta.7z"
+layout = "simple"
+include = [
+  "Waalx Animals & Creatures.esm",
+  "WAC.bsa",
+]
+# oracle version d2026.1.24.0
+
+# Guide: "rename the WAC BSA file to WACIntegration. This ensures the handshake
+# with the following mod's plugin." WACIntegration.esp is the plugin that loads
+# it, and Oblivion matches a BSA to the plugin of the same stem -- so the rename
+# is what makes WAC's half-gigabyte of assets visible at all.
+[[mods.actions]]
+action = "file_move"
+from = "WAC.bsa"
+to = "WACIntegration.bsa"
+
+# Guide 2: BAIN, "00 Core" + "01 Maskar's Oblivion Overhaul INI Files".
+#
+# The guide's name for the second subpackage is not the subpackage's name. The
+# archive calls it "01 Maskar's Oblivion Overhaul patch and INI files", which is
+# also what the Oracle's meta.ini records -- and it ships a plugin as well as
+# the two INIs, which the guide's shortened name hides. Same class of trap as
+# Part 9's `Colourful`/`Colorful`.
+[[mods]]
+id = "WAC - Integration"
+section = ["10 - OVERHAULS WAC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51102/1000035517"
+download_handler = "nexus"
+file_name = "WAC - Integration Updated-51102-0-48-1-Disp-1690318708.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Core",
+  "01 Maskar's Oblivion Overhaul patch and INI files",
+]
+# oracle version 0.48.1.0-Disp
+
+# Guide 3: BAIN, "00 Data only". The archive also offers "01 WAC - Legion" and
+# "02 Testing"; both are left out, as the guide says and the Oracle did.
+[[mods]]
+id = "HGEC Equipment Replacer for WAC"
+section = ["10 - OVERHAULS WAC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/37594/87752"
+download_handler = "nexus"
+file_name = "HGEC Equipment Replacer for WAC v1_1b FULL-37594-1-1b.7z"
+layout = "bain"
+bain_subpackages = ["00 Data"]
+# oracle version 1.1.0.0b
+
+# Guide 4. Meshes only, no plugin.
+[[mods]]
+id = "WAC - Integration - Roberts Conversion"
+section = ["10 - OVERHAULS WAC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53333/1000036066"
+download_handler = "nexus"
+file_name = "WAC Roberts Conversion 1.1-53333-1-1-1694293859.rar"
+layout = "custom-data-folder"
+data_folder = "WAC Roberts Conversion 1.1/Data"
+# oracle version 1.1.0.0
+
+# Guide 5. Its plugin is a Part 36 merge source, hidden in the Oracle and active
+# here until that merge exists.
+[[mods]]
+id = "WAC - Integration - HGEC Gauntlets Conversion"
+section = ["10 - OVERHAULS WAC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53357/1000036082"
+download_handler = "nexus"
+file_name = "WAC HGEC Gauntlets Conversion 1.0-53357-1-0-1694365770.rar"
+layout = "custom-data-folder"
+data_folder = "WAC HGEC Gauntlets Conversion 1.0/Data"
+# oracle version 1.0.0.0
