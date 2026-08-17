@@ -147,7 +147,7 @@ impl ModAction {
 #[serde(deny_unknown_fields)]
 pub struct PackBsaAction {
     /// Archive name, relative to the mod's staged data folder. Oblivion loads
-    /// `Foo.bsa` only when a `Foo.esp` is in the load order, so this normally
+    /// `Foo.bsa` when a `Foo.esp` is in the load order, so this normally
     /// shares its stem with a `create_dummy_plugin` output.
     pub output: String,
     /// Glob patterns selecting what to pack, relative to the staged folder.

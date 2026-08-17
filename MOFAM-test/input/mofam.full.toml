@@ -145,7 +145,24 @@ plugins = [
 	"Harvest [Flora].esp",
 	"Harvest [Flora] - DLCFrostcrag.esp",
 	"Harvest [Flora] - DLCVileLair.esp",
-	"Harvest [Flora] - Shivering Isles.esp"
+	"Harvest [Flora] - Shivering Isles.esp",
+	# Part 12. All Natural's three core plugins live in optional/ and so are not
+	# in the load order; only Real Lights is. `drifting mist.esp` is row 5's
+	# corrected copy -- row 4's is parked in optional/. The candelabra fix and
+	# both Cava Obscura plugins are Part 36 merge sources, hidden in the Oracle
+	# and active here until that merge exists.
+	"All Natural - Real Lights.esp",
+	"All Natural - Real Lights - candelabra pathgrid fix.esp",
+	"NAO.esp",
+	"drifting mist.esp",
+	"Atmosphere additional effects.esp",
+	"BrumasNorthernLights.esp",
+	"Falling Leaves.esp",
+	"Better Rainbows.esp",
+	"RoadLights.esp",
+	"ILOO.esp",
+	"Cava Obscura - Cyrodiil.esp",
+	"Cava Obscura - SI.esp"
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -3005,3 +3022,283 @@ path = "nexus:oblivion/45342/1000007472"
 download_handler = "nexus"
 file_name = "Nice Ice - Icing on the Cake-45342-03.7z"
 # oracle version 3.0.0.0
+
+[[mods]]
+id = "Weather - All Natural"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/18305/1000021226"
+download_handler = "nexus"
+file_name = "Weather - All Natural-18305-1-38-1548910107.7z"
+layout = "bain"
+# "Select 'All Natural - Real Lights ONLY'" is about which *plugin* ends up in
+# the load order, not which subpackage is installed: 00 Core carries the BSA and
+# the INI, both of which Real Lights needs. The Oracle installed both and parked
+# Core's three plugins in optional/, which is what the actions below do.
+bain_subpackages = ["00 Core", "01 Real Lights"]
+# oracle version 1.38.0.0
+
+# "Did you read the Notes? Make sure to manually rename the bsa to 'All Natural
+# - Real Lights'!" -- terse, and load-bearing. Oblivion loads a BSA only when a
+# plugin of the same stem is active. All Natural.esp is about to be parked in
+# optional/, so without this rename the archive is never loaded at all.
+[[mods.actions]]
+action = "file_move"
+from = "All Natural.bsa"
+to = "All Natural - Real Lights.bsa"
+
+# The three 00 Core plugins, out of the load order but kept -- MO2's optional/
+# convention, and exactly what the Oracle holds.
+[[mods.actions]]
+action = "file_move"
+from = "All Natural Base.esm"
+to = "optional/All Natural Base.esm"
+
+[[mods.actions]]
+action = "file_move"
+from = "All Natural.esp"
+to = "optional/All Natural.esp"
+
+[[mods.actions]]
+action = "file_move"
+from = "All Natural - SI.esp"
+to = "optional/All Natural - SI.esp"
+
+# TODO(qac): All Natural - Real Lights.esp -- guide row 1 marks it [QAC].
+
+[[mods]]
+id = "Weather - All Natural Real Lights - Candelabra pathgrid fix"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46854/1000013425"
+download_handler = "nexus"
+file_name = "Weather - All Natural Real Lights - Candelabra pathgrid fix-46854-1-01.7z"
+# oracle version f1.01
+
+[[mods]]
+id = "NAO - Natural and Atmospheric Oblivion"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50923/1000027251"
+download_handler = "nexus"
+file_name = "NAO - Natural and Atmospheric Oblivion-50923-1-0-1616065545.zip"
+# Guide: "Select '0 [CORE] Natural and Atmospheric Oblivion' > Right click
+# 'Data' & set as your directory" -- a nested data folder, not a BAIN choice.
+layout = "custom-data-folder"
+data_folder = "0 [CORE] Natural and Atmospheric Oblivion/Data"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Atmospheres 2021 - Drifing mist for Vanilla setup"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51592/1000029713"
+download_handler = "nexus"
+file_name = "Drifting mist for Vanilla setup-51592-v1-00-1638651724.7z"
+# oracle version f1.00
+
+# Guide: "Once installed move drifting mist.esp to the Optional folder." Row 5
+# ships a corrected `drifting mist.esp` of its own, so this one is superseded --
+# which is presumably why the guide parks it. The Oracle left it at the mod root
+# instead, where row 5's higher-priority copy wins in the VFS anyway, so the two
+# builds behave the same. Guide followed; see report 1.
+[[mods.actions]]
+action = "file_move"
+from = "drifting mist.esp"
+to = "optional/drifting mist.esp"
+
+[[mods]]
+id = "drifting mist lleyawiin missing house fix"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51592/1000029858"
+download_handler = "nexus"
+file_name = "drifting mist lleyawiin missing house fix-51592-v1-1-1640253028.7z"
+# TODO(qac): drifting mist.esp -- guide row 5 marks it [QAC]. Uncleaned here,
+# which is the 110797 vs 108624 byte difference the diff reports.
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Atmospheres 2021 - Additional Weather Effects"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51592/1000029716"
+download_handler = "nexus"
+file_name = "Additional weather effects-51592-v1-00-1638651879.7z"
+# oracle version f1.00
+
+[[mods]]
+id = "Realistic Aurora in motion"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46917/1000013653"
+download_handler = "nexus"
+file_name = "Aurora in motion Update1-46917-.zip"
+# oracle version 0.0.0.0-1462204075
+
+[[mods]]
+id = "Falling Leaves"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44257/1000003945"
+download_handler = "nexus"
+file_name = "Falling Leaves V1_0 BAIN-44257-1-0.rar"
+# The guide says to delete `Falling Leaves - UL LushWoodlands Patch.esp` after
+# installing. It lives in the `01 UL Patch Lush Woodlands` subpackage, so not
+# selecting it is the same thing done earlier -- and is what the Oracle records.
+layout = "bain"
+bain_subpackages = ["00 Core Files (Required)"]
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "T4UT - Skies Repolished"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54904/1000041165"
+download_handler = "nexus"
+file_name = "T4UT - Skies Repolished-54904-SecondEdition-1742308560.7z"
+# oracle version SecondEdition
+
+[[mods]]
+id = "High Quality Snowflakes by Xelus"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49898/1000033858"
+download_handler = "nexus"
+file_name = "High Quality Snowflakes by Xelus-49898-1-0-1677675562.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "moonreplacer"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46924/1000013666"
+download_handler = "nexus"
+file_name = "moonreplacer for masser and secunda-46924-1-0.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "DOWNPOUR - rain retexture"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45520/1000007926"
+download_handler = "nexus"
+file_name = "DOWNPOUR-45520-02.7z"
+layout = "bain"
+bain_subpackages = ["01 Small"]
+# oracle version 2.0.0.0
+
+[[mods]]
+id = "Simple Sunglare with Lens Flare"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51354/1000028839"
+download_handler = "nexus"
+file_name = "Simple Sunglare with Lens Flare-51354-1-0-1630267265.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Oblivion NightSkies Overhaul"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50121/1000024772"
+download_handler = "nexus"
+file_name = "Oblivion NightSkies Overhaul-50121-v1-0-1589674372.7z"
+layout = "bain"
+# Five subpackages, as the guide lists. The Oracle recorded only the first four
+# and has no `textures/sky/overlay.dds`, so it skipped "05 - OVERLAY - Aurora -
+# 2k". Guide followed; the extra file shows in the diff. See report 1.
+bain_subpackages = [
+  "01 - MESHES - Nebula 1 & 2 + Overlay",
+  "02 - TEXTURES - Stars - 2k",
+  "03 - TEXTURES - Nebula 1 - Version 1 - 2k",
+  "04 - TEXTURES - Nebula 2 - Version 1 (Vanilla 1k)",
+  "05 - OVERLAY - Aurora - 2k",
+]
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Atmos4096 - DustCloud"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49978/1000026279"
+download_handler = "nexus"
+file_name = "DustCloud01-4096-49978-1-0-1607183259.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Atmos4096 - GasCloud"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49978/1000040494"
+download_handler = "nexus"
+file_name = "gasgloud4096-49978-1-0b-1737015172.zip"
+# oracle version 1.0.0.0b
+
+[[mods]]
+id = "Better Rainbows"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/36566/91853"
+download_handler = "nexus"
+file_name = "Better Rainbows V1_2-36566-1-2.7z"
+# TODO(qac): Better Rainbows.esp -- guide row 16 marks it [QAC]. Uncleaned
+# here, which is the 7317 vs 7216 byte difference the diff reports.
+# oracle version 1.2.0.0
+
+[[mods]]
+id = "Lights of Oblivion - Road Lanterns"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46131/1000041734"
+download_handler = "nexus"
+file_name = "Lights of Oblivion - FOMOD-46131-1-6-1746591349.7z"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Options"
+options = ["Fantasy Mesh Type"]   # guide: "(Fantasy Mesh)"
+# oracle version 1.6.0.0
+
+[[mods]]
+id = "ILOO - Interior Lighting Oblivion Overhaul"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53298/1000035824"
+download_handler = "nexus"
+file_name = "ILOO - Interior Lighting Oblivion Overhaul-53298-1-0-1-1692525607.zip"
+# oracle version 1.0.1.0
+
+[[mods]]
+id = "Cava Obscura"
+section = ["12 - WEATHER & LIGHTING"]
+
+[[mods.archives]]
+path = "nexus:oblivion/35099/82630"
+download_handler = "nexus"
+file_name = "Cava Obscura-35099-1-4.7z"
+# Guide: "During MI, deselect 'Cava Obscura - Filter Patch for Mods.esp'. We
+# install the update file that has this updated filter patch within the Filter
+# Patches separator later." The archive spells it with a capital F in "For".
+exclude = ["Cava Obscura - Filter Patch For Mods.esp"]
+# oracle version 1.4.0.0

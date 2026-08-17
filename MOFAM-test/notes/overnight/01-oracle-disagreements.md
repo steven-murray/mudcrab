@@ -67,6 +67,37 @@ They are one mod, `OUT Essentials`, built from five archives. The Oracle's five
 folders hold nothing but a `meta.ini` — the guide's own optional cleanup, done
 in January. `diff` reporting them missing from ours is correct.
 
+### D3. NightSkies Overhaul — the Oracle skipped a subpackage the guide names
+**[decide]**  *Part 12 row 14*
+
+The guide lists five BAIN subpackages, ending `05 - OVERLAY - Aurora - 2k`. The
+Oracle's `meta.ini` records four and its folder has no
+`textures/sky/overlay.dds`. Not an ambiguity — the guide names it explicitly.
+Guide followed, so we have one file the Oracle does not.
+
+**Your call**: add the aurora overlay to the Oracle, or tell me you left it out
+deliberately.
+
+### D4. Drifting mist — the guide parks a plugin the Oracle left active
+**[decide — cosmetic]**  *Part 12 row 4*
+
+Guide: *"Once installed move drifting mist.esp to the Optional folder."* The
+Oracle left it at the mod root. Row 5 ships its own corrected
+`drifting mist.esp` at higher priority, so both builds behave identically; the
+guide's version just says so explicitly instead of relying on priority order.
+Guide followed.
+
+### D5. Installer leftovers — the Oracle is inconsistent with itself
+**[decide — cosmetic]**  *Part 12 row 19*
+
+Cava Obscura is a manual install and the Oracle kept neither its `ReadMe.txt`
+nor its `omod conversion data/` directory. Part 11's Harvest Flora, also a
+manual install, **kept** its `omod conversion data/`. The guide says nothing
+either way.
+
+We keep them, consistently — the only rule a compiler can follow. Four lines of
+diff on this mod.
+
 ---
 
 ## Resolved — recorded because the reasoning matters
