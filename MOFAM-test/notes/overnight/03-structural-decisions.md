@@ -1,0 +1,97 @@
+# Report 3 — structural decisions about mudcrab
+
+Decisions that changed how mudcrab works, as opposed to what the modlist says.
+Each states the alternative rejected, because that is the part worth arguing
+with.
+
+---
+
+## Conflict resolution is declared, not simulated
+
+**Context**: several guide rows say "open the Conflicts tab and hide the files
+that conflict with X". Part 9's was answered by reading 1725 paths off the
+Oracle, which a real build cannot do.
+
+**Decision**: the modlist declares *which mod wins*; mudcrab computes the file
+set that implies. It does **not** model MO2's virtual file system.
+
+**Why**: direction cannot be derived from priority order. In the Oracle's
+`modlist.txt`, WAC (line 568) outranks OOO Enhanced (571), yet the guide has OOO
+Enhanced winning — because loose files beat BSA contents regardless of priority.
+And that same row then packs OOO Enhanced's textures into a BSA, flipping its own
+tier mid-step. Simulating this means modelling a two-tier rule over a modlist
+that mutates its own packing.
+
+**Validated**: intersecting OOO Enhanced's files with WAC's BSA yields exactly
+the 577 the Oracle removed; the three clothing mods account for 1148 more; the
+residue is 13 `thumbs.db`. All 1738 accounted for.
+
+Design in `conflict-resolution-design.md`. **Not yet built** — see report 4.
+
+## Layout should be a path planner shared with install
+
+**Decision**: to answer "which files would mod X contribute" without installing
+X, refactor layout into a function that maps a list of archive paths to a
+selection plus an old→new mapping, used by both `install` and the file index.
+
+**Why**: the obvious implementation — extract to a temp dir and walk it — is
+wasteful on multi-gigabyte archives and, worse, invites a second implementation
+of layout that drifts from the real one. Both problems have the same fix.
+
+**Feasible because** layout decisions are structural: every handler uses
+`read_dir` only; the sole place reading file *content* is `fomod.rs:209`
+(`ModuleConfig.xml`), one small file that can be extracted alone.
+
+## `ini_set` scopes to a section, and refuses ambiguity
+
+**Decision**: `section = "<name>"` scopes an edit; without one, a key matching
+more than one line is a hard error naming the sections found.
+
+**Why**: `apply_ini_set` matched a key anywhere and rewrote **every** match.
+Part 14's `Fog.ini` has `Amount` under both `[World]` and `[Interior]`; setting
+interior fog would silently have changed the weather. Erroring preserves every
+edit that currently works while making the ambiguous case impossible to get
+wrong quietly.
+
+## `file_prune` uses staged-tree glob semantics, extraction does not
+
+**Decision**: `/` is a real separator and matching is case-insensitive for
+`file_prune`. Archive `include`/`exclude` filters keep archive-entry semantics.
+
+**Why**: both differences bit in Part 11 — `NoMushroomStalks` matched nothing
+(staged directories are folded to lowercase), and `textures/rocks/*.dds` matched
+*through* the separator and deleted the `underwater` folder the guide protects,
+silently. Extraction filters were left alone because a hundred-odd authored
+patterns depend on current behaviour and cannot be re-verified mid-build.
+
+**This asymmetry is a wart.** It is the right call for now and the wrong shape
+long-term; noted in report 4.
+
+## `layout = "simple"` overrides detection instead of agreeing with it
+
+Declared in the schema since the beginning and never honoured — it fell through
+to auto-detection, so declaring the answer still got you the guess. Fatal for
+Part 10's WAC, whose archive detection rejects outright.
+
+## `manual:` for archives nothing can fetch
+
+**Decision**: a `manual:` descriptor meaning "no automated source exists".
+Resolves from `--archive-search-path`; fails naming the file and the directories
+searched, without retrying.
+
+**Why**: an absolute local path would work but bakes one machine into a modlist
+that is otherwise host-agnostic.
+
+## Age is only inferred from evidence that is about the file
+
+`nexusLastModified` is ignored for `modid=0` mods. MO2 writes it regardless, and
+for a mod that never came from Nexus it records when the entry was written —
+dating Part 10's ~2010 WAC beta to 2026 and flagging it POST-GUIDE. Filename
+timestamps still count, whoever hosted the file.
+
+## LOOT is out of the build
+
+`post-install-actions` no longer runs `loot-sort`. It opens a GUI needing human
+approval, so an unattended run stalls until the timeout — Part 9 lost 22 minutes
+to this. `plugins.txt` is written from the plan's own `plugins` array, and
+Part 37 replaces it with a fixed `loadorder.txt` regardless.

@@ -148,7 +148,19 @@ plugins = [
 	"Harvest [Flora] - Shivering Isles.esp"
 ]
 
-post-install-actions = ["loot-sort"]
+# post-install-actions = ["loot-sort"]
+#
+# Disabled deliberately. LOOT opens a GUI that needs a human to approve its
+# masterlist prompt, so an unattended run sits at it until the 180s timeout --
+# which is a broken build, not a sorted load order. Part 9's 22-minute stall was
+# this.
+#
+# Nothing depends on it while the list is being built: `plugins.txt` is written
+# from the plan's own `plugins` array by the MO2 export, so the load order is
+# whatever this file says it is. Part 37 replaces it with a fixed
+# `loadorder.txt` anyway, which is the real answer.
+#
+# Turn it back on for a play-test, with someone at the keyboard.
 
 [ini]
 "iSize W" = 2560
