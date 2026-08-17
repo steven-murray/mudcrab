@@ -867,6 +867,89 @@ mod tests {
         assert!(!target_root.join("plugin3.esp").exists());
     }
 
+    /// `simple` has to override detection, not merely agree with it.
+    ///
+    /// This archive is Part 10's WAC in miniature: the two files the list wants
+    /// sit at the root, but a subfolder holds plugins in a shape auto detection
+    /// cannot classify. Under detection the whole archive is rejected; `simple`
+    /// says "the root is the data folder" and the include filter does the rest.
+    #[test]
+    fn simple_layout_overrides_detection_for_an_unclassifiable_archive() {
+        let temp = tempdir().expect("tempdir");
+        let archive_path = temp.path().join("simple.zip");
+        let file = std::fs::File::create(&archive_path).expect("create zip");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+
+        zip.start_file("Waalx Animals & Creatures.esm", options)
+            .expect("esm");
+        std::io::Write::write_all(&mut zip, b"esm").expect("write esm");
+        zip.start_file("WAC.bsa", options).expect("bsa");
+        std::io::Write::write_all(&mut zip, b"bsa").expect("write bsa");
+        zip.start_file("WAC - Horses.esp", options).expect("esp");
+        std::io::Write::write_all(&mut zip, b"esp").expect("write esp");
+        // The folder detection chokes on: not root, not Data/, not <mod id>/.
+        zip.add_directory("WAC_Natural_Habitat/", options)
+            .expect("dir");
+        zip.start_file("WAC_Natural_Habitat/Natural_Habitat.esp", options)
+            .expect("nested esp");
+        std::io::Write::write_all(&mut zip, b"nested").expect("write nested");
+
+        zip.finish().expect("finish zip");
+
+        let simple = CompiledArchive {
+            path: Some("manual:WACv_1beta.7z".to_string()),
+            file_name: None,
+            download_handler: None,
+            layout: Some(ArchiveLayout::Simple),
+            data_folder: None,
+            target_subdir: None,
+            bain_subpackages: Vec::new(),
+            fomod_selections: Vec::new(),
+            build: Vec::new(),
+            include: vec!["Waalx Animals & Creatures.esm".to_string(), "WAC.bsa".to_string()],
+            exclude: Vec::new(),
+            game_root_files: Vec::new(),
+        };
+        let filters =
+            crate::archive::ArchiveFilters::new(&simple.include, &simple.exclude).expect("filters");
+        let target_root = temp.path().join("out");
+
+        let extracted = extract_archive(
+            &archive_path,
+            &target_root,
+            "WAC Waalx Animals & Creatures",
+            &simple,
+            &filters,
+            &HashSet::new(),
+        )
+        .expect("simple layout should not consult detection at all");
+
+        assert_eq!(extracted, 2);
+        assert!(target_root.join("Waalx Animals & Creatures.esm").exists());
+        assert!(target_root.join("WAC.bsa").exists());
+        assert!(!target_root.join("WAC - Horses.esp").exists());
+        assert!(!target_root.join("wac_natural_habitat").exists());
+
+        // Same archive, same filters, no declared layout: detection runs and
+        // refuses. This is the assertion that makes the fix load-bearing --
+        // before it, `simple` took this branch too.
+        let detected = CompiledArchive { layout: None, ..simple };
+        let err = extract_archive(
+            &archive_path,
+            &temp.path().join("out-auto"),
+            "WAC Waalx Animals & Creatures",
+            &detected,
+            &filters,
+            &HashSet::new(),
+        )
+        .expect_err("auto detection cannot classify this archive");
+        assert!(
+            err.to_string().contains("unsupported archive layout"),
+            "{err}"
+        );
+    }
+
     #[test]
     fn data_folder_lookup_is_case_insensitive() {
         let temp = tempdir().expect("tempdir");
