@@ -166,7 +166,10 @@ plugins = [
 	# Part 16. Row 27's MageGuild_simbol.esp is parked in optional/ and so is not
 	# in the load order; this is row 28's mergeable copy, a Part 36 merge source
 	# hidden in the Oracle and active here until that merge exists.
-	"MageGuild_simbol.esp"
+	"MageGuild_simbol.esp",
+	# Part 17. Neither is a merge source; both load normally.
+	"WindowLightingSystem.esp",
+	"Diverse Chapels Vanilla.esp"
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -4083,3 +4086,119 @@ include = [
 # and replace with path = "nexus:oblivion/54904/<fileid>". Until then:
 # path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
 # oracle version d2026.1.24.0
+
+[[mods]]
+id = "Animated Window Lighting System and Chimneys - AWLS"
+section = ["17 - ANIMATED WINDOW LIGHTING SYSTEM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/19628/1000039676"
+download_handler = "nexus"
+file_name = "AWLS Animated Window Lighting System-19628-5-6-3-1729268893.7z"
+layout = "fomod"
+# Guide row 1 lists thirteen installer answers. All thirteen are written out,
+# not just the two that differ from the installer's defaults (BomretSI and
+# "Choose a combo pack") -- stating a default explicitly is what makes it
+# survive the archive changing its mind about what the default is.
+#
+# Three of the guide's spellings do not match the installer's:
+#   guide "Brunbek Yellow Multi-Colour"  -> "Brumbek Yellow Multi-Color (Recommended)"
+#   guide "Blue-purple (Recommended)"    -> "Blue-Purple (Recommended)"
+#   guide "More Colours (Recommended)"   -> "More Colors (Recommended)"
+# A typo and two British spellings of an American mod. See the guide report.
+
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Plugin"
+options = ["Advanced Smoking Chimneys"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "QTP3"
+options = ["Skip"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "RAEVWD"
+options = ["Skip"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "BomretSI"
+options = ["Install Files for Bomrets Texture Pack for Shivering Isles"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Options"
+options = ["Choose a combo pack"]
+[[mods.archives.fomod_selections]]
+step = "Combo"
+group = "Pick a Complete Texture Pack"
+options = ["Orange - Brumbek Recommends"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Cathedral Windows Options"
+options = ["Orange - Brumbek Recommends"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Mages Guild Magic Circle Window Options"
+options = ["Purple"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Imperial City Temple Windows Options"
+options = ["Blue"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Shivering Isles Settlements Options"
+options = ["Brumbek Yellow Multi-Color (Recommended)"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Shivering Isles Palace Options"
+options = ["Dual Nature (Recommended)"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Shivering Isles Crucible Options"
+options = ["Blue-Purple (Recommended)"]
+[[mods.archives.fomod_selections]]
+step = "Options"
+group = "Shivering Isles Bliss Options"
+options = ["More Colors (Recommended)"]
+# oracle version 5.6.3.0
+
+[[mods]]
+id = "TD and AWLS patch - Skingrad"
+section = ["17 - ANIMATED WINDOW LIGHTING SYSTEM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50490/1000026014"
+download_handler = "nexus"
+file_name = "TD_Skingrad AWLS Patch-50490-1-0-1604072252.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "TD and AWLS patch - Farmhouse"
+section = ["17 - ANIMATED WINDOW LIGHTING SYSTEM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50490/1000026016"
+download_handler = "nexus"
+file_name = "TD_Farmhouse AWLS Patch-50490-1-0-1604072444.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "TD and AWLS patch - Anvil"
+section = ["17 - ANIMATED WINDOW LIGHTING SYSTEM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50490/1000026015"
+download_handler = "nexus"
+file_name = "TD_Anvil AWLS Patch-50490-1-0-1604072371.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Diverse Chapels Vanilla"
+section = ["17 - ANIMATED WINDOW LIGHTING SYSTEM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48732/1000020110"
+download_handler = "nexus"
+file_name = "Diverse Chapels Vanilla-48732-1-0.7z"
+layout = "bain"
+bain_subpackages = ["00 Core", "10 AWLS Support"]
+# oracle version 1.0.0.0
