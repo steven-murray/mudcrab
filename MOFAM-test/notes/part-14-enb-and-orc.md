@@ -33,8 +33,13 @@ Three reasons, any one of which is enough:
 2. **All four ENB folders are disabled in the Oracle**, and `Mo2ModlistEntry`
    has no enabled/disabled flag — everything mudcrab installs is enabled. There
    is no way to reproduce "present but off".
-3. **Two of the four are the same thing twice.** `enbseries_oblivion_v` and
-   `enbseries_oblivion_v0180` both come from `enbseries_oblivion_v0181.zip`.
+3. **Two of the four are the guide's own version dilemma, kept side by side.**
+   `enbseries_oblivion_v` is `enbseries_oblivion_v0500.zip` and
+   `enbseries_oblivion_v0180` is `enbseries_oblivion_v0181.zip` — exactly the
+   two builds row 1 hedges between: *"Some users have reported issues with the
+   latest (500) version so use .181 if visual glitches arise."* So the Oracle
+   holds both and commits to neither, which is a decision the guide explicitly
+   leaves to the user and hardware.
 
 mudcrab does have `game_root_files`, so the honest expression probably exists —
 but choosing it means deciding whether mudcrab owns files outside the MO2
@@ -67,7 +72,10 @@ Getting it byte-identical took two further fixes, both found here:
   measured separately.
 - **Line endings.** The file is CRLF, as most of these archives are. We were
   rewriting it as LF, which changed all nine lines of a file we had been asked
-  to change two values in. `ini_set` now keeps whatever the file already uses.
+  to change two values in. `ini_set` now writes CRLF if the file contains any
+  CRLF, and LF otherwise. Note that is a *normalisation*, not preservation: a
+  file with mixed endings comes out uniform. No such file has turned up, and
+  uniform is the better of the two answers if one does.
 
 Both were invisible until a section had an INI the Oracle had also edited.
 
@@ -84,12 +92,21 @@ the moment either instance is played.
 Worth noting as a category: **a mod folder can contain runtime state**, so not
 every difference under `mods/` is something the build controls.
 
-## `ORC.esp` is hidden in the Oracle and absent from ours
+## `ORC.esp`: an undeclared plugin, now hidden
 
 Not the usual merge-source case. `mofam.merges.toml` deliberately contains no
-`ORC.esp` (the Linux build uses ORC 315F, which ships no plugin), so it is not
-in our `plugins` array at all and never gets installed as active. The Oracle
-hides its copy. Same end state, different route.
+`ORC.esp` — the Linux build uses ORC 315F, which ships no plugin — so it is not
+in our `plugins` array either. But the ORC180 **archive ships one**, and simply
+leaving it out of the load order does not remove it from the mod folder: it sat
+there loose and visible, in an enabled mod, where MO2 would offer it as a new
+undecided plugin. The Oracle hides it. Now so do we, with the same `file_hide`
+already hiding three data files on this mod.
+
+**The general case is worth a decision.** An archive can ship plugins the list
+never declares, and today mudcrab notices — the load-order step warns about
+"discovered plugins not listed in top-level plugins" — but does nothing about
+them. Hiding them automatically is probably right and is a behaviour change, so
+it is pinned rather than done.
 
 ## The caveat mudcrab cannot honour
 

@@ -95,3 +95,31 @@ timestamps still count, whoever hosted the file.
 approval, so an unattended run stalls until the timeout — Part 9 lost 22 minutes
 to this. `plugins.txt` is written from the plan's own `plugins` array, and
 Part 37 replaces it with a fixed `loadorder.txt` regardless.
+
+## `ini_set` edits a value, it does not restyle the line
+
+Three refinements, all forced by ORC's `Fog.ini` in Part 14 and all in the same
+direction — **change what you were asked to change and nothing else**:
+
+- **Alignment preserved.** The file pads keys into a column
+  (`Amount        =0.0`). Replacing a value keeps the line's left-hand side when
+  the file is written that way.
+- **Padding is not spacing.** `dominant_spacing` had counted left-hand padding
+  as "this file puts spaces around `=`". The space *after* the `=` is the half
+  Oblivion reads literally — the DarNified font bug — and padding before it is
+  cosmetic. Measured separately now.
+- **Line endings kept.** We rewrote CRLF files as LF, changing every line of a
+  file we were asked to change one value in. Now CRLF if the file has any CRLF,
+  LF otherwise. That normalises a mixed-ending file rather than preserving it;
+  none has turned up, and uniform is the better answer if one does.
+
+## Plugins an archive ships but the list never declares
+
+Part 14's ORC180 ships `ORC.esp`, which this build deliberately does not load.
+Leaving it out of the `plugins` array does not remove it from the mod folder, so
+it sat loose and visible in an enabled mod — where MO2 would offer it as a new
+undecided plugin. The Oracle hides it; a `file_hide` now does too.
+
+**The general case is pinned.** mudcrab already *notices* these (the load-order
+step warns about "discovered plugins not listed in top-level plugins") and does
+nothing about them. Auto-hiding is probably right and is a behaviour change.

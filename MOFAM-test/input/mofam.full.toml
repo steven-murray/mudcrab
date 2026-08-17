@@ -3418,6 +3418,12 @@ paths = [
   "textures/Effects/TerrainNoise.dds",
   "meshes/characters/_1stperson/skeleton.nif",
   "meshes/characters/_male/Skeleton.nif",
+  # ORC180 ships a plugin this build does not load: `mofam.merges.toml`
+  # deliberately has no ORC.esp (the Linux build uses ORC 315F, which ships
+  # none), so it is not in the top-level `plugins` array either. Left loose it
+  # would sit in an active mod folder as an undeclared plugin MO2 would offer
+  # to enable. The Oracle hides it; so do we.
+  "ORC.esp",
 ]
 
 # Guide 4: "Open up ORC\Fog\Fog.ini via the INI Files menu of MO2 & set both

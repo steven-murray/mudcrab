@@ -88,3 +88,29 @@ It is Nexus mod **47407** and the archive is on disk, but MO2 recorded
 identical while a guide INI instruction went unapplied in the Oracle. Every
 `ini_set` in the modlist should be checked against the Oracle's profile INIs
 once, at the end of the run, rather than inferred from clean diffs.
+
+## D10. ENB (Part 14 rows 1-3): does mudcrab own files outside the MO2 instance?
+**Biggest open question in Part 14.**
+
+ENB's payload is a `d3d9.dll` for the game **root**, not Data content. mudcrab
+has `game_root_files`, so the machinery exists — but using it means deciding
+that mudcrab writes outside the MO2 instance it otherwise owns completely.
+
+Two further complications, both pointing at "ask Steven":
+- All four ENB folders are **disabled** in the Oracle, and `Mo2ModlistEntry` has
+  no enabled/disabled state. "Present but off" is not expressible today.
+- Two of them are the guide's own unresolved choice — `enbseries_oblivion_v0500`
+  and `v0181` — which row 1 explicitly leaves to the user: *"some users have
+  reported issues with the latest (500) version so use .181 if visual glitches
+  arise."*
+
+## D11. Row 6's FPS settings are user-specific by the guide's own admission
+`fMaxTime` in Oblivion.ini and `EnableFPSLimit`/`FPSLimit` in enbseries.ini are
+tied to monitor refresh rate. The Oracle has `fMaxTime=0.0167` (60fps); the
+guide suggests `0.0111` (90fps). Not something to guess. The enbseries half also
+depends on D10.
+
+## D12. Auto-hide undeclared plugins
+See report 3. mudcrab warns about plugins an archive ships that the list does
+not declare, and leaves them loose. Hiding them automatically would have caught
+Part 14's `ORC.esp` without a hand-written rule.
