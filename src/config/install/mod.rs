@@ -716,6 +716,105 @@ mod tests {
         assert_eq!(content, "foo = 2\n", "a wholly spaced file stays spaced");
     }
 
+    /// Part 14's `Fog.ini` shape: one key name, two sections, two meanings.
+    #[test]
+    fn ini_set_refuses_an_ambiguous_key_instead_of_writing_both_sections() {
+        use crate::config::actions::ini_set::apply_ini_set_in_section;
+
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Fog.ini");
+        let original = "[World]\nAmount=10\n\n[Interior]\nAmount=20\n";
+        std::fs::write(&ini_path, original).expect("write ini");
+
+        let err = apply_ini_set(&ini_path, "Amount", "5", IniSetFormat::Standard)
+            .expect_err("two matches with no section is not answerable");
+        let message = err.to_string();
+        assert!(message.contains("World") && message.contains("Interior"), "{message}");
+        assert!(message.contains("section ="), "{message}");
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            original,
+            "a refused edit must leave the file untouched"
+        );
+
+        // Naming the section resolves it, and only that section moves.
+        apply_ini_set_in_section(&ini_path, Some("Interior"), "Amount", "5", IniSetFormat::Standard)
+            .expect("naming the section is unambiguous");
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            "[World]\nAmount=10\n\n[Interior]\nAmount=5\n"
+        );
+    }
+
+    /// A key the section lacks belongs *inside* that section, not at EOF --
+    /// where the game would read it as belonging to whatever section is last.
+    #[test]
+    fn ini_set_appends_a_missing_key_inside_its_section() {
+        use crate::config::actions::ini_set::apply_ini_set_in_section;
+
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Oblivion.ini");
+        std::fs::write(&ini_path, "[Grass]\niMinGrassSize=80\n\n[Display]\nbFull=1\n")
+            .expect("write ini");
+
+        apply_ini_set_in_section(
+            &ini_path,
+            Some("Grass"),
+            "iMaxGrassTypesPerTexure",
+            "5",
+            IniSetFormat::Standard,
+        )
+        .expect("ini_set");
+
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            "[Grass]\niMinGrassSize=80\niMaxGrassTypesPerTexure=5\n\n[Display]\nbFull=1\n",
+            "the new key lands under [Grass], before the blank line and [Display]"
+        );
+    }
+
+    /// Oblivion.ini omits sections it has no non-default keys for, and the
+    /// guide still asks for keys in them.
+    #[test]
+    fn ini_set_creates_a_section_the_file_does_not_have() {
+        use crate::config::actions::ini_set::apply_ini_set_in_section;
+
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Oblivion.ini");
+        std::fs::write(&ini_path, "[Display]\nbFull=1\n").expect("write ini");
+
+        apply_ini_set_in_section(
+            &ini_path,
+            Some("Grass"),
+            "iMinGrassSize",
+            "80",
+            IniSetFormat::Standard,
+        )
+        .expect("ini_set");
+
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            "[Display]\nbFull=1\n\n[Grass]\niMinGrassSize=80\n"
+        );
+    }
+
+    /// A key that appears in one section only, edited without naming it, must
+    /// keep working -- the whole top-level `[ini]` table relies on it.
+    #[test]
+    fn ini_set_without_a_section_still_edits_an_unambiguous_key() {
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Oblivion.ini");
+        std::fs::write(&ini_path, "[Display]\nbFull=1\n\n[Grass]\niMinGrassSize=80\n")
+            .expect("write ini");
+
+        apply_ini_set(&ini_path, "iMinGrassSize", "60", IniSetFormat::Standard).expect("ini_set");
+
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            "[Display]\nbFull=1\n\n[Grass]\niMinGrassSize=60\n"
+        );
+    }
+
     #[test]
     fn ini_set_keeps_bethesda_spacing_because_the_parser_is_literal() {
         // Oblivion takes everything after the `=` literally, so writing
