@@ -7,7 +7,7 @@
 
 use super::ActionCx;
 use crate::config::schema::FileMoveAction;
-use crate::util::fs::normalize_relative_path;
+use crate::util::fs::{lowercase_dir_components, normalize_relative_path};
 use std::path::Path;
 
 pub(super) fn apply(action: &FileMoveAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
@@ -16,7 +16,8 @@ pub(super) fn apply(action: &FileMoveAction, cx: &ActionCx<'_>) -> anyhow::Resul
     };
 
     let from = mod_target.join(normalize_relative_path(&action.from)?);
-    let to = mod_target.join(normalize_relative_path(&action.to)?);
+    // Directories we create fold to lowercase like every other staged folder.
+    let to = mod_target.join(lowercase_dir_components(&normalize_relative_path(&action.to)?));
 
     if cx.settings.dry_run {
         tracing::info!(

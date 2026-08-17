@@ -5,7 +5,9 @@ use crate::config::download;
 use crate::config::schema::{ArchiveLayout, CompiledArchive};
 use super::bain::apply_bain_from_staging;
 use super::fomod::apply_fomod_from_staging;
-use crate::util::fs::{copy_filtered_tree, normalize_relative_path, staging_dir_for};
+use crate::util::fs::{
+    copy_filtered_tree, copy_filtered_tree_folded, normalize_relative_path, staging_dir_for,
+};
 use std::collections::HashSet;
 use std::path::Path;
 
@@ -69,7 +71,7 @@ pub(crate) fn extract_build_archive(
                 filters,
                 "build layer",
             ),
-            _ => copy_filtered_tree(&staging_dir, &destination_root, filters),
+            _ => copy_filtered_tree_folded(&staging_dir, &destination_root, filters),
         }
     })();
 
@@ -100,6 +102,10 @@ pub(crate) fn merge_layer_into_staging(
         std::fs::create_dir_all(&dest)
             .map_err(|err| anyhow::anyhow!("failed to create staging dest {}: {err}", dest.display()))?;
 
+        // Preserve case: this assembles the *staging* tree, which a FOMOD or
+        // BAIN script then reads, naming its sources in the archive's own
+        // casing. Folding here makes those sources unfindable. The fold happens
+        // on the way out of staging, into the mod's own folder.
         copy_filtered_tree(&layer_temp, &dest, filters)?;
         Ok(())
     })();

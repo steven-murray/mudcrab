@@ -3,7 +3,7 @@
 use super::with_staged_archive;
 use crate::archive::ArchiveFilters;
 use crate::util::fs::{
-    copy_filtered_tree, eq_ci, find_child_case_insensitive, path_exists_case_insensitive,
+    copy_filtered_tree_folded, eq_ci, find_child_case_insensitive, path_exists_case_insensitive,
 };
 use std::path::{Path, PathBuf};
 
@@ -17,7 +17,7 @@ pub(crate) fn extract_archive_with_auto_layout(
 ) -> anyhow::Result<usize> {
     with_staged_archive(source, target_root, |staging_dir| {
         let source_root = detect_auto_source_root(staging_dir, mod_id, source)?;
-        copy_filtered_tree(&source_root, target_root, filters)
+        copy_filtered_tree_folded(&source_root, target_root, filters)
     })
 }
 

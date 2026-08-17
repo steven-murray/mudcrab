@@ -4,7 +4,7 @@ use super::auto::read_top_level;
 use super::{destination_for, with_staged_archive};
 use crate::archive::ArchiveFilters;
 use crate::config::schema::CompiledArchive;
-use crate::util::fs::{copy_filtered_tree, find_child_case_insensitive};
+use crate::util::fs::{copy_filtered_tree_folded, find_child_case_insensitive};
 use std::path::Path;
 
 pub(crate) fn extract_archive_with_bain_layout(
@@ -60,7 +60,7 @@ pub(crate) fn apply_bain_from_staging(
                 available_dirs.join(", ")
             );
         };
-        copied += copy_filtered_tree(&package_root, destination_root, filters)?;
+        copied += copy_filtered_tree_folded(&package_root, destination_root, filters)?;
     }
     Ok(copied)
 }

@@ -4,6 +4,7 @@ pub mod check;
 pub mod diff;
 pub mod download;
 pub mod export;
+pub mod identify;
 pub mod inspect;
 pub mod install;
 pub mod merge;
@@ -39,6 +40,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Download(args) => download::run(args).await,
         Command::Check(args) => check::run(args).await,
         Command::Inspect(args) => inspect::run(args).await,
+        Command::Identify(args) => identify::run(args).await,
         Command::Install(args) => install::run(args).await,
         Command::Diff(args) => diff::run(args).await,
         Command::Validate(args) => validate::run(args).await,

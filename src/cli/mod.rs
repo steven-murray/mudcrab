@@ -28,6 +28,8 @@ pub enum Command {
     /// Report an archive's layout, FOMOD options and plugins, for writing its
     /// modlist entry.
     Inspect(InspectArgs),
+    /// Ask Nexus which mod and file an archive is, by its MD5.
+    Identify(IdentifyArgs),
     /// Install mods from downloaded archives.
     Install(InstallArgs),
     /// Compare an installed mods directory against a reference MO2 instance.
@@ -94,6 +96,29 @@ pub struct AddArgs {
     /// Print the block and where it would go, and change nothing.
     #[arg(long)]
     pub dry_run: bool,
+}
+
+/// Recover a Nexus descriptor for an archive downloaded by hand.
+///
+/// Nexus indexes every file it serves by MD5, which is how Mod Organizer 2
+/// recognises a file you fetched yourself. Same API call, so an archive with no
+/// `.meta` sidecar does not have to be round-tripped through MO2's UI before it
+/// can become a modlist entry.
+#[derive(Debug, Args)]
+pub struct IdentifyArgs {
+    /// Archives to identify.
+    #[arg(required = true)]
+    pub archives: Vec<PathBuf>,
+    /// Nexus game domain.
+    #[arg(long, default_value = "oblivion")]
+    pub game: String,
+    /// Also write the `.meta` sidecar MO2 would have written, so later runs
+    /// need no lookup.
+    #[arg(long)]
+    pub write_meta: bool,
+    /// Override the API base, for testing against a stub.
+    #[arg(long, hide = true)]
+    pub api_base: Option<String>,
 }
 
 #[derive(Debug, Args)]
