@@ -3302,3 +3302,87 @@ file_name = "Cava Obscura-35099-1-4.7z"
 # Patches separator later." The archive spells it with a capital F in "For".
 exclude = ["Cava Obscura - Filter Patch For Mods.esp"]
 # oracle version 1.4.0.0
+
+[[mods]]
+id = "Oblivion Realm HD"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43100/93430"
+download_handler = "nexus"
+file_name = "Oblivion Realm HD-43100-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Oblivion Landskape"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "manual:Oblivion landskape.7z"
+file_name = "Oblivion landskape.7z"
+# Guide row 2, [MI]. Hosted on tesall.ru, not Nexus. The Oracle's meta.ini says
+# modid=7, which is not a real Nexus mod id -- MO2 bookkeeping, not provenance.
+# oracle version 0.0.0.0
+
+[[mods]]
+id = "Oblivion Trees"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "manual:Oblivion Trees.7z"
+file_name = "Oblivion Trees.7z"
+# Guide row 3, [MI]. Hosted on tesall.ru, not Nexus.
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "Oblivion Caves retexture 2K"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "manual:Oblivion Caves retexture 2K-47407-1-0.rar"
+file_name = "Oblivion Caves retexture 2K-47407-1-0.rar"
+# TODO(steven): this IS a Nexus mod (47407) but MO2 recorded no file id, so the
+# descriptor cannot be built without an API lookup. Resolved from the local
+# archive meanwhile. Replace with nexus:oblivion/47407/<fileid> when known.
+# oracle version d2026.1.24.0
+
+# Guide row 4: "Once installed, delete the Meshes folder given we'll use the
+# following mod." Row 5 supplies the enhanced meshes.
+[[mods.actions]]
+action = "file_prune"
+paths = ["Meshes"]
+
+[[mods]]
+id = "Collection of Fixes by Lazaro - Oblivion Caves Retexture 2K Enhanced Meshes"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53031/1000034892"
+download_handler = "nexus"
+file_name = "Oblivion Caves retexture 2K Enhanced meshes-53031-1-0-1685893324.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Ayleid Glow Maps Minor Fix and some"
+section = ["13 - OBLIVION REALM"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53411/1000036588"
+download_handler = "nexus"
+file_name = "Improved glow maps for Oblivion Realm-53411-1-2-1697805206.7z"
+# oracle version 1.2.0.0
+
+# The section's closing instruction: "using MO2's Ini Editor, search for
+# bUseRefractionShader and set it to 0. This fixes a visual bug with the
+# Oblivion gates." It lives under [Display].
+#
+# The Oracle did NOT apply this -- its own oblivion.ini still has
+# bUseRefractionShader=1. `diff` compares mod folders, not INIs, so this
+# disagreement is invisible to it. Guide followed; see the overnight reports.
+[[mods.actions]]
+action = "ini_set"
+scope = "game"
+file = "Oblivion.ini"
+section = "Display"
+key = "bUseRefractionShader"
+value = "0"

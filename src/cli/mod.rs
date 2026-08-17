@@ -93,6 +93,15 @@ pub struct AddArgs {
     /// currently comes first.
     #[arg(long = "before-mod", value_name = "MOD_ID")]
     pub before_mod: Option<String>,
+    /// Write the block with a `manual:` source instead of a Nexus descriptor.
+    ///
+    /// For an archive no automated fetch can reach, and for the case the Oracle
+    /// leaves half-recorded: a real `modid` with no `fileid`, which is not
+    /// enough to build a download URL. The archive still resolves from
+    /// `--archive-search-path` by filename, so the build proceeds; a TODO in
+    /// the block says what is still missing.
+    #[arg(long)]
+    pub manual: bool,
     /// Print the block and where it would go, and change nothing.
     #[arg(long)]
     pub dry_run: bool,
