@@ -3386,3 +3386,84 @@ file = "Oblivion.ini"
 section = "Display"
 key = "bUseRefractionShader"
 value = "0"
+
+# --------------------------------------------------------------------------
+# Part 14 rows 1-3 (ENB) are NOT here. See notes/part-14-enb-and-orc.md.
+#
+# Short version: they are `d3d9.dll` and shader files for the game ROOT folder,
+# not Data content; all four of the Oracle's ENB mods are *disabled*; and
+# mudcrab has no way to express a disabled mod, so building them would put a
+# d3d9.dll into the virtual Data folder where it does nothing and belongs to
+# nobody. Pinned for Steven rather than improvised.
+# --------------------------------------------------------------------------
+
+# Guide 4: ORC 180. The Oracle carries four ORC versions (180, 194, 311, 315F)
+# and only 180 is enabled -- which is the version the guide names.
+[[mods]]
+id = "Oblivion Reloaded Combined(ORC) v180"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51927/1000034808"
+download_handler = "nexus"
+file_name = "ORC180-51927-1-8-0-1685361618.7z"
+# oracle version 1.8.0.0
+
+# Guide 4: "Once installed hide: Textures > Effects > TerrainNoise.dds,
+# Meshes > Characters > _1stPerson > Skeleton.nif, Meshes > Characters >
+# _male > Skeleton.nif". Hidden rather than deleted, matching the Oracle.
+[[mods.actions]]
+action = "file_hide"
+paths = [
+  "textures/Effects/TerrainNoise.dds",
+  "meshes/characters/_1stperson/skeleton.nif",
+  "meshes/characters/_male/Skeleton.nif",
+]
+
+# Guide 4: "Open up ORC\Fog\Fog.ini via the INI Files menu of MO2 & set both
+# [World] & [Interior] Amount values to 0.0."
+#
+# This is the file that made ini_set section-aware: `Amount` appears under both
+# headings and means a different thing in each, so an edit that does not name
+# its section is ambiguous and is now refused outright.
+#
+# NOTE the guide's IMPORTANT caveat, which mudcrab cannot honour: "fire up the
+# game to the main menu & start a new game; then simply quit" BEFORE applying
+# these edits, because a rare crash was traced to applying them first. That is
+# a play-test ordering constraint on a machine with a human at it; the end state
+# written here is the same either way.
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Shaders/ORC/Fog/Fog.ini"
+section = "World"
+key = "Amount"
+value = "0.0"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Shaders/ORC/Fog/Fog.ini"
+section = "Interior"
+key = "Amount"
+value = "0.0"
+
+[[mods]]
+id = "ORC Main Ini"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000039828"
+download_handler = "nexus"
+file_name = "ORC Main Ini-52949-11-24-1730638333.zip"
+# oracle version 11.24.0.0
+
+[[mods]]
+id = "Vanilla Remastered 1K Whiteflame fix"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50903/1000029872"
+download_handler = "nexus"
+file_name = "Whiteflame Fix-50903-1-0-1640491351.7z"
+# oracle version 1.0.0.0

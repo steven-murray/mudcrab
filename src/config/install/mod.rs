@@ -798,6 +798,62 @@ mod tests {
         );
     }
 
+    /// ORC's `Fog.ini` aligns its `=` into a column. Setting one value there
+    /// must not restyle the line, or a one-number change rewrites the file.
+    #[test]
+    fn ini_set_keeps_an_aligned_files_column() {
+        use crate::config::actions::ini_set::apply_ini_set_in_section;
+
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("Fog.ini");
+        std::fs::write(
+            &ini_path,
+            "[World]\nExponent      =0.2\nColorCoeff    =1.2\nAmount        =0.5\n\n\
+             [Interior]\nExponent      =1.5\nColorCoeff    =0.5\nAmount        =0.7\n",
+        )
+        .expect("write ini");
+
+        for section in ["World", "Interior"] {
+            apply_ini_set_in_section(&ini_path, Some(section), "Amount", "0.0", IniSetFormat::Standard)
+                .expect("ini_set");
+        }
+
+        assert_eq!(
+            std::fs::read_to_string(&ini_path).expect("read ini"),
+            "[World]\nExponent      =0.2\nColorCoeff    =1.2\nAmount        =0.0\n\n\
+             [Interior]\nExponent      =1.5\nColorCoeff    =0.5\nAmount        =0.0\n",
+            "only the two values change; the column survives"
+        );
+    }
+
+    /// These files come from Windows archives and are mostly CRLF. Rewriting
+    /// one value must not rewrite every line ending in the file.
+    #[test]
+    fn ini_set_keeps_crlf_line_endings() {
+        use crate::config::actions::ini_set::apply_ini_set_in_section;
+
+        let temp = tempdir().expect("tempdir");
+        let crlf = temp.path().join("Fog.ini");
+        std::fs::write(&crlf, "[World]\r\nAmount        =0.5\r\n").expect("write");
+        apply_ini_set_in_section(&crlf, Some("World"), "Amount", "0.0", IniSetFormat::Standard)
+            .expect("ini_set");
+        assert_eq!(
+            std::fs::read_to_string(&crlf).expect("read"),
+            "[World]\r\nAmount        =0.0\r\n"
+        );
+
+        // An LF file stays LF: the rule is "keep what is there", not "prefer
+        // CRLF".
+        let lf = temp.path().join("plain.ini");
+        std::fs::write(&lf, "[World]\nAmount=0.5\n").expect("write");
+        apply_ini_set_in_section(&lf, Some("World"), "Amount", "0.0", IniSetFormat::Standard)
+            .expect("ini_set");
+        assert_eq!(
+            std::fs::read_to_string(&lf).expect("read"),
+            "[World]\nAmount=0.0\n"
+        );
+    }
+
     /// A key that appears in one section only, edited without naming it, must
     /// keep working -- the whole top-level `[ini]` table relies on it.
     #[test]

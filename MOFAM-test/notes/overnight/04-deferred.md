@@ -72,3 +72,19 @@ usable API. Not needed before Part 37, which replaces sorting with a fixed
 Renaming a mod orphans its cached archives, which is how 21 mods silently
 vanished during the P2g rename. Known design flaw; the fix is content-addressed
 cache keys.
+
+## D8. `Oblivion Caves retexture 2K` needs a Nexus file id
+**One lookup, not a decision.**  *Part 13 row 4*
+
+It is Nexus mod **47407** and the archive is on disk, but MO2 recorded
+`fileid=0`, so the descriptor cannot be built without an API call. Currently a
+`manual:` entry with a `TODO(steven)`. Run `mudcrab identify` on it with
+`NEXUS_API_KEY` set, or read the file id off the mod's files tab.
+
+## D9. Audit every INI edit against the Oracle
+**Method gap, not a feature.**
+
+`diff` compares mod folders only. Part 13 showed that a section can be 6-for-6
+identical while a guide INI instruction went unapplied in the Oracle. Every
+`ini_set` in the modlist should be checked against the Oracle's profile INIs
+once, at the end of the run, rather than inferred from clean diffs.

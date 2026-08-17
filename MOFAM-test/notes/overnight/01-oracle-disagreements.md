@@ -98,6 +98,20 @@ either way.
 We keep them, consistently — the only rule a compiler can follow. Four lines of
 diff on this mod.
 
+### D6. `bUseRefractionShader` — the Oracle never applied it
+**[decide]**  *Part 13, closing instruction*
+
+> *"using MO2's Ini Editor, search for bUseRefractionShader and set it to 0.
+> This fixes a visual bug with the Oblivion gates."*
+
+The Oracle's `oblivion.ini` still has `=1`. Ours is `=0`, under `[Display]`.
+
+**This one matters beyond itself**: `diff` compares mod folders, not INIs, so
+every guide instruction of this kind is invisible to our main verification tool.
+Part 13 reported 6 of 6 identical *and* had a setting the Oracle lacks — not a
+contradiction, just two different measurements. An audit of every INI edit in
+the modlist against the Oracle's profile is queued for the end of the run.
+
 ---
 
 ## Resolved — recorded because the reasoning matters
