@@ -1,5 +1,5 @@
 use crate::cli::IdentifyArgs;
-use crate::config::identify::{identify, write_meta_sidecar};
+use crate::config::identify::{identify, write_meta_sidecar, Method};
 
 pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
     let api_key = std::env::var("NEXUS_API_KEY").map_err(|_| {
@@ -23,10 +23,27 @@ pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
             continue;
         }
 
-        match identify(&client, archive, &args.game, &api_key, args.api_base.as_deref()).await {
+        match identify(
+            &client,
+            archive,
+            &args.game,
+            &api_key,
+            args.api_base.as_deref(),
+            args.mod_id,
+        )
+        .await
+        {
             Ok(found) => {
                 if let Some(name) = &found.mod_name {
                     println!("# {name}");
+                }
+                if found.method == Method::FileList {
+                    // Say so: the hash was not the thing that matched, so this
+                    // rests on the filename still being the one Nexus serves.
+                    eprintln!(
+                        "{}: not in the MD5 index; matched by filename against mod {}'s file list",
+                        found.file_name, found.mod_id
+                    );
                 }
                 print!("{}", found.toml_snippet());
 

@@ -112,6 +112,15 @@ pub struct IdentifyArgs {
     /// Nexus game domain.
     #[arg(long, default_value = "oblivion")]
     pub game: String,
+    /// Mod id to search when the MD5 index has no entry for the archive.
+    ///
+    /// Nexus does not index every file it serves by hash -- a download moved to
+    /// a mod's OLD FILES section typically has none. The fallback lists that
+    /// mod's published files and matches on filename. Read from the filename
+    /// automatically when it looks like `<title>-<mod id>-...`, which is how
+    /// Nexus names downloads, so this is rarely needed.
+    #[arg(long)]
+    pub mod_id: Option<u64>,
     /// Also write the `.meta` sidecar MO2 would have written, so later runs
     /// need no lookup.
     #[arg(long)]
