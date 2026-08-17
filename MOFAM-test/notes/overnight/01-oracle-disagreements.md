@@ -112,6 +112,30 @@ Part 13 reported 6 of 6 identical *and* had a setting the Oracle lacks — not a
 contradiction, just two different measurements. An audit of every INI edit in
 the modlist against the Oracle's profile is queued for the end of the run.
 
+### D7. NightSkies / drifting mist / Cava Obscura — see D3, D4, D5 above
+
+### D8. Guide row Part 16 #27 is absent from the Oracle
+**[decide]**
+
+*Signs of Mage Guilde English version* (Nexus 25122). Its archive is on disk —
+`Mage Guild Sign-25122.rar` — so it was downloaded and never installed. The
+Oracle has only row 28's separate *- Mergeable* variant.
+
+Guide followed, so this shows as **extra in ours**. Its plugin is parked in
+`optional/` exactly as row 27 says, so it contributes textures without touching
+the load order. Low risk either way; your call whether the Oracle should gain it.
+
+### D9. T4UTXL City Gates — the Oracle is missing a gate the guide names
+**[decide]**  *Part 16 row 32*
+
+The guide lists six texture paths to keep. All six exist once **both** BETA2
+archives are in. The Oracle has 11 files and lacks
+`castle/cheydinhal/cheydinhalcitydoor01*` — so it installed only one of the two
+parts. Ours has 13.
+
+See report 2 for why this was easy to get wrong: the Oracle's `meta.ini` records
+only the *last* archive installed into a folder.
+
 ---
 
 ## Resolved — recorded because the reasoning matters

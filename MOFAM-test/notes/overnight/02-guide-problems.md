@@ -45,6 +45,16 @@ evidence it is wrong a third time.**
 
 ---
 
+## A guide instruction that needs two archives to satisfy
+
+**Part 16 rows 1 and 32** install mod 54904 twice under different names. The
+guide says **BETA1**; the current release is **BETA2**, which ships as **two
+archives** (Part 1 and Part 2) with the city-gate textures split across both.
+Row 32's six paths cannot all be satisfied from either archive alone.
+
+Nothing in the guide says the mod comes in parts, because it did not when the
+guide was written.
+
 ## Version pinning left implicit
 
 - The guide frequently says only **"the top file on the page"**, which was true
@@ -78,3 +88,20 @@ These are the ones a compiler has to translate rather than execute.
   folder"*. Expressed by naming what to delete, since under `textures/rocks`
   there is exactly one other directory and 28 loose files. An "except" rule
   would have been more machinery for less clarity.
+
+
+## Where the guide turned out to be right and I assumed otherwise
+
+Recorded because the failure mode is mine, not the guide's, and it has now
+happened twice.
+
+- **Part 9's `Colourful Clothing - Collection - Seamless OCOv2`** is the mod's
+  exact name. Having caught the guide out on two names already, I assumed a
+  third error and left 926 files unexplained until Part 10 checked the actual
+  mod list.
+- **Part 16's Cheydinhal city gate** looked like a guide error — the path is not
+  in the BETA2 Part 2 archive. It is in Part 1. The guide names six real files;
+  the Oracle only has five of them.
+
+**Two errors in a document are not evidence of a third.** Check the artefact,
+not the pattern.
