@@ -162,7 +162,11 @@ plugins = [
 	"RoadLights.esp",
 	"ILOO.esp",
 	"Cava Obscura - Cyrodiil.esp",
-	"Cava Obscura - SI.esp"
+	"Cava Obscura - SI.esp",
+	# Part 16. Row 27's MageGuild_simbol.esp is parked in optional/ and so is not
+	# in the load order; this is row 28's mergeable copy, a Part 36 merge source
+	# hidden in the Oracle and active here until that merge exists.
+	"MageGuild_simbol.esp"
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -3614,4 +3618,468 @@ section = ["15 - INTERIOR RETEXTURES"]
 path = "nexus:oblivion/34410/67667"
 download_handler = "nexus"
 file_name = "Improved Candles v1-34410.rar"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "T4UTXL - Architecture_BETA2 - Priory"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+file_name = "T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+# Guide 1: "Delete everything except Textures > Architecture > Priory", then
+# delete priorydoor01* and weynondoor01*. Stated as a keep-list plus two
+# exceptions, so it is written as one. 48 files under priory, minus those 4,
+# leaves 44 -- the Oracle's count exactly.
+#
+# NOTE the guide says BETA1 and the Oracle installed BETA2 (dated 2025-04-15,
+# after the guide). Same archive is installed twice under two names; see the
+# City Gates entry at the end of this section.
+include = ["textures/architecture/priory/**"]
+exclude = ["**/priorydoor01*", "**/weynondoor01*"]
+# TODO: Nexus mod 54904, file id not recorded by MO2, so the descriptor
+# cannot be built. Resolve it (`mudcrab identify`, or the mod's files tab)
+# and replace with path = "nexus:oblivion/54904/<fileid>". Until then:
+# path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "Got Wood - Retexture"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54680/1000040097"
+download_handler = "nexus"
+file_name = "Got Wood-54680-1-0-1733862452.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "VKVII Oblivion Castles (Medium)"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:VKVII_Oblivion_Castles_Medium.1.7z"
+file_name = "VKVII_Oblivion_Castles_Medium.1.7z"
+# TODO: Nexus mod 1, file id not recorded by MO2, so the descriptor
+# cannot be built. Resolve it (`mudcrab identify`, or the mod's files tab)
+# and replace with path = "nexus:oblivion/1/<fileid>". Until then:
+# path = "manual:VKVII_Oblivion_Castles_Medium.1.7z"
+# oracle version 0.0.0.0
+
+[[mods]]
+id = "VKVII Oblivion Imperial City"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50255/1000025247"
+download_handler = "nexus"
+file_name = "VKVII Oblivion Imperial City-50255-1-1594313735.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "TD_Tombstones retextures"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48614/1000019800"
+download_handler = "nexus"
+file_name = "TD_Tombstones retextures-48614-1-1.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Arena Of Awe - Retexture"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53052/1000034992"
+download_handler = "nexus"
+file_name = "Arena Of Awe-53052-1-1-1686595751.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Arena Poster"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/25367/44088"
+download_handler = "nexus"
+file_name = "ArenaPoster-25367.rar"
+# oracle version 0.0.0.0-1245838774
+
+[[mods]]
+id = "Beautiful Arena Spectator"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41741/89245"
+download_handler = "nexus"
+file_name = "BAS-41741-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Cheydinhal retexture"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44685/1000005395"
+download_handler = "nexus"
+file_name = "Cheydinhal Retexture-44685-1-0.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Leyawiin Woodland"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46628/1000012427"
+download_handler = "nexus"
+file_name = "Leyawiin Woodland 2k-46628-1-1.rar"
+# oracle version 1.1.0.0
+
+# Guide 10: "Once installed delete: Textures > Landscape."
+[[mods.actions]]
+action = "file_prune"
+paths = ["textures/landscape"]
+
+[[mods]]
+id = "Leyawiin Woodland floor fix"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48759/1000020198"
+download_handler = "nexus"
+file_name = "Leyawiin Woodland floor fix -All Natural compatible-48759-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Improved Chorrol"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/9500/7843"
+download_handler = "nexus"
+file_name = "Improved Chorrol-9500.7z"
+# oracle version 0.0.0.0-1199749278
+
+[[mods]]
+id = "chorrolupdate"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/9500/15531"
+download_handler = "nexus"
+file_name = "ChorrolUpdate-9500.7z"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "chorrol2011"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/9500/87188"
+download_handler = "nexus"
+file_name = "Chorrol2011-9500-1.7z"
+# oracle version 0.0.0.0-1321249304
+
+[[mods]]
+id = "Improved Bravil"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10383/9152"
+download_handler = "nexus"
+file_name = "Improved Bravil-10383.7z"
+# oracle version 0.0.0.0-1199749689
+
+[[mods]]
+id = "Improved Bravil - Bravil Update"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10383/15404"
+download_handler = "nexus"
+file_name = "BravilUpdate-10383.7z"
+# oracle version d2026.1.26.0
+
+[[mods]]
+id = "TD_Unique_Skingrad"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:TD_Unique_Skingrad.7z"
+file_name = "TD_Unique_Skingrad.7z"
+# Guide 14, [MI]: "deselect TD_Unique_Skingrad.esp". Hosted on MediaFire.
+#
+# The archive holds three data folders -- `Data`, `Eng/Data` and
+# `TD_Unique_Skingrad_BC patch/Data` -- so auto-detection refuses (plugins split
+# across roots). The Oracle installed the plain top-level `Data`.
+layout = "custom-data-folder"
+data_folder = "Data"
+exclude = ["**/TD_Unique_Skingrad.esp"]
+# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use
+# path = "manual:TD_Unique_Skingrad.7z"
+# and record where to get it in a comment. A local path plus download_handler also works.
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "TD_Unique_Anvil"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:TD_Unique_Anvil.7z"
+file_name = "TD_Unique_Anvil.7z"
+# Guide 15, [MI]: "deselect TD_Unique_Anvil.esp". Hosted on MediaFire. The
+# Oracle recorded a BAIN selection of "Data" for this one.
+layout = "bain"
+bain_subpackages = ["Data"]
+exclude = ["**/TD_Unique_Anvil.esp"]
+# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use
+# path = "manual:TD_Unique_Anvil.7z"
+# and record where to get it in a comment. A local path plus download_handler also works.
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "TD_aesthetics"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:TD_aesthetics.7z"
+file_name = "TD_aesthetics.7z"
+# TODO: non-Nexus source -- no `path` yet. For a hand-downloaded archive use
+# path = "manual:TD_aesthetics.7z"
+# and record where to get it in a comment. A local path plus download_handler also works.
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "Farm fence retexture and UV maps"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47355/1000015403"
+download_handler = "nexus"
+file_name = "Farm Fence-47355-01.7z"
+# Guide 17: "Install manually & deselect the textures folder." The Oracle keeps
+# meshes only.
+exclude = ["textures/**"]
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "TD_Hutor - Oblivion farms retexture"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48613/1000019797"
+download_handler = "nexus"
+file_name = "TD_Hutor - Oblivion farms retexture-48613-1-1.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "TD_Hutor - Oblivion farms retexture fix"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52833/1000034087"
+download_handler = "nexus"
+file_name = "TD_Hutor - Oblivion farms retexture fix-52833-1-0-1679299864.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Kvatch HD"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45670/1000008391"
+download_handler = "nexus"
+file_name = "Kvatch HD-45670-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Kvatch HD Update"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45670/1000008438"
+download_handler = "nexus"
+file_name = "Kvatch HD-45670-1-1.7z"
+# oracle version 1.1.0.0
+
+[[mods]]
+id = "Darooz bruma1_5"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41107/87369"
+download_handler = "nexus"
+file_name = "Bruma 1_5-41107-1-5.zip"
+# Guide 21: "Once installed hide or delete: Textures > Architecture > Bruma >
+# Interioronly > brudoorupper02*". The Oracle deleted rather than hid, so this
+# prunes.
+# oracle version 1.5.0.0
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["textures/architecture/bruma/interioronly/brudoorupper02*"]
+
+[[mods]]
+id = "Khettienna's Mini-Mods"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46187/1000017566"
+download_handler = "nexus"
+file_name = "Khettienna's Mini Mods Complete Bundle-46187-2017-08-19.7z"
+# Guide 22: seven of a large BAIN package, named exactly as the guide lists them
+# and as the Oracle recorded them.
+layout = "bain"
+bain_subpackages = [
+  "KMM Chorrol Mages Guild UV Tweaks v1.0",
+  "KMM Crucible Sewage Retex v2.0",
+  "KMM Garridan's Tears Retex v1.0",
+  "KMM Leyawiin Woodland Stonewall Normalmap Fix v1.0",
+  "KMM Paint Palette Retex v1.0",
+  "KMM SE Beds Improved UV v1.0 Stone",
+  "KMM Skingrad Modular Door UV Fix for Mikal33's Improved Doors & Flora v1.0",
+]
+# oracle version 2017.8.19.0
+
+[[mods]]
+id = "VKVII Oblivion Sidewalk Stonewall"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50248/1000025212"
+download_handler = "nexus"
+file_name = "VKVII Oblivion Sidewalk Stonewall-50248-1-1593946238.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Better Window Reflections"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46774/1000013055"
+download_handler = "nexus"
+file_name = "Oblivion Window Reflection Replacer-46774-.zip"
+# oracle version d2026.1.24.0
+
+[[mods]]
+id = "Retextured Inn Signs"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48576/1000019627"
+download_handler = "nexus"
+file_name = "Retextured Inn Signs-48576-1-0.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Retextured Road Signs"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48235/1000027331"
+download_handler = "nexus"
+file_name = "Retextured Road Signs-48235-2-0-1616550659.7z"
+# oracle version 2.0.0.0
+
+[[mods]]
+id = "Signs of Mage Guilde English version"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/25122/43241"
+download_handler = "nexus"
+file_name = "Mage Guild Sign-25122.rar"
+# Guide 27. NOT IN THE ORACLE -- it installed only row 28's mergeable variant,
+# so this mod is "extra in ours". Guide followed; see the overnight reports.
+#
+# Guide: "Once installed move MageGuild_simbol.esp to the optional folder."
+
+[[mods.actions]]
+action = "file_move"
+from = "MageGuild_simbol.esp"
+to = "optional/MageGuild_simbol.esp"
+
+[[mods]]
+id = "Signs of Mage Guilde English version - Mergeable"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52823/1000034552"
+download_handler = "nexus"
+file_name = "Signs of Mage Guilde English version - Mergeable-52823-1-1-Mergeable-1682996789.7z"
+# oracle version 1.1.0.0.Mergeable
+
+[[mods]]
+id = "Daedric Statues Improved - 2k Upscaled and Fixed Textures"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54765/1000040380"
+download_handler = "nexus"
+file_name = "Daedric Statues Improved-54765-1-0-1736293196.rar"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Statues HD"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43104/1000003005"
+download_handler = "nexus"
+file_name = "Statues HD-43104-2-0.7z"
+# oracle version 2.0.0.0
+
+[[mods]]
+id = "Imperial Roads - Detailed road textures"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46744/1000012958"
+download_handler = "nexus"
+file_name = "Imperial Roads-46744-1.7z"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "T4UTXL - Architecture_BETA2 - City Gates"
+section = ["16 - TOWN AND CITY RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+file_name = "T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+# Guide 32: the same archive again, installed under a second name, keeping only
+# the city-gate textures.
+#
+# BETA2 ships as TWO archives, Part 1 and Part 2, and the city-gate textures are
+# split across both -- Part 2 has only Leyawiin and Skingrad. Building from
+# Part 2 alone produced 5 of the Oracle's 11 files, which is what caught this.
+#
+# The guide lists six paths. All six exist once both parts are in, including
+# `Castle > Cheydinhal > cheydinhalcitydoor01*` -- which the **Oracle does not
+# have**, so it installed only one part here. Guide followed: we end up with 13
+# files where the Oracle has 11.
+include = [
+  "textures/architecture/anvil/anvilcastledoor01*",
+  "textures/architecture/bravil/bravilentrancegate01*",
+  "textures/architecture/bruma/brumacitygate*",
+  "textures/architecture/leyawiin/leyawiincastledoor*",
+  "textures/architecture/skingrad/skcastledoorlarge*",
+  "textures/architecture/castle/cheydinhal/cheydinhalcitydoor01*",
+]
+
+[[mods.archives]]
+path = "manual:T4UTXL - Architecture_BETA2 (Part 1)-54904-ARCHITECTURE-BETA2-1744727305.7z"
+file_name = "T4UTXL - Architecture_BETA2 (Part 1)-54904-ARCHITECTURE-BETA2-1744727305.7z"
+include = [
+  "textures/architecture/anvil/anvilcastledoor01*",
+  "textures/architecture/bravil/bravilentrancegate01*",
+  "textures/architecture/bruma/brumacitygate*",
+  "textures/architecture/leyawiin/leyawiincastledoor*",
+  "textures/architecture/skingrad/skcastledoorlarge*",
+  "textures/architecture/castle/cheydinhal/cheydinhalcitydoor01*",
+]
+# TODO: Nexus mod 54904, file id not recorded by MO2, so the descriptor
+# cannot be built. Resolve it (`mudcrab identify`, or the mod's files tab)
+# and replace with path = "nexus:oblivion/54904/<fileid>". Until then:
+# path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
 # oracle version d2026.1.24.0
