@@ -12,6 +12,10 @@ use crate::config::install::safe_mod_dir_name;
 use std::collections::BTreeSet;
 use std::path::Path;
 
+/// MO2's suffix for a file taken out of the virtual file system. Matches
+/// `file_hide`, which is what puts it there.
+const HIDDEN_SUFFIX: &str = ".mohidden";
+
 /// Files of this mod that a named mod also provides.
 ///
 /// Returned relative to `mod_target`, spelled as they are on disk, so the
@@ -69,14 +73,28 @@ pub(super) fn conflicting_files(
     });
 
     let mut matched = Vec::new();
+    let mut already_handled = 0usize;
     for relative in crate::config::install::layout::bain::list_relative_paths(mod_target)? {
         let key = relative.to_lowercase();
+        // A file this action hid on a previous run no longer answers to its own
+        // name. Compared without the suffix it still counts as selected, which
+        // is what makes re-running a no-op rather than a "selected no files"
+        // failure.
+        let (key, hidden) = match key.strip_suffix(HIDDEN_SUFFIX) {
+            Some(unhidden) => (unhidden.to_string(), true),
+            None => (key, false),
+        };
         if let Some(prefix) = &under
             && !key.starts_with(prefix.as_str())
         {
             continue;
         }
-        if theirs.contains(&key) {
+        if !theirs.contains(&key) {
+            continue;
+        }
+        if hidden {
+            already_handled += 1;
+        } else {
             matched.push(relative);
         }
     }
@@ -84,7 +102,7 @@ pub(super) fn conflicting_files(
     // Same rule as a `file_prune` pattern that matches nothing: a selection
     // resolving to no files is the shape of the first failed pass at Part 9,
     // and it succeeds silently while leaving every conflicting file in place.
-    if matched.is_empty() && skipped.len() < conflicts_with.len() {
+    if matched.is_empty() && already_handled == 0 && skipped.len() < conflicts_with.len() {
         anyhow::bail!(
             "{}: conflicts_with [{}]{} selected no files. Either the mods do not overlap or the \
              relationship is stated the wrong way round.",

@@ -4220,3 +4220,184 @@ file_name = "Diverse Chapels Vanilla-48732-1-0.7z"
 layout = "bain"
 bain_subpackages = ["00 Core", "10 AWLS Support"]
 # oracle version 1.0.0.0
+# ── Part 18 - KATKAT'S LOCATION RETEXTURES ──────────────────────────────────
+#
+# Thirteen of the fifteen guide rows are hosted on tesall.ru, not Nexus, and
+# every one of them is marked [MI] -- manual install. `manual:` says so in the
+# modlist rather than leaving a `path` a fetch would fail on: `download` stops
+# with the filename and the search paths it looked in, which is a instruction
+# rather than an error. All fifteen archives are already in the MO2 downloads
+# folder.
+#
+# Nothing in this section ships a plugin. Every archive has a top-level `Data/`
+# (or is a data folder already), so auto-detection handles all of them; none
+# needs a declared layout.
+
+[[mods]]
+id = "FarmClutters"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 1: tesall.ru/files/modi-dlya-oblivion/reteksturi-i-repleiseri/7437
+path = "manual:FarmClutters_1.0.rar"
+file_name = "FarmClutters_1.0.rar"
+
+[[mods]]
+id = "White Gold Tower"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 2: tesall.ru .../10205-bashnya-belogo-zolota
+path = "manual:ICtower.7z"
+file_name = "ICtower.7z"
+
+# Guide 3 is one page and two separate installs: "Install 'Base Metal' [MI] then
+# 'Unofficial Oblivion Patch Meshes' separately". Two mods, in that order, so the
+# patch meshes win.
+[[mods]]
+id = "Ayleid Ruins HD BaseMetal"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:BaseMetal.7z"
+file_name = "BaseMetal.7z"
+
+[[mods]]
+id = "Ayleid Ruins Unofficial Oblivion Patch Meshes"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+path = "manual:Unofficial Oblivion Patch Meshes.7z"
+file_name = "Unofficial Oblivion Patch Meshes.7z"
+
+[[mods]]
+id = "cloudrulertemple"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 4: tesall.ru .../9193-khram-povelitelya-oblakov-hd-ot-katkat74
+path = "manual:cloudrulertemple.7z"
+file_name = "cloudrulertemple.7z"
+
+[[mods]]
+id = "wayshrine"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 5: tesall.ru .../7982-dorozhnie-svyatilishcha-ot-katkat74
+path = "manual:wayshrine.7z"
+file_name = "wayshrine.7z"
+
+[[mods]]
+id = "basementsections"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 6: tesall.ru .../7202-podvali-hd
+path = "manual:basementsections.7z"
+file_name = "basementsections.7z"
+
+# Guide 7, and its follow-up: "Once installed, open the Conflicts tab & hide the
+# files that win over 2 VWD Ships - KatKat74's Textures (4 files)".
+#
+# The first row in this list to say that, and the reason the conflict index
+# exists. Named as a relationship rather than as four paths: `VWD Ships` is a
+# Part 5 LOD mod whose four `_far.nif` meshes this one shadows, and mudcrab
+# works out which files that is. `mudcrab conflicts --mod "Ships from katkat"
+# --with "VWD Ships"` prints them.
+#
+# The Oracle did NOT do this step -- all four files are still present and
+# unhidden there -- so this section diffs by exactly those four. Following the
+# guide, per the standing rule.
+[[mods]]
+id = "Ships from katkat"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 7: tesall.ru .../8107-repleis-korablei-ot-katkat74
+path = "manual:Ships from katkat74 AWLS.rar"
+file_name = "Ships from katkat74 AWLS.rar"
+
+[[mods.actions]]
+action = "file_hide"
+conflicts_with = ["VWD Ships"]
+
+[[mods]]
+id = "English Bloated Float Signs Super Resolution 2k for KatKat74's Ships Retexture"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 8. The archive spells the author "KatKat47"; the mod page and the
+# Oracle folder both say KatKat74.
+path = "nexus:oblivion/51438/1000029218"
+download_handler = "nexus"
+file_name = "English Bloated Float Signs Super Resolution 2k for KatKat47's Ships Retexture-51438-v1-0-1632931867.zip"
+# oracle version 1.0.0.0
+
+[[mods]]
+id = "Bliss"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 9: tesall.ru .../10189-bliss-hd
+path = "manual:Bliss.7z"
+file_name = "Bliss.7z"
+
+[[mods]]
+id = "VilverinFlora"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 10: tesall.ru .../9525-flora-vilverina-ot-katkat74
+path = "manual:VilverinFlora.7z"
+file_name = "VilverinFlora.7z"
+
+[[mods]]
+id = "waterfall"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 11: tesall.ru .../8047-vodopadi-ot-katkat74
+path = "manual:waterfall.7z"
+file_name = "waterfall.7z"
+
+[[mods]]
+id = "Upper Class Furniture"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 12: tesall.ru .../7089-repleis-mebeli-visshego-klassa
+path = "manual:furnupperclass.7z"
+file_name = "furnupperclass.7z"
+
+[[mods]]
+id = "KatKat74 Upper-class Stool Fix"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 13, "main file only". One mesh, fixing the row above it.
+path = "nexus:oblivion/53128/1000035251"
+download_handler = "nexus"
+file_name = "katkat upperclass stool fix-53128-1-0-1688355623.rar"
+# oracle version 1.0.0.0
+
+# Guide 14. The Oracle has no folder for this one and never installed it, though
+# the archive is sitting in the downloads folder -- so it was fetched and then
+# skipped. Built here because the guide says to; it shows as extra in ours.
+[[mods]]
+id = "Ogorod"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 14: tesall.ru .../7143-ogorodistii-ogorod
+path = "manual:Ogorod 1.1.rar"
+file_name = "Ogorod 1.1.rar"
+
+[[mods]]
+id = "KatKat's Well"
+section = ["18 - KATKAT'S LOCATION RETEXTURES"]
+
+[[mods.archives]]
+# Guide 15: tesall.ru .../7980-kolodets-ot-katkat74
+path = "manual:well.zip"
+file_name = "well.zip"
