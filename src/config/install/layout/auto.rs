@@ -115,6 +115,18 @@ fn has_expected_content(listing: &Listing<'_>, prefix: &str) -> bool {
         || children.files.iter().any(|file| is_plugin_name(file))
 }
 
+/// Descend through wrapper folders until the content appears.
+///
+/// Authors wrap their mods in a folder named after the archive, and sometimes
+/// wrap *that* -- Part 20's Knights of the Nine patch is
+/// `<mod name> V2/<mod name> Mesh Patch/Meshes/...`, two levels of naming before
+/// anything the game reads. A single-level rule left it installed two folders
+/// deep, silently: every file present, nowhere the game looks.
+///
+/// The shape that justifies descending is narrow, and is re-checked at each
+/// level: exactly one directory here, no loose files beside it, that directory
+/// is not itself game content, and this level holds no game content of its own.
+/// The moment any of that stops holding, so does the descent.
 fn detect_content_wrapper(
     listing: &Listing<'_>,
     source_label: &str,
@@ -142,16 +154,39 @@ fn detect_content_wrapper(
             hits.join(", ")
         );
     }
-
-    if !root_has_expected
-        && hits.len() == 1
-        && top.files.is_empty()
-        && top.dirs.len() == 1
-        && !is_expected_game_content_dir_name(&top.dirs[0])
-    {
-        return Ok(hits.into_iter().next());
+    if root_has_expected {
+        return Ok(None);
     }
-    Ok(None)
+
+    let mut prefix = String::new();
+    let mut children = Children {
+        dirs: top.dirs.clone(),
+        files: top.files.clone(),
+    };
+
+    // Bounded by the deepest path in the archive, so it cannot spin.
+    loop {
+        if !children.files.is_empty() || children.dirs.len() != 1 {
+            return Ok(None);
+        }
+        let only = children.dirs[0].clone();
+        if is_expected_game_content_dir_name(&only) {
+            // A lone `textures/` is content, not a wrapper. Unwrapping it would
+            // install the *contents* of textures at the mod root.
+            return Ok(None);
+        }
+
+        let candidate = if prefix.is_empty() {
+            only
+        } else {
+            format!("{prefix}/{only}")
+        };
+        if has_expected_content(listing, &candidate) {
+            return Ok(Some(candidate));
+        }
+        children = listing.children(&candidate);
+        prefix = candidate;
+    }
 }
 
 /// What an auto-detected archive contributes, from its entry list alone.
@@ -346,5 +381,55 @@ mod tests {
         )
         .expect("resolve");
         assert_eq!(root, ".", "no unwrap when there is more than one candidate");
+    }
+}
+
+#[cfg(test)]
+mod wrapper_tests {
+    use super::*;
+
+    fn resolve(files: &[&str], mod_id: &str) -> anyhow::Result<String> {
+        let paths: Vec<String> = files.iter().map(ToString::to_string).collect();
+        detect_auto_root(&Listing::new(&paths), mod_id, "archive.7z")
+    }
+
+    #[test]
+    fn two_levels_of_wrapper_are_both_unwrapped() {
+        // Part 20's Knights of the Nine patch: the author named a folder after
+        // the archive, then named a folder inside it after the patch. A
+        // one-level rule installed the whole thing two folders deep -- every
+        // file present, nowhere the game looks, and nothing failed.
+        let root = resolve(
+            &[
+                "Knights of the Nine Weapon Improvement Project Patch V2/Knights Of the Nine Mesh Patch/ReadMe.txt",
+                "Knights of the Nine Weapon Improvement Project Patch V2/Knights Of the Nine Mesh Patch/Meshes/armor/x.nif",
+            ],
+            "Knights of the Nine_Weapon Improvement Project Patch",
+        )
+        .expect("resolve");
+        assert_eq!(
+            root,
+            "Knights of the Nine Weapon Improvement Project Patch V2/Knights Of the Nine Mesh Patch"
+        );
+    }
+
+    #[test]
+    fn the_descent_stops_where_the_shape_stops() {
+        // A file beside the wrapper means this level is content too.
+        let root = resolve(&["Wrapper/readme.txt", "Wrapper/Inner/meshes/x.nif"], "Mod")
+            .expect("resolve");
+        assert_eq!(root, "", "a loose file beside the folder ends the descent");
+
+        // Two candidates at the second level is an ambiguity, not a wrapper.
+        let root = resolve(
+            &["Wrapper/A/meshes/x.nif", "Wrapper/B/meshes/y.nif"],
+            "Mod",
+        )
+        .expect("resolve");
+        assert_eq!(root, "");
+
+        // And a lone content folder is still content, at any depth.
+        let root = resolve(&["Wrapper/textures/menus/x.dds"], "Mod").expect("resolve");
+        assert_eq!(root, "Wrapper", "descend to the wrapper, not into textures");
     }
 }
