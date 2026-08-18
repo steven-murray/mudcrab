@@ -4420,7 +4420,7 @@ file_name = "well.zip"
 
 # ── Part 19 - CREATURE & ANIMAL RETEXTURES ──────────────────────────────────
 #
-# 29 guide rows, 31 mods. Four rows install twice from one page (12, 17, 18) and
+# 29 guide rows, 31 mods. Three rows install twice from one page (12, 17, 18) and
 # guide row 9 could not be built -- see the note on it below.
 #
 # Rows 25-29 are tesall.ru and marked [MI], so they use `manual:` like Part 18's.
@@ -4681,9 +4681,12 @@ file_name = "Simple Horse Utilities-51197-2-0-8-1747467960.7z"
 # "MergablePatch", and "Coop's TW3 Oblivion Horse Replacer" is the installer's
 # title while the file is "Coop's Roach Horse Replacer".
 #
-# `KlenPatch: None` and `Horns: None` are empty selections, which is not the
-# same as omitting the group: both default to something, and the guide is
-# saying take neither. Declaring them empty is how that is said.
+# `KlenPatch: None` and `Horns: None` are declared as empty selections. For
+# KlenPatch that is load-bearing: it is SelectAtMostOne, so with no answer the
+# installer falls through to the first usable option and installs "Vanilla".
+# Horns is SelectAny with nothing Required or Recommended, so omitting it would
+# already select nothing -- the empty list is there to say the guide answered,
+# not because the behaviour needs it.
 [[mods]]
 id = "Coop's TW3 Oblivion Horse Replacer"
 section = ["19 - CREATURE & ANIMAL RETEXTURES"]
@@ -4762,7 +4765,11 @@ step = "MOO"
 group = "MOO"
 options = ["MOO"]
 
-# Guide 22: "(1st main file)".
+# Guide 22: "(1st main file)". The page hosts two main files that are not
+# versions of one another -- one for MOO users, one for people without it -- so
+# "1st" names a functional choice by its position in a list Nexus can reorder.
+# The Oracle installed the MOO one, and this list runs MOO (Part 8), so that is
+# the file pinned here. See notes/oracle-dependence.md.
 [[mods]]
 id = "Coop's Mudcrab Remake"
 section = ["19 - CREATURE & ANIMAL RETEXTURES"]

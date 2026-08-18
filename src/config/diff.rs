@@ -959,13 +959,19 @@ pub fn classify_guide_age(
     }
 
     // A legacy file id dates the file on its own, and more reliably than
-    // `nexusLastModified` does. Nexus allocates modern ids from 1_000_000_000
+    // `nexusLastModified` does -- but only when it is a real Nexus file id.
+    // Gated on `from_nexus` for the same reason the date below is: a `meta.ini`
+    // field can be MO2 bookkeeping rather than provenance, and a stray small
+    // number would otherwise become a confident answer with nothing behind it. Nexus allocates modern ids from 1_000_000_000
     // up; anything below that was uploaded under the old scheme, which Oblivion
     // files left behind years before the March 2025 guide. Eight mods in this
     // list carry a short id *and* a `nexusLastModified` in January 2026 -- the
     // day they were downloaded, not the day they were published -- and every
     // one of them was being reported as newer than the guide.
-    if let Some(file_id) = file_id.filter(|id| *id > 0 && *id < LEGACY_FILE_ID_CEILING) {
+    if let Some(file_id) = file_id
+        .filter(|_| from_nexus)
+        .filter(|id| *id > 0 && *id < LEGACY_FILE_ID_CEILING)
+    {
         return GuideAge::PreGuide {
             timestamp: 0,
             date: format!("legacy Nexus file id {file_id}"),
@@ -1731,5 +1737,24 @@ mod legacy_file_id_tests {
             GuideAge::PreGuide { date, .. } => assert!(date.starts_with("2020"), "{date}"),
             other => panic!("expected the filename's own date, got {other:?}"),
         }
+    }
+}
+
+#[cfg(test)]
+mod legacy_file_id_provenance_tests {
+    use super::{classify_guide_age, GuideAge};
+
+    #[test]
+    fn a_file_id_without_a_mod_id_behind_it_proves_nothing() {
+        // `meta.ini` fields are not provenance on their own -- Part 13's
+        // `Oblivion Landskape` is a tesall.ru download whose meta.ini claims a
+        // mod id. A stray small file id with no Nexus mod behind it must not
+        // become "definitely older than the guide"; the honest answer is that
+        // the age is unknown.
+        let age = classify_guide_age(Some("Hand Named.7z"), None, Some(0), Some(4567));
+        assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
+
+        let age = classify_guide_age(Some("Hand Named.7z"), None, None, Some(4567));
+        assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 }

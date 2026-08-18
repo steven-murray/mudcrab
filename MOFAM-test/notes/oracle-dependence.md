@@ -70,12 +70,15 @@ dependency later.
 `oracle_name` exists for the cases where our id and the Oracle's folder
 deliberately differ, and using it more widely would remove even this.
 
-## 3. Nexus file ids — **partly Oracle-derived**
+## 3. Nexus file ids — **the largest dependency in the list**
 
-Rows pinned as `nexus:oblivion/<mod>/<file>` name an exact file id. Those ids
-come from the Oracle's `meta.ini` `[installedFiles]` where one existed. The guide
-usually says only "the top file on the page", so a real user in March 2025 and a
-real user today would get different files.
+Rows pinned as `nexus:oblivion/<mod>/<file>` name an exact file id, and those ids
+come from the Oracle's `meta.ini` `[installedFiles]`. Not *some* of them: the
+Part 19 review spot-checked ten of that section's twenty-six Nexus rows and every
+one matched the Oracle's recorded file id exactly. Treat it as universal.
+
+The guide usually says only "the top file on the page", so a real user in March
+2025 and a real user today would get different files.
 
 `diff`'s guide-age check is the mitigation: any archive postdating the guide is
 flagged POST-GUIDE rather than silently accepted, and those flags are read every
@@ -85,6 +88,24 @@ from the Oracle for most rows.
 This one is genuinely load-bearing and has no clean answer: a guide that says
 "the top file" is not reproducible, by construction. Recorded as a property of
 the guide, not a defect in the list.
+
+### The harder case: when "which file" is not a version question
+
+Part 19 row 22 is the shape that has no fallback at all. The guide says
+*"Coop's Mudcrab Remake (1st main file)"*. That page hosts **two main files that
+are not versions of each other** — one for MOO users and one for people without
+it. "1st" is a position in a list that Nexus is free to reorder, naming a
+functional choice the guide never states.
+
+A version drift a user can at least reason about: the guide meant an older file,
+here is a newer one, and `diff` flags it. This is not that. A user who picks the
+other one gets a working install of the wrong mod, and nothing anywhere says so.
+
+The only honest fixes are outside mudcrab: read the mod page and record *which*
+file the guide meant, in the row's comment, in words. Done for row 22 as of this
+entry. Worth doing for every row whose selector is a position rather than a name
+-- "1st main file", "main file only", "optional file only" -- since those are
+ambiguous exactly when the page has more than one of the kind.
 
 ## 4. Install order within a section — **derivable, but checked against the Oracle**
 

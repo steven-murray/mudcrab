@@ -54,8 +54,13 @@ has.
   id only has to pair with the Oracle.
 
 `KlenPatch: None` and `Horns: None` are declared as empty selections rather than
-omitted. Not the same thing: both groups default to picking something, so
-leaving them out would install what the guide is declining.
+omitted — but only one of them needs to be. **KlenPatch** is `SelectAtMostOne`,
+so with no answer the installer falls through to the first usable option and
+installs `Vanilla`; the empty list is what stops that. **Horns** is `SelectAny`
+with nothing Required or Recommended, so omitting it would already select
+nothing. Declared anyway, to record that the guide answered rather than left it
+out — but the first draft of this note claimed both were load-bearing, and that
+was wrong about Horns.
 
 ## Small things
 
@@ -76,7 +81,7 @@ leaving them out would install what the guide is declining.
 
 `Mehrunes Dagon Retex` was reported POST-GUIDE — "the Oracle's archive is newer
 than the March 2025 guide". It is not: its Nexus file id is **54124**, an
-old-scheme upload from around 2011. What misled `diff` was
+old-scheme upload from long before the current billion-scale ids. What misled `diff` was
 `nexusLastModified=2026-01-26`, which is when the file was *downloaded to this
 machine*, not when it was published.
 
