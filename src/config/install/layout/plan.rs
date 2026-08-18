@@ -9,6 +9,7 @@
 //! `install` applies it; the file index keeps it and discards the rest. One
 //! implementation, so the index cannot drift from what install really does.
 
+use crate::archive::ArchiveFilters;
 use std::collections::BTreeMap;
 
 /// One archive entry and where it lands, relative to the mod folder.
@@ -65,6 +66,19 @@ impl LayoutPlan {
     pub fn len(&self) -> usize {
         self.files.len()
     }
+}
+
+/// The layout that does nothing: the tree root *is* the mod root.
+///
+/// `layout = "simple"` says so on the author's authority, and a `build` whose
+/// layers already assemble the finished folder has nothing left to rebase.
+pub fn plan_simple(paths: &[String], filters: &ArchiveFilters) -> LayoutPlan {
+    LayoutPlan::from_pairs(paths.iter().filter_map(|path| {
+        let normalized = path.replace('\\', "/");
+        filters
+            .should_extract(&normalized)
+            .then(|| (path.clone(), folded_destination(&normalized)))
+    }))
 }
 
 /// Fold directory components to lowercase, leaving the file name alone.
