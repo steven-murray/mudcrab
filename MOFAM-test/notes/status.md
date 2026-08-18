@@ -242,33 +242,28 @@ wanted, not built speculatively.
 
 ## Done: Part 18 (Katkat's Location Retextures)
 
-15 guide rows, 16 mods. **14 of 16 identical**, both differences deliberate —
-see `part-18-katkats-location-retextures.md`. The first real `conflicts_with`
-call site: row 7 says "hide the files that win over 2 VWD Ships (4 files)" and
-it hid exactly four, matching the guide's own count.
+15 guide rows, 16 mods, **16 of 16 identical** — see
+`part-18-katkats-location-retextures.md`. The first real `conflicts_with` call
+site: row 7 says "hide the files that win over 2 VWD Ships (4 files)" and it hid
+exactly four, matching the guide's own count.
 
-Two things for Steven:
+It found two divergences, both of which Steven has since resolved in the Oracle:
+guide row 14 (Katkat's Vegetable Garden) had never been installed there, and row
+7's four-file hide had never been done. Our id for the garden was renamed to the
+Oracle's `KatKat's Vegetable Garden`, which left a stale `mods/Ogorod` folder
+behind — harmless, and Steven's to delete.
 
-- **`Ogorod`** (guide row 14, Katkat's Vegetable Garden) has no Oracle folder,
-  though its archive is in the downloads folder. Fetched and then skipped, for
-  a reason nothing records.
-- **`Ships from katkat`** — the Oracle never did row 7's follow-up; all four
-  files are present and unhidden there.
+## Done: Part 19 (Creature & Animal Retextures)
 
-## Next sections## Done: Part 18 (Katkat's Location Retextures)
+29 guide rows, 31 mods. **25 of 31 identical**, all six differences explained —
+six plugins across five mods are Part 36 merge sources hidden in the Oracle, and
+`Ducks and Swans.esp` is a `[QAC]` row with the action commented out list-wide.
+See `part-19-creature-and-animal-retextures.md`.
 
-15 guide rows, 16 mods. **14 of 16 identical**, both differences deliberate —
-see `part-18-katkats-location-retextures.md`. The first real `conflicts_with`
-call site: row 7 says "hide the files that win over 2 VWD Ships (4 files)" and
-it hid exactly four, matching the guide's own count.
-
-Two things for Steven:
-
-- **`Ogorod`** (guide row 14, Katkat's Vegetable Garden) has no Oracle folder,
-  though its archive is in the downloads folder. Fetched and then skipped, for
-  a reason nothing records.
-- **`Ships from katkat`** — the Oracle never did row 7's follow-up; all four
-  files are present and unhidden there.
+**For Steven:** guide row 9, *Beautiful Creatures - Spider Daedra* (mod 43297,
+main file), is missing from the Oracle **and** was never downloaded, so there is
+nothing on disk to install. It needs your Nexus key. The entry is written out
+commented in the modlist, ready to uncomment.
 
 ## Next sections
 
