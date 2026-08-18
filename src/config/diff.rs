@@ -61,6 +61,36 @@ const MAX_DEPTH: usize = 64;
 /// reports a difference that means nothing.
 const OMOD_CONVERSION_DIR: &str = "omod conversion data";
 
+/// Whether a path is documentation rather than game content.
+///
+/// These are installed exactly as before -- this only decides whether a
+/// difference in them is worth *reporting*. Whether a hand-built instance kept
+/// a readme records which checkboxes were ticked during a manual install, not
+/// what the mod is: the Oracle keeps them for some mods and drops them for
+/// others, so no consistent rule can match it, and chasing that produced four
+/// "differences" in Part 16 alone that nobody would act on.
+///
+/// Deliberately narrow. Matching all `.txt` would be wrong -- mods do ship
+/// readable data files -- so this keys on names that only ever mean
+/// documentation, plus two artefacts of the tools rather than the mod:
+/// OBMM's settings screenshot and the `.url` shortcut Russian mirrors bundle.
+fn is_documentation(relative_path: &str) -> bool {
+    let name = relative_path
+        .rsplit('/')
+        .next()
+        .unwrap_or(relative_path)
+        .to_lowercase();
+
+    if name == "obmm_bsa_settings.jpg" || name.ends_with(".url") {
+        return true;
+    }
+
+    let stem = name.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(&name);
+    ["readme", "readme_", "read me", "credits", "licence", "license", "changelog"]
+        .iter()
+        .any(|marker| stem.contains(marker))
+}
+
 /// MO2 keeps its list separators as empty mod folders. They carry no files, so
 /// diffing them says nothing about whether a section was built correctly -- and
 /// an install that has not exported to MO2 yet has none of them at all.
@@ -646,6 +676,10 @@ fn collect_files(
 
         let relative = path.strip_prefix(root).unwrap_or(&path);
         let display = relative.to_string_lossy().replace('\\', "/");
+
+        if is_documentation(&display) {
+            continue;
+        }
         let key = comparison_key(&display);
 
         let hidden = display.split('/').any(|segment| strip_hidden_suffix(segment) != segment);
@@ -1476,6 +1510,37 @@ mod tests {
                 matches!(age, GuideAge::Unknown { .. }),
                 "'{value}' should not parse as a date, got {age:?}"
             );
+        }
+    }
+
+    #[test]
+    fn documentation_is_recognised_narrowly() {
+        for doc in [
+            "readme.txt",
+            "ReadMeEN.txt",
+            "readme_JP.txt",
+            "TD_aesthetics_readme.txt",
+            "HD Cobwebs - Readme.txt",
+            "Readme and Credits.txt",
+            "docs/License.txt",
+            "obmm_BSA_settings.jpg",
+            "Файл скачан с сайта TESALL.RU.url",
+        ] {
+            assert!(is_documentation(doc), "should be documentation: {doc}");
+        }
+
+        // Game content that happens to be text, or merely lives near docs,
+        // must still be compared -- this rule decides what gets *reported*, and
+        // over-matching here would hide real differences.
+        for content in [
+            "textures/rock.dds",
+            "meshes/plants/cattail.nif",
+            "OBSE/Plugins/ORC.ini",
+            "Data/notes.txt",
+            "shaders/orc/fog/Fog.ini",
+            "Maskar's Oblivion Overhaul for spawns.ini",
+        ] {
+            assert!(!is_documentation(content), "should not be documentation: {content}");
         }
     }
 
