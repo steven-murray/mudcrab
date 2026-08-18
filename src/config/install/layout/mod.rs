@@ -4,6 +4,7 @@ pub mod auto;
 pub mod bain;
 pub mod build;
 pub mod fomod;
+pub mod plan;
 
 use crate::archive::{extract_with_builtins, ArchiveFilters};
 use crate::config::download;
