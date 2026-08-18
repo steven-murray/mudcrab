@@ -3,7 +3,7 @@
 Rolling status. Update it when a section moves; it exists so a fresh context
 can pick up without re-reading the transcript.
 
-Last updated: 2026-08-17.
+Last updated: 2026-08-18.
 
 ## Done
 
@@ -134,18 +134,77 @@ filters are deliberately unchanged.
 
 `ini_set` is now section-aware, which was the plan's flagged latent bug.
 
-## Known recurring difference
+## Parts 12-17 — complete
 
-**Files beside the data folder are dropped.** When an archive has `Data/` (or a
-wrapper plus `Data/`), unwrapping takes the data folder as the mod root and
-root-level siblings — readmes, settings images — never come across. MO2 keeps
-them. Four occurrences so far (Part 9's readme; Part 11's Improved Doors and
-Flora, Improved Trees and Flora, HD Photorealistic Ivy). Harmless, but worth
-fixing rather than re-explaining each section.
+Built during the overnight run of 2026-08-17/18. Per-part notes in
+`part-12-*.md` through `part-17-awls.md`; the four reports written for Steven
+are in `notes/overnight/`, starting with `00-READ-THIS-FIRST.md`.
+
+Current standing after his decisions were applied:
+
+| part | result |
+|---|---|
+| 12 Weather & Lighting | 20 mods, 16 identical |
+| 13 Oblivion Realm | 6 of 6 identical |
+| 14 ENB & ORC | 3 built, 2 identical; ENB rows pinned |
+| 15 Interior Retextures | 13 of 13 identical |
+| 16 Town & City | 36 mods, 34 identical |
+| 17 AWLS | 5 mods, 4 identical |
+
+What remains differing across all of them is merge sources hidden in the Oracle,
+BSA payload dedup, deferred QACs, and AWLS's installer answers.
+
+## Two bugs worth remembering
+
+**The profile INI was reset on every install.** `prepare_mo2_profile` copied the
+game's Oblivion.ini over the profile's copy at the start of every run, so a
+section-by-section build kept only the most recently built section's settings.
+Six of eighteen were wrong on disk when found, including all three DarNified
+font paths. Written up in `ini-clobber-bug.md`. **`diff` compares mod folders,
+so it cannot see INI edits** — that whole class of instruction needs checking by
+hand or by the audit script in that note.
+
+**Extraction used to happen in `/tmp`, which is a tmpfs.** Unpacking one 6.5 GB
+archive twice filled 16 GB of RAM and wedged the machine. Staging now hangs off
+the MO2 instance root, deliberately as a *sibling* of `mods/` since MO2 lists
+every directory under `mods/` as a mod. A stale-dir sweep runs at install time.
+
+## Documentation differences are not findings
+
+Steven's call, after keeping straggler files (report 1, S4) turned out to fix
+three mods and break five. The files are still installed; `diff` just stops
+comparing readmes, credits, licences, `obmm_BSA_settings.jpg` and `.url`
+shortcuts. Deliberately narrow — matching all `.txt` would hide real data files.
+
+## In progress: the layout planner (D1)
+
+`MOFAM-test/notes/layout-planner-design.md` has the design and the measurements.
+The point is to answer "which files would mod X contribute?" without installing
+X, which is what deriving conflict lists needs — and, as a dividend, to extract
+only what a plan keeps.
+
+Order, with state:
+
+1. `LayoutPlan` + `Listing` — **done**
+2. `bain` handler — **done**
+3. `auto` handler — **done** (all five staged-tree helpers deleted, not kept)
+4. `fomod` handler — **next**; 585 lines, and the only handler needing file
+   *content* (`ModuleConfig.xml`), so it needs one targeted extraction first
+5. `build` handler — small
+6. selective extraction (hand the plan's sources to the extractor)
+7. file index cached by the existing `definition_hash`
+8. `conflicts_with` on `file_prune`/`file_hide`, validated against the 1725
+   recorded OOO Enhanced paths
+9. lockfile resolving selectors to explicit paths
+
+Staging does **not** disappear at the end of this: 142 of the modlist's archives
+are 7z and 32 rar, and those shell out to tools that cannot rebase paths during
+extraction. What changes is its size.
 
 ## Next sections
 
-Guide order from **Part 12 (Weather & Lighting)**. Most rows are trivial; the ones needing new features
+Guide order from **Part 18 (Katkat's Location Retextures)**, once the planner
+work is finished. Most rows are trivial; the ones needing new features
 are listed in `feature-gap-log.md` with the section that first needs them.
 The next real features are section-aware `ini_set` (Part 11's `[Grass]`, a
 live correctness bug -- see GAP-009) and the combine/repack archetype at

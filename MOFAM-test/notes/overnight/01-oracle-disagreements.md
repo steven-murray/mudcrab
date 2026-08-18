@@ -1,5 +1,13 @@
 # Report 1 — where our build does not match the Oracle
 
+> **Resolved 2026-08-18.** Steven worked through this list and updated the
+> Oracle for D1, D3, D4, D6, D8 and D9; chose to keep straggler files (S4) and
+> then to stop treating documentation differences as findings at all; and
+> confirmed ORC180 ships `ORC.esp` per the guide, making that a permanent
+> difference against his ORC 315F. What is left open is **D10 (AWLS installer
+> answers)**. The rest of this file is kept as the record of how each was
+> decided.
+
 Every difference `mudcrab diff` reports, by kind. Grouped because most recur in
 every section and only the last group needs a decision from Steven.
 
