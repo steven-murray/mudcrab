@@ -64,6 +64,29 @@ pub(crate) fn destination_for(
     }
 }
 
+/// Copy a planned set of files out of a staged tree.
+///
+/// The plan already decided every source and destination, so this is only the
+/// doing: create parents, copy, count.
+pub(crate) fn apply_plan(
+    staging_dir: &Path,
+    destination_root: &Path,
+    plan: &plan::LayoutPlan,
+) -> anyhow::Result<usize> {
+    for file in &plan.files {
+        let from = staging_dir.join(&file.source);
+        let to = destination_root.join(&file.destination);
+        if let Some(parent) = to.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
+        }
+        std::fs::copy(&from, &to).map_err(|err| {
+            anyhow::anyhow!("failed to copy {} to {}: {err}", from.display(), to.display())
+        })?;
+    }
+    Ok(plan.files.len())
+}
+
 pub(crate) fn install_mod_archives(
     mod_entry: &PersonalizedMod,
     settings: &InstallSettings,

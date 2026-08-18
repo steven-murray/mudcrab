@@ -147,3 +147,141 @@ mod tests {
         );
     }
 }
+
+/// A read-only view of an archive's entry list, shaped like a directory tree.
+///
+/// The detection layout does -- "is there a `Data/` here?", "where are the
+/// plugins?", "is the only top-level entry a wrapper folder?" -- is all
+/// structural, and structure is exactly what a list of paths already carries.
+/// Answering from the list instead of from an extracted tree is what lets a
+/// plan be computed before anything is unpacked.
+pub struct Listing<'a> {
+    paths: &'a [String],
+}
+
+/// Immediate children of one directory.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Children {
+    pub dirs: Vec<String>,
+    pub files: Vec<String>,
+}
+
+impl<'a> Listing<'a> {
+    pub fn new(paths: &'a [String]) -> Self {
+        Self { paths }
+    }
+
+    pub fn paths(&self) -> &'a [String] {
+        self.paths
+    }
+
+    /// Paths under `prefix`, with the prefix removed. `""` means the root.
+    pub fn under(&self, prefix: &str) -> impl Iterator<Item = String> + '_ {
+        let prefix = prefix.to_string();
+        self.paths.iter().filter_map(move |path| {
+            if prefix.is_empty() {
+                Some(path.replace('\\', "/"))
+            } else {
+                strip_dir_prefix(path, &prefix)
+            }
+        })
+    }
+
+    /// Immediate children of `prefix`, deduplicated and in listing order.
+    pub fn children(&self, prefix: &str) -> Children {
+        let mut children = Children::default();
+        for rest in self.under(prefix) {
+            match rest.split_once('/') {
+                Some((dir, _)) => {
+                    if !children.dirs.iter().any(|seen| seen.eq_ignore_ascii_case(dir)) {
+                        children.dirs.push(dir.to_string());
+                    }
+                }
+                None => {
+                    if !children.files.iter().any(|seen| seen.eq_ignore_ascii_case(&rest)) {
+                        children.files.push(rest);
+                    }
+                }
+            }
+        }
+        children
+    }
+
+    pub fn has_dir(&self, prefix: &str, name: &str) -> bool {
+        self.children(prefix)
+            .dirs
+            .iter()
+            .any(|dir| dir.eq_ignore_ascii_case(name))
+    }
+
+    /// Plugin paths anywhere under `prefix`, relative to it.
+    pub fn plugin_paths(&self, prefix: &str) -> Vec<String> {
+        self.under(prefix)
+            .filter(|rest| is_plugin_name(rest))
+            .collect()
+    }
+}
+
+/// Whether a path names a plugin the game would load.
+///
+/// Mirrors `stage::is_plugin_file`, which takes a `Path`; this works on the
+/// archive's own strings, before anything exists on disk.
+pub fn is_plugin_name(path: &str) -> bool {
+    let name = path.rsplit('/').next().unwrap_or(path).to_lowercase();
+    if name.ends_with(".mohidden") {
+        return false;
+    }
+    name.ends_with(".esp") || name.ends_with(".esm")
+}
+
+#[cfg(test)]
+mod listing_tests {
+    use super::*;
+
+    fn sample() -> Vec<String> {
+        [
+            "readme.txt",
+            "Data/textures/rock.dds",
+            "Data/meshes/a.nif",
+            "Data/Plugin.esp",
+            "Docs/manual.txt",
+        ]
+        .iter()
+        .map(ToString::to_string)
+        .collect()
+    }
+
+    #[test]
+    fn children_separates_dirs_from_files_without_duplicates() {
+        let paths = sample();
+        let listing = Listing::new(&paths);
+
+        let root = listing.children("");
+        assert_eq!(root.dirs, ["Data", "Docs"]);
+        assert_eq!(root.files, ["readme.txt"]);
+
+        // `Data` has two subdirectories and one loose file, each listed once
+        // even though `textures/` holds several entries.
+        let data = listing.children("Data");
+        assert_eq!(data.dirs, ["textures", "meshes"]);
+        assert_eq!(data.files, ["Plugin.esp"]);
+    }
+
+    #[test]
+    fn lookups_are_case_insensitive_like_the_archives_they_come_from() {
+        let paths = sample();
+        let listing = Listing::new(&paths);
+        assert!(listing.has_dir("", "data"));
+        assert!(listing.has_dir("", "DATA"));
+        assert!(!listing.has_dir("", "Database"));
+        assert_eq!(listing.plugin_paths("data"), ["Plugin.esp"]);
+    }
+
+    #[test]
+    fn hidden_plugins_are_not_plugins() {
+        assert!(is_plugin_name("Data/Foo.esp"));
+        assert!(is_plugin_name("Foo.ESM"));
+        assert!(!is_plugin_name("Foo.esp.mohidden"));
+        assert!(!is_plugin_name("textures/foo.dds"));
+    }
+}
