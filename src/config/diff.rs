@@ -54,6 +54,13 @@ const CHUNK: usize = 128 * 1024;
 /// Guard against a symlink loop turning the walk into an infinite descent.
 const MAX_DEPTH: usize = 64;
 
+/// Leftovers from OBMM's installer that some archives carry and that neither
+/// the game nor MO2 reads. Whether a hand-built instance kept them is a record
+/// of how it was clicked through, not of what the mod is -- the Oracle keeps
+/// them for one manual install and dropped them for another. Comparing them
+/// reports a difference that means nothing.
+const OMOD_CONVERSION_DIR: &str = "omod conversion data";
+
 /// MO2 keeps its list separators as empty mod folders. They carry no files, so
 /// diffing them says nothing about whether a section was built correctly -- and
 /// an install that has not exported to MO2 yet has none of them at all.
@@ -626,6 +633,9 @@ fn collect_files(
         };
 
         if metadata.is_dir() {
+            if depth == 0 && name.eq_ignore_ascii_case(OMOD_CONVERSION_DIR) {
+                continue;
+            }
             collect_files(&path, root, depth + 1, files)?;
             continue;
         }

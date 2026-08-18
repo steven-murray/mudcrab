@@ -167,6 +167,9 @@ plugins = [
 	# in the load order; this is row 28's mergeable copy, a Part 36 merge source
 	# hidden in the Oracle and active here until that merge exists.
 	"MageGuild_simbol.esp",
+	# Part 14. ORC180 ships this and the guide wants it. The Oracle runs ORC
+	# 315F, which ships no plugin, so this is a permanent difference.
+	"ORC.esp",
 	# Part 17. Neither is a merge source; both load normally.
 	"WindowLightingSystem.esp",
 	"Diverse Chapels Vanilla.esp"
@@ -3425,13 +3428,16 @@ paths = [
   "textures/Effects/TerrainNoise.dds",
   "meshes/characters/_1stperson/skeleton.nif",
   "meshes/characters/_male/Skeleton.nif",
-  # ORC180 ships a plugin this build does not load: `mofam.merges.toml`
-  # deliberately has no ORC.esp (the Linux build uses ORC 315F, which ships
-  # none), so it is not in the top-level `plugins` array either. Left loose it
-  # would sit in an active mod folder as an undeclared plugin MO2 would offer
-  # to enable. The Oracle hides it; so do we.
-  "ORC.esp",
 ]
+
+# ORC180 ships ORC.esp and the guide wants it, so it loads normally -- it is in
+# the top-level `plugins` array.
+#
+# This is a permanent difference from the Oracle, which runs ORC 315F instead.
+# 315F ships no plugin at all, which is why `mofam.merges.toml` deliberately
+# has no ORC.esp source and why the Oracle's copy of the 180 folder keeps it
+# hidden. Following the guide means shipping it; expect `ORC.esp` to show as
+# "hidden on one side only" for as long as the Oracle stays on 315F.
 
 # Guide 4: "Open up ORC\Fog\Fog.ini via the INI Files menu of MO2 & set both
 # [World] & [Interior] Amount values to 0.0."
@@ -3624,20 +3630,21 @@ file_name = "Improved Candles v1-34410.rar"
 # oracle version d2026.1.24.0
 
 [[mods]]
-id = "T4UTXL - Architecture_BETA2 - Priory"
+id = "T4UTXL - Architecture_BETA1 - Priory"
+# The Oracle is still on BETA2 for this row, so its folder is named for that.
+oracle_name = "T4UTXL - Architecture_BETA2 - Priory"
 section = ["16 - TOWN AND CITY RETEXTURES"]
 
 [[mods.archives]]
-path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
-file_name = "T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+path = "manual:T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z"
+file_name = "T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z"
 # Guide 1: "Delete everything except Textures > Architecture > Priory", then
 # delete priorydoor01* and weynondoor01*. Stated as a keep-list plus two
-# exceptions, so it is written as one. 48 files under priory, minus those 4,
-# leaves 44 -- the Oracle's count exactly.
+# exceptions, so it is written as one. BETA1 holds 52 files under priory, minus
+# those 4, leaves 48.
 #
-# NOTE the guide says BETA1 and the Oracle installed BETA2 (dated 2025-04-15,
-# after the guide). Same archive is installed twice under two names; see the
-# City Gates entry at the end of this section.
+# The Oracle is still on BETA2 for this row, which yields 44, so this mod
+# differs by 4 files. The guide says BETA1; followed.
 include = ["textures/architecture/priory/**"]
 exclude = ["**/priorydoor01*", "**/weynondoor01*"]
 # TODO: Nexus mod 54904, file id not recorded by MO2, so the descriptor
@@ -4044,35 +4051,20 @@ file_name = "Imperial Roads-46744-1.7z"
 # oracle version 1.0.0.0
 
 [[mods]]
-id = "T4UTXL - Architecture_BETA2 - City Gates"
+id = "T4UTXL - Architecture_BETA1 - City Gates"
 section = ["16 - TOWN AND CITY RETEXTURES"]
 
 [[mods.archives]]
-path = "manual:T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
-file_name = "T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+path = "manual:T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z"
+file_name = "T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z"
 # Guide 32: the same archive again, installed under a second name, keeping only
 # the city-gate textures.
 #
-# BETA2 ships as TWO archives, Part 1 and Part 2, and the city-gate textures are
-# split across both -- Part 2 has only Leyawiin and Skingrad. Building from
-# Part 2 alone produced 5 of the Oracle's 11 files, which is what caught this.
+# The guide lists six paths, and BETA1 has all six in one archive -- 13 files.
 #
-# The guide lists six paths. All six exist once both parts are in, including
-# `Castle > Cheydinhal > cheydinhalcitydoor01*` -- which the **Oracle does not
-# have**, so it installed only one part here. Guide followed: we end up with 13
-# files where the Oracle has 11.
-include = [
-  "textures/architecture/anvil/anvilcastledoor01*",
-  "textures/architecture/bravil/bravilentrancegate01*",
-  "textures/architecture/bruma/brumacitygate*",
-  "textures/architecture/leyawiin/leyawiincastledoor*",
-  "textures/architecture/skingrad/skcastledoorlarge*",
-  "textures/architecture/castle/cheydinhal/cheydinhalcitydoor01*",
-]
-
-[[mods.archives]]
-path = "manual:T4UTXL - Architecture_BETA2 (Part 1)-54904-ARCHITECTURE-BETA2-1744727305.7z"
-file_name = "T4UTXL - Architecture_BETA2 (Part 1)-54904-ARCHITECTURE-BETA2-1744727305.7z"
+# BETA2 splits the same content across two archives (Part 1 and Part 2) with the
+# city gates spread over both, which is how a BETA2 build ends up short unless
+# both parts go in. The guide says BETA1, so that is what this uses.
 include = [
   "textures/architecture/anvil/anvilcastledoor01*",
   "textures/architecture/bravil/bravilentrancegate01*",

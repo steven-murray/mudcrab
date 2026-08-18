@@ -75,6 +75,11 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         .collect();
 
     if !settings.dry_run {
+        // An interrupted run leaves an archive-sized directory in the temp dir.
+        // Two of them once filled a 16 GB tmpfs; clear anything an hour cold
+        // before adding more.
+        crate::util::fs::sweep_stale_staging_dirs(std::time::Duration::from_secs(3600));
+
         std::fs::create_dir_all(&settings.mods_dir).map_err(|err| {
             anyhow::anyhow!(
                 "failed to create mods directory {}: {err}",
@@ -1103,6 +1108,107 @@ mod tests {
             err.to_string().contains("unsupported archive layout"),
             "{err}"
         );
+    }
+
+    /// MO2 keeps the readme an author left beside `Data/`; unwrapping used to
+    /// drop it. Five mods across Parts 9, 11, 15 and 16 differed only by this.
+    #[test]
+    fn auto_layout_keeps_files_sitting_beside_the_data_folder() {
+        let temp = tempdir().expect("tempdir");
+        let archive_path = temp.path().join("beside.zip");
+        let file = std::fs::File::create(&archive_path).expect("create zip");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+
+        zip.start_file("readme.txt", options).expect("readme");
+        std::io::Write::write_all(&mut zip, b"docs").expect("write readme");
+        zip.start_file("obmm_BSA_settings.jpg", options).expect("jpg");
+        std::io::Write::write_all(&mut zip, b"jpg").expect("write jpg");
+        zip.add_directory("Data/", options).expect("data dir");
+        zip.start_file("Data/textures/rock.dds", options).expect("texture");
+        std::io::Write::write_all(&mut zip, b"tex").expect("write texture");
+        zip.finish().expect("finish zip");
+
+        let target_root = temp.path().join("out");
+        let archive = CompiledArchive {
+            path: Some("nexus:oblivion/1/1".to_string()),
+            file_name: None,
+            download_handler: None,
+            layout: None,
+            data_folder: None,
+            target_subdir: None,
+            bain_subpackages: Vec::new(),
+            fomod_selections: Vec::new(),
+            build: Vec::new(),
+            include: Vec::new(),
+            exclude: Vec::new(),
+            game_root_files: Vec::new(),
+        };
+        let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
+
+        let extracted = extract_archive(
+            &archive_path,
+            &target_root,
+            "Example",
+            &archive,
+            &filters,
+            &HashSet::new(),
+        )
+        .expect("extract");
+
+        assert_eq!(extracted, 3, "the texture plus both loose files");
+        assert!(target_root.join("textures/rock.dds").exists(), "Data/ is still unwrapped");
+        assert!(target_root.join("readme.txt").exists());
+        assert!(target_root.join("obmm_BSA_settings.jpg").exists());
+        // The skipped level's *name* must not reappear as a folder.
+        assert!(!target_root.join("Data").exists());
+    }
+
+    /// Only loose *files* come across. A sibling directory is either an
+    /// alternative the author separated on purpose or packaging the mod does
+    /// not want (`Screenshots/`, `-- Docs/`), and hoisting its contents into the
+    /// mod root would be wrong in both cases.
+    #[test]
+    fn auto_layout_does_not_pull_in_sibling_directories() {
+        let temp = tempdir().expect("tempdir");
+        let archive_path = temp.path().join("siblings.zip");
+        let file = std::fs::File::create(&archive_path).expect("create zip");
+        let mut zip = zip::ZipWriter::new(file);
+        let options = SimpleFileOptions::default();
+
+        zip.start_file("Data/textures/keep.dds", options).expect("keep");
+        std::io::Write::write_all(&mut zip, b"keep").expect("write keep");
+        zip.start_file("Screenshots/preview.png", options).expect("skip");
+        std::io::Write::write_all(&mut zip, b"skip").expect("write skip");
+        zip.start_file("licence.txt", options).expect("licence");
+        std::io::Write::write_all(&mut zip, b"lic").expect("write licence");
+        zip.finish().expect("finish zip");
+
+        let target_root = temp.path().join("out");
+        let archive = CompiledArchive {
+            path: Some("nexus:oblivion/1/1".to_string()),
+            file_name: None,
+            download_handler: None,
+            layout: None,
+            data_folder: None,
+            target_subdir: None,
+            bain_subpackages: Vec::new(),
+            fomod_selections: Vec::new(),
+            build: Vec::new(),
+            include: Vec::new(),
+            exclude: Vec::new(),
+            game_root_files: Vec::new(),
+        };
+        let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
+
+        extract_archive(&archive_path, &target_root, "Example", &archive, &filters, &HashSet::new())
+            .expect("extract");
+
+        assert!(target_root.join("textures/keep.dds").exists());
+        assert!(target_root.join("licence.txt").exists(), "loose files come across");
+        assert!(!target_root.join("preview.png").exists(), "a sibling directory does not");
+        assert!(!target_root.join("Screenshots").exists());
+        assert!(!target_root.join("screenshots").exists());
     }
 
     #[test]

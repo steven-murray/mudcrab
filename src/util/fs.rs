@@ -99,10 +99,66 @@ pub fn write_text_file(path: &Path, content: &str) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
 }
 
+/// Prefixes of the scratch directories mudcrab creates under the temp dir.
+const STAGING_PREFIXES: [&str; 2] = ["mudcrab-stage-", "mudcrab-sys-"];
+
+/// Delete scratch directories left behind by runs that did not finish.
+///
+/// Both staging helpers remove their directory on success *and* on error, so
+/// nothing leaks in normal operation -- but a killed process (Ctrl-C, a
+/// timeout, an OOM) leaves the whole extraction behind, and these are the size
+/// of the archive. Two abandoned runs of one 6.5 GB archive filled a 16 GB
+/// `/tmp` and wedged the machine, which is how this was found.
+///
+/// Age-gated rather than pid-gated: a concurrent `mudcrab` may legitimately own
+/// a fresh directory, and deleting it mid-extraction would corrupt that run.
+/// Anything untouched for `max_age` belongs to nobody.
+pub fn sweep_stale_staging_dirs(max_age: std::time::Duration) -> usize {
+    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+        return 0;
+    };
+    let now = SystemTime::now();
+    let mut removed = 0usize;
+
+    for entry in entries.flatten() {
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !STAGING_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) {
+            continue;
+        }
+        let Ok(metadata) = entry.metadata() else { continue };
+        if !metadata.is_dir() {
+            continue;
+        }
+        let stale = metadata
+            .modified()
+            .ok()
+            .and_then(|modified| now.duration_since(modified).ok())
+            .is_some_and(|age| age > max_age);
+        if !stale {
+            continue;
+        }
+        if std::fs::remove_dir_all(entry.path()).is_ok() {
+            tracing::info!(
+                path = %entry.path().display(),
+                "removed a staging directory left by an interrupted run"
+            );
+            removed += 1;
+        }
+    }
+
+    removed
+}
+
 /// Build a unique temporary staging directory path for `target_root`.
 ///
 /// Includes both PID and nanosecond timestamp: a timestamp alone collides when
 /// two extractions start within the same millisecond.
+///
+/// NOTE this lives under the system temp dir, which on many Linux setups is a
+/// tmpfs -- i.e. RAM. Extraction is archive-sized, so a multi-gigabyte mod is
+/// unpacked into memory. Staging beside the destination instead would be
+/// better on both counts, but it is a change of contract for every caller.
 pub fn staging_dir_for(target_root: &Path) -> anyhow::Result<PathBuf> {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
