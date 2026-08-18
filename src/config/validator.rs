@@ -1,4 +1,4 @@
-use crate::config::schema::{InputType, ModEntry, ModType, SourceModlist};
+use crate::config::schema::{InputType, ModAction, ModEntry, ModType, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -38,6 +38,23 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
             }
         }
 
+        // A conflict relationship names another mod, and naming it wrong is the
+        // failure that cost this list three rebuilds: the guide's prose names
+        // for the mods in one row were wrong three separate ways. Caught here,
+        // where a typo is a validation error rather than a conflict list that
+        // comes back empty two hours into a build.
+        for named in conflict_partners(spec) {
+            if !flattened_mods.contains_key(named) {
+                anyhow::bail!(
+                    "mod {mod_id} has a conflicts_with naming {named}, which is not a mod in this \
+                     modlist"
+                );
+            }
+            if named == mod_id {
+                anyhow::bail!("mod {mod_id} declares a conflicts_with against itself");
+            }
+        }
+
         for plugin in &spec.plugins {
             if !is_plugin_filename(plugin) {
                 anyhow::bail!("mod {mod_id} declares invalid plugin filename {plugin}");
@@ -64,6 +81,15 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
     detect_cycles(&flattened_mods)?;
 
     Ok(())
+}
+
+/// Every mod id a mod's actions declare a conflict against.
+fn conflict_partners(spec: &ModEntry) -> impl Iterator<Item = &String> {
+    spec.actions.iter().flat_map(|action| match action {
+        ModAction::FilePrune(prune) => prune.conflicts_with.iter(),
+        ModAction::FileHide(hide) => hide.conflicts_with.iter(),
+        _ => [].iter(),
+    })
 }
 
 /// Check every merge against the rest of the modlist.

@@ -1,7 +1,7 @@
 //! FOMOD installer support: parse ModuleConfig.xml and apply the selected options.
 
 use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan};
-use super::{apply_plan, destination_for};
+use super::apply_plan;
 use crate::archive::ArchiveFilters;
 use crate::config::schema::{CompiledArchive, FomodSelection};
 use crate::util::fs::{eq_ci, normalize_relative_path};
@@ -40,41 +40,27 @@ impl FomodInstallEntry {
     }
 }
 
-pub(crate) fn extract_archive_with_fomod_layout(
-    source: &Path,
-    target_root: &Path,
+/// Plan a FOMOD straight from an archive, reading its config on the way.
+///
+/// The one layout that cannot decide from paths alone, so its config comes out
+/// on its own and the rest of the archive still waits for the plan that config
+/// produces.
+pub(crate) fn plan_fomod_archive(
+    paths: &[String],
+    reader: &super::EntryReader<'_>,
+    source_label: &str,
     archive: &CompiledArchive,
     filters: &ArchiveFilters,
     active_plugins: &HashSet<String>,
-) -> anyhow::Result<usize> {
-    if archive.data_folder.is_some() {
-        anyhow::bail!(
-            "FOMOD layout for {} cannot be combined with data_folder",
-            source.display()
-        );
-    }
-    if !archive.bain_subpackages.is_empty() {
-        anyhow::bail!(
-            "FOMOD layout for {} cannot be combined with bain_subpackages",
-            source.display()
-        );
-    }
-
-    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-    let source_label = source.display().to_string();
-    super::with_planned_archive(source, target_root, &destination_root, |paths, reader| {
-        // The one layout that cannot decide from paths alone. Its config comes
-        // out on its own, and the rest of the archive still waits for the plan
-        // that config produces.
-        let config_path = find_fomod_config(paths).ok_or_else(|| {
-            anyhow::anyhow!(
-                "FOMOD archive {source_label} does not contain fomod/ModuleConfig.xml or \
-                 fomod/script.xml"
-            )
-        })?;
-        let xml = decode_xml(&reader.read(&config_path)?, &config_path)?;
-        plan_fomod(paths, &config_path, &xml, archive, filters, active_plugins)
-    })
+) -> anyhow::Result<LayoutPlan> {
+    let config_path = find_fomod_config(paths).ok_or_else(|| {
+        anyhow::anyhow!(
+            "FOMOD archive {source_label} does not contain fomod/ModuleConfig.xml or \
+             fomod/script.xml"
+        )
+    })?;
+    let xml = decode_xml(&reader.read(&config_path)?, &config_path)?;
+    plan_fomod(paths, &config_path, &xml, archive, filters, active_plugins)
 }
 
 pub(crate) fn apply_fomod_from_staging(

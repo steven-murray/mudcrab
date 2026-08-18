@@ -56,6 +56,8 @@ fn run(actions: &[ModAction], root: &Path, target: &Path) -> anyhow::Result<()> 
     apply_all(
         actions,
         &ActionCx {
+            plan_mods: &[],
+            active_plugins: &Default::default(),
             owner: "Example",
             settings: &settings,
             mod_target: Some(target),
@@ -89,12 +91,16 @@ fn dummy(output: &str) -> ModAction {
 
 fn hide(paths: &[&str]) -> ModAction {
     ModAction::FileHide(FileHideAction {
+        conflicts_with: Vec::new(),
+        under: None,
         paths: paths.iter().map(|s| s.to_string()).collect(),
     })
 }
 
 fn prune(paths: &[&str]) -> ModAction {
     ModAction::FilePrune(FilePruneAction {
+        conflicts_with: Vec::new(),
+        under: None,
         paths: paths.iter().map(|s| s.to_string()).collect(),
     })
 }
@@ -201,6 +207,8 @@ fn pack_bsa_writes_nothing_in_a_dry_run() {
     apply_all(
         &[pack("Example.bsa", &[], &[])],
         &ActionCx {
+            plan_mods: &[],
+            active_plugins: &Default::default(),
             owner: "Example",
             settings: &settings,
             mod_target: Some(&target),
@@ -399,6 +407,8 @@ fn file_prune_deletes_nothing_in_a_dry_run() {
     apply_all(
         &[prune(&["meshes/**"])],
         &ActionCx {
+            plan_mods: &[],
+            active_plugins: &Default::default(),
             owner: "Example",
             settings: &settings,
             mod_target: Some(&target),
@@ -501,6 +511,8 @@ fn all_three_are_only_valid_as_per_mod_actions() {
         let err = apply_all(
             std::slice::from_ref(&action),
             &ActionCx {
+            plan_mods: &[],
+            active_plugins: &Default::default(),
                 owner: "plan",
                 settings: &settings,
                 mod_target: None,
@@ -599,6 +611,8 @@ fn file_hide_changes_nothing_in_a_dry_run() {
     apply_all(
         &[hide(&["meshes/rocks"])],
         &ActionCx {
+            plan_mods: &[],
+            active_plugins: &Default::default(),
             owner: "Example",
             settings: &settings,
             mod_target: Some(&target),
@@ -832,4 +846,59 @@ fn pack_bsa_prune_deletes_regardless_of_how_the_tree_is_cased() {
     assert!(!target.join("Sound").exists(), "mixed-case folders must go too");
     assert!(!target.join("MESHES").exists());
     assert!(target.join("Example.bsa").is_file());
+}
+
+/// A prune or hide carrying neither `paths` nor `conflicts_with` selects
+/// everything or nothing depending on which way the glob machinery is read,
+/// and both answers are wrong. `paths` used to be mandatory in the schema; a
+/// conflict selection names no paths, so the rule moved here.
+#[test]
+fn a_prune_or_hide_with_nothing_to_act_on_is_rejected() {
+    let (dir, target) = staged_mod();
+
+    for action in [
+        ModAction::FilePrune(FilePruneAction {
+            paths: Vec::new(),
+            conflicts_with: Vec::new(),
+            under: None,
+        }),
+        ModAction::FileHide(FileHideAction {
+            paths: Vec::new(),
+            conflicts_with: Vec::new(),
+            under: None,
+        }),
+    ] {
+        let name = action.name();
+        let err = run(&[action], dir.path(), &target).expect_err("should reject");
+        // `apply_all` wraps every failure in the action's name, so the reason
+        // is one link down the chain.
+        let reported = format!("{err:#}");
+        assert!(reported.contains("conflicts_with"), "{name}: {reported}");
+    }
+
+    // Nothing was touched on the way to refusing.
+    assert!(target.join("meshes/rocks/rock01.nif").exists());
+}
+
+/// `conflicts_with` naming a mod the plan does not have is a typo, and the
+/// guide's own names for the mods in the row that needs this were wrong three
+/// separate ways. An empty conflict list looks exactly like "no conflicts".
+#[test]
+fn conflicts_with_naming_an_unknown_mod_is_rejected() {
+    let (dir, target) = staged_mod();
+
+    let err = run(
+        &[ModAction::FilePrune(FilePruneAction {
+            paths: Vec::new(),
+            conflicts_with: vec!["No Such Mod".to_string()],
+            under: None,
+        })],
+        dir.path(),
+        &target,
+    )
+    .expect_err("should reject");
+
+    let reported = format!("{err:#}");
+    assert!(reported.contains("No Such Mod"), "{reported}");
+    assert!(target.join("meshes/rocks/rock01.nif").exists());
 }

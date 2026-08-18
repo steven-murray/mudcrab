@@ -2,22 +2,7 @@
 
 use crate::archive::ArchiveFilters;
 use crate::util::fs::eq_ci;
-use std::path::Path;
 use super::plan::{folded_destination, is_plugin_name, strip_dir_prefix, Children, LayoutPlan, Listing};
-
-pub(crate) fn extract_archive_with_auto_layout(
-    source: &Path,
-    target_root: &Path,
-    mod_id: &str,
-    filters: &ArchiveFilters,
-) -> anyhow::Result<usize> {
-    super::with_planned_archive(source, target_root, target_root, |paths, _| {
-        plan_auto(paths, mod_id, &source.display().to_string(), filters)
-    })
-}
-
-
-
 
 // ---------------------------------------------------------------------------
 // Listing-based detection.

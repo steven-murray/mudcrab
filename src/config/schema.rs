@@ -186,8 +186,20 @@ pub struct CreateDummyPluginAction {
 #[serde(deny_unknown_fields)]
 pub struct FilePruneAction {
     /// Glob patterns resolved relative to the mod's staged data folder.
-    /// Required: a prune with nothing to delete is always a mistake.
+    #[serde(default)]
     pub paths: Vec<String>,
+    /// Mod ids whose files this mod should yield to.
+    ///
+    /// The guide's "Winning File conflicts -> Overwritten mods" and "Losing
+    /// file conflicts -> Providing Mod" rows, said once instead of as a list
+    /// of paths read off somebody's finished install. See
+    /// `notes/conflict-resolution-design.md` for why the *direction* has to be
+    /// declared rather than derived from mod priority.
+    #[serde(default)]
+    pub conflicts_with: Vec<String>,
+    /// Restrict a `conflicts_with` selection to one subtree.
+    #[serde(default)]
+    pub under: Option<String>,
 }
 
 /// Rename staged files to `<name>.mohidden`, MO2's way of dropping something
@@ -203,7 +215,15 @@ pub struct FileHideAction {
     /// case-insensitively a segment at a time. Literal paths, not globs: each
     /// one is a file or folder the guide named, and one that is not there is an
     /// error rather than a silent skip.
+    #[serde(default)]
     pub paths: Vec<String>,
+    /// Mod ids whose files this mod should yield to. See
+    /// [`FilePruneAction::conflicts_with`].
+    #[serde(default)]
+    pub conflicts_with: Vec<String>,
+    /// Restrict a `conflicts_with` selection to one subtree.
+    #[serde(default)]
+    pub under: Option<String>,
 }
 
 /// Move a staged file or folder somewhere else inside the same mod.

@@ -1,5 +1,6 @@
 pub mod add;
 pub mod compile;
+pub mod conflicts;
 pub mod check;
 pub mod diff;
 pub mod download;
@@ -36,6 +37,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Add(args) => add::run(args).await,
         Command::Compile(args) => compile::run(args).await,
+        Command::Conflicts(args) => conflicts::run(args).await,
         Command::Query(args) => query::run(args).await,
         Command::Download(args) => download::run(args).await,
         Command::Check(args) => check::run(args).await,

@@ -9,10 +9,7 @@ pub mod plan;
 use crate::archive::{extract_entries, extract_with_builtins, list_archive_paths, ArchiveFilters};
 use crate::config::download;
 use crate::config::schema::{ArchiveLayout, CompiledArchive, ModType, PersonalizedMod};
-use auto::extract_archive_with_auto_layout;
-use bain::extract_archive_with_bain_layout;
 use build::extract_build_archive;
-use fomod::extract_archive_with_fomod_layout;
 
 use crate::util::fs::{lowercase_path, normalize_relative_path, staging_dir_for};
 use std::collections::{BTreeSet, HashSet};
@@ -69,7 +66,11 @@ pub(crate) struct EntryReader<'a> {
     scratch: PathBuf,
 }
 
-impl EntryReader<'_> {
+impl<'a> EntryReader<'a> {
+    pub(crate) fn new(source: &'a Path, scratch: PathBuf) -> Self {
+        Self { source, scratch }
+    }
+
     pub(crate) fn read(&self, entry: &str) -> anyhow::Result<Vec<u8>> {
         std::fs::create_dir_all(&self.scratch).map_err(|err| {
             anyhow::anyhow!("failed to create {}: {err}", self.scratch.display())
@@ -430,12 +431,59 @@ pub(crate) fn extract_archive(
     filters: &ArchiveFilters,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<usize> {
+    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
+    with_planned_archive(source, target_root, &destination_root, |paths, reader| {
+        plan_archive(
+            &source.display().to_string(),
+            paths,
+            reader,
+            mod_id,
+            archive,
+            filters,
+            active_plugins,
+        )
+    })
+}
+
+/// Which layout applies, and what it decides.
+///
+/// The single dispatch. `install` applies the plan; the file index keeps the
+/// destinations and throws the rest away. Two callers, one answer -- which is
+/// the point: an index that disagreed with what install does would report
+/// conflicts against files that never arrive.
+pub(crate) fn plan_archive(
+    source_label: &str,
+    paths: &[String],
+    reader: &EntryReader<'_>,
+    mod_id: &str,
+    archive: &CompiledArchive,
+    filters: &ArchiveFilters,
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<plan::LayoutPlan> {
     if archive.layout == Some(ArchiveLayout::Fomod) {
-        return extract_archive_with_fomod_layout(source, target_root, archive, filters, active_plugins);
+        if archive.data_folder.is_some() {
+            anyhow::bail!("FOMOD layout for {source_label} cannot be combined with data_folder");
+        }
+        if !archive.bain_subpackages.is_empty() {
+            anyhow::bail!(
+                "FOMOD layout for {source_label} cannot be combined with bain_subpackages"
+            );
+        }
+        return fomod::plan_fomod_archive(
+            paths,
+            reader,
+            source_label,
+            archive,
+            filters,
+            active_plugins,
+        );
     }
 
     if archive.layout == Some(ArchiveLayout::Bain) {
-        return extract_archive_with_bain_layout(source, target_root, archive, filters);
+        if archive.data_folder.is_some() {
+            anyhow::bail!("BAIN layout for {source_label} cannot be combined with data_folder");
+        }
+        return bain::plan_bain(paths, archive, filters, source_label);
     }
 
     // `simple` says the archive root *is* the data folder, on the author's
@@ -447,38 +495,13 @@ pub(crate) fn extract_archive(
     // the layouts detection knows, so it is rejected outright even though the
     // two files this list wants are plainly at the root.
     if archive.layout == Some(ArchiveLayout::Simple) {
-        // `target_subdir` used to be ignored here, silently, while every other
-        // layout honoured it. Nothing in the list combines the two, so this
-        // makes a latent trap behave like its neighbours rather than changing
-        // any mod.
-        let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-        return with_planned_archive(source, target_root, &destination_root, |paths, _| {
-            Ok(plan::plan_simple(paths, filters))
-        });
+        return Ok(plan::plan_simple(paths, filters));
     }
 
-    let has_data_folder = archive
-        .data_folder
-        .as_ref()
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false);
-    let has_target_subdir = archive
-        .target_subdir
-        .as_ref()
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false);
-
-    if !has_data_folder && !has_target_subdir {
-        return extract_archive_with_auto_layout(source, target_root, mod_id, filters);
+    let declared = |value: &Option<String>| value.as_deref().is_some_and(|v| !v.trim().is_empty());
+    if !declared(&archive.data_folder) && !declared(&archive.target_subdir) {
+        return auto::plan_auto(paths, mod_id, source_label, filters);
     }
 
-    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-    with_planned_archive(source, target_root, &destination_root, |paths, _| {
-        plan::plan_data_folder(
-            paths,
-            archive.data_folder.as_deref(),
-            filters,
-            &source.display().to_string(),
-        )
-    })
+    plan::plan_data_folder(paths, archive.data_folder.as_deref(), filters, source_label)
 }

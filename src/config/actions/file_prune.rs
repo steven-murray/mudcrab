@@ -17,8 +17,11 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
 
     // An empty pattern list would compile to a glob set that matches
     // everything, which would delete the entire staged mod.
-    if action.paths.is_empty() {
-        anyhow::bail!("{}: file_prune requires at least one path pattern", cx.owner);
+    if action.paths.is_empty() && action.conflicts_with.is_empty() {
+        anyhow::bail!(
+            "{}: file_prune requires at least one path pattern or a conflicts_with selection",
+            cx.owner
+        );
     }
 
     for pattern in &action.paths {
@@ -30,8 +33,39 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
             owner = cx.owner,
             target = %mod_target.display(),
             paths = ?action.paths,
+            conflicts_with = ?action.conflicts_with,
             "install dry-run file_prune action"
         );
+        return Ok(());
+    }
+
+    // Resolved first, and separately: these are exact paths another mod also
+    // provides, not patterns, so they are deleted by name rather than fed
+    // through the glob machinery below.
+    let mut deleted_by_conflict = 0usize;
+    if !action.conflicts_with.is_empty() {
+        let files = super::conflicts::conflicting_files(
+            cx,
+            mod_target,
+            &action.conflicts_with,
+            action.under.as_deref(),
+        )?;
+        for relative in &files {
+            let path = mod_target.join(relative);
+            std::fs::remove_file(&path)
+                .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", path.display()))?;
+        }
+        deleted_by_conflict = files.len();
+        remove_empty_dirs(mod_target)?;
+        tracing::info!(
+            owner = cx.owner,
+            conflicts_with = ?action.conflicts_with,
+            deleted = deleted_by_conflict,
+            "pruned files another mod provides"
+        );
+    }
+
+    if action.paths.is_empty() {
         return Ok(());
     }
 
@@ -77,10 +111,33 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
     tracing::info!(
         owner = cx.owner,
         target = %mod_target.display(),
-        deleted,
+        deleted = deleted + deleted_by_conflict,
         "pruned staged files"
     );
     Ok(())
+}
+
+/// Drop directories a by-name deletion emptied, as the glob path already does.
+fn remove_empty_dirs(current: &Path) -> anyhow::Result<bool> {
+    let mut remaining = 0usize;
+    for entry in std::fs::read_dir(current)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?
+    {
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
+        let path = entry.path();
+        if path.is_dir() {
+            if remove_empty_dirs(&path)? {
+                std::fs::remove_dir(&path)
+                    .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", path.display()))?;
+            } else {
+                remaining += 1;
+            }
+        } else {
+            remaining += 1;
+        }
+    }
+    Ok(remaining == 0)
 }
 
 /// A pattern naming a plain directory also matches everything below it.
