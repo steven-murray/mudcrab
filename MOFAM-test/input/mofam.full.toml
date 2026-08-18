@@ -4885,11 +4885,11 @@ file_name = "boar.7z"
 # files from one page. Row 1c is hosted on mega.nz, the list's only one.
 
 # Guide 1a: "main file only", then "Install manually & deselect the Textures and
-# Meshes folders." The archive also has a `Docs/` folder of ~100 screenshots,
-# which the guide does not mention and the Oracle does not have either. Excluded
-# with the other two: the guide names what to drop by what it is, and a folder
-# of screenshots is not something a deselect-two-folders instruction was meant
-# to keep. Recorded in notes/part-20-*.md as a guide ambiguity.
+# Meshes folders." The archive also has a `Docs/` folder -- 48 screenshots and a
+# readme -- which the guide does not mention and the Oracle does not have
+# either. Excluded with the other two: an instruction about which folders to
+# drop was not meant to keep a screenshot gallery. Recorded in
+# notes/part-20-*.md as a gap in the guide rather than a choice mudcrab made.
 [[mods]]
 id = "Weapon Improvement Project"
 section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
@@ -4916,7 +4916,7 @@ id = "Weapon Improvement Project - fixes"
 section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
 
 [[mods.archives]]
-# Guide 1c, and the only mega.nz row in the list:
+# Guide 1c, the first mega.nz row in the list -- Part 25 has another:
 # mega.nz/file/lGwSjY4K#Nn_RX412Fq8ObbvNJlpSU2ti00aoyZHSwI9Zc3rAkBs
 # Nothing automated can fetch it, so `manual:` says so.
 path = "manual:Weapon Improvement Project - fixes (NO ESP) v2.7z"
@@ -4993,6 +4993,12 @@ file_name = "VGR SR OCOv2-Reasonable-50858-1-0-1614025717.zip"
 # Guide 8: "Within the BAIN Package Installer, select 00 Core only." The
 # subpackage is spelled `00 core patch`, not `00 Core`; the other three are
 # Optional-prefixed alternatives the guide is declining.
+#
+# UNRESOLVED, for Steven: this archive is dated 2025-03-30 and so flags
+# POST-GUIDE. Version 3.4.5 (2024-06-29) is also in the downloads folder and
+# would predate the guide comfortably. A guide dated 03.25 could mean either --
+# 30 March is inside its own month. Pinned to the Oracle's 3.4.7 so the section
+# stays comparable; see notes/part-20-*.md.
 [[mods]]
 id = "Patch for Vanilla Gear Redux Reasonable Flavor - Clipping and fpv fixes"
 section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]

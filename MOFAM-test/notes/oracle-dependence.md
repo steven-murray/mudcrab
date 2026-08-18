@@ -107,6 +107,29 @@ entry. Worth doing for every row whose selector is a position rather than a name
 -- "1st main file", "main file only", "optional file only" -- since those are
 ambiguous exactly when the page has more than one of the kind.
 
+## 3b. Two implementations of "where is the content root"
+
+*Found by the Part 20 review.*
+
+`install` decides an archive's data folder in `layout::auto::detect_auto_root`.
+`inspect` decides the same thing, differently, in `inspect::guess_layout` — a
+shallowest-content-root search over the whole directory tree. They are not
+the same algorithm and never were.
+
+Part 20's Knights of the Nine patch is what exposed it: `inspect` reported the
+right answer while `install` put the mod two folders deep. The install side was
+fixed. **The duplication was not**, and the commit message for that fix implied
+otherwise, which was an overclaim.
+
+They agree on every archive in the list today. Nothing makes them agree
+tomorrow. The layout planner exists precisely so one implementation answers this
+question, and `inspect` is the last caller that does not use it — porting
+`guess_layout` onto `plan_archive` is the fix, and it is a structural change, so
+it is pinned rather than improvised.
+
+This is not an Oracle dependency, but it belongs in the same list: it is a place
+where the build looked right for a reason other than being right.
+
 ## 4. Install order within a section — **derivable, but checked against the Oracle**
 
 Section order is taken from the guide's numbered rows, which is correct and

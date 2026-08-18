@@ -29,17 +29,21 @@ question, disagreeing, with the one that does the installing being the wrong one
 — the exact failure the layout planner was built to remove, surviving in the one
 handler that still had its own detection.
 
-`detect_content_wrapper` now descends rather than looking exactly one level down.
-The shape that justifies descending is re-checked at every level: exactly one
-directory, no loose files beside it, that directory is not itself game content,
-and this level holds none of its own. Any of those failing ends the descent. The
-three cases that must keep working are tested — a file beside the wrapper, two
-candidate folders, and a lone `textures/` which is content and not a wrapper.
+`detect_content_wrapper` now descends rather than looking exactly one level down,
+and **ambiguity is an error at every depth rather than only at the root**. That
+second half matters as much as the first: bailing at the top and shrugging one
+level below it would leave the same silent failure in place, just deeper. Two
+rival content folders under a wrapper used to return "no wrapper", after which
+detection fell through to installing *both alternatives at once* at the archive
+root, silently. Now it says so.
+
+Both `bail!` paths finally have tests. Neither ever had one, before or after the
+original single-level version.
 
 ## Where the guide is thin
 
 - **Row 1a** says *"Install manually & deselect the Textures and Meshes folders"*.
-  The archive has a third folder, `Docs/`, holding about a hundred screenshots,
+  The archive has a third folder, `Docs/`, holding 48 screenshots and a readme,
   which the guide does not mention. The Oracle does not have it either — that
   folder's mod ends up as one file, the plugin. Excluded here with the other
   two, on the grounds that an instruction about which folders to drop was not
@@ -48,13 +52,30 @@ candidate folders, and a lone `textures/` which is content and not a wrapper.
 - **Row 8** says *"select 00 Core only"*. The subpackage is spelled
   **`00 core patch`**. The other three are `Optional`-prefixed alternatives, so
   the intent is unambiguous even though the name is not.
+- **Row 8 is POST-GUIDE, and unresolved.** Its archive,
+  `VGR Reasonable patch-51851-3-4-7-1743341721.7z`, is dated **2025-03-30**, so
+  `diff` flags it as newer than the guide. Version **3.4.5**
+  (`...-3-4-5-1719631116.7z`, 2024-06-29) is sitting in the same downloads
+  folder and would predate the guide comfortably.
+
+  A guide called *MOFAM 03.25* could mean either: 30 March is inside its own
+  month, so "the top file on the page" may well have been 3.4.7 by the time it
+  was written — or may not. **Pinned to the Oracle's 3.4.7 so the section stays
+  comparable, and left for Steven to settle.** It is the same class as Part 8's
+  MOO version and Part 16's T4UTXL BETA1, both of which he decided himself.
+
+  Worth noting the evidence is muddier than usual: both archives' MO2 `.meta`
+  sidecars claim the *same* `fileID=1000038748`, so the file id alone does not
+  distinguish them. Only the filename timestamps do.
 - **Rows 20 and 21** are Ebony then Umbra in the guide; the Oracle installed
   Umbra first. They replace different swords and share no files, so the order
   decides nothing. Following the guide, and noting it.
 
-## Row 1c is the list's only mega.nz row
+## Row 1c is the list's first mega.nz row
 
-*Weapon Improvement Project - fixes (NO ESP)* is hosted on mega.nz. Nothing
+*Weapon Improvement Project - fixes (NO ESP)* is hosted on mega.nz — the first
+such row, not the only one: Part 25 row 6b (*Sutch Village - VA*) is another.
+Nothing
 automated can fetch it, so it is `manual:` like the tesall.ru rows — with the
 same caveat recorded in `oracle-dependence.md`: the archive being on disk
 already is availability, not reproducibility, and a mega.nz link is if anything
