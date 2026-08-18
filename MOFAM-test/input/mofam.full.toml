@@ -3640,11 +3640,12 @@ path = "manual:T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7
 file_name = "T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z"
 # Guide 1: "Delete everything except Textures > Architecture > Priory", then
 # delete priorydoor01* and weynondoor01*. Stated as a keep-list plus two
-# exceptions, so it is written as one. BETA1 holds 52 files under priory, minus
-# those 4, leaves 48.
+# exceptions, so it is written as one. BETA1 holds 48 files under
+# textures/architecture/priory, minus those 4, leaves 44.
 #
-# The Oracle is still on BETA2 for this row, which yields 44, so this mod
-# differs by 4 files. The guide says BETA1; followed.
+# The Oracle is still on BETA2 for this row and lands on the same 44 files, so
+# the two agree on content -- `diff` reports only the archive mismatch, which is
+# provenance rather than a difference in what got installed.
 include = ["textures/architecture/priory/**"]
 exclude = ["**/priorydoor01*", "**/weynondoor01*"]
 # TODO: Nexus mod 54904, file id not recorded by MO2, so the descriptor
