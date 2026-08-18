@@ -93,6 +93,9 @@ pub(super) fn conflicting_files(
             continue;
         }
         if hidden {
+            // Reported, not silent: this is the branch that lets the emptiness
+            // check below pass, so a run that looks like it did nothing should
+            // say why it was allowed to.
             already_handled += 1;
         } else {
             matched.push(relative);
@@ -116,4 +119,162 @@ pub(super) fn conflicting_files(
     }
 
     Ok(matched)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::install::InstallSettings;
+    use crate::config::schema::PersonalizedMod;
+    use crate::config::tools::ToolsConfig;
+    use std::path::PathBuf;
+
+    /// A partner mod that exists on disk, so `staged_paths` reads its folder
+    /// rather than trying to predict it from archives that are not there.
+    fn instance(
+        root: &std::path::Path,
+        partner_files: &[&str],
+        subject_files: &[&str],
+    ) -> (PathBuf, PathBuf) {
+        let mods_dir = root.join("mods");
+        for (mod_name, files) in [("Partner", partner_files), ("Subject", subject_files)] {
+            for file in files {
+                let full = mods_dir.join(mod_name).join(file);
+                std::fs::create_dir_all(full.parent().unwrap()).unwrap();
+                std::fs::write(full, b"DATA").unwrap();
+            }
+        }
+        (mods_dir.clone(), mods_dir.join("Subject"))
+    }
+
+    fn settings(mods_dir: PathBuf) -> InstallSettings {
+        InstallSettings {
+            cache_dir: mods_dir.join("cache"),
+            mods_dir,
+            mo2_instance_dir: None,
+            profile_name: String::new(),
+            game_dir: None,
+            game_root_dir: None,
+            execute_actions: true,
+            dry_run: false,
+            tools: ToolsConfig::default(),
+            filter: Default::default(),
+            archive_search_paths: Vec::new(),
+            force_merges: false,
+            force: false,
+        }
+    }
+
+    fn partner() -> PersonalizedMod {
+        PersonalizedMod {
+            id: "Partner".to_string(),
+            oracle_name: None,
+            section: Vec::new(),
+            mod_type: None,
+            merge: None,
+            archives: Vec::new(),
+            files: Vec::new(),
+            actions: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_selection_finds_the_files_the_partner_also_provides() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["meshes/a.nif", "meshes/shared.nif"],
+            &["meshes/shared.nif", "textures/mine.dds"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None).unwrap();
+        assert_eq!(files, ["meshes/shared.nif"]);
+    }
+
+    /// The bug a rerun of Part 18 found. A file this action hid last time is
+    /// called `x.nif.mohidden`, so it stops matching its own name, the selection
+    /// comes back empty, and the "selected no files" check -- which exists to
+    /// catch a selector that was *wrong* -- fires on one that already worked.
+    #[test]
+    fn rerunning_a_selection_that_already_hid_its_files_is_not_a_failure() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["meshes/shared.nif"],
+            &["meshes/shared.nif.mohidden", "textures/mine.dds"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None)
+            .expect("a selection that already ran is not a failure");
+        assert!(files.is_empty(), "nothing left to hide, and nothing rehidden");
+    }
+
+    /// The check the fix must not weaken: two mods that genuinely do not
+    /// overlap, which is what a selector stated the wrong way round looks like.
+    #[test]
+    fn a_selection_that_overlaps_nothing_is_still_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["meshes/theirs.nif"],
+            &["meshes/mine.nif", "meshes/hidden.nif.mohidden"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        // Note the subject has a hidden file: being hidden is not on its own
+        // enough to satisfy the check, only being hidden *and* provided by the
+        // named mod.
+        let err = conflicting_files(&cx, &subject, &["Partner".to_string()], None)
+            .expect_err("no overlap at all");
+        assert!(err.to_string().contains("selected no files"), "{err}");
+    }
+
+    #[test]
+    fn under_restricts_the_selection_to_one_subtree() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["meshes/shared.nif", "textures/shared.dds"],
+            &["meshes/shared.nif", "textures/shared.dds"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let files =
+            conflicting_files(&cx, &subject, &["Partner".to_string()], Some("textures")).unwrap();
+        assert_eq!(files, ["textures/shared.dds"]);
+    }
 }
