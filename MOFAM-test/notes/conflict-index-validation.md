@@ -43,24 +43,44 @@ matching by luck, it is matching by mod.
 
 ## The one disagreement
 
-`meshes/realswords/nord/chainmailm1.nif`.
+`meshes/realswords/nord/chainmailm1.nif`. Steven kept it because MO2 lists it as
+overwritten by **WAC - Integration - Roberts Conversion**, not by WAC. That is
+right, and it explains itself once the priorities are laid out:
 
-The computation says WAC provides it and so OOO Enhanced Resources should yield
-it. The Oracle's hidden list does not contain it, and the file is still sitting
-there unhidden:
+| mod | modlist.txt line | ships it as |
+|---|---|---|
+| WAC - Integration - Roberts Conversion | 566 | loose |
+| WAC Waalx Animals & Creatures | 569 | inside `WACIntegration.bsa` |
+| OOO Enhanced 5.3b - Resources | 571 | loose |
 
-```
-MOFAM-03.25/mods/OOO Enhanced 5.3b - Resources/meshes/RealSwords/Nord/chainmailM1.nif
-```
+WAC ships **no loose files at all** — its folder is an esm and a BSA. So for the
+other 577 files the only competitor is a packed one, MO2 files them under archive
+conflicts, and it names WAC. `chainmailm1.nif` is the single file in the 578 that
+*also* has a loose competitor, and MO2's conflict list names the **winner**:
+loose beats packed regardless of priority, and Roberts outranks everything here
+anyway. So this one file appears under Roberts and vanishes from the WAC list.
 
-Both `WAC Waalx Animals & Creatures` (inside `WACIntegration.bsa`) and
-`WAC - Integration - Roberts Conversion` (loose) ship that path, so it meets the
-guide's condition the same way its 270 neighbours in `meshes/realswords` do.
+**Which means the computation and the Oracle are both right about the world, and
+the disagreement is only about what the guide's "conflicts with WAC" covers.**
+The claim in the first draft of this note — that it "meets the guide's condition
+the same way its 270 neighbours do" — is true of the file and misleading about
+the consequence. It does not behave the same way, because it is the only one with
+a loose competitor.
 
-**This looks like a miss in the hand-built Oracle, not an error here** — one file
-out of 578 selected by eye through MO2's conflict tab. Worth confirming with
-Steven before treating it as settled; it is the sort of thing the mechanism
-exists to stop happening, so it would be a shame to "fix" it the wrong way.
+Functionally it does not matter either way. Roberts wins that path whatever OOO
+Enhanced Resources does with its copy, so the file is already dead weight; the
+choice is between two spellings of the same in-game result.
+
+The argument for removing it is only consistency: `conflicts_with = ["WAC ..."]`
+is a statement about mods, and WAC does provide this path. Keeping it would mean
+carrying a one-file exception in the modlist for a file that has no effect.
+**Steven's call, and neither answer is wrong.** Recorded as a known difference
+until decided.
+
+Worth keeping regardless: MO2's conflict tab names the winner, not every
+provider, so a file with two competitors is filed under one of them and drops out
+of the other's list. That is a property of the UI, not of the conflict, and it is
+a good reason not to derive these lists by reading them off a finished install.
 
 ## Two bugs this found
 
