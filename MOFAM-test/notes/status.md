@@ -240,7 +240,37 @@ rather than a review one, and it needs a new pipeline phase (`compile` is a pure
 TOML→JSON transform today and has no archive access). Left for when it is
 wanted, not built speculatively.
 
-## Next sections## Next sections
+## Done: Part 18 (Katkat's Location Retextures)
+
+15 guide rows, 16 mods. **14 of 16 identical**, both differences deliberate —
+see `part-18-katkats-location-retextures.md`. The first real `conflicts_with`
+call site: row 7 says "hide the files that win over 2 VWD Ships (4 files)" and
+it hid exactly four, matching the guide's own count.
+
+Two things for Steven:
+
+- **`Ogorod`** (guide row 14, Katkat's Vegetable Garden) has no Oracle folder,
+  though its archive is in the downloads folder. Fetched and then skipped, for
+  a reason nothing records.
+- **`Ships from katkat`** — the Oracle never did row 7's follow-up; all four
+  files are present and unhidden there.
+
+## Next sections## Done: Part 18 (Katkat's Location Retextures)
+
+15 guide rows, 16 mods. **14 of 16 identical**, both differences deliberate —
+see `part-18-katkats-location-retextures.md`. The first real `conflicts_with`
+call site: row 7 says "hide the files that win over 2 VWD Ships (4 files)" and
+it hid exactly four, matching the guide's own count.
+
+Two things for Steven:
+
+- **`Ogorod`** (guide row 14, Katkat's Vegetable Garden) has no Oracle folder,
+  though its archive is in the downloads folder. Fetched and then skipped, for
+  a reason nothing records.
+- **`Ships from katkat`** — the Oracle never did row 7's follow-up; all four
+  files are present and unhidden there.
+
+## Next sections
 
 Guide order from **Part 18 (Katkat's Location Retextures)**, once the planner
 work is finished. Most rows are trivial; the ones needing new features
