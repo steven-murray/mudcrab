@@ -1,6 +1,5 @@
 //! Automatic layout detection for archives that declare no explicit layout.
 
-use super::with_staged_archive;
 use crate::archive::ArchiveFilters;
 use crate::util::fs::eq_ci;
 use std::path::Path;
@@ -12,10 +11,8 @@ pub(crate) fn extract_archive_with_auto_layout(
     mod_id: &str,
     filters: &ArchiveFilters,
 ) -> anyhow::Result<usize> {
-    with_staged_archive(source, target_root, |staging_dir| {
-        let listing = super::bain::list_relative_paths(staging_dir)?;
-        let plan = plan_auto(&listing, mod_id, &source.display().to_string(), filters)?;
-        super::apply_plan(staging_dir, target_root, &plan)
+    super::with_planned_archive(source, target_root, target_root, |paths, _| {
+        plan_auto(paths, mod_id, &source.display().to_string(), filters)
     })
 }
 
@@ -257,39 +254,6 @@ pub(crate) fn is_expected_game_content_dir_name(name: &str) -> bool {
 
     EXPECTED_DIRS.iter().any(|expected| eq_ci(name, expected))
 }
-
-pub(crate) struct TopLevelEntries {
-    pub(crate) dirs: Vec<String>,
-    /// Kept for the error message BAIN builds; the layout decisions themselves
-    /// now come from `Listing`.
-    #[allow(dead_code)]
-    pub(crate) files: Vec<String>,
-}
-
-pub(crate) fn read_top_level(root: &Path) -> anyhow::Result<TopLevelEntries> {
-    let mut dirs = Vec::new();
-    let mut files = Vec::new();
-
-    for entry in std::fs::read_dir(root)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", root.display()))?
-    {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", root.display()))?;
-        let name = entry.file_name().to_string_lossy().to_string();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", entry.path().display()))?;
-
-        if file_type.is_dir() {
-            dirs.push(name);
-        } else if file_type.is_file() {
-            files.push(name);
-        }
-    }
-
-    Ok(TopLevelEntries { dirs, files })
-}
-
-
 
 pub(crate) fn classify_plugin_layout(plugin_rel: &str, mod_id: &str) -> Option<AutoLayoutKind> {
     let parts: Vec<&str> = plugin_rel.split('/').filter(|p| !p.is_empty()).collect();

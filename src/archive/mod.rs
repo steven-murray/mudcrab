@@ -1,5 +1,6 @@
 use flate2::read::GzDecoder;
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
+use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 use std::process::Command;
@@ -45,6 +46,11 @@ pub fn extract_with_builtins(
 pub struct ArchiveFilters {
     include: Option<GlobSet>,
     exclude: Option<GlobSet>,
+    /// Exact entry names to keep, when the caller already knows precisely which
+    /// entries it wants. Not expressible as globs: Oblivion file names contain
+    /// brackets (`Harvest [Flora] - DLCVileLair.esp`), which any pattern match
+    /// reads as a character class.
+    wanted: Option<BTreeSet<String>>,
 }
 
 impl ArchiveFilters {
@@ -52,7 +58,17 @@ impl ArchiveFilters {
         Ok(Self {
             include: compile_globset(include)?,
             exclude: compile_globset(exclude)?,
+            wanted: None,
         })
+    }
+
+    /// Keep exactly these entries, named as `list_archive_paths` reports them.
+    pub fn for_entries(wanted: &BTreeSet<String>) -> Self {
+        Self {
+            include: None,
+            exclude: None,
+            wanted: Some(wanted.clone()),
+        }
     }
 
     /// Filters for matching against a staged tree rather than an archive.
@@ -74,10 +90,17 @@ impl ArchiveFilters {
         Ok(Self {
             include: compile_staged_globset(include)?,
             exclude: compile_staged_globset(exclude)?,
+            wanted: None,
         })
     }
 
     pub fn should_extract(&self, path: &str) -> bool {
+        if let Some(wanted) = &self.wanted
+            && !wanted.contains(path)
+        {
+            return false;
+        }
+
         let include_match = self.include.as_ref().map(|set| set.is_match(path)).unwrap_or(true);
         if !include_match {
             return false;
@@ -284,6 +307,138 @@ fn extract_tar_entries<R: Read>(
     Ok(extracted)
 }
 
+/// Extract only the named entries, keeping their archive paths.
+///
+/// `wanted` holds entry names exactly as [`list_archive_paths`] reports them.
+/// This is what a [`LayoutPlan`](crate::config::install::layout::plan::LayoutPlan)
+/// buys: the plan already knows which entries survive, so the other 3798 files
+/// in a 3854-file texture pack never have to be written out to be thrown away.
+///
+/// Falls back to extracting everything when a format cannot do it selectively.
+/// The caller copies out of the result by plan either way, so the fallback is
+/// slower, never wrong.
+pub fn extract_entries(
+    source: &Path,
+    target_root: &Path,
+    wanted: &BTreeSet<String>,
+) -> anyhow::Result<usize> {
+    if wanted.is_empty() {
+        return Ok(0);
+    }
+
+    let filters = ArchiveFilters::for_entries(wanted);
+
+    // The native extractors already decide per entry, so restricting them is
+    // just a narrower filter -- and it saves the write, which is the cost that
+    // matters.
+    for extractor in [
+        &ZipExtractor as &dyn ArchiveExtractor,
+        &TarGzExtractor,
+        &TarExtractor,
+    ] {
+        if extractor.can_handle(source) {
+            return extractor.extract(source, target_root, &filters);
+        }
+    }
+
+    if SystemArchiveExtractor.can_handle(source) {
+        match system_extract_entries(source, target_root, wanted) {
+            Ok(count) => return Ok(count),
+            Err(err) => tracing::warn!(
+                source = %source.display(),
+                error = %err,
+                "selective extraction failed; falling back to extracting the whole archive"
+            ),
+        }
+        return SystemArchiveExtractor.extract(source, target_root, &filters);
+    }
+
+    anyhow::bail!(
+        "unsupported archive format for {} (supports .zip, .tar, .tar.gz, .tgz, .rar, .7z)",
+        source.display()
+    )
+}
+
+/// Ask 7z for a named subset, straight into `target_root`.
+///
+/// 7z only. `bsdtar` reads its `-T` member list as fnmatch patterns, so
+/// `Harvest [Flora] - DLCVileLair.esp` becomes a character class and matches
+/// nothing -- and it reports that as "not found in archive", which is one
+/// diagnostic away from looking like a corrupt download. `-spd` turns 7z's own
+/// wildcard handling off for the same reason.
+///
+/// Solid archives still decompress in full internally; what is saved is the
+/// writing out, which for this list means 93 MB instead of 8.8 GB.
+fn system_extract_entries(
+    source: &Path,
+    target_root: &Path,
+    wanted: &BTreeSet<String>,
+) -> anyhow::Result<usize> {
+    let src = source
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
+    let dst = target_root
+        .to_str()
+        .ok_or_else(|| anyhow::anyhow!("non-UTF8 target path: {}", target_root.display()))?;
+
+    // A member list runs to thousands of paths, well past what a command line
+    // will carry, so it goes in a file. Its own directory, so a half-written
+    // list can never be mistaken for archive content.
+    let list_dir = crate::util::fs::system_staging_dir_for(source, target_root)?;
+    std::fs::create_dir_all(&list_dir)
+        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", list_dir.display()))?;
+    let list_path = list_dir.join("entries.txt");
+
+    let result = (|| -> anyhow::Result<usize> {
+        let mut listing = wanted.iter().cloned().collect::<Vec<_>>().join("\n");
+        listing.push('\n');
+        std::fs::write(&list_path, listing)
+            .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", list_path.display()))?;
+        let list_arg = format!(
+            "@{}",
+            list_path
+                .to_str()
+                .ok_or_else(|| anyhow::anyhow!("non-UTF8 list path: {}", list_path.display()))?
+        );
+
+        let status = Command::new("7z")
+            .args([
+                "x", src, &format!("-o{dst}"), "-y", "-spd", "-scsUTF-8", &list_arg,
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map_err(|err| {
+                anyhow::anyhow!("7z is not available to extract {}: {err}", source.display())
+            })?;
+        if !status.success() {
+            anyhow::bail!("7z failed (exit {status}) extracting {}", source.display());
+        }
+
+        // Confirm the subset really arrived. An entry the tool spelled
+        // differently to the listing -- a separator, an encoding -- would
+        // otherwise be a file missing from the mod rather than a failure, and
+        // the caller can still get it right by extracting everything.
+        let missing = wanted
+            .iter()
+            .filter(|entry| !target_root.join(entry).exists())
+            .count();
+        if missing > 0 {
+            anyhow::bail!(
+                "7z extracted {} of {} requested entries from {}",
+                wanted.len() - missing,
+                wanted.len(),
+                source.display()
+            );
+        }
+
+        Ok(wanted.len())
+    })();
+
+    let _ = std::fs::remove_dir_all(&list_dir);
+    result
+}
+
 // ── Archive entry listing (no extraction) ────────────────────────────────────
 
 /// Return all file paths inside `source` without extracting anything.
@@ -367,51 +522,118 @@ fn list_tar_paths<R: Read>(mut archive: TarArchive<R>, source: &Path) -> anyhow:
     Ok(out)
 }
 
+/// List a rar or 7z with a system tool.
+///
+/// `7z l -slt` first, because it marks directories explicitly. `bsdtar -tf`
+/// cannot: it prints one path per line and the only clue is a trailing slash,
+/// which plenty of archives do not write -- `Arena Poster_0_44088.rar` stores
+/// `textures`, `textures/architecture` and `textures/architecture/imperialcity`
+/// as bare paths. That cost nothing while installs walked the extracted tree,
+/// and became a directory in a file list the moment they stopped.
 fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
     let src = source
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
 
-    // bsdtar -tf prints one path per line
-    if let Ok(output) = Command::new("bsdtar").args(["-t", "-f", src]).output()
+    if let Ok(output) = Command::new("7z").args(["l", "-slt", src]).output()
         && output.status.success()
     {
-        let text = String::from_utf8_lossy(&output.stdout);
-        let mut out = Vec::new();
-        for line in text.lines() {
-            let p = Path::new(line.trim());
-            if line.trim().ends_with('/') {
-                continue; // directory entry
-            }
-            let normalized = normalize_archive_path(p)?;
-            if !normalized.is_empty() {
-                out.push(normalized);
-            }
-        }
-        return Ok(out);
+        let listed = parse_7z_listing(&String::from_utf8_lossy(&output.stdout))?;
+        // Belt and braces. Both listing bugs found so far were a directory
+        // presented as a file, and both were silent until an install tried to
+        // copy one -- so the structural check runs even where the tool is
+        // supposed to have said.
+        return Ok(drop_directory_entries(listed));
     }
 
-    // Fall back to `7z l -slt` which emits "Path = ..." lines
-    let output = Command::new("7z")
-        .args(["l", "-slt", src])
+    let output = Command::new("bsdtar")
+        .args(["-t", "-f", src])
         .output()
-        .map_err(|err| anyhow::anyhow!("no system tool (bsdtar, 7z) available to list {}: {err}", source.display()))?;
-
+        .map_err(|err| {
+            anyhow::anyhow!(
+                "no system tool (7z, bsdtar) available to list {}: {err}",
+                source.display()
+            )
+        })?;
     if !output.status.success() {
-        anyhow::bail!("7z failed listing {}", source.display());
+        anyhow::bail!("bsdtar failed listing {}", source.display());
     }
 
     let text = String::from_utf8_lossy(&output.stdout);
     let mut out = Vec::new();
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.ends_with('/') {
+            continue;
+        }
+        let normalized = normalize_archive_path(Path::new(trimmed))?;
+        if !normalized.is_empty() {
+            out.push(normalized);
+        }
+    }
+
+    Ok(drop_directory_entries(out))
+}
+
+/// Drop entries that other entries sit inside, which only a directory can be.
+///
+/// The salvage for a lister that cannot say. It cannot see an *empty*
+/// directory written without a trailing slash, so it is the fallback rather
+/// than the rule.
+fn drop_directory_entries(paths: Vec<String>) -> Vec<String> {
+    let prefixes: BTreeSet<&str> = paths
+        .iter()
+        .flat_map(|path| {
+            path.match_indices('/')
+                .map(|(idx, _)| &path[..idx])
+                .collect::<Vec<_>>()
+        })
+        .collect();
+
+    paths
+        .iter()
+        .filter(|path| !prefixes.contains(path.as_str()))
+        .cloned()
+        .collect()
+}
+
+/// Parse `7z l -slt`: a header block, a `----------` rule, then one blank-line
+/// separated block per entry.
+///
+/// The header carries a `Path =` of its own -- the archive's absolute path --
+/// so collecting before the rule yields the archive as its own first entry.
+/// Whether a 7z attribute field marks a directory.
+///
+/// The field is Windows attribute letters -- `A`, `RD`, `HSA` -- optionally
+/// followed by a unix mode after whitespace. `D` is the directory flag and can
+/// sit anywhere in the letters: `OOO Enhanced - Resources` writes its folders
+/// `RD`, which a `starts_with("D")` test reads as a file. That archive also
+/// omits the `Folder` line entirely, so this is the only thing that says.
+fn is_directory_attribute(field: &str) -> bool {
+    field
+        .split_whitespace()
+        .next()
+        .is_some_and(|flags| flags.contains('D'))
+}
+
+fn parse_7z_listing(text: &str) -> anyhow::Result<Vec<String>> {
+    let mut out = Vec::new();
     let mut current_path: Option<String> = None;
     let mut current_is_dir = false;
+    let mut in_entries = false;
 
     for line in text.lines() {
         let line = line.trim();
+        if !in_entries {
+            in_entries = line.starts_with("----------");
+            continue;
+        }
         if let Some(rest) = line.strip_prefix("Path = ") {
             current_path = Some(rest.to_string());
             current_is_dir = false;
-        } else if line.starts_with("Attributes = D") || line == "Folder = +" {
+        } else if let Some(rest) = line.strip_prefix("Attributes = ") {
+            current_is_dir |= is_directory_attribute(rest);
+        } else if line == "Folder = +" {
             current_is_dir = true;
         } else if line.is_empty() {
             if let Some(path) = current_path.take()
@@ -425,7 +647,7 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
             current_is_dir = false;
         }
     }
-    // flush final entry if file didn't end with blank line
+    // Flush a final entry when the output does not end in a blank line.
     if let Some(path) = current_path
         && !current_is_dir
     {
@@ -578,5 +800,86 @@ mod tests {
         assert!(filters.should_extract("Data/test.txt"));
         assert!(!filters.should_extract("Docs/readme.txt"));
         assert!(!filters.should_extract("Data/skip.tmp"));
+    }
+}
+#[cfg(test)]
+mod listing_tests {
+    use super::*;
+
+    #[test]
+    fn the_seven_zip_header_is_not_an_entry() {
+        // The header block carries a `Path =` of its own. Collecting from the
+        // top of the output makes the archive its own first entry -- and since
+        // that path is absolute, `normalize_archive_path` rejects it and the
+        // whole listing fails.
+        let text = "\
+Listing archive: /downloads/Mod.7z
+
+--
+Path = /downloads/Mod.7z
+Type = 7z
+Solid = +
+
+----------
+Path = textures/a.dds
+Folder = -
+Attributes = A
+
+Path = textures
+Folder = +
+Attributes = D
+";
+        assert_eq!(parse_7z_listing(text).expect("parse"), ["textures/a.dds"]);
+    }
+
+    #[test]
+    fn a_read_only_directory_is_still_a_directory() {
+        // `OOO Enhanced - Resources` writes `Attributes = RD` and no `Folder`
+        // line at all, so the attribute letters are the only signal.
+        assert!(is_directory_attribute("D"));
+        assert!(is_directory_attribute("RD"));
+        assert!(is_directory_attribute("RD_ drwxr-xr-x"));
+        assert!(!is_directory_attribute("A"));
+        assert!(!is_directory_attribute("A_ -rw-r--r--"));
+
+        let text = "\
+----------
+Path = meshes/kdLucas
+Size = 0
+Attributes = RD
+
+Path = meshes/kdLucas/thing.nif
+Attributes = A
+";
+        assert_eq!(
+            parse_7z_listing(text).expect("parse"),
+            ["meshes/kdLucas/thing.nif"]
+        );
+    }
+
+    #[test]
+    fn a_directory_written_without_a_trailing_slash_is_still_a_directory() {
+        // `Arena Poster_0_44088.rar` writes its directories bare, which bsdtar
+        // reports indistinguishably from files.
+        let listed = vec![
+            "textures/architecture/imperialcity/poster.dds".to_string(),
+            "textures/architecture/imperialcity".to_string(),
+            "textures/architecture".to_string(),
+            "textures".to_string(),
+        ];
+        assert_eq!(
+            drop_directory_entries(listed),
+            ["textures/architecture/imperialcity/poster.dds"]
+        );
+    }
+
+    #[test]
+    fn a_file_sharing_a_name_with_no_children_survives() {
+        let listed = vec!["readme".to_string(), "meshes/a.nif".to_string()];
+        assert_eq!(
+            drop_directory_entries(listed),
+            ["readme", "meshes/a.nif"],
+            "only a path other paths sit inside is a directory"
+        );
     }
 }

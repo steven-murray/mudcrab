@@ -6,7 +6,7 @@ pub mod build;
 pub mod fomod;
 pub mod plan;
 
-use crate::archive::{extract_with_builtins, ArchiveFilters};
+use crate::archive::{extract_entries, extract_with_builtins, list_archive_paths, ArchiveFilters};
 use crate::config::download;
 use crate::config::schema::{ArchiveLayout, CompiledArchive, ModType, PersonalizedMod};
 use auto::extract_archive_with_auto_layout;
@@ -14,26 +14,30 @@ use bain::extract_archive_with_bain_layout;
 use build::extract_build_archive;
 use fomod::extract_archive_with_fomod_layout;
 
-use crate::util::fs::{
-    copy_filtered_tree_folded, lowercase_path, normalize_relative_path,
-    resolve_existing_path_case_insensitive,
-    staging_dir_for,
-};
-use std::collections::HashSet;
+use crate::util::fs::{lowercase_path, normalize_relative_path, staging_dir_for};
+use std::collections::{BTreeSet, HashSet};
 use std::path::{Path, PathBuf};
 
 use super::InstallSettings;
 
-/// Extract `source` into a fresh staging directory, hand it to `f`, then clean up.
+/// List an archive, decide what it contributes, then unpack only that.
 ///
-/// Every layout handler needs the same dance -- make a unique temp dir, extract
-/// with passthrough filters, run the layout logic, remove the temp dir even on
-/// failure. It was copy-pasted five times with subtly different cleanup.
-pub(crate) fn with_staged_archive<T>(
+/// The old shape was the other way round -- unpack everything, walk the result,
+/// copy what was wanted -- which meant a 3854-file texture pack was written out
+/// in full so that 48 files could be copied from it. Deciding first is the
+/// point of the planner; this is where the decision starts paying.
+///
+/// The scratch reader is for the one layout that cannot decide from paths
+/// alone: FOMOD needs its `ModuleConfig.xml`, so that single entry comes out
+/// first and the rest still waits for the plan.
+pub(crate) fn with_planned_archive(
     source: &Path,
     target_root: &Path,
-    f: impl FnOnce(&Path) -> anyhow::Result<T>,
-) -> anyhow::Result<T> {
+    destination_root: &Path,
+    plan_from: impl FnOnce(&[String], &EntryReader<'_>) -> anyhow::Result<plan::LayoutPlan>,
+) -> anyhow::Result<usize> {
+    let paths = list_archive_paths(source)?;
+
     let staging_dir = staging_dir_for(target_root)?;
     std::fs::create_dir_all(&staging_dir).map_err(|err| {
         anyhow::anyhow!(
@@ -42,13 +46,45 @@ pub(crate) fn with_staged_archive<T>(
         )
     })?;
 
-    let no_patterns: Vec<String> = Vec::new();
-    let result = ArchiveFilters::new(&no_patterns, &no_patterns)
-        .and_then(|passthrough| extract_with_builtins(source, &staging_dir, &passthrough))
-        .and_then(|_| f(&staging_dir));
+    let result = (|| -> anyhow::Result<usize> {
+        let reader = EntryReader {
+            source,
+            scratch: staging_dir.join(".mudcrab-entry"),
+        };
+        let plan = plan_from(&paths, &reader)?;
+        let _ = std::fs::remove_dir_all(&reader.scratch);
+
+        let wanted: BTreeSet<String> = plan.sources().map(ToString::to_string).collect();
+        extract_entries(source, &staging_dir, &wanted)?;
+        apply_plan(&staging_dir, destination_root, &plan)
+    })();
 
     let _ = std::fs::remove_dir_all(&staging_dir);
     result
+}
+
+/// Reads a single entry out of an archive, before the plan exists.
+pub(crate) struct EntryReader<'a> {
+    source: &'a Path,
+    scratch: PathBuf,
+}
+
+impl EntryReader<'_> {
+    pub(crate) fn read(&self, entry: &str) -> anyhow::Result<Vec<u8>> {
+        std::fs::create_dir_all(&self.scratch).map_err(|err| {
+            anyhow::anyhow!("failed to create {}: {err}", self.scratch.display())
+        })?;
+        let wanted = BTreeSet::from([entry.to_string()]);
+        extract_entries(self.source, &self.scratch, &wanted)?;
+
+        let path = self.scratch.join(entry);
+        std::fs::read(&path).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to read '{entry}' from {}: {err}",
+                self.source.display()
+            )
+        })
+    }
 }
 
 /// Append `target_subdir` to the mod root when the archive declares one.
@@ -416,9 +452,8 @@ pub(crate) fn extract_archive(
         // makes a latent trap behave like its neighbours rather than changing
         // any mod.
         let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-        return with_staged_archive(source, target_root, |staging_dir| {
-            let staged = bain::list_relative_paths(staging_dir)?;
-            apply_plan(staging_dir, &destination_root, &plan::plan_simple(&staged, filters))
+        return with_planned_archive(source, target_root, &destination_root, |paths, _| {
+            Ok(plan::plan_simple(paths, filters))
         });
     }
 
@@ -437,40 +472,13 @@ pub(crate) fn extract_archive(
         return extract_archive_with_auto_layout(source, target_root, mod_id, filters);
     }
 
-    let staging_dir = staging_dir_for(target_root)?;
-    std::fs::create_dir_all(&staging_dir)
-        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging_dir.display()))?;
-
-    let empty_patterns: Vec<String> = Vec::new();
-    let passthrough_filters = ArchiveFilters::new(&empty_patterns, &empty_patterns)?;
-    let extract_result = extract_with_builtins(source, &staging_dir, &passthrough_filters);
-    if let Err(err) = extract_result {
-        let _ = std::fs::remove_dir_all(&staging_dir);
-        return Err(err);
-    }
-
-    let mut source_root = staging_dir.clone();
-    if let Some(data_folder) = archive.data_folder.as_deref() {
-        let rel = normalize_relative_path(data_folder)?;
-        let wanted = source_root.join(rel);
-        source_root = resolve_existing_path_case_insensitive(&wanted).unwrap_or(wanted);
-        if !source_root.exists() {
-            let _ = std::fs::remove_dir_all(&staging_dir);
-            anyhow::bail!(
-                "data_folder '{}' was not found in extracted archive {}",
-                data_folder,
-                source.display()
-            );
-        }
-    }
-
-    let mut destination_root = target_root.to_path_buf();
-    if let Some(target_subdir) = archive.target_subdir.as_deref() {
-        let rel = lowercase_path(&normalize_relative_path(target_subdir)?);
-        destination_root = destination_root.join(rel);
-    }
-
-    let copy_result = copy_filtered_tree_folded(&source_root, &destination_root, filters);
-    let _ = std::fs::remove_dir_all(&staging_dir);
-    copy_result
+    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
+    with_planned_archive(source, target_root, &destination_root, |paths, _| {
+        plan::plan_data_folder(
+            paths,
+            archive.data_folder.as_deref(),
+            filters,
+            &source.display().to_string(),
+        )
+    })
 }
