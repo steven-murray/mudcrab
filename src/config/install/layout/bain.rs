@@ -1,10 +1,9 @@
 //! BAIN archive layout: merge selected top-level subpackages into the mod root.
 
-use super::auto::read_top_level;
-use super::{destination_for, with_staged_archive};
+use super::destination_for;
 use crate::archive::ArchiveFilters;
 use crate::config::schema::CompiledArchive;
-use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan};
+use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan, Listing};
 use std::path::Path;
 
 pub(crate) fn extract_archive_with_bain_layout(
@@ -21,14 +20,9 @@ pub(crate) fn extract_archive_with_bain_layout(
     }
 
     let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-    with_staged_archive(source, target_root, |staging_dir| {
-        apply_bain_from_staging(
-            staging_dir,
-            &destination_root,
-            archive,
-            filters,
-            &source.display().to_string(),
-        )
+    let source_label = source.display().to_string();
+    super::with_planned_archive(source, target_root, &destination_root, |paths, _| {
+        plan_bain(paths, archive, filters, &source_label)
     })
 }
 
@@ -50,24 +44,9 @@ pub(crate) fn apply_bain_from_staging(
         );
     }
 
-    let available_dirs = read_top_level(staging_dir)?.dirs;
     let listing = list_relative_paths(staging_dir)?;
-    let plan = plan_bain(&listing, archive, filters, &available_dirs, source_label)?;
-
-    let mut copied = 0usize;
-    for file in &plan.files {
-        let from = staging_dir.join(&file.source);
-        let to = destination_root.join(&file.destination);
-        if let Some(parent) = to.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
-        }
-        std::fs::copy(&from, &to).map_err(|err| {
-            anyhow::anyhow!("failed to copy {} to {}: {err}", from.display(), to.display())
-        })?;
-        copied += 1;
-    }
-    Ok(copied)
+    let plan = plan_bain(&listing, archive, filters, source_label)?;
+    super::apply_plan(staging_dir, destination_root, &plan)
 }
 
 /// Decide what a BAIN archive contributes, from its entry list alone.
@@ -80,7 +59,6 @@ pub(crate) fn plan_bain(
     paths: &[String],
     archive: &CompiledArchive,
     filters: &ArchiveFilters,
-    available_dirs: &[String],
     source_label: &str,
 ) -> anyhow::Result<LayoutPlan> {
     let mut pairs: Vec<(String, String)> = Vec::new();
@@ -105,7 +83,7 @@ pub(crate) fn plan_bain(
             anyhow::bail!(
                 "BAIN subpackage '{subpackage}' was not found in {source_label}. \
                  Available top-level directories: {}",
-                available_dirs.join(", ")
+                Listing::new(paths).children("").dirs.join(", ")
             );
         }
     }

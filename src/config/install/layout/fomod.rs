@@ -1,7 +1,7 @@
 //! FOMOD installer support: parse ModuleConfig.xml and apply the selected options.
 
 use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan};
-use super::{apply_plan, destination_for, with_staged_archive};
+use super::{apply_plan, destination_for};
 use crate::archive::ArchiveFilters;
 use crate::config::schema::{CompiledArchive, FomodSelection};
 use crate::util::fs::{eq_ci, normalize_relative_path};
@@ -61,14 +61,19 @@ pub(crate) fn extract_archive_with_fomod_layout(
     }
 
     let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-    with_staged_archive(source, target_root, |staging_dir| {
-        apply_fomod_from_staging(
-            staging_dir,
-            &destination_root,
-            archive,
-            filters,
-            active_plugins,
-        )
+    let source_label = source.display().to_string();
+    super::with_planned_archive(source, target_root, &destination_root, |paths, reader| {
+        // The one layout that cannot decide from paths alone. Its config comes
+        // out on its own, and the rest of the archive still waits for the plan
+        // that config produces.
+        let config_path = find_fomod_config(paths).ok_or_else(|| {
+            anyhow::anyhow!(
+                "FOMOD archive {source_label} does not contain fomod/ModuleConfig.xml or \
+                 fomod/script.xml"
+            )
+        })?;
+        let xml = decode_xml(&reader.read(&config_path)?, &config_path)?;
+        plan_fomod(paths, &config_path, &xml, archive, filters, active_plugins)
     })
 }
 

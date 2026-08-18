@@ -81,6 +81,40 @@ pub fn plan_simple(paths: &[String], filters: &ArchiveFilters) -> LayoutPlan {
     }))
 }
 
+/// Descend into `data_folder` (if any) and take everything below it.
+///
+/// The explicit counterpart to `auto`: the modlist names the folder that is
+/// really the data root, rather than letting detection guess.
+pub fn plan_data_folder(
+    paths: &[String],
+    data_folder: Option<&str>,
+    filters: &ArchiveFilters,
+    source_label: &str,
+) -> anyhow::Result<LayoutPlan> {
+    let Some(data_folder) = data_folder.filter(|value| !value.trim().is_empty()) else {
+        return Ok(plan_simple(paths, filters));
+    };
+
+    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut matched = 0usize;
+    for path in paths {
+        let Some(rest) = strip_dir_prefix(path, data_folder) else {
+            continue;
+        };
+        matched += 1;
+        if !filters.should_extract(&rest) {
+            continue;
+        }
+        pairs.push((path.clone(), folded_destination(&rest)));
+    }
+
+    if matched == 0 {
+        anyhow::bail!("data_folder '{data_folder}' was not found in archive {source_label}");
+    }
+
+    Ok(LayoutPlan::from_pairs(pairs))
+}
+
 /// Fold directory components to lowercase, leaving the file name alone.
 ///
 /// Mirrors `copy_filtered_tree_folded`, which is what actually writes these
