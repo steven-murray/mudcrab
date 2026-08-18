@@ -176,32 +176,71 @@ three mods and break five. The files are still installed; `diff` just stops
 comparing readmes, credits, licences, `obmm_BSA_settings.jpg` and `.url`
 shortcuts. Deliberately narrow — matching all `.txt` would hide real data files.
 
-## In progress: the layout planner (D1)
+## Done: the layout planner and conflict resolution (D1)
 
-`MOFAM-test/notes/layout-planner-design.md` has the design and the measurements.
-The point is to answer "which files would mod X contribute?" without installing
-X, which is what deriving conflict lists needs — and, as a dividend, to extract
-only what a plan keeps.
+`notes/layout-planner-design.md` has the design; `notes/conflict-resolution-design.md`
+has the reasoning about conflict *direction*; `notes/conflict-index-validation.md`
+records the result. The point was to answer "which files would mod X contribute?"
+without installing X, and to extract only what a plan keeps.
 
-Order, with state:
+All nine steps are done:
 
-1. `LayoutPlan` + `Listing` — **done**
-2. `bain` handler — **done**
-3. `auto` handler — **done** (all five staged-tree helpers deleted, not kept)
-4. `fomod` handler — **next**; 585 lines, and the only handler needing file
-   *content* (`ModuleConfig.xml`), so it needs one targeted extraction first
-5. `build` handler — small
-6. selective extraction (hand the plan's sources to the extractor)
-7. file index cached by the existing `definition_hash`
-8. `conflicts_with` on `file_prune`/`file_hide`, validated against the 1725
-   recorded OOO Enhanced paths
-9. lockfile resolving selectors to explicit paths
+1. `LayoutPlan` + `Listing`
+2. `bain` handler
+3. `auto` handler (all five staged-tree helpers deleted, not kept)
+4. `fomod` handler — the only one needing file *content*, so its
+   `ModuleConfig.xml` is extracted on its own and the rest waits for the plan
+5. `build` handler — the staging tree is now predicted from the layers' entry
+   lists and checked against what actually appears
+6. selective extraction
+7. the file index (`install::index`)
+8. `conflicts_with` on `file_prune`/`file_hide`, plus `mudcrab conflicts`
+9. explicit-path resolution — **not done**, and deliberately: see below
 
-Staging does **not** disappear at the end of this: 142 of the modlist's archives
-are 7z and 32 rar, and those shell out to tools that cannot rebase paths during
-extraction. What changes is its size.
+### What it bought
 
-## Next sections
+`T4UTXL - Architecture_BETA1 - Priory` went from **5:00 to 0:22**, and from
+writing 8.8 GB of staging to writing 93 MB. A full rebuild of the list is 8m42s.
+
+Staging did not disappear, as predicted: 142 archives are 7z and 32 are rar, and
+those shell out to tools that cannot rebase paths during extraction. What
+changed is its size.
+
+### Bugs it surfaced
+
+Every one of these was invisible while installs walked an extracted tree, and
+every one stopped an install dead the moment they stopped.
+
+- **`bsdtar` cannot list directories reliably.** It marks them only with a
+  trailing slash, and plenty of archives do not write one — `Arena
+  Poster_0_44088.rar` stores `textures`, `textures/architecture` and
+  `textures/architecture/imperialcity` bare. Listing now prefers `7z l -slt`.
+- **7z's directory flag is a letter among letters.** `OOO Enhanced - Resources`
+  writes its folders `Attributes = RD` with no `Folder` line at all, and a
+  `starts_with("D")` test read every one as a file.
+- **The 7z header block carries a `Path =` of its own**, so collecting from the
+  top made the archive its own first entry.
+- **BSAs store `folder\file`.** Comparing that to filesystem paths without
+  normalising gave *zero* overlap against a 7628-file mod — and zero overlap
+  reads exactly like "these mods do not conflict".
+- **`bsdtar` reads its member list as fnmatch patterns**, so a selective
+  extraction of `Harvest [Flora] - DLCVileLair.esp` matches nothing and reports
+  "not found in archive". Verified before relying on 7z instead.
+
+A structural check now runs over every archive listing regardless of tool: a
+path that other paths sit inside cannot be a file.
+
+### Step 9, and why it is not done
+
+The design wanted selectors resolved to explicit paths in a lockfile, on the
+grounds that a 1024-line list is reviewable in a way a selector is not. That
+still holds. `mudcrab conflicts` gives the reviewability now — it prints exactly
+what the action would act on — so the lockfile is a reproducibility measure
+rather than a review one, and it needs a new pipeline phase (`compile` is a pure
+TOML→JSON transform today and has no archive access). Left for when it is
+wanted, not built speculatively.
+
+## Next sections## Next sections
 
 Guide order from **Part 18 (Katkat's Location Retextures)**, once the planner
 work is finished. Most rows are trivial; the ones needing new features
