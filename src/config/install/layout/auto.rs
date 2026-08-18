@@ -17,8 +17,90 @@ pub(crate) fn extract_archive_with_auto_layout(
 ) -> anyhow::Result<usize> {
     with_staged_archive(source, target_root, |staging_dir| {
         let source_root = detect_auto_source_root(staging_dir, mod_id, source)?;
-        copy_filtered_tree_folded(&source_root, target_root, filters)
+        let mut copied = copy_filtered_tree_folded(&source_root, target_root, filters)?;
+        copied += copy_files_beside_the_data_folder(staging_dir, &source_root, target_root, filters)?;
+        Ok(copied)
     })
+}
+
+/// Copy the loose files that sat *beside* the data folder we descended into.
+///
+/// Unwrapping an archive takes its `Data/` (or `<wrapper>/Data/`) as the mod
+/// root, which silently drops anything the author left next to it -- readmes,
+/// `obmm_BSA_settings.jpg`, licences. MO2's installer keeps them, and the
+/// difference showed up in five mods across Parts 9, 11, 15 and 16 before it
+/// was worth fixing rather than re-explaining.
+///
+/// Only *files* are carried across, and only from the levels actually skipped.
+/// Sibling *directories* are deliberately left behind: an archive with `Data/`
+/// alongside `Optional/` or `Eng/Data/` means those to be alternatives, not
+/// extra content, and pulling them in would merge choices the author separated.
+fn copy_files_beside_the_data_folder(
+    staging_dir: &Path,
+    source_root: &Path,
+    target_root: &Path,
+    filters: &ArchiveFilters,
+) -> anyhow::Result<usize> {
+    let Ok(descent) = source_root.strip_prefix(staging_dir) else {
+        return Ok(0);
+    };
+    if descent.as_os_str().is_empty() {
+        // Nothing was skipped: the archive root is the mod root.
+        return Ok(0);
+    }
+
+    let mut copied = 0usize;
+    let mut level = staging_dir.to_path_buf();
+    for step in descent.iter() {
+        copied += copy_loose_files(&level, target_root, filters)?;
+        level = level.join(step);
+    }
+
+    Ok(copied)
+}
+
+/// Copy the files directly inside `dir` (not its subdirectories) into `target`.
+fn copy_loose_files(
+    dir: &Path,
+    target: &Path,
+    filters: &ArchiveFilters,
+) -> anyhow::Result<usize> {
+    let mut copied = 0usize;
+    let entries = std::fs::read_dir(dir)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", dir.display()))?;
+
+    for entry in entries {
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", dir.display()))?;
+        let file_type = entry
+            .file_type()
+            .map_err(|err| anyhow::anyhow!("failed to read type of {}: {err}", entry.path().display()))?;
+        if !file_type.is_file() {
+            continue;
+        }
+
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        // Filters are written against the archive's own paths, and at this
+        // level the path *is* the file name.
+        if !filters.should_extract(name) {
+            continue;
+        }
+
+        std::fs::create_dir_all(target)
+            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", target.display()))?;
+        let destination = target.join(name);
+        std::fs::copy(entry.path(), &destination).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to copy {} to {}: {err}",
+                entry.path().display(),
+                destination.display()
+            )
+        })?;
+        copied += 1;
+    }
+
+    Ok(copied)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
