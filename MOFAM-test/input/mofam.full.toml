@@ -184,6 +184,19 @@ plugins = [
 	"BetterLorgrenBenirus_NoStaffEdit.esp",
 	"CoopArmoredLegionHorses.esp",
 	"DLCHorseArmor - Mane Enabled.esp",
+	# Part 20. Two load normally; the other nine are Part 36 merge sources,
+	# hidden in the Oracle and active here until that merge exists.
+	"Vanilla Gear Redux.esp",
+	"MagicArrows.esp",
+	"Weapon Improvement Project.esp",
+	"Shivering Isles Female Armor Displays.esp",
+	"Goblin Totem Staff Icon.esp",
+	"Banes Steel Helm Replacer.esp",
+	"ReteroX_ClosedIronHelmet_v1.esp",
+	"ReteroX_ClosedEbonyHelmet_v1.esp",
+	"Initial Glow Redux.esp",
+	"Initial Glow Redux - Creatures.esp",
+	"Female Amulets.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -4865,3 +4878,329 @@ section = ["19 - CREATURE & ANIMAL RETEXTURES"]
 # Guide 29: tesall.ru .../8797-raskabanevshie-kabani
 path = "manual:boar.7z"
 file_name = "boar.7z"
+
+# ── Part 20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS ────────────────────────
+#
+# 30 guide rows (1a/1b/1c count separately), 31 mods -- row 10 installs two
+# files from one page. Row 1c is hosted on mega.nz, the list's only one.
+
+# Guide 1a: "main file only", then "Install manually & deselect the Textures and
+# Meshes folders." The archive also has a `Docs/` folder of ~100 screenshots,
+# which the guide does not mention and the Oracle does not have either. Excluded
+# with the other two: the guide names what to drop by what it is, and a folder
+# of screenshots is not something a deselect-two-folders instruction was meant
+# to keep. Recorded in notes/part-20-*.md as a guide ambiguity.
+[[mods]]
+id = "Weapon Improvement Project"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Weapon Improvement Project.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43852/1000007552"
+download_handler = "nexus"
+file_name = "Weapon Improvement Project-43852-1-9.7z"
+exclude = ["Meshes/**", "Textures/**", "Docs/**"]
+
+[[mods]]
+id = "Weapon Improvement Project - Town Guard Shields"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+# Guide 1b: "optional file, Town Guard Shields - Preview".
+path = "nexus:oblivion/43852/1000003411"
+download_handler = "nexus"
+file_name = "Town Guard Shields - Preview-43852-1-0.7z"
+
+[[mods]]
+id = "Weapon Improvement Project - fixes"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+# Guide 1c, and the only mega.nz row in the list:
+# mega.nz/file/lGwSjY4K#Nn_RX412Fq8ObbvNJlpSU2ti00aoyZHSwI9Zc3rAkBs
+# Nothing automated can fetch it, so `manual:` says so.
+path = "manual:Weapon Improvement Project - fixes (NO ESP) v2.7z"
+file_name = "Weapon Improvement Project - fixes (NO ESP) v2.7z"
+
+[[mods]]
+id = "Knights of the Nine_Weapon Improvement Project Patch"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+# Guide 2: "1st main file".
+path = "nexus:oblivion/46313/1000032046"
+download_handler = "nexus"
+file_name = "Knights of the Nine Weapon Improvement Project Patch-46313-V-2-1661024654.7z"
+
+[[mods]]
+id = "HiRes Iron Armor"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/30386/56752"
+download_handler = "nexus"
+file_name = "HiRes Iron Armor-30386.7z"
+
+[[mods]]
+id = "HiRes Iron Weapons"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/30357/56693"
+download_handler = "nexus"
+file_name = "HiRes Iron Weapons-30357.7z"
+
+# Guide 5 lists all four subpackages the archive has, so this is a BAIN row
+# where "select these" happens to mean "select everything".
+[[mods]]
+id = "Visually Improved Staffs"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/38438/87653"
+download_handler = "nexus"
+file_name = "Staffs version 1_1-38438-1-1.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Core",
+  "01 Optional glowing",
+  "02 Hrormirs Ice Staff",
+  "03 Staff of Indarys",
+]
+
+[[mods]]
+id = "Vanilla Gear Redux"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Vanilla Gear Redux.esp"]
+
+[[mods.archives]]
+# Guide 6: "1st main file" -- the Reasonable Flavor build, which rows 7 and 8
+# then patch, so the three have to agree on flavour.
+path = "nexus:oblivion/45241/1000023948"
+download_handler = "nexus"
+file_name = "Vanilla Gear Redux - Reasonable Flavor (Final)-45241-1-0-1581732494.rar"
+
+[[mods]]
+id = "Vanilla Gear Redux-Seamless OCOv2 fix"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+# Guide 7: "1st main file, 'Reasonable'".
+path = "nexus:oblivion/50858/1000027046"
+download_handler = "nexus"
+file_name = "VGR SR OCOv2-Reasonable-50858-1-0-1614025717.zip"
+
+# Guide 8: "Within the BAIN Package Installer, select 00 Core only." The
+# subpackage is spelled `00 core patch`, not `00 Core`; the other three are
+# Optional-prefixed alternatives the guide is declining.
+[[mods]]
+id = "Patch for Vanilla Gear Redux Reasonable Flavor - Clipping and fpv fixes"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Vanilla Gear Redux.esp", "Shivering Isles Female Armor Displays.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51851/1000038748"
+download_handler = "nexus"
+file_name = "VGR Reasonable patch-51851-3-4-7-1743341721.7z"
+layout = "bain"
+bain_subpackages = ["00 core patch"]
+
+[[mods]]
+id = "Blue Darker Glass - Armor and Weapons"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52978/1000036309"
+download_handler = "nexus"
+file_name = "Blue Darker Glass-52978-1-2-1696117663.7z"
+
+# Guide 10: "Amber Bow Replacer + Amber Sword replacer, install separately".
+[[mods]]
+id = "Amber Enhancements - Bow"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/18111/61548"
+download_handler = "nexus"
+file_name = "Amber Bow Replacer-18111.7z"
+
+[[mods]]
+id = "Amber Enhancements - Sword"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/18111/69967"
+download_handler = "nexus"
+file_name = "Amber Sword replacer-18111.7z"
+
+[[mods]]
+id = "Mythic Amber Armor"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/37955/77997"
+download_handler = "nexus"
+file_name = "Mythic Amber Armor Final-37955-1-1.7z"
+
+[[mods]]
+id = "Madness Armor and Weapons Retex by TheMythofStrider"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/29286/54024"
+download_handler = "nexus"
+file_name = "Madness Armor Retex by themythofstrider and insanitysorrow-29286.7z"
+
+[[mods]]
+id = "Half-off Clavicusvile Mask remodel replacer"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51113/1000028019"
+download_handler = "nexus"
+file_name = "Ho_Clavicusvile Mask Remodel Replacer-51113-V1-0-1622979550.7z"
+
+[[mods]]
+id = "Gray Cowl of Nocturnal Reshaped"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50545/1000026200"
+download_handler = "nexus"
+file_name = "Gray Cowl of Nocturnal Reshaped-50545-1-0-1606161262.7z"
+
+[[mods]]
+id = "Goblin Totem Staff Icon"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Goblin Totem Staff Icon.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41058/87244"
+download_handler = "nexus"
+file_name = "Goblin Totem Staff Icon 1_0-41058-1-0.7z"
+
+[[mods]]
+id = "Cutlass Retexture"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51704/1000030083"
+download_handler = "nexus"
+file_name = "Cutlass Retexture 1.1 hotfix-51704-1-1-1642760611.7z"
+
+[[mods]]
+id = "Banes Steel Helm Replacer"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Banes Steel Helm Replacer.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/36219/72754"
+download_handler = "nexus"
+file_name = "Banes Steel Helm Replacer-36219-1-0.rar"
+
+[[mods]]
+id = "Closed Iron Helmet"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["ReteroX_ClosedIronHelmet_v1.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/40791/86394"
+download_handler = "nexus"
+file_name = "Closed Iron Helmet v1-40791-1-0.rar"
+
+[[mods]]
+id = "Closed Ebony Helmet"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["ReteroX_ClosedEbonyHelmet_v1.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/40829/86551"
+download_handler = "nexus"
+file_name = "Closed Ebony Helmet v1-40829-1-0.rar"
+
+# Guide order is 20 Ebony then 21 Umbra; the Oracle installed Umbra first. They
+# replace different swords and share no files, so the order decides nothing --
+# following the guide, and noting the divergence.
+[[mods]]
+id = "Insanitys Ebony Sword Replacer"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43718/1000002039"
+download_handler = "nexus"
+file_name = "Ebony Sword Replacer-43718-1-0.7z"
+
+[[mods]]
+id = "Insanitys Umbra Sword Replacer"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43762/1000002213"
+download_handler = "nexus"
+file_name = "Umbra Sword Replacer-43762-1-0.7z"
+
+[[mods]]
+id = "Magical Arrows"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["MagicArrows.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43666/1000001878"
+download_handler = "nexus"
+file_name = "Magical Arrows 2_0-43666-2-0.zip"
+
+[[mods]]
+id = "Initial Glow Redux"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Initial Glow Redux.esp", "Initial Glow Redux - Creatures.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46961/1000013826"
+download_handler = "nexus"
+file_name = "Initial Glow Redux-46961--3.7z"
+
+[[mods]]
+id = "SI Mania Clothing Fix"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52202/1000031856"
+download_handler = "nexus"
+file_name = "SI Mania Clothing Fix-52202-1-0-1658604461.7z"
+
+[[mods]]
+id = "Retextured Rings"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47742/1000016754"
+download_handler = "nexus"
+file_name = "Retextured Rings-47742-1-0.zip"
+
+[[mods]]
+id = "Vanilla Amulets fix for HGEC"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+plugins = ["Female Amulets.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47583/1000016226"
+download_handler = "nexus"
+file_name = "Female amulets-47583-0-9b.rar"
+
+[[mods]]
+id = "Retextured Amulets"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47734/1000016739"
+download_handler = "nexus"
+file_name = "Retextured Amulet-47734-1-0.zip"
+
+[[mods]]
+id = "Sanguine Rose Retexture"
+section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48529/1000019481"
+download_handler = "nexus"
+file_name = "Sanguine Rose Retexture-48529-1-0.7z"
