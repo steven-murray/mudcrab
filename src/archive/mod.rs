@@ -461,7 +461,7 @@ impl ArchiveExtractor for SystemArchiveExtractor {
         target_root: &Path,
         filters: &ArchiveFilters,
     ) -> anyhow::Result<usize> {
-        let stage = system_staging_dir(source)?;
+        let stage = crate::util::fs::system_staging_dir_for(source, target_root)?;
         let result = system_extract_to(source, &stage)
             .and_then(|()| crate::util::fs::copy_filtered_tree(&stage, target_root, filters));
         let _ = std::fs::remove_dir_all(&stage);
@@ -477,20 +477,6 @@ fn probe_magic(source: &Path, magic: &[u8]) -> bool {
     file.read_exact(&mut buf).map(|_| buf == magic).unwrap_or(false)
 }
 
-fn system_staging_dir(source: &Path) -> anyhow::Result<PathBuf> {
-    let stamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let name = source
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("archive");
-    let dir = std::env::temp_dir().join(format!("mudcrab-sys-{name}-{stamp}"));
-    std::fs::create_dir_all(&dir)
-        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", dir.display()))?;
-    Ok(dir)
-}
 
 fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     let src = source

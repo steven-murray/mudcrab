@@ -102,6 +102,9 @@ pub fn write_text_file(path: &Path, content: &str) -> anyhow::Result<()> {
 /// Prefixes of the scratch directories mudcrab creates under the temp dir.
 const STAGING_PREFIXES: [&str; 2] = ["mudcrab-stage-", "mudcrab-sys-"];
 
+/// Scratch directory hung off the MO2 instance root.
+pub const STAGING_DIR_NAME: &str = ".mudcrab-staging";
+
 /// Delete scratch directories left behind by runs that did not finish.
 ///
 /// Both staging helpers remove their directory on success *and* on error, so
@@ -113,8 +116,18 @@ const STAGING_PREFIXES: [&str; 2] = ["mudcrab-stage-", "mudcrab-sys-"];
 /// Age-gated rather than pid-gated: a concurrent `mudcrab` may legitimately own
 /// a fresh directory, and deleting it mid-extraction would corrupt that run.
 /// Anything untouched for `max_age` belongs to nobody.
-pub fn sweep_stale_staging_dirs(max_age: std::time::Duration) -> usize {
-    let Ok(entries) = std::fs::read_dir(std::env::temp_dir()) else {
+pub fn sweep_stale_staging_dirs(max_age: std::time::Duration, roots: &[PathBuf]) -> usize {
+    let mut removed = 0usize;
+    // The temp dir is still swept: it is where staging used to live, and where
+    // it still falls back to when an instance path is unavailable.
+    for root in std::iter::once(std::env::temp_dir()).chain(roots.iter().cloned()) {
+        removed += sweep_one_root(&root, max_age);
+    }
+    removed
+}
+
+fn sweep_one_root(root: &Path, max_age: std::time::Duration) -> usize {
+    let Ok(entries) = std::fs::read_dir(root) else {
         return 0;
     };
     let now = SystemTime::now();
@@ -150,15 +163,50 @@ pub fn sweep_stale_staging_dirs(max_age: std::time::Duration) -> usize {
     removed
 }
 
-/// Build a unique temporary staging directory path for `target_root`.
+/// Where scratch directories for `target_root` should live.
+///
+/// **Not the system temp dir.** On most Linux setups `/tmp` is a tmpfs, i.e.
+/// RAM, and extraction is archive-sized: unpacking one 6.5 GB mod twice filled
+/// a 16 GB `/tmp` and wedged the machine. Staging beside the destination
+/// instead puts that traffic on the disk the files are headed for anyway, and
+/// makes the subsequent copy an intra-filesystem one.
+///
+/// The chosen spot is a sibling of the mods directory -- `<instance>/`, not
+/// `<instance>/mods/` -- because MO2 lists every directory under `mods/` as a
+/// mod, and a scratch folder left there by an interrupted run would show up in
+/// the user's list.
+///
+/// Falls back to the temp dir when `target_root` has no grandparent to hang it
+/// off, which is the case in unit tests and for `inspect`'s throwaway paths.
+fn staging_parent_for(target_root: &Path) -> PathBuf {
+    let Some(instance_dir) = target_root.parent().and_then(Path::parent) else {
+        return std::env::temp_dir();
+    };
+    if !instance_dir.is_dir() {
+        return std::env::temp_dir();
+    }
+
+    let staging_root = instance_dir.join(STAGING_DIR_NAME);
+    match std::fs::create_dir_all(&staging_root) {
+        Ok(()) => staging_root,
+        // Read-only instance, wrong permissions, whatever: a slower correct
+        // answer beats failing the install.
+        Err(err) => {
+            tracing::warn!(
+                path = %staging_root.display(),
+                error = %err,
+                "could not create a staging directory beside the instance; \
+                 falling back to the system temp dir, which may be a tmpfs"
+            );
+            std::env::temp_dir()
+        }
+    }
+}
+
+/// Build a unique staging directory path for `target_root`.
 ///
 /// Includes both PID and nanosecond timestamp: a timestamp alone collides when
 /// two extractions start within the same millisecond.
-///
-/// NOTE this lives under the system temp dir, which on many Linux setups is a
-/// tmpfs -- i.e. RAM. Extraction is archive-sized, so a multi-gigabyte mod is
-/// unpacked into memory. Staging beside the destination instead would be
-/// better on both counts, but it is a change of contract for every caller.
 pub fn staging_dir_for(target_root: &Path) -> anyhow::Result<PathBuf> {
     let stamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -173,10 +221,30 @@ pub fn staging_dir_for(target_root: &Path) -> anyhow::Result<PathBuf> {
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
 
-    Ok(std::env::temp_dir().join(format!(
+    Ok(staging_parent_for(target_root).join(format!(
         "mudcrab-stage-{name}-{}-{stamp}",
         std::process::id()
     )))
+}
+
+/// Staging directory for an extractor that only knows the archive and target.
+pub fn system_staging_dir_for(source: &Path, target_root: &Path) -> anyhow::Result<PathBuf> {
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|err| anyhow::anyhow!("system clock error: {err}"))?
+        .as_millis();
+    let name: String = source
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("archive")
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+
+    let dir = staging_parent_for(target_root).join(format!("mudcrab-sys-{name}-{stamp}"));
+    std::fs::create_dir_all(&dir)
+        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", dir.display()))?;
+    Ok(dir)
 }
 
 /// Hard-link `source` to `destination`, falling back to a copy across devices.
@@ -393,6 +461,42 @@ mod tests {
             normalize_relative_path("./a/b").unwrap(),
             PathBuf::from("a/b")
         );
+    }
+
+    /// Staging must not land in the system temp dir when an instance path is
+    /// available: `/tmp` is usually a tmpfs, and extraction is archive-sized.
+    #[test]
+    fn staging_goes_beside_the_instance_not_into_temp() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let instance = temp.path().join("MudCrab Test");
+        let mod_target = instance.join("mods").join("Some Mod");
+        std::fs::create_dir_all(&mod_target).expect("mkdir");
+
+        let staging = staging_dir_for(&mod_target).expect("staging dir");
+
+        assert!(
+            staging.starts_with(instance.join(STAGING_DIR_NAME)),
+            "expected staging under the instance, got {}",
+            staging.display()
+        );
+        // Not the *fallback* placement. `starts_with(temp_dir())` would be
+        // vacuously true here because the fixture instance is itself built
+        // under the temp dir, so check the parent rather than the prefix.
+        assert_ne!(
+            staging.parent(),
+            Some(std::env::temp_dir().as_path()),
+            "staging landed directly in the system temp dir"
+        );
+        // Never inside mods/, where MO2 lists every directory as a mod.
+        assert!(!staging.starts_with(instance.join("mods")));
+    }
+
+    /// A path with no grandparent has nowhere to hang staging off; falling back
+    /// to the temp dir beats failing the install.
+    #[test]
+    fn staging_falls_back_to_temp_without_an_instance_path() {
+        let staging = staging_dir_for(Path::new("inspect")).expect("staging dir");
+        assert!(staging.starts_with(std::env::temp_dir()), "{}", staging.display());
     }
 
     #[test]
