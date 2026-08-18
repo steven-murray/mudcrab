@@ -915,6 +915,12 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
 ///
 /// With neither, the age is reported as unknown rather than guessed: "no
 /// timestamp" and "old enough" are very different answers.
+/// Below this, a Nexus file id comes from the scheme that predates the current
+/// one by the better part of a decade -- comfortably before any 2025 guide.
+/// Oblivion's old-scheme ids run to five or six digits; the new ones all start
+/// at 1_000_000_000.
+const LEGACY_FILE_ID_CEILING: u64 = 1_000_000;
+
 pub fn classify_guide_age(
     installation_file: Option<&str>,
     nexus_last_modified: Option<&str>,
@@ -950,6 +956,20 @@ pub fn classify_guide_age(
 
     if let Some(timestamp) = parse_trailing_timestamp(name) {
         return classify_timestamp(timestamp);
+    }
+
+    // A legacy file id dates the file on its own, and more reliably than
+    // `nexusLastModified` does. Nexus allocates modern ids from 1_000_000_000
+    // up; anything below that was uploaded under the old scheme, which Oblivion
+    // files left behind years before the March 2025 guide. Eight mods in this
+    // list carry a short id *and* a `nexusLastModified` in January 2026 -- the
+    // day they were downloaded, not the day they were published -- and every
+    // one of them was being reported as newer than the guide.
+    if let Some(file_id) = file_id.filter(|id| *id > 0 && *id < LEGACY_FILE_ID_CEILING) {
+        return GuideAge::PreGuide {
+            timestamp: 0,
+            date: format!("legacy Nexus file id {file_id}"),
+        };
     }
 
     if let Some(timestamp) = nexus_last_modified.and_then(parse_iso8601_date) {
@@ -1387,27 +1407,34 @@ mod tests {
         assert_eq!(parse_trailing_timestamp(""), None);
     }
 
+    /// A current-scheme Nexus file id, for tests about something other than the
+    /// id itself. `1` used to serve, but a short id now says "uploaded under
+    /// the old scheme, so older than any 2025 guide" -- which is the point of
+    /// `LEGACY_FILE_ID_CEILING` and would decide these cases before they got to
+    /// what they are testing.
+    const MODERN_FILE_ID: u64 = 1_000_000_000;
+
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
         assert_eq!(
-            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(1)),
+            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(MODERN_FILE_ID)),
             GuideAge::PreGuide {
                 timestamp: 1_647_873_144,
                 date: "2022-03-21".to_string()
             }
         );
         assert_eq!(
-            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(1)),
+            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(MODERN_FILE_ID)),
             GuideAge::PostGuide {
                 timestamp: 1_750_000_000,
                 date: "2025-06-15".to_string()
             }
         );
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(1)),
+            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(MODERN_FILE_ID)),
             GuideAge::Unknown { .. }
         ));
-        assert!(matches!(classify_guide_age(None, None, Some(1), Some(1)), GuideAge::Unknown { .. }));
+        assert!(matches!(classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID)), GuideAge::Unknown { .. }));
     }
 
     fn compare_trees(ours: &Path, oracle: &Path) -> ModDiff {
@@ -1475,11 +1502,11 @@ mod tests {
             Some("Evenstar CW LOD-42190-1-2.7z"),
             Some("2012-05-20T03:59:22Z"),
             Some(42190),
-            Some(1),
+            Some(MODERN_FILE_ID),
         );
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"), Some(1), Some(1));
+        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"), Some(1), Some(MODERN_FILE_ID));
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
     }
 
@@ -1488,10 +1515,10 @@ mod tests {
         // A hand-installed mod has no `installationFile`, and MO2's
         // `nexusLastModified` is then just when the folder was written. Reading
         // it would date a 2019 archive to today and flag it POST-GUIDE.
-        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(1));
+        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(1));
+        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 
@@ -1524,7 +1551,7 @@ mod tests {
             Some("WACv_1beta.7z"),
             Some("2026-01-25T20:19:46Z"),
             Some(1318),
-            Some(1),
+            Some(MODERN_FILE_ID),
         );
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
 
@@ -1542,7 +1569,7 @@ mod tests {
             Some("Better Fort Aurus-50682-1-1-1647873144.7z"),
             Some("2026-01-01T00:00:00Z"),
             Some(50682),
-            Some(1),
+            Some(MODERN_FILE_ID),
         );
         match age {
             GuideAge::PreGuide { date, .. } => assert_eq!(date, "2022-03-21"),
@@ -1553,7 +1580,7 @@ mod tests {
     #[test]
     fn an_unparseable_meta_ini_date_leaves_the_age_unknown() {
         for value in ["", "not a date", "2012-13-01T00:00:00Z", "2012-05-32"] {
-            let age = classify_guide_age(Some("Hand Named.7z"), Some(value), Some(1), Some(1));
+            let age = classify_guide_age(Some("Hand Named.7z"), Some(value), Some(1), Some(MODERN_FILE_ID));
             assert!(
                 matches!(age, GuideAge::Unknown { .. }),
                 "'{value}' should not parse as a date, got {age:?}"
@@ -1649,5 +1676,60 @@ mod archive_name_tests {
             "well.zip",
             "KatKat_s Well_0_manual_well.zip"
         ));
+    }
+}
+
+#[cfg(test)]
+mod legacy_file_id_tests {
+    use super::{classify_guide_age, GuideAge};
+
+    #[test]
+    fn a_legacy_file_id_outweighs_a_download_stamped_meta_ini() {
+        // `Mehrunes Dagon Retex`: file id 54124, an old-scheme upload, with
+        // `nexusLastModified=2026-01-26` -- which is when it was downloaded to
+        // this machine, not when it was published. Reported as newer than the
+        // guide, along with seven others in the list.
+        let age = classify_guide_age(
+            Some("Mehrunes Dagon Alt Textures - matching arms and legs-29314.7z"),
+            Some("2026-01-26T00:06:25Z"),
+            Some(29314),
+            Some(54124),
+        );
+        match age {
+            GuideAge::PreGuide { date, .. } => assert!(date.contains("54124"), "{date}"),
+            other => panic!("expected PreGuide, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_modern_file_id_is_still_dated_by_its_meta_ini() {
+        // The check must not swallow real drift: a current-scheme id says
+        // nothing about age, so `nexusLastModified` remains the evidence.
+        let age = classify_guide_age(
+            Some("Simple Horse Utilities-51197.7z"),
+            Some("2025-05-17T07:46:00Z"),
+            Some(51197),
+            Some(1000041917),
+        );
+        assert!(
+            matches!(age, GuideAge::PostGuide { .. }),
+            "a 2025-05 file is after a 2025-03 guide: {age:?}"
+        );
+    }
+
+    #[test]
+    fn a_timestamped_filename_still_wins_over_everything() {
+        // The filename names the exact file, so it stays the first source even
+        // when the id is legacy.
+        let age = classify_guide_age(
+            Some("Old Mod-123-1-0-1600000000.7z"),
+            Some("2026-01-26T00:06:25Z"),
+            Some(123),
+            Some(4567),
+        );
+        match age {
+            GuideAge::PreGuide { date, .. } => assert!(date.starts_with("2020"), "{date}"),
+            other => panic!("expected the filename's own date, got {other:?}"),
+        }
     }
 }
