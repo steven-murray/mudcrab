@@ -856,28 +856,48 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
 ///
 /// Usually a plain comparison, but not when the Oracle was built by installing
 /// from mudcrab's own cache. The cache renames on the way in --
-/// `{mod id}_{archive index}_{source}`, e.g. `Ogorod 1.1.rar` becomes
+/// `{mod id}_{archive index}_{sanitised source}`, so `Ogorod 1.1.rar` arrives as
 /// `Ogorod_0_manual_Ogorod_1.1.rar` -- and MO2 records whatever name it was
 /// handed. Reporting that as "the Oracle installed a different archive" is
 /// false: it is the same bytes under the name we gave them.
 ///
-/// Deliberately narrow. It matches only when the Oracle's name *ends with* the
-/// plan's, so a genuinely different archive still reports, and it does not try
-/// to reconstruct the cache name (the mod may since have been renamed, which is
-/// exactly how this was found).
+/// The prefix has to *look like* a cache prefix, not merely end in `_`. A first
+/// version required only the underscore, which made `Base_Metal.7z` "the same
+/// archive" as `Metal.7z` -- and archive names on Nexus and tesall.ru use
+/// underscores as word separators constantly, so that was a live way to swallow
+/// a real mismatch rather than a theoretical one. The marker is the archive
+/// index: an all-digit component, which a filename does not otherwise produce
+/// in that position.
 fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
     if plan.eq_ignore_ascii_case(oracle) {
         return true;
     }
 
-    let plan_key = plan.replace(' ', "_").to_ascii_lowercase();
-    let oracle_key = oracle.replace(' ', "_").to_ascii_lowercase();
-    let Some(prefix) = oracle_key.strip_suffix(&plan_key) else {
+    // The cache sanitises every character outside `[A-Za-z0-9._-]`, so the plan
+    // name has to be sanitised the same way before it can be looked for.
+    let sanitise = |name: &str| -> String {
+        name.chars()
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
+            .collect::<String>()
+            .to_ascii_lowercase()
+    };
+
+    let Some(prefix) = sanitise(oracle).strip_suffix(&sanitise(plan)).map(str::to_string) else {
         return false;
     };
-    // The prefix mudcrab's cache adds always ends at a separator, and it is
-    // never empty -- an empty one would mean the names simply matched.
-    prefix.ends_with('_') && prefix.len() > 1
+    let Some(prefix) = prefix.strip_suffix('_') else {
+        return false;
+    };
+
+    prefix
+        .split('_')
+        .any(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
 }
 
 /// Date the Oracle's archive, to decide whether the March 2025 guide could
@@ -1610,5 +1630,24 @@ mod archive_name_tests {
         // A suffix match that is not at a cache-prefix boundary is a coincidence.
         assert!(!names_the_same_archive("Metal.7z", "BaseMetal.7z"));
         assert!(!names_the_same_archive("Bliss.7z", "OtherBliss.7z"));
+    }
+
+    #[test]
+    fn an_underscore_alone_does_not_make_it_a_cache_name() {
+        // The gap in the first version. Archive names use underscores as word
+        // separators all the time, so requiring only `<something>_<plan name>`
+        // matched real, different archives. A cache name carries the archive
+        // index, and an all-digit component is what says so.
+        assert!(!names_the_same_archive("Metal.7z", "Base_Metal.7z"));
+        assert!(!names_the_same_archive("Ships.rar", "Old_Ships.rar"));
+        assert!(!names_the_same_archive("Core.7z", "T4UT_Core.7z"));
+        // Still matched when the index really is there.
+        assert!(names_the_same_archive("Metal.7z", "Ayleid Ruins_0_manual_Metal.7z"));
+        // The cache sanitises apostrophes and spaces, so the plan name has to be
+        // sanitised the same way to be found inside the cache name.
+        assert!(names_the_same_archive(
+            "well.zip",
+            "KatKat_s Well_0_manual_well.zip"
+        ));
     }
 }

@@ -4312,9 +4312,9 @@ file_name = "basementsections.7z"
 # works out which files that is. `mudcrab conflicts --mod "Ships from katkat"
 # --with "VWD Ships"` prints them.
 #
-# The Oracle did NOT do this step -- all four files are still present and
-# unhidden there -- so this section diffs by exactly those four. Following the
-# guide, per the standing rule.
+# The Oracle had NOT done this step when the section was first built -- all four
+# files were present and unhidden there. Steven has since hidden them, and the
+# two sides now agree.
 [[mods]]
 id = "Ships from katkat"
 section = ["18 - KATKAT'S LOCATION RETEXTURES"]

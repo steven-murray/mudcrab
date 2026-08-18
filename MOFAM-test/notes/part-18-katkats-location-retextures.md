@@ -33,7 +33,7 @@ meshes/architecture/ships/shipwreck01_far.nif
 ```
 
 That is the mechanism checked against a count written in the guide, on a mod
-whose partner lives eleven sections earlier. `mudcrab conflicts --mod "Ships from
+whose partner lives thirteen sections earlier. `mudcrab conflicts --mod "Ships from
 katkat" --with "VWD Ships"` prints the same list without installing anything.
 
 Re-running the section surfaced an idempotence bug and it is now fixed: a file
@@ -61,11 +61,11 @@ All four `_far.nif` files were present and unhidden there. **Steven has since
 hidden them**, and the two sides now agree.
 
 Worth keeping: the priorities make the instruction load-bearing. `Ships from
-katkat` sits at `modlist.txt` line 431 and `VWD Ships` at 678, so without the
+katkat` sits at `modlist.txt` line 432 and `VWD Ships` at 679, so without the
 hide the Katkat meshes win and the VWD LOD meshes never load at distance.
 
 Note the priorities make the instruction meaningful: `Ships from katkat` sits at
-`modlist.txt` line 431 and `VWD Ships` at 678, so without the hide the Katkat
+`modlist.txt` line 432 and `VWD Ships` at 679, so without the hide the Katkat
 meshes win and the VWD LOD meshes never load.
 
 ## Thirteen non-Nexus rows
@@ -76,9 +76,10 @@ reach them: `download` stops with the filename and the paths it searched, which
 is an instruction rather than an error. Every one was already in the MO2
 downloads folder.
 
-The cost is that `diff` cannot date them — 13 of this section's mods report
+The cost is that `diff` cannot date them — **14** of this section's mods report
 UNKNOWN AGE, because a mod with `modid=0` has no Nexus file whose timestamp
-could be compared against the March 2025 guide. That is honest rather than
+could be compared against the March 2025 guide. Fourteen, not thirteen: row 3 is
+one guide row installed as two mods, and both halves are manual. That is honest rather than
 useful; there is nothing better available for a non-Nexus source.
 
 ## Small things

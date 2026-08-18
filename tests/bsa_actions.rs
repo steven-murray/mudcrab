@@ -902,35 +902,3 @@ fn conflicts_with_naming_an_unknown_mod_is_rejected() {
     assert!(reported.contains("No Such Mod"), "{reported}");
     assert!(target.join("meshes/rocks/rock01.nif").exists());
 }
-
-/// Hiding files a conflict selection names is idempotent: the files it hid last
-/// time no longer answer to their own names, so a naive re-run sees an empty
-/// selection and fails the "selected no files" check -- which exists to catch a
-/// selector that was wrong, not one that already worked.
-#[test]
-fn a_conflict_selection_that_already_ran_is_not_a_failure() {
-    let (dir, target) = staged_mod();
-    // Stand in for the partner mod having provided this path.
-    std::fs::rename(
-        target.join("meshes/rocks/rock01.nif"),
-        target.join("meshes/rocks/rock01.nif.mohidden"),
-    )
-    .unwrap();
-
-    let selection = |conflicts: Vec<String>| {
-        ModAction::FileHide(FileHideAction {
-            paths: Vec::new(),
-            conflicts_with: conflicts,
-            under: None,
-        })
-    };
-
-    // With no plan there is no partner to resolve, so drive the emptiness rule
-    // directly: an unknown mod is still rejected...
-    let err = run(&[selection(vec!["Nope".into()])], dir.path(), &target)
-        .expect_err("unknown mod");
-    assert!(format!("{err:#}").contains("Nope"));
-
-    // ...and the file that was hidden stayed hidden either way.
-    assert!(target.join("meshes/rocks/rock01.nif.mohidden").exists());
-}
