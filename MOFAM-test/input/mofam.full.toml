@@ -172,7 +172,18 @@ plugins = [
 	"ORC.esp",
 	# Part 17. Neither is a merge source; both load normally.
 	"WindowLightingSystem.esp",
-	"Diverse Chapels Vanilla.esp"
+	"Diverse Chapels Vanilla.esp",
+	# Part 19. Three load normally; the other six are Part 36 merge sources,
+	# hidden in the Oracle and active here until that merge exists.
+	"Ducks and Swans.esp",
+	"BettysButterflies.esp",
+	"Simple Horse Utilities.esp",
+	"Better minotaurs.esp",
+	"KingofMisc.esp",
+	"BattlehornLich.esp",
+	"BetterLorgrenBenirus_NoStaffEdit.esp",
+	"CoopArmoredLegionHorses.esp",
+	"DLCHorseArmor - Mane Enabled.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -4406,3 +4417,444 @@ section = ["18 - KATKAT'S LOCATION RETEXTURES"]
 # Guide 15: tesall.ru .../7980-kolodets-ot-katkat74
 path = "manual:well.zip"
 file_name = "well.zip"
+
+# ── Part 19 - CREATURE & ANIMAL RETEXTURES ──────────────────────────────────
+#
+# 29 guide rows, 31 mods. Four rows install twice from one page (12, 17, 18) and
+# guide row 9 could not be built -- see the note on it below.
+#
+# Rows 25-29 are tesall.ru and marked [MI], so they use `manual:` like Part 18's.
+# Rows 1, 5, 7, 15 are marked [MI] too but are hosted on Nexus: there "manual
+# install" means "do not run the installer", which is what mudcrab does anyway.
+
+[[mods]]
+id = "Mythic Creatures"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/29569/54724"
+download_handler = "nexus"
+file_name = "Mainfile-29569.7z"
+# oracle version 1.0.0.0
+
+# Guide 2 and 3 are two files from one mod page, installed separately. The
+# Oracle's folder names misspell both creatures; kept so `diff` can pair them.
+[[mods]]
+id = "Big Liz's Big Textures for Big Lizards - Clanndear"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54407/1000039301"
+download_handler = "nexus"
+file_name = "Clannfear Reptilian 2K-54407-1-0-1725564112.7z"
+
+[[mods]]
+id = "Big Liz's Big Textures for Big Lizards - Deadroth"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54407/1000039307"
+download_handler = "nexus"
+file_name = "Daedroth Reptilian 2K-54407-1-0-1725564304.7z"
+
+[[mods]]
+id = "Xivilaization Revolution"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 4: "(2k)".
+path = "nexus:oblivion/54392/1000039275"
+download_handler = "nexus"
+file_name = "Xiv Rev 2K-54392-1-0-1725309610.7z"
+
+[[mods]]
+id = "Mythic Animals"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 5: "(low res)".
+path = "nexus:oblivion/29638/54899"
+download_handler = "nexus"
+file_name = "Mythic Animals low res-29638.7z"
+
+# Guide 6, and its follow-up: "Once installed delete the Alt Ghost Texture
+# (Rags) folder." An alternative the author shipped alongside the default, so
+# leaving it in would put a second ghost texture into the VFS.
+[[mods]]
+id = "Mythic Ghosts and Goblins"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/36000/72058"
+download_handler = "nexus"
+file_name = "Mythic Ghosts and Goblins-36000-1.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["Alt Ghost Texture (Rags)"]
+
+[[mods]]
+id = "Mythic Madness"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/38251/78765"
+download_handler = "nexus"
+file_name = "Mythic Madness-38251-1.7z"
+
+[[mods]]
+id = "Beautiful Creatures - Spriggan"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43285/1000000630"
+download_handler = "nexus"
+file_name = "Spriggan-43285-1-1.7z"
+
+# Guide 9 -- Beautiful Creatures - Spider Daedra, mod 43297, "main file only" --
+# is NOT here, and it is not in the Oracle either. Its archive is not in the
+# downloads folder, so unlike Part 18's vegetable garden this one was never
+# fetched. Building it needs a Nexus download, which needs Steven's API key.
+#
+#   [[mods]]
+#   id = "Beautiful Creatures - Spider Daedra"
+#   section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+#
+#   [[mods.archives]]
+#   path = "nexus:oblivion/43297/<file id>"
+#   download_handler = "nexus"
+
+# Guide 10: "Install manually, and right click the flame atronach replacer >
+# Data folder & select Set as \ Directory." That is `data_folder`. The archive's
+# other top-level folder, `optional flame replacer`, is the alternative the
+# guide is steering away from -- auto-detection refuses to choose between them,
+# correctly.
+[[mods]]
+id = "Improved Flame Atronachs"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45356/1000007445"
+download_handler = "nexus"
+file_name = "Improved Flame Atronachs-45356-1-1.7z"
+data_folder = "flame atronach replacer/Data"
+
+[[mods]]
+id = "Better minotaurs"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["Better minotaurs.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49425/1000022282"
+download_handler = "nexus"
+file_name = "Better minotaurs-49425-1-0-1559859675.7z"
+
+# Guide 12: "both main & optional files, install separately".
+[[mods]]
+id = "Unique Liches"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["KingofMisc.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54384/1000039257"
+download_handler = "nexus"
+file_name = "Unique Liches-54384-1-0-1725253137.7z"
+
+[[mods]]
+id = "Unique Liches - Battlehorn Lich"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["BattlehornLich.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54384/1000039260"
+download_handler = "nexus"
+file_name = "Battlehorn Lich-54384-1-1-1725263432.7z"
+
+[[mods]]
+id = "Better Lorgren Benirus"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["BetterLorgrenBenirus_NoStaffEdit.esp"]
+
+[[mods.archives]]
+# Guide 13: "Better Lorgren Benirus - No Staff Edit".
+path = "nexus:oblivion/51263/1000028574"
+download_handler = "nexus"
+file_name = "Better Lorgren Benirus - No Staff Edit-51263-1-1-1627911859.7z"
+
+[[mods]]
+id = "Diablo-like Goblins"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 14: "Goblin Aesthetics Tweak - Vanilla".
+path = "nexus:oblivion/48477/1000020308"
+download_handler = "nexus"
+file_name = "Goblin Aesthetics Tweak-48477-Vanilla.rar"
+
+[[mods]]
+id = "Mehrunes Dagon Retex by themythofstrider"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 15: "optional file only".
+path = "nexus:oblivion/29314/54124"
+download_handler = "nexus"
+file_name = "Mehrunes Dagon Alt Textures - matching arms and legs-29314.7z"
+
+# Guide 16 is marked [QAC]. Like every other QAC row in this list, the action is
+# commented out to keep rebuilds fast; see the TODO at the top of the file.
+[[mods]]
+id = "Ducks and Swans for Cyrodiil"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["Ducks and Swans.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45275/1000007251"
+download_handler = "nexus"
+file_name = "Ducks and Swans for Cyrodiil-45275-1-0.7z"
+
+# [[mods.actions]]
+# action = "qac"
+
+# Guide 17: "This mod requires installing twice. For each separate install,
+# right click the Data folder in each of the 'ducks' and 'swans' folders & set
+# as \ directory, calling the installs 'Diverse Ducks and Swans - Ducks' &
+# 'Diverse Ducks and Swans - Swans' respectively." One archive, two mods, two
+# data folders -- and the guide names both mods, so the ids are the guide's.
+[[mods]]
+id = "Diverse Ducks and Swans - Ducks"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46526/1000011903"
+download_handler = "nexus"
+file_name = "Diverse Duck and Swan Textures-46526-.zip"
+data_folder = "ducks/data"
+
+[[mods]]
+id = "Diverse Ducks and Swans - Swans"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46526/1000011903"
+download_handler = "nexus"
+file_name = "Diverse Duck and Swan Textures-46526-.zip"
+data_folder = "swans/data"
+
+# Guide 18: "main file then Update; install separately". Both ship
+# BettysButterflies.esp, so the Update's copy wins on priority -- which is what
+# installing it second means.
+[[mods]]
+id = "More Butterflies"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["BettysButterflies.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46785/1000013111"
+download_handler = "nexus"
+file_name = "More New Butterflies-46785-.zip"
+
+[[mods]]
+id = "More Butterflies Update"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46785/1000013118"
+download_handler = "nexus"
+file_name = "900 Butterflies-46785-.zip"
+
+[[mods]]
+id = "Simple Horse Utilities - Saddlebags and Follow-Wait Commands"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["Simple Horse Utilities.esp"]
+
+[[mods.archives]]
+# Guide 19: "1st main file". The Oracle's file is dated 2025-05-17, after the
+# March 2025 guide, so `diff` flags it POST-GUIDE -- the guide says only "the
+# top file on the page" and the page has moved on.
+path = "nexus:oblivion/51197/1000041917"
+download_handler = "nexus"
+file_name = "Simple Horse Utilities-51197-2-0-8-1747467960.7z"
+
+# Guide 20, with the guide's five FOMOD answers. Two spellings differ from the
+# installer's own: the guide writes "MergeablePatch" where the FOMOD says
+# "MergablePatch", and "Coop's TW3 Oblivion Horse Replacer" is the installer's
+# title while the file is "Coop's Roach Horse Replacer".
+#
+# `KlenPatch: None` and `Horns: None` are empty selections, which is not the
+# same as omitting the group: both default to something, and the guide is
+# saying take neither. Declaring them empty is how that is said.
+[[mods]]
+id = "Coop's TW3 Oblivion Horse Replacer"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+plugins = ["CoopArmoredLegionHorses.esp", "DLCHorseArmor - Mane Enabled.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53323/1000036390"
+download_handler = "nexus"
+file_name = "Coop's Roach Horse Replacer-53323-1-5-1696716355.zip"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+step = "Intro"
+group = "Intro"
+options = ["Intro"]
+
+[[mods.archives.fomod_selections]]
+step = "Misc"
+group = "Misc"
+options = ["Feathering", "Simple Horse Utilities Patch", "Armored Legion Horses"]
+
+[[mods.archives.fomod_selections]]
+step = "ArmoredManeFix"
+group = "ArmoredManeFix"
+options = ["MergablePatch"]
+
+[[mods.archives.fomod_selections]]
+step = "KlenPatch"
+group = "KlenPatch"
+options = []
+
+[[mods.archives.fomod_selections]]
+step = "Bodies"
+group = "Bodies"
+options = ["Shaggy Horses"]
+
+[[mods.archives.fomod_selections]]
+step = "Horns"
+group = "Horns"
+options = []
+
+# Guide 21. Doe/MtnLion happen to match the installer's defaults; declared
+# anyway, because a default is the author's choice and this is the guide's.
+[[mods]]
+id = "Coops Deer and Mountain Lion Revamp"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53640/1000037153"
+download_handler = "nexus"
+file_name = "Coop's Deer and Mountain lion Revamp 2K-53640-1-0-1702167812.zip"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+step = "Intro"
+group = "Intro"
+options = ["Intro"]
+
+[[mods.archives.fomod_selections]]
+step = "Buck"
+group = "Buck"
+options = ["Dark"]
+
+[[mods.archives.fomod_selections]]
+step = "Doe"
+group = "Doe"
+options = ["Solid"]
+
+[[mods.archives.fomod_selections]]
+step = "MtnLion"
+group = "MtnLion"
+options = ["Green"]
+
+[[mods.archives.fomod_selections]]
+step = "MOO"
+group = "MOO"
+options = ["MOO"]
+
+# Guide 22: "(1st main file)".
+[[mods]]
+id = "Coop's Mudcrab Remake"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53435/1000036346"
+download_handler = "nexus"
+file_name = "Coop's MOO Crab Revamp-53435-1-0-1696441217.zip"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+step = "Intro"
+group = "Intro"
+options = ["Intro"]
+
+[[mods.archives.fomod_selections]]
+step = "Pattern"
+group = "Pattern"
+options = ["New"]
+
+[[mods.archives.fomod_selections]]
+step = "Shine"
+group = "Shine"
+options = ["Muted"]
+
+[[mods.archives.fomod_selections]]
+step = "Misc"
+group = "Misc"
+options = []
+
+# Guide 23 and 24 are two files from one page. The Oracle's folder for 23 is
+# named "MOO and Vanilla Wolf Remesh" although the file is the Vanilla one.
+[[mods]]
+id = "Coop's MOO and Vanilla Wolf Remesh"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53384/1000036257"
+download_handler = "nexus"
+file_name = "Coop's Vanilla Wolf Revamp 2K-53384-1-2-1695497995.zip"
+
+[[mods]]
+id = "Coop's MOO Wolf Revamp"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53384/1000036258"
+download_handler = "nexus"
+file_name = "Coop's MOO Wolf Revamp 2K-53384-1-2-1695498073.zip"
+
+# Guide 25-29: Katkat again, tesall.ru again, [MI] again.
+[[mods]]
+id = "SHEEP"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 25: tesall.ru .../8770-baranistie-barani
+path = "manual:SHEEP.7z"
+file_name = "SHEEP.7z"
+
+[[mods]]
+id = "slaughterfish"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 26: tesall.ru .../9073-riba-ubiitsa-sk
+path = "manual:slaughterfish.7z"
+file_name = "slaughterfish.7z"
+
+[[mods]]
+id = "dog"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 27: tesall.ru .../8672-sobakus-vulgaris
+path = "manual:dog.rar"
+file_name = "dog.rar"
+
+[[mods]]
+id = "bear"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 28: tesall.ru .../9025-medvedi-cdpr
+path = "manual:bear.7z"
+file_name = "bear.7z"
+
+[[mods]]
+id = "boar"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# Guide 29: tesall.ru .../8797-raskabanevshie-kabani
+path = "manual:boar.7z"
+file_name = "boar.7z"
