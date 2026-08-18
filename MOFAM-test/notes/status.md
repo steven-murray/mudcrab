@@ -293,6 +293,19 @@ Steven's to delete when convenient:
 no longer names, so a renamed mod leaves its old folder behind. Harmless, but it
 shows up in every diff until removed.
 
+## Next: Part 21 (Clutter & Miscellaneous) — scoped, not started
+
+See `part-21-brief.md`. 35 rows, 44 mods, all archives on disk. **Two blockers
+for Steven** before it can be finished:
+
+1. Rows 22 and 30 have no recorded Nexus file id anywhere on disk. `mudcrab
+   identify` would resolve both from the archive MD5, but needs `NEXUS_API_KEY`.
+2. Row 1 repeats Part 16's BETA1/BETA2 question — the guide names CLUTTER_BETA1
+   and the only archive on disk is the BETA2 file.
+
+Row 3 is the next `conflicts_with` call site, against `KatKat's Vegetable
+Garden`, and the guide states the count (5) so it is checkable.
+
 ## Next sections
 
 Guide order from **Part 18 (Katkat's Location Retextures)**, once the planner
