@@ -123,38 +123,19 @@ fn has_expected_content(listing: &Listing<'_>, prefix: &str) -> bool {
 /// anything the game reads. A single-level rule left it installed two folders
 /// deep, silently: every file present, nowhere the game looks.
 ///
-/// The shape that justifies descending is narrow, and is re-checked at each
-/// level: exactly one directory here, no loose files beside it, that directory
-/// is not itself game content, and this level holds no game content of its own.
-/// The moment any of that stops holding, so does the descent.
+/// Ambiguity is an error at every depth, not only at the root. Bailing at the
+/// top and shrugging below it would reintroduce the same silent failure one
+/// level down, which is the whole reason this function exists.
 fn detect_content_wrapper(
     listing: &Listing<'_>,
     source_label: &str,
     top: &Children,
 ) -> anyhow::Result<Option<String>> {
-    let root_has_expected = has_expected_content(listing, "");
-    let hits: Vec<String> = top
-        .dirs
-        .iter()
-        .filter(|dir| !is_expected_game_content_dir_name(dir))
-        .filter(|dir| has_expected_content(listing, dir))
-        .cloned()
-        .collect();
-
-    if root_has_expected && !hits.is_empty() {
-        anyhow::bail!(
-            "unsupported archive layout for {source_label}: expected game-content roots were found \
-             at both archive root and nested directory level"
-        );
-    }
-    if hits.len() > 1 {
-        anyhow::bail!(
-            "unsupported archive layout for {source_label}: expected game-content roots were found \
-             in multiple sibling directories: {}",
-            hits.join(", ")
-        );
-    }
-    if root_has_expected {
+    if has_expected_content(listing, "") {
+        // The root is the data folder. Anything nested below it is the author's
+        // own structure, not a wrapper -- except when it *also* looks like a
+        // data folder, which is a shape nothing here can resolve.
+        check_for_rival_content(listing, source_label, "", top)?;
         return Ok(None);
     }
 
@@ -164,28 +145,78 @@ fn detect_content_wrapper(
         files: top.files.clone(),
     };
 
-    // Bounded by the deepest path in the archive, so it cannot spin.
+    // Bounded by the deepest path in the archive: every pass descends into a
+    // directory that the listing already contains, so it cannot spin.
     loop {
-        if !children.files.is_empty() || children.dirs.len() != 1 {
-            return Ok(None);
-        }
-        let only = children.dirs[0].clone();
-        if is_expected_game_content_dir_name(&only) {
-            // A lone `textures/` is content, not a wrapper. Unwrapping it would
-            // install the *contents* of textures at the mod root.
-            return Ok(None);
+        check_for_rival_content(listing, source_label, &prefix, &children)?;
+
+        // Only a lone folder with nothing beside it is a wrapper. Two folders
+        // is a choice the author made on purpose, and a file beside them means
+        // this level carries content of its own.
+        if children.files.is_empty()
+            && children.dirs.len() == 1
+            && !is_expected_game_content_dir_name(&children.dirs[0])
+        {
+            let candidate = join_under(&prefix, &children.dirs[0]);
+            if has_expected_content(listing, &candidate) {
+                return Ok(Some(candidate));
+            }
+            children = listing.children(&candidate);
+            prefix = candidate;
+            continue;
         }
 
-        let candidate = if prefix.is_empty() {
-            only
-        } else {
-            format!("{prefix}/{only}")
-        };
-        if has_expected_content(listing, &candidate) {
-            return Ok(Some(candidate));
-        }
-        children = listing.children(&candidate);
-        prefix = candidate;
+        return Ok(None);
+    }
+}
+
+/// Reject a level whose children hold game content in more than one place.
+///
+/// Two sibling folders that both look like data folders is a question the
+/// listing cannot answer -- and picking one would install half a mod. Said
+/// once, and applied at whatever depth the descent has reached.
+fn check_for_rival_content(
+    listing: &Listing<'_>,
+    source_label: &str,
+    prefix: &str,
+    children: &Children,
+) -> anyhow::Result<()> {
+    let hits: Vec<String> = children
+        .dirs
+        .iter()
+        .filter(|dir| !is_expected_game_content_dir_name(dir))
+        .map(|dir| join_under(prefix, dir))
+        .filter(|dir| has_expected_content(listing, dir))
+        .collect();
+
+    let here = if prefix.is_empty() {
+        "archive root".to_string()
+    } else {
+        format!("'{prefix}'")
+    };
+
+    if has_expected_content(listing, prefix) && !hits.is_empty() {
+        anyhow::bail!(
+            "unsupported archive layout for {source_label}: expected game-content roots were found \
+             both at {here} and below it, in {}",
+            hits.join(", ")
+        );
+    }
+    if hits.len() > 1 {
+        anyhow::bail!(
+            "unsupported archive layout for {source_label}: expected game-content roots were found \
+             in multiple sibling directories under {here}: {}",
+            hits.join(", ")
+        );
+    }
+    Ok(())
+}
+
+fn join_under(prefix: &str, name: &str) -> String {
+    if prefix.is_empty() {
+        name.to_string()
+    } else {
+        format!("{prefix}/{name}")
     }
 }
 
@@ -415,21 +446,47 @@ mod wrapper_tests {
 
     #[test]
     fn the_descent_stops_where_the_shape_stops() {
-        // A file beside the wrapper means this level is content too.
+        // A file beside the wrapper means this level carries content too.
         let root = resolve(&["Wrapper/readme.txt", "Wrapper/Inner/meshes/x.nif"], "Mod")
             .expect("resolve");
         assert_eq!(root, "", "a loose file beside the folder ends the descent");
 
-        // Two candidates at the second level is an ambiguity, not a wrapper.
-        let root = resolve(
-            &["Wrapper/A/meshes/x.nif", "Wrapper/B/meshes/y.nif"],
-            "Mod",
-        )
-        .expect("resolve");
-        assert_eq!(root, "");
-
-        // And a lone content folder is still content, at any depth.
+        // A lone content folder is content, at any depth. Unwrapping it would
+        // install the *contents* of textures at the mod root.
         let root = resolve(&["Wrapper/textures/menus/x.dds"], "Mod").expect("resolve");
         assert_eq!(root, "Wrapper", "descend to the wrapper, not into textures");
+    }
+
+    #[test]
+    fn rival_content_roots_are_an_error_at_every_depth() {
+        // At the root this always failed loudly. One level down it used to
+        // return "no wrapper", and detection then fell through to installing
+        // everything at the archive root -- both alternatives at once, silently.
+        // That is the same failure this function exists to close, one level
+        // deeper, so it is now the same error.
+        let err = resolve(&["Wrapper/A/meshes/x.nif", "Wrapper/B/meshes/y.nif"], "Mod")
+            .expect_err("two rival content roots under one wrapper");
+        let message = err.to_string();
+        assert!(message.contains("Wrapper/A"), "{message}");
+        assert!(message.contains("Wrapper/B"), "{message}");
+        assert!(message.contains("multiple sibling directories"), "{message}");
+
+        // The root-level version of the same shape, which has always errored
+        // and had no test.
+        let err = resolve(&["A/meshes/x.nif", "B/meshes/y.nif"], "Mod")
+            .expect_err("two rival content roots at the archive root");
+        assert!(err.to_string().contains("archive root"), "{err}");
+    }
+
+    #[test]
+    fn content_at_a_level_and_below_it_is_an_error() {
+        // The other ambiguity, also previously untested: the archive root is a
+        // data folder *and* a folder inside it is one too, so there is no
+        // answer to "which of these is the mod".
+        let err = resolve(&["meshes/x.nif", "Alternative/meshes/y.nif"], "Mod")
+            .expect_err("content at the root and below it");
+        let message = err.to_string();
+        assert!(message.contains("archive root"), "{message}");
+        assert!(message.contains("Alternative"), "{message}");
     }
 }
