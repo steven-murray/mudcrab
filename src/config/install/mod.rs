@@ -32,6 +32,7 @@ pub struct InstallSettings {
     pub force: bool,
 }
 
+pub mod index;
 pub mod layout;
 pub mod manifest;
 pub mod merge;
@@ -146,7 +147,13 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     if settings.execute_actions && !settings.dry_run {
         crate::config::actions::apply_all(
             &plan.actions,
-            &crate::config::actions::ActionCx { owner: "plan", settings, mod_target: None },
+            &crate::config::actions::ActionCx {
+                owner: "plan",
+                settings,
+                mod_target: None,
+                plan_mods: &plan.mods,
+                active_plugins: &active_plugins,
+            },
         )?;
     } else if settings.execute_actions && !plan.actions.is_empty() {
         tracing::info!(
@@ -239,6 +246,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                     owner: &mod_entry.id,
                     settings,
                     mod_target: Some(&mod_target),
+                    plan_mods: &plan.mods,
+                    active_plugins: &active_plugins,
                 },
             )?;
                 actions_applied = true;
@@ -287,6 +296,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                     owner: &mod_entry.id,
                     settings,
                     mod_target: Some(&mod_target),
+                    plan_mods: &plan.mods,
+                    active_plugins: &active_plugins,
                 },
             )?;
             actions_applied = true;

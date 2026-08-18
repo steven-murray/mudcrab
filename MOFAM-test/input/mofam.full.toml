@@ -2457,6 +2457,31 @@ bain_subpackages = [
 # return after Part 24. Packing now would archive exactly the files that step
 # removes. Until then the textures stay loose, and this mod's `textures/` shows
 # against the Oracle's packed `OOO Enhanced.bsa`.
+#
+# Its final form, written now so the row is not carrying a shape we intend to
+# throw away. Inert until Part 24 authors the Colourful Clothing mods, because
+# `validate` rejects a conflicts_with naming a mod the list does not have -- and
+# that rejection is the point of it.
+#
+# The WAC half already reproduces 577 of the 578 files the Oracle hides by hand
+# for these mods; see notes/conflict-index-validation.md.
+#
+#   [[mods.actions]]
+#   action = "file_prune"
+#   conflicts_with = [
+#     "WAC Waalx Animals & Creatures",
+#     "WAC - Integration",
+#     "HGEC Equipment Replacer for WAC",
+#     "WAC - Integration - Roberts Conversion",
+#     "WAC - Integration - HGEC Gauntlets Conversion",
+#     # Part 24, not yet authored:
+#     # "Colourful Clothing - Collection - Seamless OCOv2",
+#   ]
+#
+#   [[mods.actions]]
+#   action = "pack_bsa"
+#   output = "OOO Enhanced.bsa"
+#   prune_packed = true
 [[mods]]
 id = "OOO Enhanced 5.3 (03.25) - Resources"
 oracle_name = "OOO Enhanced 5.3b - Resources"  # renamed when the Oracle moved to 5.3b

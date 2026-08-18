@@ -9,6 +9,7 @@
 //! currently only those desugared from the top-level `[ini]` table), so there
 //! is one dispatcher rather than two implementations that drifted apart.
 
+pub mod conflicts;
 pub mod create_dummy_plugin;
 pub mod extract_bsa;
 pub mod file_hide;
@@ -19,7 +20,8 @@ pub mod pack_bsa;
 pub mod qac;
 
 use crate::config::install::InstallSettings;
-use crate::config::schema::ModAction;
+use crate::config::schema::{ModAction, PersonalizedMod};
+use std::collections::HashSet;
 use std::path::Path;
 
 /// Everything an action needs to run.
@@ -30,6 +32,13 @@ pub struct ActionCx<'a> {
     /// The mod's staged data folder. `None` for install-wide actions, which is
     /// what makes `scope = "mod"` invalid there.
     pub mod_target: Option<&'a Path>,
+    /// Every mod in the plan. `conflicts_with` asks about mods other than the
+    /// one being installed, which is the whole point of it: the modlist is
+    /// declarative, so a later mod's files are knowable now.
+    pub plan_mods: &'a [PersonalizedMod],
+    /// Plugins the finished install will have active, for FOMOD conditions in
+    /// a mod this one is being compared against.
+    pub active_plugins: &'a HashSet<String>,
 }
 
 pub fn apply_all(actions: &[ModAction], cx: &ActionCx<'_>) -> anyhow::Result<()> {
@@ -169,10 +178,17 @@ mod tests {
     }
 
     #[test]
-    fn file_prune_without_paths_is_a_parse_error() {
-        // Matching the qac rule: a prune with nothing to delete is a mistake.
-        let err = parse(r#"action = "file_prune""#).unwrap_err();
-        assert!(err.to_string().contains("paths"), "{err}");
+    fn file_prune_takes_either_paths_or_a_conflict_selection() {
+        // `paths` used to be mandatory, which made "a prune with nothing to
+        // delete is a mistake" a parse error. A `conflicts_with` prune names no
+        // paths at all -- that is the point of it -- so the same rule now lives
+        // at apply time, where both forms can be checked at once.
+        for source in [
+            "action=\"file_prune\"\npaths=[\"meshes/**\"]",
+            "action=\"file_prune\"\nconflicts_with=[\"Some Mod\"]",
+        ] {
+            assert!(matches!(parse(source), Ok(ModAction::FilePrune(_))), "{source}");
+        }
     }
 
     #[test]

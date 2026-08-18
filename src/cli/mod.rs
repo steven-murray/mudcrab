@@ -30,6 +30,9 @@ pub enum Command {
     Inspect(InspectArgs),
     /// Ask Nexus which mod and file an archive is, by its MD5.
     Identify(IdentifyArgs),
+    /// List the files two mods both provide, which is what `conflicts_with`
+    /// acts on.
+    Conflicts(ConflictsArgs),
     /// Install mods from downloaded archives.
     Install(InstallArgs),
     /// Compare an installed mods directory against a reference MO2 instance.
@@ -275,6 +278,37 @@ pub struct CheckArgs {
 /// transcribing `fomod/ModuleConfig.xml` into TOML, where a typo only surfaces
 /// at install time. Nothing is written and no plan is involved: this takes an
 /// archive path so it can be run on a download before the modlist mentions it.
+/// Report what a mod contributes to the virtual file system, and which of
+/// those files another mod also provides.
+///
+/// Answers from the same code `install` uses, so what this prints is what
+/// `conflicts_with` would act on. An installed mod is read from its folder; one
+/// not yet installed is computed from its archives' entry lists.
+#[derive(Debug, Args)]
+pub struct ConflictsArgs {
+    /// Personalized install plan.
+    #[arg(long)]
+    pub plan: PathBuf,
+    /// Installation directory holding the mod folders.
+    #[arg(long)]
+    pub mods_dir: PathBuf,
+    /// The mod whose files are in question.
+    #[arg(long = "mod")]
+    pub mod_id: String,
+    /// Mods to compare against. With none, every file the mod provides is
+    /// listed instead.
+    #[arg(long = "with")]
+    pub with: Vec<String>,
+    /// Restrict the comparison to one subtree, e.g. `textures/`.
+    #[arg(long)]
+    pub under: Option<String>,
+    /// Archive cache directory.
+    #[arg(long)]
+    pub cache: Option<PathBuf>,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
+}
+
 #[derive(Debug, Args)]
 pub struct InspectArgs {
     /// Path to the archive to read. Only ever read from.

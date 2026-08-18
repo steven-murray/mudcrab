@@ -1,30 +1,9 @@
 //! BAIN archive layout: merge selected top-level subpackages into the mod root.
 
-use super::destination_for;
 use crate::archive::ArchiveFilters;
 use crate::config::schema::CompiledArchive;
 use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan, Listing};
 use std::path::Path;
-
-pub(crate) fn extract_archive_with_bain_layout(
-    source: &Path,
-    target_root: &Path,
-    archive: &CompiledArchive,
-    filters: &ArchiveFilters,
-) -> anyhow::Result<usize> {
-    if archive.data_folder.is_some() {
-        anyhow::bail!(
-            "BAIN layout for {} cannot be combined with data_folder",
-            source.display()
-        );
-    }
-
-    let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
-    let source_label = source.display().to_string();
-    super::with_planned_archive(source, target_root, &destination_root, |paths, _| {
-        plan_bain(paths, archive, filters, &source_label)
-    })
-}
 
 /// Copy the selected subpackages out of an already-extracted staging tree.
 ///

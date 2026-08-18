@@ -23,8 +23,11 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
         anyhow::bail!("{}: file_hide is only valid as a per-mod action", cx.owner);
     };
 
-    if action.paths.is_empty() {
-        anyhow::bail!("{}: file_hide requires at least one path", cx.owner);
+    if action.paths.is_empty() && action.conflicts_with.is_empty() {
+        anyhow::bail!(
+            "{}: file_hide requires at least one path or a conflicts_with selection",
+            cx.owner
+        );
     }
 
     if cx.settings.dry_run {
@@ -32,8 +35,35 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
             owner = cx.owner,
             target = %mod_target.display(),
             paths = ?action.paths,
+            conflicts_with = ?action.conflicts_with,
             "install dry-run file_hide action"
         );
+        return Ok(());
+    }
+
+    // Files another mod also provides, named by the relationship rather than
+    // one at a time. These are exact paths, so they need none of the
+    // case-insensitive resolution the guide-written ones below do.
+    let mut hidden_by_conflict = 0usize;
+    if !action.conflicts_with.is_empty() {
+        for relative in super::conflicts::conflicting_files(
+            cx,
+            mod_target,
+            &action.conflicts_with,
+            action.under.as_deref(),
+        )? {
+            hide_path(&mod_target.join(&relative))?;
+            hidden_by_conflict += 1;
+        }
+        tracing::info!(
+            owner = cx.owner,
+            conflicts_with = ?action.conflicts_with,
+            hidden = hidden_by_conflict,
+            "hid files another mod provides"
+        );
+    }
+
+    if action.paths.is_empty() {
         return Ok(());
     }
 
@@ -56,11 +86,7 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
             continue;
         }
 
-        let mut hidden_name = source.as_os_str().to_os_string();
-        hidden_name.push(MO2_HIDDEN_SUFFIX);
-        std::fs::rename(&source, Path::new(&hidden_name)).map_err(|err| {
-            anyhow::anyhow!("failed to hide {}: {err}", source.display())
-        })?;
+        hide_path(&source)?;
         hidden += 1;
     }
 
@@ -84,10 +110,27 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
     tracing::info!(
         owner = cx.owner,
         target = %mod_target.display(),
-        hidden,
+        hidden = hidden + hidden_by_conflict,
         "hid staged files"
     );
     Ok(())
+}
+
+/// Rename to `<name>.mohidden`, which is how MO2 drops a file from the VFS.
+fn hide_path(source: &Path) -> anyhow::Result<()> {
+    // A re-run must not produce `x.mohidden.mohidden`.
+    if source
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.to_ascii_lowercase().ends_with(MO2_HIDDEN_SUFFIX))
+    {
+        return Ok(());
+    }
+
+    let mut hidden_name = source.as_os_str().to_os_string();
+    hidden_name.push(MO2_HIDDEN_SUFFIX);
+    std::fs::rename(source, Path::new(&hidden_name))
+        .map_err(|err| anyhow::anyhow!("failed to hide {}: {err}", source.display()))
 }
 
 /// Walk the path a segment at a time, matching each case-insensitively.
