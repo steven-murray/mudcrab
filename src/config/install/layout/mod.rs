@@ -411,8 +411,14 @@ pub(crate) fn extract_archive(
     // the layouts detection knows, so it is rejected outright even though the
     // two files this list wants are plainly at the root.
     if archive.layout == Some(ArchiveLayout::Simple) {
+        // `target_subdir` used to be ignored here, silently, while every other
+        // layout honoured it. Nothing in the list combines the two, so this
+        // makes a latent trap behave like its neighbours rather than changing
+        // any mod.
+        let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
         return with_staged_archive(source, target_root, |staging_dir| {
-            copy_filtered_tree_folded(staging_dir, target_root, filters)
+            let staged = bain::list_relative_paths(staging_dir)?;
+            apply_plan(staging_dir, &destination_root, &plan::plan_simple(&staged, filters))
         });
     }
 
