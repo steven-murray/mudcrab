@@ -75,10 +75,19 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         .collect();
 
     if !settings.dry_run {
-        // An interrupted run leaves an archive-sized directory in the temp dir.
-        // Two of them once filled a 16 GB tmpfs; clear anything an hour cold
-        // before adding more.
-        crate::util::fs::sweep_stale_staging_dirs(std::time::Duration::from_secs(3600));
+        // An interrupted run leaves an archive-sized directory behind. Two of
+        // them once filled a 16 GB tmpfs; clear anything an hour cold before
+        // adding more. Both the current location (beside the instance) and the
+        // old one (the system temp dir) are swept.
+        let staging_roots: Vec<PathBuf> = settings
+            .mo2_instance_dir
+            .iter()
+            .map(|dir| dir.join(crate::util::fs::STAGING_DIR_NAME))
+            .collect();
+        crate::util::fs::sweep_stale_staging_dirs(
+            std::time::Duration::from_secs(3600),
+            &staging_roots,
+        );
 
         std::fs::create_dir_all(&settings.mods_dir).map_err(|err| {
             anyhow::anyhow!(
