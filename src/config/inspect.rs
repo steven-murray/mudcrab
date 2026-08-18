@@ -17,6 +17,7 @@ use crate::config::install::is_plugin_file;
 use crate::config::install::layout::auto::is_expected_game_content_dir_name;
 use crate::config::install::layout::fomod::{
     build_fomod_selection_map, child_elements, collect_fomod_entries, find_child_element,
+    find_fomod_config,
     fomod_dependencies_match, fomod_option_type, read_xml_text, select_fomod_options,
     FomodInstallEntry, FomodOptionType,
 };
@@ -144,7 +145,7 @@ pub fn inspect_archive(source: &Path, include_files: bool) -> anyhow::Result<Ins
         .unwrap_or_default()
         .to_string();
 
-    let fomod_config = tree.find_fomod_config();
+    let fomod_config = find_fomod_config(&paths);
     let layout = guess_layout(&tree, fomod_config.as_deref());
 
     let fomod = match fomod_config {
@@ -256,29 +257,6 @@ impl ArchiveTree {
             .any(|name| is_plugin_file(Path::new(name)))
     }
 
-    /// The `fomod/ModuleConfig.xml` (or `fomod/script.xml`) entry, if any.
-    ///
-    /// Matches the installer's own rule: any depth, case-insensitive, and
-    /// ModuleConfig wins over the older script.xml.
-    fn find_fomod_config(&self) -> Option<String> {
-        let mut script_xml = None;
-        for (dir, names) in &self.files {
-            let leaf = dir.rsplit('/').next().unwrap_or(dir);
-            if !eq_ci(leaf, "fomod") {
-                continue;
-            }
-            for name in names {
-                let full = format!("{dir}/{name}");
-                if eq_ci(name, "ModuleConfig.xml") {
-                    return Some(full);
-                }
-                if eq_ci(name, "script.xml") && script_xml.is_none() {
-                    script_xml = Some(full);
-                }
-            }
-        }
-        script_xml
-    }
 }
 
 /// A BAIN subpackage directory: an ordering prefix, a separator, then a name.
@@ -843,14 +821,6 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn the_fomod_config_is_found_at_any_depth_and_any_casing() {
-        let tree = tree(&["Wrapper/FOMOD/moduleconfig.xml", "Wrapper/base.txt"]);
-        assert_eq!(
-            tree.find_fomod_config().as_deref(),
-            Some("Wrapper/FOMOD/moduleconfig.xml")
-        );
-    }
 
     #[test]
     fn toml_snippet_quotes_names_containing_quotes_and_backslashes() {
