@@ -4387,11 +4387,10 @@ download_handler = "nexus"
 file_name = "katkat upperclass stool fix-53128-1-0-1688355623.rar"
 # oracle version 1.0.0.0
 
-# Guide 14. The Oracle has no folder for this one and never installed it, though
-# the archive is sitting in the downloads folder -- so it was fetched and then
-# skipped. Built here because the guide says to; it shows as extra in ours.
+# Guide 14. Missing from the Oracle when this section was first built; Steven
+# has since installed it, as `KatKat's Vegetable Garden`.
 [[mods]]
-id = "Ogorod"
+id = "KatKat's Vegetable Garden"
 section = ["18 - KATKAT'S LOCATION RETEXTURES"]
 
 [[mods.archives]]

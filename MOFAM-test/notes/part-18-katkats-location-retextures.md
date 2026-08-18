@@ -1,7 +1,8 @@
 # Part 18 — Katkat's Location Retextures
 
-15 guide rows, 16 mods (row 3 is one page installed twice). **14 of 16 identical
-against the Oracle; both differences are deliberate and explained below.**
+15 guide rows, 16 mods (row 3 is one page installed twice). **16 of 16 identical
+against the Oracle**, after Steven acted on the two divergences this section
+found — both recorded below, because finding them was the point.
 
 Nothing here ships a plugin — the whole section is texture and mesh replacers —
 so the load order is untouched.
@@ -41,21 +42,27 @@ own name, and the "selected no files" check — which exists to catch a selector
 that was *wrong* — fired on one that had already worked. Comparison now ignores
 the suffix.
 
-## Two differences from the Oracle, both deliberate
+## Two divergences found, both since resolved in the Oracle
 
-### `Ogorod` — extra in ours (guide row 14)
+### Guide row 14 was missing from the Oracle
 
-Guide 14 is *Katkat's VEGETABLE GARDEN*. **The Oracle has no folder for it**, yet
-`Ogorod 1.1.rar` is sitting in the downloads folder — so it was fetched and then
-not installed. Built here because the guide says to, per the standing rule.
-Worth a look: if it was skipped on purpose, the reason is not recorded anywhere.
+*Katkat's VEGETABLE GARDEN* had no Oracle folder, yet `Ogorod 1.1.rar` was
+sitting in the downloads folder — fetched and then not installed. Built here per
+the standing rule; **Steven has since installed it as `KatKat's Vegetable
+Garden`**, and our id was renamed to match.
 
-### `Ships from katkat` — 4 files hidden in ours
+That rename left a stale `mods/Ogorod` folder behind, since `install` writes the
+profile from the plan but does not remove folders the plan no longer names.
+Harmless, and Steven's to delete.
 
-**The Oracle did not perform row 7's follow-up.** All four `_far.nif` files are
-still present and unhidden there. Ours follows the guide, so this shows as
-"hidden on one side only (4)" until the Oracle is changed by hand or the
-instruction is decided against.
+### Row 7's follow-up was never done in the Oracle
+
+All four `_far.nif` files were present and unhidden there. **Steven has since
+hidden them**, and the two sides now agree.
+
+Worth keeping: the priorities make the instruction load-bearing. `Ships from
+katkat` sits at `modlist.txt` line 431 and `VWD Ships` at 678, so without the
+hide the Katkat meshes win and the VWD LOD meshes never load at distance.
 
 Note the priorities make the instruction meaningful: `Ships from katkat` sits at
 `modlist.txt` line 431 and `VWD Ships` at 678, so without the hide the Katkat

@@ -834,7 +834,7 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
     // Only a plan that actually declares an archive can disagree with the
     // Oracle; a mod we build from loose files or a merge has nothing to compare.
     let archive_mismatch = match (&plan_file_name, &installation_file) {
-        (Some(ours), Some(theirs)) => !ours.eq_ignore_ascii_case(theirs),
+        (Some(ours), Some(theirs)) => !names_the_same_archive(ours, theirs),
         _ => false,
     };
 
@@ -850,6 +850,34 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
         plan_file_name,
         archive_mismatch,
     }
+}
+
+/// Whether two `installationFile` spellings name the same archive.
+///
+/// Usually a plain comparison, but not when the Oracle was built by installing
+/// from mudcrab's own cache. The cache renames on the way in --
+/// `{mod id}_{archive index}_{source}`, e.g. `Ogorod 1.1.rar` becomes
+/// `Ogorod_0_manual_Ogorod_1.1.rar` -- and MO2 records whatever name it was
+/// handed. Reporting that as "the Oracle installed a different archive" is
+/// false: it is the same bytes under the name we gave them.
+///
+/// Deliberately narrow. It matches only when the Oracle's name *ends with* the
+/// plan's, so a genuinely different archive still reports, and it does not try
+/// to reconstruct the cache name (the mod may since have been renamed, which is
+/// exactly how this was found).
+fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
+    if plan.eq_ignore_ascii_case(oracle) {
+        return true;
+    }
+
+    let plan_key = plan.replace(' ', "_").to_ascii_lowercase();
+    let oracle_key = oracle.replace(' ', "_").to_ascii_lowercase();
+    let Some(prefix) = oracle_key.strip_suffix(&plan_key) else {
+        return false;
+    };
+    // The prefix mudcrab's cache adds always ends at a separator, and it is
+    // never empty -- an empty one would mean the names simply matched.
+    prefix.ends_with('_') && prefix.len() > 1
 }
 
 /// Date the Oracle's archive, to decide whether the March 2025 guide could
@@ -1549,5 +1577,38 @@ mod tests {
         assert_eq!(format_date(GUIDE_CUTOFF), "2025-03-01");
         assert_eq!(format_date(GUIDE_CUTOFF - 1), "2025-02-28");
         assert_eq!(format_date(0), "1970-01-01");
+    }
+}
+
+#[cfg(test)]
+mod archive_name_tests {
+    use super::names_the_same_archive;
+
+    #[test]
+    fn a_cache_renamed_archive_is_the_same_archive() {
+        // Installing into the Oracle from mudcrab's cache leaves MO2 recording
+        // the cache's name for it. That is the same bytes, not a different
+        // download, and reporting it as a mismatch buries the real ones.
+        assert!(names_the_same_archive(
+            "Ogorod 1.1.rar",
+            "Ogorod_0_manual_Ogorod_1.1.rar"
+        ));
+        assert!(names_the_same_archive(
+            "well.zip",
+            "KatKat's Well_0_manual_well.zip"
+        ));
+        assert!(names_the_same_archive("Bliss.7z", "Bliss.7z"));
+    }
+
+    #[test]
+    fn a_genuinely_different_archive_still_reports() {
+        // The case this check must never swallow: Part 16's BETA1 vs BETA2.
+        assert!(!names_the_same_archive(
+            "T4UTXL - Architecture_BETA1-54904-Architecture-BETA1-1742397074.7z",
+            "T4UTXL - Architecture_BETA2 (Part 2)-54904-ARCHITECTURE-BETA2-1744730302.7z"
+        ));
+        // A suffix match that is not at a cache-prefix boundary is a coincidence.
+        assert!(!names_the_same_archive("Metal.7z", "BaseMetal.7z"));
+        assert!(!names_the_same_archive("Bliss.7z", "OtherBliss.7z"));
     }
 }
