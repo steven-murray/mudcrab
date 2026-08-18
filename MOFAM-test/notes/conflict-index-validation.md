@@ -74,8 +74,11 @@ choice is between two spellings of the same in-game result.
 The argument for removing it is only consistency: `conflicts_with = ["WAC ..."]`
 is a statement about mods, and WAC does provide this path. Keeping it would mean
 carrying a one-file exception in the modlist for a file that has no effect.
-**Steven's call, and neither answer is wrong.** Recorded as a known difference
-until decided.
+**Decided by Steven: this is not a defect.** The Oracle keeps the file, and any
+`conflicts_with` written for this row has to reproduce that. Since the guide's
+instruction names WAC and WAC does provide the path, the eventual Part 24 row
+will select it, so it needs an explicit exception when that row goes live —
+recorded on the row itself and in task #25.
 
 Worth keeping regardless: MO2's conflict tab names the winner, not every
 provider, so a file with two competitors is filed under one of them and drops out

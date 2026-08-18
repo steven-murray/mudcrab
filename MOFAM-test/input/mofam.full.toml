@@ -2466,6 +2466,12 @@ bain_subpackages = [
 # The WAC half already reproduces 577 of the 578 files the Oracle hides by hand
 # for these mods; see notes/conflict-index-validation.md.
 #
+# One exception is needed. `meshes/realswords/nord/chainmailm1.nif` is the single
+# file of the 578 with a *loose* competitor as well as WAC's packed one --
+# `WAC - Integration - Roberts Conversion`, which outranks everything here and
+# wins the path regardless. Steven keeps it deliberately, and it is not a defect:
+# removing it changes nothing in game. See notes/conflict-index-validation.md.
+#
 #   [[mods.actions]]
 #   action = "file_prune"
 #   conflicts_with = [
