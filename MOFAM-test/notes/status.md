@@ -265,6 +265,34 @@ main file), is missing from the Oracle **and** was never downloaded, so there is
 nothing on disk to install. It needs your Nexus key. The entry is written out
 commented in the modlist, ready to uncomment.
 
+## Done: Part 20 (Weapons, Armour & Clothing)
+
+30 guide rows, 31 mods. **23 of 31 identical**; all eight differences are nine
+Part 36 merge-source plugins across eight mods, hidden in the Oracle. See
+`part-20-weapons-armour-and-clothing.md`.
+
+It found a layout bug worth more than the section: auto-detection unwrapped one
+wrapper folder and stopped, so a doubly-wrapped archive installed two folders
+deep with nothing failing. `inspect` had it right the whole time, which is two
+implementations of one question disagreeing. Fixed by descending.
+
+## Full-list verification after the wrapper fix
+
+`detect_content_wrapper` affects every auto-layout mod, so the whole list was
+rebuilt. **273 of 728 identical, and every section matches the count recorded
+against it** — nothing moved. Parts 18/19/20 add exactly 64, which is 16+25+23.
+
+Nine mods are "extra in ours". Seven are long-standing and recorded in
+`earlier-sections-backlog.md`. Two are **stale folders left by renames** and are
+Steven's to delete when convenient:
+
+- `mods/Ogorod` — renamed to `KatKat's Vegetable Garden` in Part 18
+- `mods/T4UTXL - Architecture_BETA2 - City Gates` — renamed to BETA1 in Part 16
+
+`install` writes the profile from the plan but does not remove folders the plan
+no longer names, so a renamed mod leaves its old folder behind. Harmless, but it
+shows up in every diff until removed.
+
 ## Next sections
 
 Guide order from **Part 18 (Katkat's Location Retextures)**, once the planner
