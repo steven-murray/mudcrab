@@ -8,7 +8,7 @@
 
 use crate::cli::ConflictsArgs;
 use crate::config;
-use crate::config::install::index::staged_paths;
+use crate::config::install::index::staged_paths_detailed;
 use crate::config::install::safe_mod_dir_name;
 use crate::config::tools::ToolsConfig;
 use std::collections::BTreeSet;
@@ -53,12 +53,13 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     };
 
     let subject = find(&args.mod_id)?;
-    let mine = staged_paths(
+    let subject_paths = staged_paths_detailed(
         subject,
         Some(&args.mods_dir.join(safe_mod_dir_name(&subject.id)?)),
         &settings,
         &active_plugins,
     )?;
+    let mine = subject_paths.visible;
 
     if args.with.is_empty() {
         for path in &mine {
@@ -71,14 +72,14 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     let mut theirs = BTreeSet::new();
     for id in &args.with {
         let other = find(id)?;
-        let paths = staged_paths(
+        let paths = staged_paths_detailed(
             other,
             Some(&args.mods_dir.join(safe_mod_dir_name(&other.id)?)),
             &settings,
             &active_plugins,
         )?;
-        eprintln!("{id}: {} files", paths.len());
-        theirs.extend(paths);
+        eprintln!("{id}: {} files", paths.visible.len());
+        theirs.extend(paths.visible);
     }
 
     let under = args.under.as_ref().map(|value| {
@@ -101,5 +102,26 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         mine.len(),
         args.with.join(", ")
     );
+
+    // Without this, asking about a row whose `file_hide` has already run answers
+    // "0", which reads as "the row was wrong" when it means "the row worked".
+    // The hidden files are out of the VFS and so genuinely conflict with
+    // nothing -- but that is not what the person asking wants to hear.
+    let already = subject_paths
+        .hidden
+        .iter()
+        .filter(|path| under.as_deref().is_none_or(|p| path.starts_with(p)))
+        .filter(|path| theirs.contains(*path))
+        .count();
+    if already > 0 {
+        eprintln!(
+            "note: {already} further file{} {} already hidden in {}, so out of the \
+             virtual file system and not counted above. Re-install the mod to see \
+             the selection as it was first made.",
+            if already == 1 { "" } else { "s" },
+            if already == 1 { "is" } else { "are" },
+            subject.id,
+        );
+    }
     Ok(())
 }

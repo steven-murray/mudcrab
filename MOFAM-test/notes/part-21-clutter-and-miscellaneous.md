@@ -54,8 +54,9 @@ modern ids, so it did not help. The real observation is stronger:
 **Nexus allocates file ids in ascending order, so an id is an upload date.**
 
 Checked against every archive in this list carrying both a file id and a Unix
-timestamp in its filename — 405 of them. The orderings agree, with one
-exception (below). The boundary is clean:
+timestamp in its filename — **406** of them, of which **405** were usable. Across
+those 405 the orderings agree exactly; the 406th is the exception described
+below. The boundary is clean:
 
 | | file id | date |
 |---|---|---|
@@ -65,10 +66,15 @@ exception (below). The boundary is clean:
 Nothing in between. `classify_guide_age` now uses the file id as its second
 source, after the filename timestamp.
 
-**This is a property of Nexus, not of the Oracle.** A user who has never seen a
-reference instance gets the same answers. That matters: the previous rule was
-calibrated on Oracle data too, but this one can be re-derived from any corpus of
-Nexus downloads.
+**The constant is baked into the binary, so a user who has never seen a
+reference instance gets the same answers.** That is the real gain over
+`nexusLastModified`, which was only ever as good as one install's metadata.
+
+Worth stating the limit honestly: this is one game's corpus over one year, not a
+verified site-wide invariant. It is a strong, clean signal and it can be
+re-derived from any corpus of Nexus downloads — but "Nexus allocates ids in
+ascending order, globally" is an inference from 405 archives, not something this
+repo can prove.
 
 Part 21's POST-GUIDE count went from 4 to 1, and the survivor is real.
 
