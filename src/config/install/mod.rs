@@ -975,7 +975,7 @@ mod tests {
     }
 
     #[test]
-    fn ini_set_updates_set_to_assignment_with_arbitrary_spacing() {
+    fn ini_set_finds_a_set_to_assignment_whatever_its_spacing_and_keeps_it() {
         let temp = tempdir().expect("tempdir");
         let ini_path = temp.path().join("example.ini");
         std::fs::write(&ini_path, "set   zzzMigckQ.bBetterSkillup    to    1\n")
@@ -984,8 +984,34 @@ mod tests {
         apply_ini_set(&ini_path, "zzzMigckQ.bBetterSkillup", "0", IniSetFormat::SetTo)
             .expect("ini_set should succeed");
 
+        // This used to normalise the line to `set key to 0`. Part 23's
+        // `Dynamic Oblivion Combat.ini` is tab-aligned into columns and
+        // annotates every line with its default, and normalising threw both
+        // away -- the same mistake the standard format made and had fixed.
+        // Setting a value is not a licence to reformat somebody's file.
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
-        assert_eq!(content, "set zzzMigckQ.bBetterSkillup to 0\n");
+        assert_eq!(content, "set   zzzMigckQ.bBetterSkillup    to    0\n");
+    }
+
+    #[test]
+    fn ini_set_keeps_a_set_to_lines_trailing_comment() {
+        let temp = tempdir().expect("tempdir");
+        let ini_path = temp.path().join("doc.ini");
+        std::fs::write(
+            &ini_path,
+            "set dcvars.ini_NPCdodgePercent\t\tto\t90\t;Default 90\n",
+        )
+        .expect("write ini");
+
+        apply_ini_set(&ini_path, "dcvars.ini_NPCdodgePercent", "50", IniSetFormat::SetTo)
+            .expect("ini_set should succeed");
+
+        let content = std::fs::read_to_string(&ini_path).expect("read ini");
+        assert_eq!(
+            content,
+            "set dcvars.ini_NPCdodgePercent\t\tto\t50\t;Default 90\n",
+            "the author's note about the default is not ours to delete"
+        );
     }
 
     #[test]

@@ -134,6 +134,7 @@ pub(crate) fn apply_ini_set_in_section(
     // change one value in -- harmless to Oblivion, which reads both, but it
     // makes each INI we touch differ from the Oracle for no reason.
     let newline = if original.contains("\r\n") { "\r\n" } else { "\n" };
+    let trailing_newline = original.ends_with('\n');
     let mut lines: Vec<String> = original.lines().map(ToString::to_string).collect();
 
     // Match the file's own spacing rather than imposing ours. Oblivion.ini is
@@ -167,7 +168,7 @@ pub(crate) fn apply_ini_set_in_section(
                 }
                 lines.push(format!("[{name}]"));
                 lines.push(rendered);
-                return write_ini_lines(path, &lines, newline);
+                return write_ini_lines(path, &lines, newline, trailing_newline);
             }
         },
     };
@@ -210,7 +211,7 @@ pub(crate) fn apply_ini_set_in_section(
         }
     }
 
-    write_ini_lines(path, &lines, newline)
+    write_ini_lines(path, &lines, newline, trailing_newline)
 }
 
 /// The `[Section]` a line sits under, for error messages.
@@ -218,9 +219,21 @@ fn enclosing_section(lines: &[String], index: usize) -> Option<&str> {
     lines[..index].iter().rev().find_map(|line| section_header(line))
 }
 
-fn write_ini_lines(path: &Path, lines: &[String], newline: &str) -> anyhow::Result<()> {
+/// Write the lines back, keeping the file's own line ending *and* whether it
+/// ended with one.
+///
+/// `trailing_newline` is not a detail: `Av Latta Magicka.ini` ships without a
+/// final newline, and adding one made a file we changed one value in differ
+/// from the reference by two bytes. Harmless to the game and pure noise in a
+/// report, which is the sort of thing that trains people to skim the report.
+fn write_ini_lines(
+    path: &Path,
+    lines: &[String],
+    newline: &str,
+    trailing_newline: bool,
+) -> anyhow::Result<()> {
     let mut content = lines.join(newline);
-    if !content.ends_with('\n') {
+    if trailing_newline && !content.ends_with('\n') {
         content.push_str(newline);
     }
 
@@ -246,8 +259,8 @@ fn replace_value_in_place(
     aligned: bool,
     spaced: bool,
 ) -> Option<String> {
-    if format != IniSetFormat::Standard {
-        return None;
+    if format == IniSetFormat::SetTo {
+        return replace_set_to_value(line, key, value);
     }
     let (lhs, _rhs) = line.split_once('=')?;
     if lhs.trim() != key {
@@ -264,6 +277,43 @@ fn replace_value_in_place(
     // repaired in a file that is otherwise tight.
     let separator = if spaced { " " } else { "" };
     Some(format!("{lhs}={separator}{value}"))
+}
+
+/// Replace only the value in a `set <key> to <value>` line.
+///
+/// These files are hand-aligned with tabs and carry a trailing comment on almost
+/// every line -- `set dcvars.ini_NPCdodgePercent\t\tto\t70\t;Default 90`. Re-rendering
+/// the line threw both away, which is the same mistake the standard format made
+/// and had fixed: an edit should set a value, not reformat somebody's file.
+///
+/// Everything before the value and everything after it is kept exactly.
+fn replace_set_to_value(line: &str, key: &str, value: &str) -> Option<String> {
+    let key_at = line.find(key)?;
+    let after_key = &line[key_at + key.len()..];
+
+    // The `to` separator, with whatever whitespace surrounds it.
+    let gap = after_key.len() - after_key.trim_start().len();
+    let rest = &after_key[gap..];
+    let to = rest.get(..2)?;
+    if !to.eq_ignore_ascii_case("to") {
+        return None;
+    }
+    let after_to = &rest[2..];
+
+    // The value runs to the next whitespace; anything past it -- padding, a
+    // `;Default 90` comment, trailing spaces -- belongs to the author.
+    let value_gap = after_to.len() - after_to.trim_start().len();
+    let old_value = after_to[value_gap..]
+        .split_whitespace()
+        .next()
+        .unwrap_or_default();
+
+    let head_len = line.len() - after_to.len() + value_gap;
+    Some(format!(
+        "{}{value}{}",
+        &line[..head_len],
+        &after_to[value_gap + old_value.len()..]
+    ))
 }
 
 /// Whether the file pads its keys out to a column before the `=`.
@@ -363,5 +413,82 @@ fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bool {
                 && separator.eq_ignore_ascii_case("to")
                 && found_key == key
         }
+    }
+}
+
+#[cfg(test)]
+mod set_to_tests {
+    use super::replace_set_to_value;
+
+    #[test]
+    fn only_the_value_changes() {
+        // Part 23's Dynamic Oblivion Combat.ini, which is tab-aligned and
+        // annotates every line. Re-rendering these threw away both the columns
+        // and the author's note about the default.
+        assert_eq!(
+            replace_set_to_value(
+                "set dcvars.ini_NPCdodgePercent\t\tto\t70\t;Default 90",
+                "dcvars.ini_NPCdodgePercent",
+                "50"
+            )
+            .as_deref(),
+            Some("set dcvars.ini_NPCdodgePercent\t\tto\t50\t;Default 90")
+        );
+        assert_eq!(
+            replace_set_to_value(
+                "set dcvars.ini_DodgeKeyCode\t\tto\t35\t;Default 35 (the keyboard H key) ",
+                "dcvars.ini_DodgeKeyCode",
+                "42"
+            )
+            .as_deref(),
+            Some("set dcvars.ini_DodgeKeyCode\t\tto\t42\t;Default 35 (the keyboard H key) ")
+        );
+    }
+
+    #[test]
+    fn a_plain_line_survives_too() {
+        assert_eq!(
+            replace_set_to_value("set almQ.bDisableREHEShader to 0", "almQ.bDisableREHEShader", "1")
+                .as_deref(),
+            Some("set almQ.bDisableREHEShader to 1")
+        );
+    }
+
+    #[test]
+    fn a_line_that_is_not_this_assignment_is_declined() {
+        assert_eq!(replace_set_to_value("set other to 1", "wanted", "2"), None);
+        assert_eq!(replace_set_to_value("wanted = 1", "wanted", "2"), None);
+    }
+}
+
+#[cfg(test)]
+mod trailing_newline_tests {
+    use super::{apply_ini_set, IniSetFormat};
+
+    #[test]
+    fn a_file_without_a_final_newline_does_not_gain_one() {
+        // `Av Latta Magicka.ini` ships this way. Adding a newline made a file
+        // we changed one value in differ from the reference by two bytes.
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("no-newline.ini");
+        std::fs::write(&path, "set a.b to 0\r\nset c.d to 0").expect("write");
+
+        apply_ini_set(&path, "a.b", "1", IniSetFormat::SetTo).expect("ini_set");
+
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read"),
+            "set a.b to 1\r\nset c.d to 0"
+        );
+    }
+
+    #[test]
+    fn a_file_with_a_final_newline_keeps_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("newline.ini");
+        std::fs::write(&path, "set a.b to 0\n").expect("write");
+
+        apply_ini_set(&path, "a.b", "1", IniSetFormat::SetTo).expect("ini_set");
+
+        assert_eq!(std::fs::read_to_string(&path).expect("read"), "set a.b to 1\n");
     }
 }
