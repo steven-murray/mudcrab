@@ -293,7 +293,35 @@ Steven's to delete when convenient:
 no longer names, so a renamed mod leaves its old folder behind. Harmless, but it
 shows up in every diff until removed.
 
-## Next: Part 21 (Clutter & Miscellaneous) — scoped, not started
+## Done: Parts 21, 22, 23
+
+| section | rows | mods | identical |
+|---|---|---|---|
+| 21 — Clutter & Miscellaneous | 35 | 44 | 37 / 44 |
+| 22 — Effects | 5 | 8 | 6 / 8 |
+| 23 — Combat & Magic | 13 | 14 | 9 / 14 |
+
+Per-section notes in `part-2N-*.md`. Almost every remaining difference is a
+Part 36 merge-source plugin. The exceptions:
+
+- **Parts 21 and 22 each perform a guide step the Oracle skipped** (a conflict
+  hide), joining Part 18. Three in a row.
+- **Part 23 disagrees with the Oracle on two numbers**: the guide sets
+  `NPCdodgePercent` and `NPCflankPercent` to 50, the Oracle has 70. Steven's to
+  settle.
+
+`conflicts_with` has now been checked against a guide-stated count three times —
+4 files, 5 files, 2 files — and matched every time.
+
+### The INI fixes repaired three earlier sections
+
+Part 23's `set-to` bug had been reformatting every `set X to Y` file mudcrab
+touched. Fixing it retroactively resolved `Extended UI`, `Follower Status` and
+`Migck's Miscellaneous fixes` — three entries the backlog had recorded as
+"probably a missing edit". They were the opposite: an edit applied
+destructively. Full-list identical went 316 → 328, and no section regressed.
+
+## Superseded: Part 21 scoping notes
 
 See `part-21-brief.md`. 35 rows, 44 mods, all archives on disk. **Two blockers
 for Steven** before it can be finished:

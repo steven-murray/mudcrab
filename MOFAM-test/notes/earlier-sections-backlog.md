@@ -41,15 +41,25 @@ section from Part 5 onward is diffed as it is authored.
 | `Loot Menu` | 4 files differ | not investigated |
 | `Dynamic Map` | 2 files differ | not investigated |
 
-### INI content — probably guide edits not yet applied
+### INI content — partly resolved
 
-`AveSithis Engine Fixes`, `Oblivion Display Tweaks`, `Extended UI`,
-`Follower Status`, `Map Marker Overhaul`, `Marking the Landmarks`,
-`QZ Easy Menus Update`, `Better Letters`, `Migck's Miscellaneous fixes`.
+`AveSithis Engine Fixes`, `Oblivion Display Tweaks`, `Map Marker Overhaul`,
+`Marking the Landmarks`, `QZ Easy Menus Update`, `Better Letters`.
 
 Each differs by one file, usually an `.ini`. The guide specifies INI edits for
-several of these and `ini_set` is not yet wired up for them. Note GAP-009:
-`ini_set` is not section-aware, which must be fixed before trusting any of it.
+several of these and `ini_set` is not yet wired up for them.
+
+**Three of the original nine fixed themselves in Part 23** — `Extended UI`,
+`Follower Status` and `Migck's Miscellaneous fixes tweaks and additions` — and
+none of them was ever about a missing edit. They use the `set X to Y` format,
+and `ini_set` was re-rendering those lines instead of replacing only the value,
+so every file it touched came out reformatted. Fixing that for Part 23's
+`Dynamic Oblivion Combat.ini` repaired all three retroactively. Worth
+remembering: an entry in this list saying "probably a missing edit" was, for a
+third of them, an edit that had been applied destructively.
+
+GAP-009 (`ini_set` not section-aware) is closed — it has a `section` field, and
+an ambiguous key without one is a hard error.
 
 ### Deliberate, no action
 
