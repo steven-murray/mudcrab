@@ -900,6 +900,28 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
         .any(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
 }
 
+/// The Nexus file id separating files published before the guide from files
+/// published after it.
+///
+/// Nexus appears to allocate file ids in ascending order, so an id doubles as an
+/// upload date. Calibrated against the archives in this list carrying both a
+/// file id and a Unix timestamp in their filename: 406 of them, of which 405
+/// were usable, and across those 405 the two orderings agree exactly. The
+/// boundary is clean -- largest pre-guide id 1_000_040_927 (2025-02-23),
+/// smallest post-guide id 1_000_040_999 (2025-03-01), nothing in between.
+/// Legacy ids, five or six digits, fall far below either.
+///
+/// The 406th is Part 20's VGR patch, whose two versions' MO2 sidecars both claim
+/// the same file id -- which is itself why that row is written up as unresolved.
+/// Excluded rather than allowed to widen the boundary.
+///
+/// The value is baked in, so a user who has never seen a reference instance gets
+/// the same answers -- which is the real gain over `nexusLastModified`, and the
+/// reason this constant is worth having. It is *not* an independently verified
+/// property of Nexus site-wide: it is one game's corpus over one year, and
+/// re-calibrating means finding the boundary again from filename timestamps.
+const GUIDE_FILE_ID: u64 = 1_000_040_999;
+
 /// Date the Oracle's archive, to decide whether the March 2025 guide could
 /// have meant this file.
 ///
@@ -919,26 +941,6 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
 ///
 /// With neither source, the age is reported as unknown rather than guessed: "no
 /// timestamp" and "old enough" are very different answers.
-/// The Nexus file id separating files published before the guide from files
-/// published after it.
-///
-/// Nexus allocates file ids in ascending order, globally, so an id *is* an
-/// upload date. Calibrated against every archive in this list carrying both a
-/// file id and a Unix timestamp in its filename -- 405 of them -- and the two
-/// orderings agree: the largest pre-guide id is 1_000_040_927 (2025-02-23) and
-/// the smallest post-guide id is 1_000_040_999 (2025-03-01), with nothing in
-/// between. Legacy ids, five or six digits, fall far below either.
-///
-/// This is a fact about Nexus rather than about anyone's install, so it holds
-/// for a user who has never seen a reference instance. Re-calibrating means
-/// finding the same boundary from filename timestamps again; it needs a corpus
-/// of Nexus downloads, not this particular one.
-///
-/// One archive had to be left out of the calibration: Part 20's VGR patch,
-/// whose two versions' MO2 sidecars both claim the same file id -- which is
-/// itself why that row is written up as unresolved.
-const GUIDE_FILE_ID: u64 = 1_000_040_999;
-
 pub fn classify_guide_age(
     installation_file: Option<&str>,
     nexus_last_modified: Option<&str>,

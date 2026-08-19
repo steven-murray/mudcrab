@@ -39,18 +39,48 @@ pub(crate) fn staged_paths(
     settings: &InstallSettings,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<BTreeSet<String>> {
+    Ok(staged_paths_detailed(mod_entry, installed_at, settings, active_plugins)?.visible)
+}
+
+/// What a mod contributes, plus what it *would* contribute if nothing were
+/// hidden.
+///
+/// The two differ once a `file_hide` has run, and the gap is worth reporting
+/// rather than swallowing: asking `mudcrab conflicts` about a row that has
+/// already been installed otherwise answers "nothing", which reads as "the row
+/// was wrong" when it means "the row already worked".
+pub(crate) struct StagedPaths {
+    /// In the virtual file system: what actually conflicts with anything.
+    pub(crate) visible: BTreeSet<String>,
+    /// Present on disk but hidden, so out of the VFS.
+    pub(crate) hidden: BTreeSet<String>,
+}
+
+pub(crate) fn staged_paths_detailed(
+    mod_entry: &PersonalizedMod,
+    installed_at: Option<&Path>,
+    settings: &InstallSettings,
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<StagedPaths> {
     if let Some(dir) = installed_at.filter(|dir| dir.is_dir()) {
         return from_installed_folder(dir);
     }
-    from_plan(mod_entry, settings, active_plugins)
+    Ok(StagedPaths {
+        visible: from_plan(mod_entry, settings, active_plugins)?,
+        hidden: BTreeSet::new(),
+    })
 }
 
 /// The paths an installed mod actually has, which is what MO2 sees.
-fn from_installed_folder(dir: &Path) -> anyhow::Result<BTreeSet<String>> {
+fn from_installed_folder(dir: &Path) -> anyhow::Result<StagedPaths> {
     let mut out = BTreeSet::new();
+    let mut hidden = BTreeSet::new();
     for relative in list_relative_paths(dir)? {
-        // A hidden file is out of the VFS, so it cannot conflict with anything.
-        if relative.to_lowercase().ends_with(".mohidden") {
+        // A hidden file is out of the VFS, so it cannot conflict with anything
+        // -- but it is kept separately, because "hidden" and "absent" are very
+        // different answers to give someone asking what a mod provides.
+        if let Some(unhidden) = relative.to_lowercase().strip_suffix(".mohidden") {
+            hidden.insert(unhidden.to_string());
             continue;
         }
         if is_bsa(&relative) {
@@ -61,7 +91,10 @@ fn from_installed_folder(dir: &Path) -> anyhow::Result<BTreeSet<String>> {
         }
         out.insert(relative.to_lowercase());
     }
-    Ok(out)
+    Ok(StagedPaths {
+        visible: out,
+        hidden,
+    })
 }
 
 /// The paths a mod would have, from its archives' entry lists.
@@ -263,6 +296,9 @@ mod tests {
         std::fs::write(dir.path().join("meshes/b.nif.mohidden"), b"NIF").expect("write");
 
         let paths = from_installed_folder(dir.path()).expect("walk");
-        assert_eq!(paths.into_iter().collect::<Vec<_>>(), ["meshes/a.nif"]);
+        assert_eq!(paths.visible.into_iter().collect::<Vec<_>>(), ["meshes/a.nif"]);
+        // Hidden is not the same as absent: the caller needs to be able to say
+        // "already hidden" rather than "does not conflict".
+        assert_eq!(paths.hidden.into_iter().collect::<Vec<_>>(), ["meshes/b.nif"]);
     }
 }
