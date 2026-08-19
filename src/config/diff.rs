@@ -81,8 +81,25 @@ fn is_documentation(relative_path: &str) -> bool {
         .unwrap_or(relative_path)
         .to_lowercase();
 
-    if name == "obmm_bsa_settings.jpg" || name.ends_with(".url") {
+    let extension = name.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("");
+
+    // Oblivion reads textures as `.dds` and nothing else, so any other raster
+    // format in a mod folder is a screenshot or a preview -- documentation by
+    // construction, whatever it is called. This replaces a special case for
+    // `obmm_bsa_settings.jpg`, which was the same observation made one filename
+    // at a time; Part 22's `IMPROVED Fire Spell Animation.gif` is the next one.
+    if matches!(extension, "gif" | "jpg" | "jpeg" | "png" | "bmp" | "webp" | "url") {
         return true;
+    }
+
+    // The name markers below are matched loosely -- `contains`, so
+    // `readme-first.txt` and `OOO readme.rtf` both count -- which is only safe
+    // on a file the game would never load. `textures/menus/license.dds` is a
+    // texture, and treating it as a readme would drop a real difference on the
+    // floor, which is the one failure mode this whole report exists to avoid.
+    if !matches!(extension, "txt" | "rtf" | "doc" | "docx" | "pdf" | "htm" | "html" | "md" | "")
+    {
+        return false;
     }
 
     let stem = name.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(&name);
@@ -1743,5 +1760,39 @@ mod file_id_provenance_tests {
 
         let age = classify_guide_age(Some("Hand Named.7z"), None, None, Some(4567));
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
+    }
+}
+
+#[cfg(test)]
+mod documentation_image_tests {
+    use super::is_documentation;
+
+    #[test]
+    fn a_raster_format_the_game_cannot_read_is_documentation() {
+        // Oblivion reads `.dds` and nothing else, so these are previews and
+        // screenshots however they are named. Was a special case for one
+        // filename until Part 22 produced the next one.
+        for name in [
+            "IMPROVED Fire Spell Animation.gif",
+            "obmm_bsa_settings.jpg",
+            "Docs/W.I.P/Screenshots/Vanilla/BladeOfWoe.jpg",
+            "preview.png",
+        ] {
+            assert!(is_documentation(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn actual_game_assets_are_never_documentation() {
+        for name in [
+            "textures/dungeons/ayleidruins/arparticle01.dds",
+            "meshes/lights/lamp.nif",
+            "Thing.esp",
+            "sound/fx/thud.wav",
+            // A readme-shaped name in a texture path is still a texture.
+            "textures/menus/license.dds",
+        ] {
+            assert!(!is_documentation(name), "{name}");
+        }
     }
 }

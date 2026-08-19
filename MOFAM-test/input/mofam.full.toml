@@ -205,6 +205,10 @@ plugins = [
 	"Alluring Wine Bottles.esp",
 	"PotionReplacer.esp",
 	"SavillaStoneEnhanced.esp",
+	# Part 22. Both are Part 36 merge sources, hidden in the Oracle and active
+	# here until that merge exists.
+	"Alternate ghost shader.esp",
+	"Improved Fires and Flames - Increased Sound.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -5703,3 +5707,100 @@ download_handler = "nexus"
 file_name = "Savilla's Stone Enhanced-52713-1-1a-1675795943.7z"
 layout = "bain"
 bain_subpackages = ["01 - Marbled Style - Alternative"]
+
+# ── Part 22 - EFFECTS ───────────────────────────────────────────────────────
+#
+# 5 guide rows, 8 mods; row 3 installs four files from one page, in the order
+# the guide gives.
+
+[[mods]]
+id = "Alternate ghost effect"
+section = ["22 - EFFECTS"]
+plugins = ["Alternate ghost shader.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47401/1000015516"
+download_handler = "nexus"
+file_name = "Alternate ghost effect-47401-1.rar"
+
+# Guide 2, and its follow-up: "hide the 2 winning texture files over Katkat's
+# Ayleid Ruins HD mod." Guide row 3 of Part 18 installs that page as two mods;
+# the textures come from the BaseMetal half. `under` because the guide says
+# *texture* files.
+[[mods]]
+id = "Improved Fires and Flames"
+section = ["22 - EFFECTS"]
+plugins = ["Improved Fires and Flames - Increased Sound.esp"]
+
+[[mods.archives]]
+# "Improved Fires and Flames - Performance".
+path = "nexus:oblivion/38061/78213"
+download_handler = "nexus"
+file_name = "Improved Fires and Flames - Performance-38061-1-0.7z"
+
+[[mods.actions]]
+action = "file_hide"
+conflicts_with = ["Ayleid Ruins HD BaseMetal"]
+under = "textures"
+
+# Guide 3: four files from one page, "Install in this order, separately".
+[[mods]]
+id = "Smoking Firesources BETA - Project Ambience"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46476/1000011745"
+download_handler = "nexus"
+file_name = "Smoking Firesources beta - Project Ambience - LANTERN PACK for VANILLA-46476-0-1.rar"
+
+# "Once installed, hide: Meshes > Lights > IronLampHangingShort01Fake.nif".
+# A named path rather than a conflict relationship: the guide points at one
+# file, and does not say what it loses to.
+[[mods.actions]]
+action = "file_hide"
+paths = ["Meshes/Lights/IronLampHangingShort01Fake.nif"]
+
+[[mods]]
+id = "Smoking Firesources BETA - Project Ambience - CANDLES"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46476/1000011741"
+download_handler = "nexus"
+file_name = "Smoking Firesources beta - Project Ambience CANDLES PACK-46476-0-1.rar"
+
+[[mods]]
+id = "Smoking Firesources BETA - Project Ambience - Hotfix for Candles"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46476/1000011743"
+download_handler = "nexus"
+file_name = "Hotfix for Candles pack-46476-0-1.rar"
+
+[[mods]]
+id = "Smoking Firesources BETA - Project Ambience - Torch MIP"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46476/1000011740"
+download_handler = "nexus"
+file_name = "Smoking Firesources beta - Project Ambience MIP version-46476-0-1.rar"
+
+[[mods]]
+id = "IMPROVED Fire Spell Animation"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/9058/7470"
+download_handler = "nexus"
+file_name = "IMPROVED Fire Spell Animation-9058.7z"
+
+[[mods]]
+id = "Better Summon Undead Effect"
+section = ["22 - EFFECTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10418/9206"
+download_handler = "nexus"
+file_name = "SummonUndead02-10418.rar"
