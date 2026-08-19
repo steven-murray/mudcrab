@@ -52,10 +52,21 @@ finding — but `is_documentation` matched by *name*, and the file is called aft
 the mod.
 
 `obmm_bsa_settings.jpg` was already special-cased there, which was the same
-observation made one filename at a time. Generalised: **Oblivion reads textures
-as `.dds` and nothing else, so any other raster format in a mod folder is a
-screenshot or a preview**, whatever it is called. That subsumes the special case
-and covers Part 20's `Docs/` gallery too.
+observation made one filename at a time. Generalised — but the first attempt
+generalised too far.
+
+**"Oblivion reads `.dds` and nothing else" is true of the engine and false of
+what ships in a mod.** The review found three counterexamples already in the
+Oracle: ORC's `textures/Effects/bluenoise.png` is a shader resource its own DLL
+loads, Pek's COBL book jackets are sixteen `.png` textures that constitute the
+entire mod, and `Dagger_Data` puts `.bmp` skies under `textures/dag/sky/`. An
+extension-only rule would have dropped all of those from the report in silence —
+causing the exact failure it was written to prevent.
+
+The rule is now gated on *where* the file sits: a raster format outside the
+game's content folders (`meshes/`, `textures/`, `sound/`, `menus/`, …) is a
+screenshot; inside one it is an asset. That still covers the `.gif` at a mod
+root, Part 20's `Docs/` gallery, and the old special case.
 
 Writing the test for it turned up a genuine flaw that predates this change. The
 name markers (`readme`, `credits`, `license`, …) were matched with `contains`

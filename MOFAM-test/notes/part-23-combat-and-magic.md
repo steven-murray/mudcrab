@@ -78,9 +78,31 @@ setting twice and the real one untouched. The key occurs once in the whole file,
 so no section is needed at all.
 
 That mudcrab created a section rather than failing is deliberate — Oblivion.ini
-genuinely omits sections it has no non-default keys for — but it is worth
-recording that the behaviour is wrong-looking in a file whose sections are
-cosmetic. Left as it is; the modlist says why in a comment on the row.
+genuinely omits sections it has no non-default keys for — but doing it *silently*
+was not. `ini_set` was the only action that logged nothing at all on success, so
+its most surprising branch was also its quietest, and this was caught by reading
+the guide against a diff rather than by anything mudcrab said.
+
+It now reports every edit, and **warns** on this one specifically, naming the
+hazard: if the file marks its sections with comments rather than headers, the key
+the guide meant is elsewhere and there are now two of it.
+
+### Two parsers of one syntax
+
+`is_ini_key_line` and `replace_set_to_value` both recognise `set X to Y`, by
+different means, and agreed only because the first always ran before the second.
+The second now matches the key at a token boundary itself, so a key that is a
+suffix of another key cannot slip through if that call order ever changes.
+
+### Two smaller gaps, recorded not fixed
+
+- Appending a *new* key to a `set-to` file renders it plainly; the file's tab
+  alignment is only consulted for the standard format. No row has hit it.
+- A file ending in two or more blank lines keeps only one. Neither of Part 23's
+  files does.
+
+Both are the same shape as the bugs above and would be worth closing if a row
+ever lands on them; building for them now would be machinery without a caller.
 
 ## Small things
 

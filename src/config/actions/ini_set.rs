@@ -51,13 +51,57 @@ pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<
         return Ok(());
     }
 
-    apply_ini_set_in_section(
+    let outcome = apply_ini_set_in_section(
         &ini_path,
         action.section.as_deref(),
         &action.key,
         &action.value.0,
         action.format,
-    )
+    )?;
+
+    // Every other action reports what it did; this one reported nothing at all,
+    // which made its most surprising branch its quietest.
+    match outcome {
+        IniSetOutcome::Replaced => tracing::info!(
+            owner = cx.owner,
+            ini = %ini_path.display(),
+            key = action.key,
+            value = %action.value,
+            "set an existing ini key"
+        ),
+        IniSetOutcome::AppendedToSection => tracing::info!(
+            owner = cx.owner,
+            ini = %ini_path.display(),
+            key = action.key,
+            value = %action.value,
+            section = ?action.section,
+            "added a missing ini key"
+        ),
+        IniSetOutcome::CreatedSection => tracing::warn!(
+            owner = cx.owner,
+            ini = %ini_path.display(),
+            key = action.key,
+            section = ?action.section,
+            "ini_set created a [section] the file did not have. If the file marks \
+             its sections with comments rather than headers, this is not the edit \
+             you wanted -- the key the guide meant is elsewhere in the file, and \
+             now there are two."
+        ),
+    }
+    Ok(())
+}
+
+/// What an `ini_set` actually did, so the caller can say so.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IniSetOutcome {
+    /// A key that was there had its value changed.
+    Replaced,
+    /// A key the file lacked was added to a section that existed.
+    AppendedToSection,
+    /// Both the key and its `[section]` were added. Legitimate for Oblivion.ini,
+    /// which omits sections it has no non-default keys for -- and a red flag
+    /// anywhere else, which is why it is the one outcome that warns.
+    CreatedSection,
 }
 
 /// The `[Section]` name a header line declares, if it is one.
@@ -116,7 +160,7 @@ pub(crate) fn apply_ini_set(
     key: &str,
     value: &str,
     format: IniSetFormat,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<IniSetOutcome> {
     apply_ini_set_in_section(path, None, key, value, format)
 }
 
@@ -126,7 +170,7 @@ pub(crate) fn apply_ini_set_in_section(
     key: &str,
     value: &str,
     format: IniSetFormat,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<IniSetOutcome> {
     let original = std::fs::read_to_string(path)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
     // These files come from Windows-authored archives and mostly use CRLF.
@@ -168,7 +212,8 @@ pub(crate) fn apply_ini_set_in_section(
                 }
                 lines.push(format!("[{name}]"));
                 lines.push(rendered);
-                return write_ini_lines(path, &lines, newline, trailing_newline);
+                write_ini_lines(path, &lines, newline, trailing_newline)?;
+                return Ok(IniSetOutcome::CreatedSection);
             }
         },
     };
@@ -196,8 +241,9 @@ pub(crate) fn apply_ini_set_in_section(
         );
     }
 
-    if matches.is_empty() {
+    let outcome = if matches.is_empty() {
         lines.insert(append_at, rendered);
+        IniSetOutcome::AppendedToSection
     } else {
         for index in matches {
             // Replacing a key sets its value; it does not reformat the line.
@@ -209,9 +255,11 @@ pub(crate) fn apply_ini_set_in_section(
             lines[index] = replace_value_in_place(&lines[index], key, value, format, aligned, spaced)
                 .unwrap_or_else(|| rendered.clone());
         }
-    }
+        IniSetOutcome::Replaced
+    };
 
-    write_ini_lines(path, &lines, newline, trailing_newline)
+    write_ini_lines(path, &lines, newline, trailing_newline)?;
+    Ok(outcome)
 }
 
 /// The `[Section]` a line sits under, for error messages.
@@ -288,7 +336,15 @@ fn replace_value_in_place(
 ///
 /// Everything before the value and everything after it is kept exactly.
 fn replace_set_to_value(line: &str, key: &str, value: &str) -> Option<String> {
-    let key_at = line.find(key)?;
+    // Found by scanning for the key at a token boundary rather than anywhere in
+    // the line, so this does not depend on `is_ini_key_line` having filtered
+    // the line first. Two parsers of one syntax that agree only because of call
+    // order is the kind of coupling this file has been bitten by before.
+    let key_at = line.match_indices(key).find(|(at, _)| {
+        let before_ok = line[..*at].ends_with(char::is_whitespace);
+        let after = &line[at + key.len()..];
+        before_ok && after.starts_with(char::is_whitespace)
+    })?.0;
     let after_key = &line[key_at + key.len()..];
 
     // The `to` separator, with whatever whitespace surrounds it.
@@ -490,5 +546,66 @@ mod trailing_newline_tests {
         apply_ini_set(&path, "a.b", "1", IniSetFormat::SetTo).expect("ini_set");
 
         assert_eq!(std::fs::read_to_string(&path).expect("read"), "set a.b to 1\n");
+    }
+}
+
+#[cfg(test)]
+mod outcome_tests {
+    use super::{apply_ini_set, apply_ini_set_in_section, replace_set_to_value, IniSetFormat, IniSetOutcome};
+
+    #[test]
+    fn each_kind_of_edit_reports_itself() {
+        let dir = tempfile::tempdir().expect("tempdir");
+
+        let path = dir.path().join("existing.ini");
+        std::fs::write(&path, "[A]\nkey=0\n").expect("write");
+        assert_eq!(
+            apply_ini_set_in_section(&path, Some("A"), "key", "1", IniSetFormat::Standard).unwrap(),
+            IniSetOutcome::Replaced
+        );
+
+        let path = dir.path().join("missing-key.ini");
+        std::fs::write(&path, "[A]\nother=0\n").expect("write");
+        assert_eq!(
+            apply_ini_set_in_section(&path, Some("A"), "key", "1", IniSetFormat::Standard).unwrap(),
+            IniSetOutcome::AppendedToSection
+        );
+
+        // The branch Part 23 hit, and the one that warns: a file whose sections
+        // are comment banners rather than headers gets a header invented, and
+        // the key the guide meant stays untouched somewhere above.
+        let path = dir.path().join("no-section.ini");
+        std::fs::write(&path, ";===== A =====\nkey=0\n").expect("write");
+        assert_eq!(
+            apply_ini_set_in_section(&path, Some("A"), "key", "1", IniSetFormat::Standard).unwrap(),
+            IniSetOutcome::CreatedSection
+        );
+    }
+
+    #[test]
+    fn the_key_is_matched_at_a_token_boundary() {
+        // `replace_set_to_value` used to rely on `is_ini_key_line` having
+        // already vetted the line, so a substring match could not bite. It no
+        // longer does, and must not.
+        assert_eq!(
+            replace_set_to_value("set prefix.wanted to 0", "wanted", "1"),
+            None,
+            "`wanted` is a suffix of the real key, not the key"
+        );
+        assert_eq!(
+            replace_set_to_value("set wanted to 0", "wanted", "1").as_deref(),
+            Some("set wanted to 1")
+        );
+    }
+
+    #[test]
+    fn a_plain_apply_still_reports() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("plain.ini");
+        std::fs::write(&path, "set a.b to 0\n").expect("write");
+        assert_eq!(
+            apply_ini_set(&path, "a.b", "1", IniSetFormat::SetTo).unwrap(),
+            IniSetOutcome::Replaced
+        );
     }
 }

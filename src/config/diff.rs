@@ -74,6 +74,23 @@ const OMOD_CONVERSION_DIR: &str = "omod conversion data";
 /// readable data files -- so this keys on names that only ever mean
 /// documentation, plus two artefacts of the tools rather than the mod:
 /// OBMM's settings screenshot and the `.url` shortcut Russian mirrors bundle.
+/// Whether a path sits inside a folder the game loads content from.
+///
+/// Used to keep the raster-format rule in `is_documentation` out of the places
+/// where a `.png` is an asset rather than a screenshot.
+fn is_in_game_content_folder(relative_path: &str) -> bool {
+    const CONTENT_DIRS: &[&str] = &[
+        "meshes", "textures", "sound", "menus", "ini", "video", "obse", "shaders", "facegen",
+        "trees", "distantlod", "music", "lodsettings",
+    ];
+
+    relative_path
+        .split('/')
+        .rev()
+        .skip(1)
+        .any(|segment| CONTENT_DIRS.contains(&segment.to_lowercase().as_str()))
+}
+
 fn is_documentation(relative_path: &str) -> bool {
     let name = relative_path
         .rsplit('/')
@@ -83,12 +100,20 @@ fn is_documentation(relative_path: &str) -> bool {
 
     let extension = name.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("");
 
-    // Oblivion reads textures as `.dds` and nothing else, so any other raster
-    // format in a mod folder is a screenshot or a preview -- documentation by
-    // construction, whatever it is called. This replaces a special case for
-    // `obmm_bsa_settings.jpg`, which was the same observation made one filename
-    // at a time; Part 22's `IMPROVED Fire Spell Animation.gif` is the next one.
-    if matches!(extension, "gif" | "jpg" | "jpeg" | "png" | "bmp" | "webp" | "url") {
+    // A raster format the *engine* cannot load is a screenshot or a preview --
+    // Part 22's `IMPROVED Fire Spell Animation.gif`, Part 20's `Docs/` gallery,
+    // and the `obmm_bsa_settings.jpg` that used to be special-cased by name.
+    //
+    // But only outside the game's own content folders. "Oblivion reads `.dds`
+    // and nothing else" is true of the engine and false of what ships in a mod:
+    // ORC's `textures/Effects/bluenoise.png` is a shader resource its DLL loads
+    // directly, Pek's COBL book jackets are sixteen `.png` textures that are the
+    // whole mod, and `Dagger_Data` puts `.bmp` skies under `textures/dag/sky/`.
+    // Judging those by extension would drop real differences from the report in
+    // silence, which is the failure this rule exists to avoid rather than cause.
+    if matches!(extension, "gif" | "jpg" | "jpeg" | "png" | "bmp" | "webp" | "url")
+        && !is_in_game_content_folder(relative_path)
+    {
         return true;
     }
 
@@ -1777,6 +1802,28 @@ mod documentation_image_tests {
             "obmm_bsa_settings.jpg",
             "Docs/W.I.P/Screenshots/Vanilla/BladeOfWoe.jpg",
             "preview.png",
+        ] {
+            assert!(is_documentation(name), "{name}");
+        }
+    }
+
+    #[test]
+    fn a_raster_inside_a_content_folder_is_an_asset() {
+        // The counterexamples that falsified the first version of this rule.
+        // All three ship a non-`.dds` raster that the mod itself loads.
+        for name in [
+            "textures/Effects/bluenoise.png",
+            "textures/Pek/COBLBooks/cover01.png",
+            "textures/dag/sky/skyday.bmp",
+            "menus/icons/preview.png",
+        ] {
+            assert!(!is_documentation(name), "{name}");
+        }
+
+        // Still documentation outside them, at any depth.
+        for name in [
+            "IMPROVED Fire Spell Animation.gif",
+            "Docs/W.I.P/Screenshots/Vanilla/BladeOfWoe.jpg",
         ] {
             assert!(is_documentation(name), "{name}");
         }
