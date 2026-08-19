@@ -60,9 +60,9 @@ original single-level version.
 
   A guide called *MOFAM 03.25* could mean either: 30 March is inside its own
   month, so "the top file on the page" may well have been 3.4.7 by the time it
-  was written — or may not. **Pinned to the Oracle's 3.4.7 so the section stays
-  comparable, and left for Steven to settle.** It is the same class as Part 8's
-  MOO version and Part 16's T4UTXL BETA1, both of which he decided himself.
+  was written — or may not. **Settled by Steven: 3.4.7 is fine.** The section keeps the Oracle's file, and
+  the POST-GUIDE flag on this row stays as a true statement about the archive
+  rather than a problem to fix.
 
   Worth noting the evidence is muddier than usual: both archives' MO2 `.meta`
   sidecars claim the *same* `fileID=1000038748`, so the file id alone does not

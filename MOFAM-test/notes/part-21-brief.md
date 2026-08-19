@@ -4,18 +4,18 @@
 authored without re-deriving it. 35 guide rows, **44 Oracle mods**, and all 44
 archives are already in the downloads folder.
 
-## Two rows cannot be pinned without Steven's Nexus key
+## Two rows needed Steven's Nexus key — now resolved
 
-Both have `fileid=0` in the Oracle's `meta.ini` and no `fileID` in the download's
-`.meta` sidecar, so there is nothing on disk that names the Nexus file:
+Both had `fileid=0` in the Oracle's `meta.ini` and no `fileID` in the download's
+sidecar. Steven ran `mudcrab identify --write-meta`, which resolved both:
 
-| row | mod | archive |
+| row | mod | pin |
 |---|---|---|
-| 22 | `Paintings Variation 2.0` | `Paintings Variation 2.0-46482-2-0.7z` |
-| 30 | `Luna's Ironwood Nut Retex` | `Luna's Ironwood Nut Retex-49242-1-1553094439.7z` |
+| 22 | `Paintings Variation 2.0` | `nexus:oblivion/46482/1000012686` |
+| 30 | `Luna's Ironwood Nut Retex` | `nexus:oblivion/49242/1000021587` |
 
-`mudcrab identify` resolves a descriptor from an archive's MD5 and would settle
-both, but it needs `NEXUS_API_KEY`. Same shape as Part 19's row 9.
+Worth remembering as the standing fix for this shape: an archive with no
+recorded file id is not a dead end, it is one `identify` run away.
 
 ## Row 3 is the next `conflicts_with` call site
 
@@ -42,8 +42,9 @@ bug.
 The guide names **T4UT - CLUTTER_BETA1**. The only archive on disk is
 `T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA2-1748437804.7z` — the mod *page* is
 BETA1, the *file* is CLUTTER-BETA2. This is the same confusion that made Part 16
-a divergence, where Steven redownloaded BETA1 to settle it. **Check with him
-before assuming this archive is what the guide meant.**
+a divergence, where Steven redownloaded BETA1 to settle it. **He is downloading
+the real BETA1 now** — wait for it rather than building row 1 from the BETA2
+file.
 
 Row 1 also needs an include filter rather than the whole archive: *"delete
 everything except Textures > Clutter > Vinyard and Textures > Clutter
