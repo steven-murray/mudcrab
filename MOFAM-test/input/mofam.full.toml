@@ -209,6 +209,20 @@ plugins = [
 	# here until that merge exists.
 	"Alternate ghost shader.esp",
 	"Improved Fires and Flames - Increased Sound.esp",
+	# Part 23. Eight load normally; the last four are Part 36 merge sources,
+	# hidden in the Oracle and active here until that merge exists.
+	"Dynamic Oblivion Combat.esp",
+	"De-Nock Arrows.esp",
+	"StarX Vampire Deaths.esp",
+	"Av Latta Magicka.esm",
+	"Av Latta Magicka.esp",
+	"lGet rid of small Souls.esp",
+	"De Rerum Dirennis.esp",
+	"Enemy Spell Variety.esp",
+	"Av Latta Magicka - Rebalance Complete.esp",
+	"DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp",
+	"lGet rid of Small Souls - Soulgem Prices.esp",
+	"Better Traps.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -5804,3 +5818,214 @@ section = ["22 - EFFECTS"]
 path = "nexus:oblivion/10418/9206"
 download_handler = "nexus"
 file_name = "SummonUndead02-10418.rar"
+
+# ── Part 23 - COMBAT & MAGIC ────────────────────────────────────────────────
+#
+# 13 guide rows, 14 mods; row 10 installs two files from one page.
+
+# Guide 1's four INI edits. The transcription mangles the spacing into mojibake
+# (`set dcvars.ini_DodgeKeyCode______ to__ 42`); the keys and values are legible
+# through it, and `format = "set-to"` is the OBSE script-style syntax the file
+# actually uses.
+[[mods]]
+id = "Dynamic Oblivion Combat"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["Dynamic Oblivion Combat.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49873/1000027358"
+download_handler = "nexus"
+file_name = "Dynamic Oblivion Combat V2_10-49873-2-10-1616823985.rar"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Dynamic Oblivion Combat.ini"
+format = "set-to"
+key = "dcvars.ini_DodgeKeyCode"
+value = "42"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Dynamic Oblivion Combat.ini"
+format = "set-to"
+key = "dcvars.ini_NPCdodgePercent"
+value = "50"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Dynamic Oblivion Combat.ini"
+format = "set-to"
+key = "dcvars.ini_NPCflankPercent"
+value = "50"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "Dynamic Oblivion Combat.ini"
+format = "set-to"
+key = "dcvars.ini_NPCDisarmToKOratio"
+value = "10"
+
+[[mods]]
+id = "De-Nock Arrows xOBSE"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["De-Nock Arrows.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52143/1000031717"
+download_handler = "nexus"
+file_name = "De-Nock Arrows-52143-1-0-1-1657229781.7z"
+
+# Guide 3: "main file only", then "Once installed delete
+# SkycaptainsBloodTime.esp." A delete rather than a hide, because the guide says
+# delete and the Oracle's folder has no plugin at all.
+[[mods]]
+id = "Better Blood"
+section = ["23 - COMBAT & MAGIC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/24448/50374"
+download_handler = "nexus"
+file_name = "Better Blood v11-24448.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["SkycaptainsBloodTime.esp"]
+
+[[mods]]
+id = "Better Blood skin decal fix"
+section = ["23 - COMBAT & MAGIC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46344/1000011231"
+download_handler = "nexus"
+file_name = "Better Blood fix-46344-1-0.7z"
+
+[[mods]]
+id = "Normal Map for Better Blood"
+section = ["23 - COMBAT & MAGIC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50547/1000026202"
+download_handler = "nexus"
+file_name = "Normal Map for Better Blood-50547-1-0-1606167327.7z"
+
+# Guide 6: "Once installed delete StarX Vampire Deaths.esp & StarX Vampire
+# Deaths.esm." Row 7 ships its own `StarX Vampire Deaths.esp`, which is what
+# ends up loading -- so this row contributes only its assets.
+[[mods]]
+id = "StarXs Vampire Deaths"
+section = ["23 - COMBAT & MAGIC"]
+
+[[mods.archives]]
+path = "nexus:oblivion/25613/44705"
+download_handler = "nexus"
+file_name = "StarXs Vampire Deaths v12-25613.zip"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["StarX Vampire Deaths.esp", "StarX Vampire Deaths.esm"]
+
+[[mods]]
+id = "StarX Vampire death Improved Extended Edition"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["StarX Vampire Deaths.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50480/1000026000"
+download_handler = "nexus"
+file_name = "StarX Vampire death Improved Extended Edition-50480-0-02-1603720985.zip"
+
+# Guide 8: "main file only", then one INI edit to Av Latta Magicka.ini's
+# Restoration section. The mod ships two INIs; the guide names this one.
+[[mods]]
+id = "Av Latta Magicka - Oblivion Magic Overhaul"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["Av Latta Magicka.esm", "Av Latta Magicka.esp", "Av Latta Magicka - Rebalance Complete.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49096/1000037757"
+download_handler = "nexus"
+file_name = "Av Latta Magicka-49096-1-25-1708110022.7z"
+
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "ini/Av Latta Magicka.ini"
+# The guide says "Av Latta Magicka.ini's Restoration section", but the file
+# marks its sections with comment banners (`;===== Restoration =====`), not
+# `[headers]`. The key occurs once in the whole file, so no section is needed --
+# and naming one would have appended a second copy under a `[Restoration]`
+# header the game would never read.
+format = "set-to"
+key = "almQ.bDisableREHEShader"
+value = "1"
+
+# Guide 9: "Install just Av Latta Magicka - Migcks Misc Elemental Fists Poison
+# Patch, and name the mod this way." One folder out of sixteen in a patch
+# collection, so `data_folder`. The archive spells it "Migck's" with an
+# apostrophe and the guide does not; the Oracle's folder follows the guide.
+[[mods]]
+id = "Av Latta Magicka - Migcks Misc Elemental Fists Poison Patch"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+data_folder = "Av Latta Magicka - Migck's Misc Elemental Fists Poison Patch"
+
+# Guide 10: "both main file & optional, install separately".
+[[mods]]
+id = "Get rid of small Souls - Empty Soulgems"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["lGet rid of small Souls.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49753/1000039135"
+download_handler = "nexus"
+file_name = "Get rid of small Souls-49753-1-1-1724184542.7z"
+
+[[mods]]
+id = "Get rid of small Souls - Empty Soulgems Prices"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["lGet rid of Small Souls - Soulgem Prices.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49753/1000024200"
+download_handler = "nexus"
+file_name = "Get rid of Small Souls - Soulgem Prices-49753-1-0-1584241312.7z"
+
+[[mods]]
+id = "Better Traps"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["Better Traps.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47713/1000016664"
+download_handler = "nexus"
+file_name = "Better Traps-47713-1-0.7z"
+
+[[mods]]
+id = "De Rerum Dirennis - Alchemy Overhaul"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["De Rerum Dirennis.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53020/1000040664"
+download_handler = "nexus"
+file_name = "De Rerum Dirennis-53020-1-06-1738404836.7z"
+
+[[mods]]
+id = "Enemy Spell Variety"
+section = ["23 - COMBAT & MAGIC"]
+plugins = ["Enemy Spell Variety.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53501/1000036581"
+download_handler = "nexus"
+file_name = "Enemy Spell Variety-53501-1-0-1697742770.7z"
