@@ -4524,18 +4524,20 @@ path = "nexus:oblivion/43285/1000000630"
 download_handler = "nexus"
 file_name = "Spriggan-43285-1-1.7z"
 
-# Guide 9 -- Beautiful Creatures - Spider Daedra, mod 43297, "main file only" --
-# is NOT here, and it is not in the Oracle either. Its archive is not in the
-# downloads folder, so unlike Part 18's vegetable garden this one was never
-# fetched. Building it needs a Nexus download, which needs Steven's API key.
-#
-#   [[mods]]
-#   id = "Beautiful Creatures - Spider Daedra"
-#   section = ["19 - CREATURE & ANIMAL RETEXTURES"]
-#
-#   [[mods.archives]]
-#   path = "nexus:oblivion/43297/<file id>"
-#   download_handler = "nexus"
+# Guide 9. Missing from the Oracle and never downloaded when this section was
+# first built; Steven has since fetched it and run `identify` to resolve the
+# file id. The Oracle still has no folder for it, so this one shows as extra in
+# ours until he installs it there.
+[[mods]]
+id = "Beautiful Creatures - Spider Daedra"
+section = ["19 - CREATURE & ANIMAL RETEXTURES"]
+
+[[mods.archives]]
+# "main file only". The archive wraps a `Data/` in a `Creatures/` folder, which
+# auto-detection unwraps.
+path = "nexus:oblivion/43297/1000000569"
+download_handler = "nexus"
+file_name = "Spider Daedra Replacer-43297-1-2.rar"
 
 # Guide 10: "Install manually, and right click the flame atronach replacer >
 # Data folder & select Set as \ Directory." That is `data_folder`. The archive's
