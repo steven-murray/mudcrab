@@ -909,17 +909,35 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
 ///    (`<title>-<modid>-<version parts>-<unix timestamp>.7z`). This names the
 ///    exact file, so it is preferred -- but Nexus only started doing it at some
 ///    point, and older archives end in the bare mod id or nothing useful.
-/// 2. `nexusLastModified` from the Oracle's `meta.ini`, which MO2 records when
-///    it fetches. Present for 704 of the Oracle's 745 mods, and it agrees with
-///    the filename timestamp wherever both exist.
+/// 2. The Nexus file id, against [`GUIDE_FILE_ID`].
 ///
-/// With neither, the age is reported as unknown rather than guessed: "no
+/// `nexusLastModified` used to be the second source and is no longer consulted
+/// at all: it is frequently the date MO2 fetched rather than the date the file
+/// was published, and the file id answers the same question correctly. It is
+/// still read from `meta.ini`, because its *presence* is what distinguishes
+/// "no date recorded" from "a date we decline to trust" in the message below.
+///
+/// With neither source, the age is reported as unknown rather than guessed: "no
 /// timestamp" and "old enough" are very different answers.
-/// Below this, a Nexus file id comes from the scheme that predates the current
-/// one by the better part of a decade -- comfortably before any 2025 guide.
-/// Oblivion's old-scheme ids run to five or six digits; the new ones all start
-/// at 1_000_000_000.
-const LEGACY_FILE_ID_CEILING: u64 = 1_000_000;
+/// The Nexus file id separating files published before the guide from files
+/// published after it.
+///
+/// Nexus allocates file ids in ascending order, globally, so an id *is* an
+/// upload date. Calibrated against every archive in this list carrying both a
+/// file id and a Unix timestamp in its filename -- 405 of them -- and the two
+/// orderings agree: the largest pre-guide id is 1_000_040_927 (2025-02-23) and
+/// the smallest post-guide id is 1_000_040_999 (2025-03-01), with nothing in
+/// between. Legacy ids, five or six digits, fall far below either.
+///
+/// This is a fact about Nexus rather than about anyone's install, so it holds
+/// for a user who has never seen a reference instance. Re-calibrating means
+/// finding the same boundary from filename timestamps again; it needs a corpus
+/// of Nexus downloads, not this particular one.
+///
+/// One archive had to be left out of the calibration: Part 20's VGR patch,
+/// whose two versions' MO2 sidecars both claim the same file id -- which is
+/// itself why that row is written up as unresolved.
+const GUIDE_FILE_ID: u64 = 1_000_040_999;
 
 pub fn classify_guide_age(
     installation_file: Option<&str>,
@@ -941,8 +959,6 @@ pub fn classify_guide_age(
     // modid=7, which is MO2 bookkeeping rather than provenance, and which slid
     // straight past a mod-id-only check to be flagged POST-GUIDE.
     let from_nexus = !matches!(mod_id, Some(0) | None) && !matches!(file_id, Some(0) | None);
-    let nexus_last_modified_raw = nexus_last_modified;
-    let nexus_last_modified = if from_nexus { nexus_last_modified } else { None };
 
     let Some(name) = name else {
         // Without an `installationFile` there is no archive to date. MO2 still
@@ -958,34 +974,33 @@ pub fn classify_guide_age(
         return classify_timestamp(timestamp);
     }
 
-    // A legacy file id dates the file on its own, and more reliably than
-    // `nexusLastModified` does -- but only when it is a real Nexus file id.
+    // The file id dates the file, and far more reliably than
+    // `nexusLastModified` does: ids are allocated in ascending order, while the
+    // meta.ini date is frequently just when the archive was downloaded here.
+    // `TIBs Compact Quivers` is the shape -- three 2018 uploads stamped
+    // 2026-01-26, all three reported as newer than the guide.
+    //
     // Gated on `from_nexus` for the same reason the date below is: a `meta.ini`
-    // field can be MO2 bookkeeping rather than provenance, and a stray small
-    // number would otherwise become a confident answer with nothing behind it. Nexus allocates modern ids from 1_000_000_000
-    // up; anything below that was uploaded under the old scheme, which Oblivion
-    // files left behind years before the March 2025 guide. Eight mods in this
-    // list carry a short id *and* a `nexusLastModified` in January 2026 -- the
-    // day they were downloaded, not the day they were published -- and every
-    // one of them was being reported as newer than the guide.
-    if let Some(file_id) = file_id
-        .filter(|_| from_nexus)
-        .filter(|id| *id > 0 && *id < LEGACY_FILE_ID_CEILING)
-    {
-        return GuideAge::PreGuide {
-            timestamp: 0,
-            date: format!("legacy Nexus file id {file_id}"),
+    // field can be MO2 bookkeeping rather than provenance, and a stray number
+    // would otherwise become a confident answer with nothing behind it.
+    if let Some(file_id) = file_id.filter(|_| from_nexus).filter(|id| *id > 0) {
+        return if file_id < GUIDE_FILE_ID {
+            GuideAge::PreGuide {
+                timestamp: 0,
+                date: format!("Nexus file id {file_id}"),
+            }
+        } else {
+            GuideAge::PostGuide {
+                timestamp: 0,
+                date: format!("Nexus file id {file_id}"),
+            }
         };
-    }
-
-    if let Some(timestamp) = nexus_last_modified.and_then(parse_iso8601_date) {
-        return classify_timestamp(timestamp);
     }
 
     // Only worth saying when a date was actually discarded. With no
     // `nexusLastModified` at all, the filename is the whole story and the
     // message below says so more usefully.
-    if !from_nexus && nexus_last_modified_raw.is_some() {
+    if !from_nexus && nexus_last_modified.is_some() {
         return GuideAge::Unknown {
             reason: format!(
                 "'{name}' has no recorded Nexus file, so its meta.ini date is not \
@@ -1008,31 +1023,6 @@ fn classify_timestamp(timestamp: i64) -> GuideAge {
     }
 }
 
-/// Seconds since the epoch for an MO2 `nexusLastModified` value.
-///
-/// Only the date is read. The value is always UTC (`2012-05-20T03:59:22Z`), and
-/// the question being asked -- before or after March 2025 -- is not one a
-/// time-of-day can change the answer to.
-fn parse_iso8601_date(value: &str) -> Option<i64> {
-    let date = value.trim().split('T').next()?;
-    let mut parts = date.split('-');
-    let year: i64 = parts.next()?.parse().ok()?;
-    let month: i64 = parts.next()?.parse().ok()?;
-    let day: i64 = parts.next()?.parse().ok()?;
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) {
-        return None;
-    }
-
-    // Days from the epoch to the civil date, by Howard Hinnant's algorithm.
-    let year = year - i64::from(month <= 2);
-    let era = if year >= 0 { year } else { year - 399 } / 400;
-    let year_of_era = year - era * 400;
-    let day_of_year = (153 * (month + if month > 2 { -3 } else { 9 }) + 2) / 5 + day - 1;
-    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
-    let days = era * 146_097 + day_of_era - 719_468;
-
-    Some(days * 86_400)
-}
 
 fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
     // The last `-` separated field, cut at its first non-digit. This survives
@@ -1413,12 +1403,12 @@ mod tests {
         assert_eq!(parse_trailing_timestamp(""), None);
     }
 
-    /// A current-scheme Nexus file id, for tests about something other than the
-    /// id itself. `1` used to serve, but a short id now says "uploaded under
-    /// the old scheme, so older than any 2025 guide" -- which is the point of
-    /// `LEGACY_FILE_ID_CEILING` and would decide these cases before they got to
-    /// what they are testing.
-    const MODERN_FILE_ID: u64 = 1_000_000_000;
+    /// A Nexus file id from just before the guide, for tests about something
+    /// other than the id itself. `1` used to serve, but an id now dates the file
+    /// on its own -- which is the point of
+    /// `GUIDE_FILE_ID` and would decide these cases before they got to what they
+    /// are testing.
+    const MODERN_FILE_ID: u64 = 1_000_040_000;
 
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
@@ -1436,8 +1426,15 @@ mod tests {
                 date: "2025-06-15".to_string()
             }
         );
+        // A filename with no timestamp used to be unanswerable. The file id
+        // answers it now, which is the point of the boundary.
         assert!(matches!(
             classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(MODERN_FILE_ID)),
+            GuideAge::PreGuide { .. }
+        ));
+        // With neither a timestamp nor a file id there is still nothing to go on.
+        assert!(matches!(
+            classify_guide_age(Some("Anvil Morning Glory.7z"), None, Some(19039), Some(0)),
             GuideAge::Unknown { .. }
         ));
         assert!(matches!(classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID)), GuideAge::Unknown { .. }));
@@ -1500,23 +1497,6 @@ mod tests {
     }
 
     #[test]
-    fn nexus_last_modified_dates_an_archive_whose_filename_cannot() {
-        // Evenstars ships as `Evenstar CW LOD-42190-1-2.7z`: the trailing field
-        // is the version, not a timestamp, so the filename says nothing about
-        // when the file was uploaded. MO2 recorded the date anyway.
-        let age = classify_guide_age(
-            Some("Evenstar CW LOD-42190-1-2.7z"),
-            Some("2012-05-20T03:59:22Z"),
-            Some(42190),
-            Some(MODERN_FILE_ID),
-        );
-        assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
-
-        let age = classify_guide_age(Some("Hand Named.7z"), Some("2025-06-01T00:00:00Z"), Some(1), Some(MODERN_FILE_ID));
-        assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
-    }
-
-    #[test]
     fn no_installation_file_means_unknown_even_with_a_meta_ini_date() {
         // A hand-installed mod has no `installationFile`, and MO2's
         // `nexusLastModified` is then just when the folder was written. Reading
@@ -1552,14 +1532,15 @@ mod tests {
         );
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        // The same date on a real Nexus mod is still usable.
+        // A real Nexus file is dated by its id instead, and correctly: WAC's
+        // meta.ini date of 2026-01-25 is when it was installed here.
         let age = classify_guide_age(
             Some("WACv_1beta.7z"),
             Some("2026-01-25T20:19:46Z"),
             Some(1318),
-            Some(MODERN_FILE_ID),
+            Some(52000),
         );
-        assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
+        assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
 
         // A filename timestamp names *this file* whoever hosted it, so it
         // survives modid=0 -- only the Nexus-derived date is dropped.
@@ -1580,17 +1561,6 @@ mod tests {
         match age {
             GuideAge::PreGuide { date, .. } => assert_eq!(date, "2022-03-21"),
             other => panic!("expected the filename's 2022 date, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn an_unparseable_meta_ini_date_leaves_the_age_unknown() {
-        for value in ["", "not a date", "2012-13-01T00:00:00Z", "2012-05-32"] {
-            let age = classify_guide_age(Some("Hand Named.7z"), Some(value), Some(1), Some(MODERN_FILE_ID));
-            assert!(
-                matches!(age, GuideAge::Unknown { .. }),
-                "'{value}' should not parse as a date, got {age:?}"
-            );
         }
     }
 
@@ -1686,11 +1656,11 @@ mod archive_name_tests {
 }
 
 #[cfg(test)]
-mod legacy_file_id_tests {
+mod file_id_age_tests {
     use super::{classify_guide_age, GuideAge};
 
     #[test]
-    fn a_legacy_file_id_outweighs_a_download_stamped_meta_ini() {
+    fn a_file_id_outweighs_a_download_stamped_meta_ini() {
         // `Mehrunes Dagon Retex`: file id 54124, an old-scheme upload, with
         // `nexusLastModified=2026-01-26` -- which is when it was downloaded to
         // this machine, not when it was published. Reported as newer than the
@@ -1705,22 +1675,37 @@ mod legacy_file_id_tests {
             GuideAge::PreGuide { date, .. } => assert!(date.contains("54124"), "{date}"),
             other => panic!("expected PreGuide, got {other:?}"),
         }
+
+        // `TIBs Compact Quivers`: a 2018 upload stamped 2026-01-26, which is
+        // when it was downloaded here. Three of them were reported as newer
+        // than the guide.
+        let age = classify_guide_age(
+            Some("TIBs Compact Quivers - Manual Install-45111-1-0.rar"),
+            Some("2026-01-26T00:00:00Z"),
+            Some(45111),
+            Some(1000006810),
+        );
+        assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
     #[test]
-    fn a_modern_file_id_is_still_dated_by_its_meta_ini() {
-        // The check must not swallow real drift: a current-scheme id says
-        // nothing about age, so `nexusLastModified` remains the evidence.
+    fn a_file_id_above_the_boundary_is_after_the_guide() {
+        // The check must not swallow real drift. Part 19's Simple Horse
+        // Utilities is a genuine post-guide file and stays one.
         let age = classify_guide_age(
             Some("Simple Horse Utilities-51197.7z"),
-            Some("2025-05-17T07:46:00Z"),
+            None,
             Some(51197),
             Some(1000041917),
         );
-        assert!(
-            matches!(age, GuideAge::PostGuide { .. }),
-            "a 2025-05 file is after a 2025-03 guide: {age:?}"
-        );
+        assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
+
+        // And the boundary itself: the smallest post-guide id observed.
+        let age = classify_guide_age(Some("Sneak Vignette.7z"), None, Some(1), Some(1000040999));
+        assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
+        // ...against the largest pre-guide id observed.
+        let age = classify_guide_age(Some("Better dungeons.7z"), None, Some(1), Some(1000040927));
+        assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
     #[test]
@@ -1741,7 +1726,7 @@ mod legacy_file_id_tests {
 }
 
 #[cfg(test)]
-mod legacy_file_id_provenance_tests {
+mod file_id_provenance_tests {
     use super::{classify_guide_age, GuideAge};
 
     #[test]
