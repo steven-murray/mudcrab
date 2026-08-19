@@ -321,6 +321,12 @@ touched. Fixing it retroactively resolved `Extended UI`, `Follower Status` and
 "probably a missing edit". They were the opposite: an edit applied
 destructively. Full-list identical went 316 → 328, and no section regressed.
 
+### Reports for Steven
+
+`notes/overnight-2/` holds the four reports for this run — Oracle
+disagreements, guide problems, structural decisions, and deferred calls. Start
+at `00-READ-THIS-FIRST.md`.
+
 ## Superseded: Part 21 scoping notes
 
 See `part-21-brief.md`. 35 rows, 44 mods, all archives on disk. **Two blockers
