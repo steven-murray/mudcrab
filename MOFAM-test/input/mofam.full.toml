@@ -197,6 +197,14 @@ plugins = [
 	"Initial Glow Redux.esp",
 	"Initial Glow Redux - Creatures.esp",
 	"Female Amulets.esp",
+	# Part 21. All six are Part 36 merge sources, hidden in the Oracle and
+	# active here until that merge exists.
+	"Book Jackets Oblivion.esp",
+	"Knights - Book Jackets.esp",
+	"Book Jackets DLC Misc.esp",
+	"Alluring Wine Bottles.esp",
+	"PotionReplacer.esp",
+	"SavillaStoneEnhanced.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -5212,3 +5220,486 @@ section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
 path = "nexus:oblivion/48529/1000019481"
 download_handler = "nexus"
 file_name = "Sanguine Rose Retexture-48529-1-0.7z"
+
+# ── Part 21 - CLUTTER & MISCELLANEOUS RETEXTURES ────────────────────────────
+#
+# 35 guide rows, 44 mods. Rows 7, 17, 22 and 34 install several files from one
+# page. Three non-Nexus hosts: rows 9 and 15 are mediafire, row 18 is moddb.
+
+# Guide 1: "Once installed delete everything except Textures > Clutter > Vinyard
+# and Textures > Clutter > Farmhouse." An include filter rather than a prune --
+# same result, and it never writes the 3 GB it would then delete.
+#
+# UNRESOLVED, for Steven: the guide names CLUTTER_BETA1 and the only archive on
+# disk is `T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA2-...` -- the mod page is
+# BETA1, the file is BETA2. He is downloading the real BETA1. The Oracle
+# installed this same BETA2-named file, so the diff will look clean either way,
+# which is exactly why it is written down here. Same shape as Part 16's D9.
+#
+# The guide also says to name the mod `T4UT - CLUTTER_BETA1 - Farmhouse &
+# Vinyard`; the Oracle called it `T4UTXL - CLUTTER_BETA1`. Ours matches the
+# Oracle so `diff` can pair them.
+[[mods]]
+id = "T4UTXL - CLUTTER_BETA1"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54904/1000042074"
+download_handler = "nexus"
+file_name = "T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA2-1748437804.7z"
+include = ["textures/clutter/vinyard/**", "textures/clutter/farmhouse/**"]
+
+[[mods]]
+id = "Improved Fruits Vegetables and Meats"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10487/9343"
+download_handler = "nexus"
+file_name = "Improved Fruits Vegetables and Meats-10487.7z"
+
+# Guide 3, and its follow-up: "Once installed, open the Conflicts tab & hide the
+# 5 winning mesh conflicts over Katkat's Vegetable Garden." The partner is the
+# Part 18 row the Oracle had been missing. `under` because the guide says *mesh*
+# conflicts; the two mods also share textures, which this row is not about.
+[[mods]]
+id = "Improved Fruits Vegetables and Meats Update"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10487/46249"
+download_handler = "nexus"
+file_name = "IFVMUpdate-10487.7z"
+
+[[mods.actions]]
+action = "file_hide"
+conflicts_with = ["KatKat's Vegetable Garden"]
+under = "meshes"
+
+[[mods]]
+id = "Sweet Rolls - A Sweet Roll Replacer"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52645/1000033406"
+download_handler = "nexus"
+file_name = "High Poly Sweet Rolls-52645-2-0-1673234536.rar"
+
+[[mods]]
+id = "Garlic - A Garlic Replacer"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52670/1000033491"
+download_handler = "nexus"
+file_name = "Garlic - A Garlic Replacer-52670-0-2o-1674192438.rar"
+
+[[mods]]
+id = "EGO - Nirnroot Retexture"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53574/1000038335"
+download_handler = "nexus"
+file_name = "EGO - Nirnroot Retexture-53574-1-1-1714835865.7z"
+
+# Guide 7: three optional files, installed separately.
+[[mods]]
+id = "TIBs Compact Quivers - Thinner Arrow Holders"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45111/1000006810"
+download_handler = "nexus"
+file_name = "TIBs Compact Quivers - Manual Install-45111-1-0.rar"
+
+[[mods]]
+id = "TIBs Compact Quivers - Thinner Arrow Holders SI"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45111/1000006811"
+download_handler = "nexus"
+file_name = "TIBs Compact Quivers - Manual Install - SI-45111-1-0.rar"
+
+[[mods]]
+id = "TIBs Compact Quivers - Thinner Arrow Holders Bonus Textures"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45111/1000006812"
+download_handler = "nexus"
+file_name = "TIBs Compact Quivers - Manual Install - Bonus Textures-45111-1-0.rar"
+
+[[mods]]
+id = "The Good China - Retexture"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54636/1000039968"
+download_handler = "nexus"
+file_name = "The Good China-54636-1-1-1732443676.7z"
+
+[[mods]]
+id = "TD_Lower_Clutter"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# Guide 9, hosted on mediafire:
+# mediafire.com/file/y4hpcsfplpqmp80/TD_Lower_Clutter.7z/file
+path = "manual:TD_Lower_Clutter.7z"
+file_name = "TD_Lower_Clutter.7z"
+
+[[mods]]
+id = "Improved Skulls and Bones and Ironwork"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# Guide 10: "1st main file only".
+path = "nexus:oblivion/36075/72380"
+download_handler = "nexus"
+file_name = "Improved Skulls and Bones and ironwork-36075-1-1.7z"
+
+# Guide 11 picks 2 of 13 subpackages. The four `01x` options are alternative
+# builds of one plugin, and the guide takes the Filter version.
+[[mods]]
+id = "Book Jackets Oblivion High Res BAIN"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["Book Jackets Oblivion.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50033/1000033735"
+download_handler = "nexus"
+file_name = "Book Jackets Oblivion High Res BAIN - Cleaned and Bash Tags-50033-1-3-1676245502.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 Core Assets",
+  "01c Core Book Jackets ESP - Filter Version (Maximum Compatibility with Knights and UOP)",
+]
+
+[[mods]]
+id = "Book Jackets KOTN"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["Knights - Book Jackets.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/27521/49497"
+download_handler = "nexus"
+file_name = "Book_Jackets_KOTN_v10-27521.zip"
+
+[[mods]]
+id = "Book Jackets KOTN HD update"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49307/1000021786"
+download_handler = "nexus"
+file_name = "KOTN Book Jackets HD remake-49307-1-0-1555223544.7z"
+
+[[mods]]
+id = "Book Jackets for Misc DLC"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["Book Jackets DLC Misc.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49260/1000034080"
+download_handler = "nexus"
+file_name = "Book Jackets for Misc DLC-49260-1-4-1679283776.7z"
+
+[[mods]]
+id = "TD Alternative Book Covers"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# Guide 15, hosted on mediafire:
+# mediafire.com/file/zdm8rceqe70sgla/TD_Alternative_Books_Covers.7z/file
+path = "manual:TD_Alternative_Books_Covers.7z"
+file_name = "TD_Alternative_Books_Covers.7z"
+
+[[mods]]
+id = "Better Book Pages"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47352/1000015390"
+download_handler = "nexus"
+file_name = "Better book pages-47352-1-0.7z"
+
+# Guide 17: "both main & optional files, install separately".
+[[mods]]
+id = "HiRes Silver and Gold Clutter - Silver"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/38546/79717"
+download_handler = "nexus"
+file_name = "HiRes Silver Clutter-38546-1.zip"
+
+[[mods]]
+id = "HiRes Silver and Gold Clutter - Gold"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/38546/79814"
+download_handler = "nexus"
+file_name = "HiRes Gold Clutter-38546-1.zip"
+
+[[mods]]
+id = "VKVII Oblivion Mages Guid Clutter"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# Guide 18, hosted on moddb:
+# moddb.com/mods/vkvii-oblivion-mages-guild-clutter/downloads
+path = "manual:VKVII_Oblivion_MagesGuild_Clutter.1.7z"
+file_name = "VKVII_Oblivion_MagesGuild_Clutter.1.7z"
+
+[[mods]]
+id = "Alluring Wine Bottles with Real Glass"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["Alluring Wine Bottles.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46789/1000029679"
+download_handler = "nexus"
+file_name = "Alluring Wine Bottles with Real Glass-46789-1-0-1638316724.7z"
+
+[[mods]]
+id = "Alluring Wine Bottles with Real Glass - Loose Files Patch for Mods"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52171/1000031782"
+download_handler = "nexus"
+file_name = "Alluring Wine Bottles with Real Glass - Loose Files Patch for Mods-52171-1-1-1657776801.7z"
+
+[[mods]]
+id = "Retextured Potions"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["PotionReplacer.esp"]
+
+[[mods.archives]]
+# Guide 21: "select 00 Core only". The other subpackage is `10 Optional Slimy`.
+path = "nexus:oblivion/49068/1000027329"
+download_handler = "nexus"
+file_name = "Potions-49068-1-2-1616538207.7z"
+layout = "bain"
+bain_subpackages = ["00 Core"]
+
+# Guide 22: "both main file & optional, install separately".
+[[mods]]
+id = "Paintings Variation 2.0"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# File id resolved by `mudcrab identify`; the Oracle's meta.ini records none.
+path = "nexus:oblivion/46482/1000012686"
+download_handler = "nexus"
+file_name = "Paintings Variation 2.0-46482-2-0.7z"
+
+[[mods]]
+id = "Paintings Variation 2.0 - SI"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46482/1000021723"
+download_handler = "nexus"
+file_name = "Paintings Variation SI-46482-1-0-1554746835.7z"
+
+# Guide 23 names three of five subpackages. `01` and `02` each come in a plain
+# and a "2x UV Scaling" flavour; the guide takes the scaled one both times.
+[[mods]]
+id = "High-Res Varla and Welkynd Texture Replacer"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/36814/1000010831"
+download_handler = "nexus"
+file_name = "High-Res Varla and Welkynd Texture Replacer-36814-2-0.7z"
+layout = "bain"
+bain_subpackages = [
+  "00 High-Res Varla & Welkynd Textures",
+  "01 Fixed UV Meshes w. 2x UV Scaling",
+  "02 More Meshes w. New Iron Tex & 2x UV Scaling",
+]
+
+[[mods]]
+id = "Particled Ayleid Stones"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47245/1000015081"
+download_handler = "nexus"
+file_name = "Particled Ayleid Stones 1.0-47245-1-0.7z"
+
+[[mods]]
+id = "HiRes Hay Bail Textures"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/27138/48345"
+download_handler = "nexus"
+file_name = "High Resolution Hay Bail Textures-27138.7z"
+
+[[mods]]
+id = "Darooz Upperclass clutter"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41108/87370"
+download_handler = "nexus"
+file_name = "Upperclass clutter-41108-1-0.zip"
+
+[[mods]]
+id = "Darooz artsupplies"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41122/87400"
+download_handler = "nexus"
+file_name = "Drz_artsupplies-41122-1-0.zip"
+
+[[mods]]
+id = "Modryn Oreyn Renaissance Master"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51434/1000029209"
+download_handler = "nexus"
+file_name = "Modryn Oreyn's Renaissance Painting-51434-1-0-1632771046.zip"
+
+# Guide 29 calls this "Kat's Actually Decent Enviroment Map"; the mod page and
+# the Oracle folder both say "Kinda Actually Decent Environment Map".
+[[mods]]
+id = "Kinda Actually Decent Environment Map"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48856/1000020613"
+download_handler = "nexus"
+file_name = "kadem-48856-1-1-1541090545.zip"
+
+# Guide 30: "right click the LunasIronwoodNutRetex > Data folder & select Set as
+# \ Directory." The archive's other top-level folder, `OPTIONAL`, is what that
+# instruction is steering past.
+[[mods]]
+id = "Luna's Ironwood Nut Retex"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# File id resolved by `mudcrab identify`; the Oracle's meta.ini records none.
+path = "nexus:oblivion/49242/1000021587"
+download_handler = "nexus"
+file_name = "Luna's Ironwood Nut Retex-49242-1-1553094439.7z"
+data_folder = "LunasIronwoodNutRetex/Data"
+
+[[mods]]
+id = "Azuras Star retexture"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+# Guide 31: "main file only".
+path = "nexus:oblivion/50362/1000025584"
+download_handler = "nexus"
+file_name = "Azura Star retexture-50362-1-0-1597780650.rar"
+
+# Guide 32's two answers. `Main` has one option and `Meshes` defaults to the one
+# the guide wants, so both are declared to record that the guide answered.
+[[mods]]
+id = "HD Septim"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49017/1000020879"
+download_handler = "nexus"
+file_name = "HD Septims-49017-1-4a-1543613153.zip"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+step = "Step1"
+group = "Main"
+options = ["Textures"]
+
+[[mods.archives.fomod_selections]]
+step = "Step1"
+group = "Meshes"
+options = ["Normal Size Mesh"]
+
+[[mods]]
+id = "Little Baron Flower Pot Makeover - patched and adjusted"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50792/1000026852"
+download_handler = "nexus"
+file_name = "Little Baron Flower Pot Makeover - patched and adjusted-50792-1-0-1612663114.7z"
+
+# Guide 34: six files from one page, installed separately, all named.
+[[mods]]
+id = "Reb's Average Misc Junkyard - Guild Stuff"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000038553"
+download_handler = "nexus"
+file_name = "Reb's Average Misc Guild Stuff 1k-53617-v5-1718036691.7z"
+
+[[mods]]
+id = "Reb's Average Misc Junkyard - Alchemy Replacers"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000037427"
+download_handler = "nexus"
+file_name = "Reb's Average Misc Alchemy Replacers 1k-53617-v4-1705322195.7z"
+
+[[mods]]
+id = "Reb's Average Misc Junkyard - MiscJunk"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000038719"
+download_handler = "nexus"
+file_name = "Reb's Average Misc Misc Junk 1k-53617-v3-1719423875.7z"
+
+[[mods]]
+id = "Reb's Average Misc Junkyard - Tents Replacer"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000037087"
+download_handler = "nexus"
+file_name = "Reb's Average Misc Tents Replacer 1k-53617-v1-1701598657.7z"
+
+# The Oracle's folder says "CLC Stuff"; the file is the DLC one.
+[[mods]]
+id = "Reb's Average Misc Junkyard - CLC Stuff"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000038635"
+download_handler = "nexus"
+file_name = "Reb's Average Misc DLC Stuff 1k-53617-v2-1718647408.7z"
+
+[[mods]]
+id = "Reb's Average Misc Junkyard - Mage Stuff"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53617/1000037390"
+download_handler = "nexus"
+file_name = "Reb's Average Misc Mage Stuff 1k-53617-v1-1704973661.7z"
+
+# Guide 35: "01 - Marbled Style - Alternative". The other subpackage is the
+# ".esp FREE" build, so this choice is what brings the plugin.
+[[mods]]
+id = "Savilla's Stone Enhanced"
+section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
+plugins = ["SavillaStoneEnhanced.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52713/1000033684"
+download_handler = "nexus"
+file_name = "Savilla's Stone Enhanced-52713-1-1a-1675795943.7z"
+layout = "bain"
+bain_subpackages = ["01 - Marbled Style - Alternative"]
