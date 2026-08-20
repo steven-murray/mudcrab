@@ -53,6 +53,31 @@ Three differences, all understood:
 The guide says pack the remaining **textures**, and both BSAs hold 3580 textures
 and no meshes — so on that point the two agree exactly.
 
+## Our BSAs differ from BSArch's by one header field
+
+Weapons of Morrowind is the clean case: same 82 entries, same 176,975,853 bytes,
+different hash. The whole difference is at offset `0x0C`, the archive-flags word.
+
+| | archiveFlags |
+|---|---|
+| ours | `0x003` — has folder names, has file names |
+| BSArch | `0x783` — those two, plus bits 7, 8, 9 and 10 |
+
+Bits 0 and 1 are what Oblivion reads to find anything at all. The rest are
+"retain" hints that vanilla Oblivion ignores, and bits 8–10 are not defined for
+the v103 archives Oblivion loads.
+
+**Not matched deliberately.** Copying flag bits whose meaning we cannot state
+would be cargo-culting a byte pattern into a file format, and the contents are
+verified identical. Recorded so that "the BSA differs" stops being mysterious:
+for OOO Enhanced it is payload dedup and size, and for everything else it is
+this one word.
+
+Also worth noting the guide says to name it *"Weapons of Morrowind"* and the
+plugin is `Weapons Of Morrowind.esp`. Ours follows the guide's casing and the
+Oracle follows the plugin's. Oblivion matches BSA to plugin case-insensitively,
+so both load.
+
 ## An ergonomic trap worth naming
 
 `exclude = ["**/thumbs.db"]` caught **4 of 14**. The archive spells four of them
@@ -66,12 +91,15 @@ cost anything. Both spellings are listed on the row.
 ## The rest of the section
 
 - **Row 1** says to pack Weapons of Morrowind into a BSA and delete the loose
-  folders. **The Oracle did not**: its folder still holds 82 loose files and no
-  BSA. Ours follows the guide, so this mod diffs wholesale.
+  folders. Steven has since done so, and the two archives hold **the same 82
+  files at the same total size** — but differ in one header word, see below.
 - **Row 4** says *hide* `JBlades!.esp`; the Oracle **deleted** it. Ours hides,
   per the guide, so we have a `.mohidden` the Oracle lacks entirely.
-- **Row 7c** (Thorn Addon) is **missing from the Oracle**, though its archive is
-  in the downloads folder. Built here; shows as extra in ours.
+- **Row 7c** (Thorn Addon) was missing from the Oracle; Steven has since
+  installed it. The guide's *"Once installed delete
+  tbskGuardsFeaturesThornAddon.esp"* has not been done there, though — rows 7b
+  and 7d got the same instruction and were followed. Ours prunes it, so this
+  mod now differs by that one plugin.
 - **Row 6** is `[QAC]`, so `tbskGuardsFeatures.esp` differs by cleaning, like
   every other QAC row.
 - Four Part 36 merge-source plugins.
