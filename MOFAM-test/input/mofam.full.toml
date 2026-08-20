@@ -5,25 +5,25 @@ name = "MOFAM Full"
 # archive as POST-GUIDE when it postdates `published` -- meaning "the top file
 # on the page" today is not the file the guide meant.
 #
+# The guide dates itself only as "03.25", so `published` is a judgement. It sits
+# at 2025-03-18 rather than the start of the month because Part 21 row 1 settles
+# it: the guide names CLUTTER_BETA1 by name and that file was published
+# 2025-03-17, so any earlier date reports a file the guide explicitly asks for as
+# newer than the guide.
+#
 # `file_id` dates archives whose filenames carry no Unix timestamp. Nexus
 # allocates file ids in ascending order, so an id doubles as an upload date, and
 # it beats MO2's `nexusLastModified`, which is frequently the day the file was
 # *downloaded* rather than published. Derived from this list's own archives: of
-# the 406 carrying both a file id and a filename timestamp, 405 order
-# identically by either measure, and the boundary at 2025-03-01 is clean --
-# largest pre-guide id 1000040927 (2025-02-23), smallest post-guide 1000040999
-# (2025-03-01), nothing between. The 406th is Part 20 row 8, whose two versions'
-# MO2 sidecars claim the same file id.
+# the 406 carrying both a file id and a filename timestamp, 405 order identically
+# by either measure, and the boundary is clean -- largest pre-guide id
+# 1000041155 (CLUTTER_BETA1, 2025-03-17), smallest post-guide 1000041165
+# (T4UT Skies Repolished, 2025-03-18), nothing between. The 406th is Part 20
+# row 8, whose two versions' MO2 sidecars claim the same file id.
 #
-# Re-derive for a different guide; do not copy these numbers to one.
-#
-# UNRESOLVED, for Steven: 2025-03-01 is our own reading of "MOFAM 03.25", and it
-# may be a fortnight too early. Part 21 row 1 is the evidence -- the guide names
-# CLUTTER_BETA1 explicitly, and BETA1 was published 2025-03-17, so `diff` reports
-# a file the guide asks for by name as newer than the guide. Either the date
-# should be the end of March rather than the start, or POST-GUIDE means "worth a
-# look" rather than "wrong", which is how it has been read so far.
-guide = { published = "2025-03-01", file_id = 1000040999 }
+# Both numbers move together: change `published` and the boundary must be
+# re-derived, or it will be answering the old question.
+guide = { published = "2025-03-18", file_id = 1000041165 }
 
 
 # Source: nexus:oblivion/52949
