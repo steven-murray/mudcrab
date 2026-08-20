@@ -302,6 +302,12 @@ pub struct ContentDiff {
     pub ours_sha256: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oracle_sha256: Option<String>,
+    /// What the difference actually is, when the file is a format mudcrab can
+    /// read. A BSA holding the same files as another BSA is still a different
+    /// file, and saying only "sha256 differs" leaves that unexplained -- which
+    /// is the one thing a diff report is not allowed to do.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
 }
 
 /// How old the Oracle's archive is relative to the guide.
@@ -838,6 +844,7 @@ fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentD
             oracle_size: oracle.size,
             ours_sha256: None,
             oracle_sha256: None,
+            note: describe_bsa_difference(&ours.path, &oracle.path),
         }));
     }
 
@@ -863,7 +870,97 @@ fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentD
         oracle_size: oracle.size,
         ours_sha256: Some(ours_sha256),
         oracle_sha256: Some(oracle_sha256),
+        note: describe_bsa_difference(&ours.path, &oracle.path),
     }))
+}
+
+/// Say what two differing BSAs differ *in*, rather than only that they do.
+///
+/// Two archives can hold exactly the same files, byte for byte, and still not
+/// be the same file: the payload region need not follow record order, and the
+/// archive-flags word carries hints the packer chose rather than anything about
+/// content. Both are true of every mod this list packs, so without this each
+/// one costs a manual investigation to reach "fine, as before".
+///
+/// Returns `None` for anything that is not a readable BSA -- an unreadable one
+/// is a difference worth leaving unexplained rather than papering over.
+fn describe_bsa_difference(ours: &Path, oracle: &Path) -> Option<String> {
+    let is_bsa = |path: &Path| {
+        path.extension()
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("bsa"))
+    };
+    if !is_bsa(ours) || !is_bsa(oracle) {
+        return None;
+    }
+
+    let ours_bytes = std::fs::read(ours).ok()?;
+    let oracle_bytes = std::fs::read(oracle).ok()?;
+    let ours_bsa = crate::bsa::Bsa::parse(&ours_bytes).ok()?;
+    let oracle_bsa = crate::bsa::Bsa::parse(&oracle_bytes).ok()?;
+
+    // Keyed by path, valued by payload, so a file that moved and a file that
+    // changed are told apart.
+    let index = |archive: &crate::bsa::Bsa<'_>| -> BTreeMap<String, [u8; 32]> {
+        archive
+            .files()
+            .map(|(folder, file)| {
+                let digest = Sha256::digest(file.stored_bytes());
+                (file.path_in(folder).to_lowercase(), digest.into())
+            })
+            .collect()
+    };
+    let ours_index = index(&ours_bsa);
+    let oracle_index = index(&oracle_bsa);
+
+    let only_ours = ours_index
+        .keys()
+        .filter(|path| !oracle_index.contains_key(*path))
+        .count();
+    let only_oracle = oracle_index
+        .keys()
+        .filter(|path| !ours_index.contains_key(*path))
+        .count();
+    let changed = ours_index
+        .iter()
+        .filter(|(path, digest)| {
+            oracle_index
+                .get(*path)
+                .is_some_and(|other| other != *digest)
+        })
+        .count();
+
+    let mut parts = Vec::new();
+    if only_ours + only_oracle + changed == 0 {
+        parts.push(format!(
+            "same {} files, same payloads",
+            ours_index.len()
+        ));
+    } else {
+        if only_ours > 0 {
+            parts.push(format!("{only_ours} only in ours"));
+        }
+        if only_oracle > 0 {
+            parts.push(format!("{only_oracle} only in the oracle"));
+        }
+        if changed > 0 {
+            parts.push(format!("{changed} with different content"));
+        }
+    }
+
+    if ours_bsa.archive_flags != oracle_bsa.archive_flags {
+        parts.push(format!(
+            "archive flags {:#06x} vs {:#06x}",
+            ours_bsa.archive_flags, oracle_bsa.archive_flags
+        ));
+    }
+    if ours_bsa.file_flags != oracle_bsa.file_flags {
+        parts.push(format!(
+            "file flags {:#06x} vs {:#06x}",
+            ours_bsa.file_flags, oracle_bsa.file_flags
+        ));
+    }
+
+    Some(parts.join("; "))
 }
 
 fn bytes_equal(left: &Path, right: &Path) -> std::io::Result<bool> {
@@ -1345,6 +1442,10 @@ fn render_mod(out: &mut String, diff: &ModDiff) {
                     "        {}  (ours {} B, oracle {} B)\n",
                     entry.path, entry.ours_size, entry.oracle_size
                 ));
+            }
+            // What the difference is, for the formats mudcrab can read into.
+            if let Some(note) = &entry.note {
+                out.push_str(&format!("          {note}\n"));
             }
         }
         render_overflow(out, diff.content_differs.len());

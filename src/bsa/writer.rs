@@ -2,8 +2,8 @@
 
 use super::hash::{hash_file_name, hash_folder_name};
 use super::{
-    Bsa, BsaError, File, Folder, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES, HEADER_LEN, RECORD_LEN,
-    VERSION_OBLIVION,
+    Bsa, BsaError, File, Folder, FLAG_CONVENTIONAL, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES,
+    HEADER_LEN, RECORD_LEN, VERSION_OBLIVION,
 };
 use crate::archive::ArchiveFilters;
 use std::borrow::Cow;
@@ -83,8 +83,41 @@ pub(super) fn write_to<W: Write>(bsa: &Bsa<'_>, out: &mut W) -> Result<(), BsaEr
         });
     }
 
+    // Where each file's payload goes, and which payloads actually get written.
+    //
+    // Two file records may point at the same offset: the reader seeks to it and
+    // takes that record's own size, so identical content needs storing once.
+    // BSArch does this, and it is not a nicety -- a village mod whose voice
+    // lines repeat across race folders is a quarter smaller for it, and Urasek
+    // two thirds. Without it a mudcrab-packed archive holds exactly the same
+    // files as a BSArch one and is visibly larger, which reads as a difference
+    // in content until somebody checks.
+    let mut planned_offsets: Vec<u32> = Vec::with_capacity(file_count);
+    let mut distinct_payloads: Vec<&File<'_>> = Vec::new();
+    if bsa.source.is_none() {
+        // Keyed on the bytes themselves, borrowed rather than copied, together
+        // with the compression flag -- a compressed and an uncompressed payload
+        // that happen to be equal are still different stored forms.
+        let mut seen: std::collections::HashMap<(bool, &[u8]), u32> =
+            std::collections::HashMap::new();
+        let mut cursor = u32::try_from(metadata_length).map_err(|_| BsaError::TooLarge)?;
+        for (_, file) in bsa.files() {
+            let key = (file.compressed, file.stored.as_ref());
+            if let Some(&offset) = seen.get(&key) {
+                planned_offsets.push(offset);
+                continue;
+            }
+            seen.insert(key, cursor);
+            planned_offsets.push(cursor);
+            distinct_payloads.push(file);
+            cursor = cursor
+                .checked_add(u32::try_from(file.stored.len()).map_err(|_| BsaError::TooLarge)?)
+                .ok_or(BsaError::TooLarge)?;
+        }
+    }
+
     // --- folder blocks: name then file records ---
-    let mut next_offset = u32::try_from(metadata_length).map_err(|_| BsaError::TooLarge)?;
+    let mut planned = planned_offsets.iter();
     for folder in &bsa.folders {
         let name = folder.name.as_bytes();
         out.write_all(&[u8::try_from(name.len() + 1).map_err(|_| {
@@ -103,14 +136,9 @@ pub(super) fn write_to<W: Write>(bsa: &Bsa<'_>, out: &mut W) -> Result<(), BsaEr
                 // A parsed archive keeps its original offsets, because its data
                 // region is replayed verbatim and is not in record order.
                 Some(offset) => write_u32(out, offset)?,
-                None => {
-                    write_u32(out, next_offset)?;
-                    next_offset = next_offset
-                        .checked_add(
-                            u32::try_from(file.stored.len()).map_err(|_| BsaError::TooLarge)?,
-                        )
-                        .ok_or(BsaError::TooLarge)?;
-                }
+                // Taken from the layout above, which walks `files()` in this
+                // same order.
+                None => write_u32(out, *planned.next().ok_or(BsaError::TooLarge)?)?,
             }
         }
     }
@@ -127,8 +155,10 @@ pub(super) fn write_to<W: Write>(bsa: &Bsa<'_>, out: &mut W) -> Result<(), BsaEr
         // deduplicated, and in one archive carries interstitial bytes that no
         // record points at.
         Some(source) => out.write_all(source.data_region).map_err(io)?,
+        // Only the distinct payloads, in the order the layout assigned them
+        // offsets, so the region is contiguous and every record points into it.
         None => {
-            for (_, file) in bsa.files() {
+            for file in &distinct_payloads {
                 out.write_all(file.stored.as_ref()).map_err(io)?;
             }
         }
@@ -200,8 +230,9 @@ pub(super) fn from_directory(
     }).collect::<Vec<_>>().iter().map(String::as_str));
 
     Ok(Bsa {
-        // Names present, nothing compressed.
-        archive_flags: FLAG_FOLDER_NAMES | FLAG_FILE_NAMES,
+        // Names present, nothing compressed, plus the three bits every real
+        // archive sets -- see `FLAG_CONVENTIONAL`.
+        archive_flags: FLAG_FOLDER_NAMES | FLAG_FILE_NAMES | FLAG_CONVENTIONAL,
         file_flags,
         folders,
         source: None,

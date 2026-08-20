@@ -44,7 +44,10 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                         }
                         Ok(CompiledArchive {
                             path: archive.path.clone(),
-                            file_name: archive.file_name.clone(),
+                            file_name: archive
+                                .file_name
+                                .clone()
+                                .or_else(|| manual_file_name(archive.path.as_deref())),
                             download_handler: archive.download_handler.clone(),
                             layout: archive.layout,
                             data_folder: archive.data_folder.clone(),
@@ -85,6 +88,22 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
 ///
 /// These target Oblivion.ini specifically; game-scoped writes are redirected to
 /// the MO2 profile-local copy, never the original in the game directory.
+/// The filename a `manual:` descriptor already carries.
+///
+/// `--archive-search-path` matches an archive by its `file_name`, and for a
+/// manual source that name is the whole descriptor: `manual:Feldscar.7z` can
+/// only ever be `Feldscar.7z`. Writing it twice is redundant, and redundancy
+/// that has to be kept in sync is a defect waiting to happen -- an entry with
+/// only the descriptor used to be simply unfindable, reported as "must be
+/// downloaded by hand" while sitting in a search path.
+///
+/// Only `manual:`. Every other scheme names a resource, not a file: a Nexus
+/// descriptor is ids, and an HTTP one is a URL whose last segment is a guess.
+fn manual_file_name(path: Option<&str>) -> Option<String> {
+    let name = path?.strip_prefix("manual:")?.trim();
+    (!name.is_empty()).then(|| name.to_string())
+}
+
 fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
     ini.iter()
         .map(|(key, value)| {
@@ -113,5 +132,45 @@ fn ini_value_to_string(value: &toml::Value) -> String {
             if *flag { "1".to_string() } else { "0".to_string() }
         }
         other => other.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_manual_descriptor_supplies_its_own_file_name() {
+        assert_eq!(
+            manual_file_name(Some("manual:Feldscar_-_VA.7z")).as_deref(),
+            Some("Feldscar_-_VA.7z")
+        );
+        assert_eq!(
+            manual_file_name(Some("manual:Sutch Village - VA.7z")).as_deref(),
+            Some("Sutch Village - VA.7z"),
+            "spaces and dashes are part of the name, not separators"
+        );
+    }
+
+    #[test]
+    fn no_other_scheme_guesses_a_file_name() {
+        // A Nexus descriptor is ids; the real filename carries a slug and a
+        // timestamp that cannot be derived from them.
+        assert_eq!(manual_file_name(Some("nexus:oblivion/52874/1000036033")), None);
+        // The last segment of a URL is a plausible guess, and a guess that is
+        // wrong looks exactly like an archive nobody has downloaded.
+        assert_eq!(manual_file_name(Some("https://example.com/x.7z")), None);
+        assert_eq!(manual_file_name(Some("manual:")), None);
+        assert_eq!(manual_file_name(None), None);
+    }
+
+    /// An explicit `file_name` still wins: the descriptor is a label, and a few
+    /// entries deliberately point at a file called something else.
+    #[test]
+    fn an_explicit_file_name_is_not_overridden() {
+        // The same `or_else` chain `compile` uses, with the explicit name set.
+        let declared = Some("Actually Called This.7z".to_string());
+        let resolved = declared.or_else(|| manual_file_name(Some("manual:Label.7z")));
+        assert_eq!(resolved.as_deref(), Some("Actually Called This.7z"));
     }
 }

@@ -448,3 +448,75 @@ fn rejects_a_truncated_archive() {
     assert!(Bsa::parse(&bytes[..bytes.len() - 4]).is_err());
     assert!(Bsa::parse(&bytes[..20]).is_err());
 }
+
+/// BSArch stores one copy of a repeated payload and points every record at it.
+/// mudcrab used to store one copy per record, which made a packed mod visibly
+/// larger than the same mod packed by BSArch while holding exactly the same
+/// files -- a difference that reads as wrong content until somebody checks.
+#[test]
+fn packing_stores_a_repeated_payload_once() {
+    let source = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(source.path().join("sound/voice/argonian")).unwrap();
+    std::fs::create_dir_all(source.path().join("sound/voice/breton")).unwrap();
+    std::fs::create_dir_all(source.path().join("meshes")).unwrap();
+
+    // The village-mod shape: one recording reused across race folders.
+    let shared = vec![b'V'; 4096];
+    std::fs::write(source.path().join("sound/voice/argonian/line.mp3"), &shared).unwrap();
+    std::fs::write(source.path().join("sound/voice/breton/line.mp3"), &shared).unwrap();
+    std::fs::write(source.path().join("meshes/unique.nif"), b"NIF").unwrap();
+
+    let filters = mudcrab::archive::ArchiveFilters::new(&[], &[]).unwrap();
+    let built = Bsa::from_directory(source.path(), &filters).expect("pack");
+    let bytes = built.to_bytes().expect("write");
+
+    let parsed = assert_round_trips("deduplicated", &bytes);
+    assert_eq!(parsed.file_count(), 3, "every record is still there");
+
+    // One copy of the shared payload, not two. Two copies alone would exceed
+    // 8192 bytes before any metadata.
+    assert!(
+        bytes.len() < 2 * shared.len(),
+        "the repeated payload was stored twice: archive is {} bytes",
+        bytes.len()
+    );
+
+    // And both records still read back correctly, which is the point: sharing
+    // an offset must not cost either file its content.
+    let extracted = tempfile::tempdir().unwrap();
+    parsed.extract_to(extracted.path()).expect("extract");
+    for race in ["argonian", "breton"] {
+        assert_eq!(
+            std::fs::read(extracted.path().join(format!("sound/voice/{race}/line.mp3"))).unwrap(),
+            shared,
+            "{race} lost its line"
+        );
+    }
+    assert_eq!(
+        std::fs::read(extracted.path().join("meshes/unique.nif")).unwrap(),
+        b"NIF"
+    );
+}
+
+/// Every real Oblivion archive sets bits 8-10, Bethesda's own included, and the
+/// plain uncompressed shape they share is `0x703`. mudcrab wrote `0x003`, which
+/// no archive the game has ever loaded does.
+#[test]
+fn a_packed_archive_declares_the_flags_every_real_one_does() {
+    let source = tempfile::tempdir().unwrap();
+    std::fs::create_dir_all(source.path().join("meshes")).unwrap();
+    std::fs::write(source.path().join("meshes/a.nif"), b"NIF").unwrap();
+
+    let filters = mudcrab::archive::ArchiveFilters::new(&[], &[]).unwrap();
+    let built = Bsa::from_directory(source.path(), &filters).expect("pack");
+    assert_eq!(
+        built.archive_flags, 0x0000_0703,
+        "expected the corpus-wide baseline, got {:#010x}",
+        built.archive_flags
+    );
+
+    // And it survives the write, since the header ORs its own name bits in.
+    let bytes = built.to_bytes().expect("write");
+    let parsed = assert_round_trips("conventional flags", &bytes);
+    assert_eq!(parsed.archive_flags, 0x0000_0703);
+}
