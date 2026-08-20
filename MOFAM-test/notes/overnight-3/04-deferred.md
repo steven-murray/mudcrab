@@ -27,6 +27,55 @@ The same reasoning applies to the next section. Part 26b's twenty rows are
 **exactly** the TACE merge's twenty sources, so 26b + TACE is a net **+1**
 plugin, not +20. That is SP8, and it is the natural next step.
 
+## D0b. Part 26b is blocked, and mudcrab is what found out why
+
+I tried SP8 — Part 26b plus the TACE merge — expecting it to work the same way
+as SP7. It does not, and the reason is worth knowing.
+
+Part 26b's twenty rows are exactly TACE's twenty sources, so on paper the
+section costs one plugin instead of twenty. All twenty authored and installed
+fine. The merge then refused to build:
+
+    Error: master Tales of Cyrodiil.esp (required by TACE Consistency Patch.esp)
+    is not in the load order.
+
+**TACE's consistency patch depends on a Part 28 mod** (row 37, Tales of
+Cyrodiil). In guide order this never arises — Part 28 comes before Part 36. It
+only bites because we are building merges early to make room.
+
+So the early-merge trick is not general. It worked for Unique Forts because all
+eleven of its sources live in Part 26a or in Part 36 itself. TACE reaches
+forward two sections.
+
+**I reverted Part 26b** rather than leave a half-built section: the modlist is
+back at 245 plugins and the install re-run is clean. What I did **not** do is
+delete the 22 Part 26b mod folders that had already been written under
+`MudCrab Test/mods` before the merge failed — they are your files and the
+standing rule is that you remove things under `~/Games`. They are inert (no
+plugin of theirs is in the load order) but they are there.
+
+The three ways forward, and I did not want to pick:
+
+1. **Pull `Tales of Cyrodiil` forward** (one mod, one plugin, 245 → 246) purely
+   to satisfy the master, then build 26b + TACE. Smallest change, but it drags
+   a Part 28 quest mod into Part 26b, and its Part 28 row 38 companion — the
+   voice addon needing a BSArch repack — logically comes with it.
+2. **Do Parts 27 and 28 first**, in guide order, then 26b + TACE. Correct, but
+   Part 28 is ~40 rows and there are only 10 free slots, so it will hit the
+   same wall partway through.
+3. **Teach `merge` a `--allow-missing-masters`** equivalent so a merge can be
+   built provisionally and rebuilt later. Your plan already anticipates
+   `--allow-missing-sources` for SP9; this is the same idea one level down. It
+   is the only option that generalises, and the merged plugin has to be rebuilt
+   at the end regardless.
+
+My recommendation is **(2) then (3)**: work in guide order as far as the slots
+allow, and build the flag when it actually blocks rather than now.
+
+The error message itself is the good news — mudcrab refused to build a merge
+whose masters it could not satisfy, and said exactly which plugin and which
+master. That is the failure mode this project keeps designing against.
+
 ## D1. Merge-source hides are now 86 of 136 differences
 
 63% of every remaining difference is one thing: a plugin hidden in your Oracle

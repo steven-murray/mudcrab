@@ -25,9 +25,13 @@ plan's SP7 and, on reading the guide, needed nothing pulled out of order: its
 consistency patch is Part 36's own row 3. The load order is back to **245**.
 
 That is the one call tonight I would most like you to look at, and it is
-`04-deferred.md` item **D0**. The next section is set up to follow the same
-shape: Part 26b's twenty rows are exactly the TACE merge's twenty sources, so
-26b + TACE is a net **+1** plugin.
+`04-deferred.md` item **D0**.
+
+I then tried the same trick on Part 26b and it does not work — **D0b**. Its
+merge's consistency patch needs a master from Part 28, two sections ahead, so
+the merge refused to build. I reverted the section rather than leave it half
+done; 22 of its mod folders were already written to disk before that and I have
+left them alone, since removing things under `~/Games` is your call.
 
 ## The four reports
 
