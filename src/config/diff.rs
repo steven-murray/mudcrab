@@ -426,6 +426,11 @@ pub struct DiffReport {
     pub ours: String,
     pub oracle: String,
     pub scope: String,
+    /// The guide's publication date, when the list declares one. Named in the
+    /// report rather than described in prose: the date is configurable now, so
+    /// a heading that says "March 2025" is a lie waiting for the second list.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guide_published: Option<String>,
     pub summary: DiffSummary,
     pub sections: Vec<SectionReport>,
 }
@@ -994,8 +999,7 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
 }
 
 
-/// Date the Oracle's archive, to decide whether the March 2025 guide could
-/// have meant this file.
+/// Date the Oracle's archive, to decide whether the guide could have meant it.
 ///
 /// Two sources, in order of how specific they are:
 ///
@@ -1242,6 +1246,7 @@ fn assemble_report(diffs: Vec<ModDiff>, settings: &DiffSettings) -> DiffReport {
         ours: settings.mods_dir.display().to_string(),
         oracle: settings.oracle_dir.display().to_string(),
         scope: settings.filter.describe(),
+        guide_published: settings.era.map(|era| format_date(era.published)),
         summary,
         sections,
     }
@@ -1435,8 +1440,13 @@ fn render_version_notes(out: &mut String, report: &DiffReport) {
 
     if !post_guide.is_empty() {
         out.push_str(&format!(
-            "  POST-GUIDE ({}): the Oracle's archive is newer than the March 2025 guide,\n  so \"the top file on the page\" is not what it installed.\n",
-            post_guide.len()
+            "  POST-GUIDE ({}): the Oracle's archive is newer than the guide{},\n  so \"the top file on the page\" is not what it installed.\n",
+            post_guide.len(),
+            report
+                .guide_published
+                .as_deref()
+                .map(|date| format!(" ({date})"))
+                .unwrap_or_default()
         ));
         for diff in &post_guide {
             let version = diff.version.as_ref().expect("post-guide implies version info");
