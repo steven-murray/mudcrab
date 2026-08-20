@@ -66,6 +66,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         .collect::<anyhow::Result<Vec<_>>>()?;
 
     Ok(CompiledModlist {
+        guide: source.guide.clone(),
         schema_version: 1,
         name: source.name,
         input_count: source.inputs.len(),

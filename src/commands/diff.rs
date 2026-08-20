@@ -1,8 +1,10 @@
 use crate::cli::{DiffArgs, DiffFormat};
 use crate::config;
-use crate::config::diff::{DiffSettings, PlanIndex};
+use crate::config::diff::{DiffSettings, GuideEra, PlanIndex};
+use crate::config::schema::GuideProvenance;
 
 pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
+    let mut plan_guide: Option<GuideProvenance> = None;
     let plan = match &args.plan {
         Some(path) => {
             let raw = std::fs::read_to_string(path)
@@ -12,6 +14,7 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
                     anyhow::anyhow!("failed to parse personalized plan {}: {err}", path.display())
                 },
             )?;
+            plan_guide = plan.guide.clone();
             Some(PlanIndex::from_plan(&plan))
         }
         None => None,
@@ -25,11 +28,22 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
         anyhow::bail!("--section needs --plan: a mods directory does not record section paths");
     }
 
+    // The command line wins over the plan, so a one-off comparison can say what
+    // the plan does not -- or correct it.
+    let era = match &args.guide_date {
+        Some(published) => GuideEra::from_provenance(Some(&GuideProvenance {
+            published: published.clone(),
+            file_id: args.guide_file_id,
+        }))?,
+        None => GuideEra::from_provenance(plan_guide.as_ref())?,
+    };
+
     let settings = DiffSettings {
         mods_dir: args.mods_dir.clone(),
         oracle_dir: args.oracle.clone(),
         filter,
         plan,
+        era,
     };
 
     let report = config::diff::diff_all(&settings)?;

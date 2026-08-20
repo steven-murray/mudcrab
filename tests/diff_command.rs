@@ -42,6 +42,7 @@ impl Fixture {
             r#"{{
   "schema_version": 1,
   "name": "Diff Test",
+  "guide": {{ "published": "2025-03-01", "file_id": 1000040999 }},
   "responses": {{}},
   "mod_order": [],
   "selected_mods": [],
@@ -50,6 +51,19 @@ impl Fixture {
 }}"#
         );
         std::fs::write(self.plan_path(), plan).expect("plan should be written");
+    }
+
+    /// `diff` told which guide to measure archives against, the way a run
+    /// without a plan has to be. The age tests used to rely on the guide's date
+    /// being a constant inside mudcrab.
+    fn diff_against_guide(&self) -> Command {
+        let mut command = self.diff();
+        command
+            .arg("--guide-date")
+            .arg("2025-03-01")
+            .arg("--guide-file-id")
+            .arg("1000040999");
+        command
     }
 
     fn diff(&self) -> Command {
@@ -348,7 +362,7 @@ fn a_post_guide_archive_timestamp_is_flagged_without_gating_the_run() {
 
     // The files reproduce the Oracle, so the run is clean; the drift is a note
     // about the reference's own archive, not a fault in our copy of it.
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(text.contains("version notes:"), "unexpected report:\n{text}");
@@ -372,7 +386,7 @@ fn a_pre_guide_archive_timestamp_produces_no_version_note() {
         "[General]\nmodid=50682\ninstallationFile=Better Fort Aurus-50682-1-1-1647873144.7z\n",
     );
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(!text.contains("version notes:"), "unexpected report:\n{text}");
@@ -391,7 +405,7 @@ fn an_unparseable_archive_name_is_reported_as_unknown_rather_than_assumed_fine()
         "[General]\nmodid=19039\ninstallationFile=Anvil Morning Glory-19039.7z\n",
     );
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(text.contains("UNKNOWN AGE (1)"), "unexpected report:\n{text}");
@@ -639,7 +653,12 @@ fn json_format_carries_the_same_findings_structured() {
         "[General]\nmodid=1234\nversion=2.0\ninstallationFile=Newer Mod-1234-2-0-1750000000.7z\n",
     );
 
-    let assert = fixture.diff().arg("--format").arg("json").assert().failure();
+    let assert = fixture
+        .diff_against_guide()
+        .arg("--format")
+        .arg("json")
+        .assert()
+        .failure();
     let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
     let report: serde_json::Value =
         serde_json::from_str(&text).expect("json report should parse");
@@ -701,4 +720,81 @@ fn a_missing_mods_directory_is_a_section_not_yet_built_not_an_error() {
         text.contains("1 compared, 0 identical, 0 differing, 1 missing from ours"),
         "unexpected report:\n{text}"
     );
+}
+
+/// A modlist that is not transcribing a guide has nothing to call an archive
+/// older or newer than, and `diff` should say so rather than inventing a date.
+///
+/// This is the behaviour that used to be impossible: the guide's publication
+/// date was a constant in the binary, so every list was measured against
+/// MOFAM's March 2025 whether it followed MOFAM or not.
+#[test]
+fn a_modlist_with_no_guide_reports_no_archive_age() {
+    let fixture = Fixture::new();
+    write(&fixture.ours(), "Newer Mod/readme.txt", "same");
+    write(&fixture.oracle(), "Newer Mod/readme.txt", "same");
+    write(
+        &fixture.oracle(),
+        "Newer Mod/meta.ini",
+        "[General]\nmodid=1234\nversion=2.0\ninstallationFile=Newer Mod-1234-2-0-1750000000.7z\n",
+    );
+    // Same plan, minus the [guide] table.
+    let plan = r#"{
+  "schema_version": 1,
+  "name": "Diff Test",
+  "responses": {},
+  "mod_order": [],
+  "selected_mods": [],
+  "mods": [],
+  "plugins": []
+}"#;
+    std::fs::write(fixture.plan_path(), plan).expect("plan should be written");
+
+    let output = fixture
+        .diff()
+        .arg("--plan")
+        .arg(fixture.plan_path())
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
+    let text = String::from_utf8(output).expect("utf-8");
+
+    assert!(
+        !text.contains("POST-GUIDE"),
+        "a list with no guide cannot have a post-guide archive:\n{text}"
+    );
+}
+
+/// A `[guide]` whose date will not parse disables every age check in the
+/// report. Failing loudly beats a report that quietly stops checking.
+#[test]
+fn an_unparseable_guide_date_is_an_error() {
+    let fixture = Fixture::new();
+    write(&fixture.ours(), "Mod/readme.txt", "same");
+    write(&fixture.oracle(), "Mod/readme.txt", "same");
+    let plan = r#"{
+  "schema_version": 1,
+  "name": "Diff Test",
+  "guide": { "published": "March 2025" },
+  "responses": {},
+  "mod_order": [],
+  "selected_mods": [],
+  "mods": [],
+  "plugins": []
+}"#;
+    std::fs::write(fixture.plan_path(), plan).expect("plan should be written");
+
+    let output = fixture
+        .diff()
+        .arg("--plan")
+        .arg(fixture.plan_path())
+        .assert()
+        .failure()
+        .get_output()
+        .stderr
+        .clone();
+    let text = String::from_utf8(output).expect("utf-8");
+    assert!(text.contains("YYYY-MM-DD"), "unexpected error:\n{text}");
 }

@@ -1,4 +1,30 @@
 name = "MOFAM Full"
+# When this guide was published, and how to tell an archive newer than it.
+#
+# Facts about MOFAM, not about mudcrab, so they live here. `diff` reports an
+# archive as POST-GUIDE when it postdates `published` -- meaning "the top file
+# on the page" today is not the file the guide meant.
+#
+# `file_id` dates archives whose filenames carry no Unix timestamp. Nexus
+# allocates file ids in ascending order, so an id doubles as an upload date, and
+# it beats MO2's `nexusLastModified`, which is frequently the day the file was
+# *downloaded* rather than published. Derived from this list's own archives: of
+# the 406 carrying both a file id and a filename timestamp, 405 order
+# identically by either measure, and the boundary at 2025-03-01 is clean --
+# largest pre-guide id 1000040927 (2025-02-23), smallest post-guide 1000040999
+# (2025-03-01), nothing between. The 406th is Part 20 row 8, whose two versions'
+# MO2 sidecars claim the same file id.
+#
+# Re-derive for a different guide; do not copy these numbers to one.
+#
+# UNRESOLVED, for Steven: 2025-03-01 is our own reading of "MOFAM 03.25", and it
+# may be a fortnight too early. Part 21 row 1 is the evidence -- the guide names
+# CLUTTER_BETA1 explicitly, and BETA1 was published 2025-03-17, so `diff` reports
+# a file the guide asks for by name as newer than the guide. Either the date
+# should be the end of March rather than the start, or POST-GUIDE means "worth a
+# look" rather than "wrong", which is how it has been read so far.
+guide = { published = "2025-03-01", file_id = 1000040999 }
+
 
 # Source: nexus:oblivion/52949
 # This is the full translation target and may include entries requiring future mudcrab features.
@@ -5248,23 +5274,19 @@ file_name = "Sanguine Rose Retexture-48529-1-0.7z"
 # and Textures > Clutter > Farmhouse." An include filter rather than a prune --
 # same result, and it never writes the 3 GB it would then delete.
 #
-# UNRESOLVED, for Steven: the guide names CLUTTER_BETA1 and the only archive on
-# disk is `T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA2-...` -- the mod page is
-# BETA1, the file is BETA2. He is downloading the real BETA1. The Oracle
-# installed this same BETA2-named file, so the diff will look clean either way,
-# which is exactly why it is written down here. Same shape as Part 16's D9.
-#
-# The guide also says to name the mod `T4UT - CLUTTER_BETA1 - Farmhouse &
-# Vinyard`; the Oracle called it `T4UTXL - CLUTTER_BETA1`. Ours matches the
-# Oracle so `diff` can pair them.
+# Resolved: this was built from the BETA2-named file for one night, because that
+# was the only archive on disk -- the mod *page* is CLUTTER_BETA1 and the *file*
+# was CLUTTER-BETA2. Steven has since fetched the real BETA1 and reinstalled it
+# in the Oracle, so both sides now use it. Worth remembering that the diff was
+# clean throughout, because both sides had the same wrong file.
 [[mods]]
-id = "T4UTXL - CLUTTER_BETA1"
+id = "T4UTXL - CLUTTER_BETA1 - Farmhouse and Vineyard"
 section = ["21 - CLUTTER & MISCELLANEOUS RETEXTURES"]
 
 [[mods.archives]]
-path = "nexus:oblivion/54904/1000042074"
+path = "nexus:oblivion/54904/1000041155"
 download_handler = "nexus"
-file_name = "T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA2-1748437804.7z"
+file_name = "T4UT - CLUTTER_BETA1-54904-CLUTTER-BETA1-1742174938.7z"
 include = ["textures/clutter/vinyard/**", "textures/clutter/farmhouse/**"]
 
 [[mods]]
