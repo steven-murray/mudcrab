@@ -16,17 +16,28 @@ use std::path::Path;
 /// `file_hide`, which is what puts it there.
 const HIDDEN_SUFFIX: &str = ".mohidden";
 
+/// What a `conflicts_with` selection came to.
+#[derive(Debug)]
+pub(super) struct ConflictSelection {
+    /// Files of this mod the named mods also provide, relative to
+    /// `mod_target` and spelled as they are on disk, so the caller can delete
+    /// or rename them.
+    pub(super) files: Vec<String>,
+    /// `except` entries this selection never picked, so it could not honour
+    /// them. Returned rather than rejected here because the caller may have a
+    /// second selector that accounts for them -- `file_prune` does. A caller
+    /// with only this one passes them straight to `reject_unused_exceptions`.
+    pub(super) unused_except: Vec<String>,
+}
+
 /// Files of this mod that a named mod also provides.
-///
-/// Returned relative to `mod_target`, spelled as they are on disk, so the
-/// caller can delete or rename them.
 pub(super) fn conflicting_files(
     cx: &ActionCx<'_>,
     mod_target: &Path,
     conflicts_with: &[String],
     under: Option<&str>,
     except: &[String],
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<ConflictSelection> {
     let mut theirs = BTreeSet::new();
     let mut skipped = Vec::new();
 
@@ -103,9 +114,6 @@ pub(super) fn conflicting_files(
         }
     }
 
-    // A carve-out that carves nothing out is stale -- the archives moved, or
-    // the relationship changed -- and silently keeping it would leave a reason
-    // recorded for a thing that no longer happens.
     let excepted: BTreeSet<String> = except.iter().map(|path| path.to_lowercase()).collect();
     let mut unused: Vec<&String> = except.iter().collect();
     matched.retain(|relative| {
@@ -121,18 +129,6 @@ pub(super) fn conflicting_files(
         }
         true
     });
-    if !unused.is_empty() {
-        anyhow::bail!(
-            "{}: conflicts_with `except` names {} that the selection did not pick. \
-             Either the path is wrong or the exception is no longer needed.",
-            cx.owner,
-            unused
-                .iter()
-                .map(|path| format!("'{path}'"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-    }
 
     // Same rule as a `file_prune` pattern that matches nothing: a selection
     // resolving to no files is the shape of the first failed pass at Part 9,
@@ -150,7 +146,28 @@ pub(super) fn conflicting_files(
         );
     }
 
-    Ok(matched)
+    Ok(ConflictSelection {
+        files: matched,
+        unused_except: unused.into_iter().cloned().collect(),
+    })
+}
+
+/// A carve-out that carves nothing out is stale -- the archives moved, or the
+/// relationship changed -- and silently keeping it would leave a reason
+/// recorded for a thing that no longer happens.
+pub(super) fn reject_unused_exceptions(owner: &str, unused: &[String]) -> anyhow::Result<()> {
+    if unused.is_empty() {
+        return Ok(());
+    }
+    anyhow::bail!(
+        "{owner}: `except` names {} that no selector picked. Either the path is wrong or the \
+         exception is no longer needed.",
+        unused
+            .iter()
+            .map(|path| format!("'{path}'"))
+            .collect::<Vec<_>>()
+            .join(", ")
+    )
 }
 
 #[cfg(test)]
@@ -230,7 +247,7 @@ pub(super) mod tests {
 
         let files =
             conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[]).unwrap();
-        assert_eq!(files, ["meshes/shared.nif"]);
+        assert_eq!(files.files, ["meshes/shared.nif"]);
     }
 
     /// The bug a rerun of Part 18 found. A file this action hid last time is
@@ -257,7 +274,10 @@ pub(super) mod tests {
 
         let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[])
             .expect("a selection that already ran is not a failure");
-        assert!(files.is_empty(), "nothing left to hide, and nothing rehidden");
+        assert!(
+            files.files.is_empty(),
+            "nothing left to hide, and nothing rehidden"
+        );
     }
 
     /// The check the fix must not weaken: two mods that genuinely do not
@@ -308,7 +328,7 @@ pub(super) mod tests {
 
         let files =
             conflicting_files(&cx, &subject, &["Partner".to_string()], Some("textures"), &[]).unwrap();
-        assert_eq!(files, ["textures/shared.dds"]);
+        assert_eq!(files.files, ["textures/shared.dds"]);
     }
 }
 
@@ -346,19 +366,29 @@ mod except_tests {
             &["meshes/keep.nif".to_string()],
         )
         .unwrap();
-        assert_eq!(files, ["meshes/a.nif"], "the exception survives the selection");
+        assert_eq!(
+            files.files,
+            ["meshes/a.nif"],
+            "the exception survives the selection"
+        );
 
-        // An exception the selection never picks is stale: the archives moved,
-        // or the relationship changed, and the recorded reason now describes
-        // nothing.
-        let err = conflicting_files(
+        // An exception the selection never picks is reported back rather than
+        // rejected here -- the caller may have a second selector that accounts
+        // for it. `file_prune` does; `file_hide` does not.
+        let selection = conflicting_files(
             &cx,
             &subject,
             &["Partner".to_string()],
             None,
             &["meshes/not-in-either.nif".to_string()],
         )
-        .expect_err("a carve-out that carves nothing is stale");
+        .expect("an unplaceable exception is the caller's call, not this function's");
+        assert_eq!(selection.unused_except, ["meshes/not-in-either.nif"]);
+
+        // And a caller with nothing else to try rejects it, which is what the
+        // archives-moved case has to look like.
+        let err = reject_unused_exceptions("Subject", &selection.unused_except)
+            .expect_err("a carve-out that carves nothing is stale");
         assert!(err.to_string().contains("not-in-either.nif"), "{err}");
     }
 }

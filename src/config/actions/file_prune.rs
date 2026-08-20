@@ -41,36 +41,41 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
 
     // Which exceptions the glob patterns account for, worked out before
     // anything is deleted so the tree still holds the files being asked about.
-    // Whatever is left over belongs to the `conflicts_with` selection, which
-    // rejects an exception it cannot place -- so between them every `except`
-    // has to be honoured by somebody.
+    // Compared in the normalised spelling on both sides: this list holds the
+    // tree's own casing, for logging, and the guide writes an `except` in the
+    // casing the mod page uses. Neither is authoritative.
     let kept_by_patterns = exceptions_the_patterns_select(mod_target, action)?;
-    // Compared in the normalised spelling on both sides: `kept_by_patterns`
-    // holds the tree's own casing, for logging, and the guide writes an
-    // `except` in the casing the mod page uses. Neither is authoritative.
-    let placed: std::collections::BTreeSet<String> = kept_by_patterns
+    let mut accounted: std::collections::BTreeSet<String> = kept_by_patterns
         .iter()
         .map(|path| normalize_except(path))
-        .collect();
-    let unplaced: Vec<String> = action
-        .except
-        .iter()
-        .filter(|path| !placed.contains(&normalize_except(path)))
-        .cloned()
         .collect();
 
     // Resolved first, and separately: these are exact paths another mod also
     // provides, not patterns, so they are deleted by name rather than fed
     // through the glob machinery below.
+    //
+    // The *whole* `except` list goes to this selector, not the part the
+    // patterns did not claim. Splitting it meant a file both selectors named
+    // was credited to the patterns and then deleted here, before the pattern
+    // pass that would have spared it ever ran -- an exception silently
+    // ignored, which is the one thing `except` promises not to be.
     let mut deleted_by_conflict = 0usize;
     if !action.conflicts_with.is_empty() {
-        let files = super::conflicts::conflicting_files(
+        let selection = super::conflicts::conflicting_files(
             cx,
             mod_target,
             &action.conflicts_with,
             action.under.as_deref(),
-            &unplaced,
+            &action.except,
         )?;
+        for path in action
+            .except
+            .iter()
+            .filter(|path| !selection.unused_except.contains(path))
+        {
+            accounted.insert(normalize_except(path));
+        }
+        let files = selection.files;
         for relative in &files {
             let path = mod_target.join(relative);
             std::fs::remove_file(&path)
@@ -87,26 +92,25 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
     }
 
     if action.paths.is_empty() {
-        return Ok(());
+        let unaccounted: Vec<String> = action
+            .except
+            .iter()
+            .filter(|path| !accounted.contains(&normalize_except(path)))
+            .cloned()
+            .collect();
+        return super::conflicts::reject_unused_exceptions(cx.owner, &unaccounted);
     }
 
-    // An exception nobody could place is stale in exactly the way a
-    // `conflicts_with` one is: the archive moved, or the guide's carve-out no
-    // longer describes anything, and keeping it records a reason for a thing
-    // that does not happen. When there is a `conflicts_with`, it has already
-    // had its say above.
-    if action.conflicts_with.is_empty() && !unplaced.is_empty() {
-        anyhow::bail!(
-            "{}: file_prune `except` names {} that no pattern selects. Either the path is \
-             wrong or the exception is no longer needed.",
-            cx.owner,
-            unplaced
-                .iter()
-                .map(|path| format!("'{path}'"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
-    }
+    // Decided only now that both selectors have had their say: an exception
+    // neither one picked is stale, and keeping it records a reason for a thing
+    // that no longer happens.
+    let unaccounted: Vec<String> = action
+        .except
+        .iter()
+        .filter(|path| !accounted.contains(&normalize_except(path)))
+        .cloned()
+        .collect();
+    super::conflicts::reject_unused_exceptions(cx.owner, &unaccounted)?;
     for path in &kept_by_patterns {
         tracing::info!(
             owner = cx.owner,
@@ -443,5 +447,77 @@ mod except_tests {
 
         let err = apply(&action(&["textures/**"], &[]), &cx).expect_err("matched nothing");
         assert!(err.to_string().contains("matched nothing"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod except_across_selectors_tests {
+    use super::super::conflicts::tests::{instance, partner, settings};
+    use super::*;
+    use crate::config::actions::ActionCx;
+    use crate::config::schema::FilePruneAction;
+
+    /// The bug the Part 25 review found. An `except` naming a file that *both*
+    /// selectors reach was credited to the pattern pass and then deleted by the
+    /// conflict pass, which runs first -- so the carve-out was silently ignored,
+    /// with no error and no file. `except` promises the opposite.
+    #[test]
+    fn an_exception_both_selectors_reach_is_still_honoured() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["shared.esp", "other.esp"],
+            &["shared.esp", "other.esp", "mine.esp"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let action = FilePruneAction {
+            paths: vec!["*.esp".to_string()],
+            conflicts_with: vec!["Partner".to_string()],
+            under: None,
+            except: vec!["shared.esp".to_string()],
+        };
+        apply(&action, &cx).expect("prune");
+
+        assert!(
+            subject.join("shared.esp").exists(),
+            "the carve-out was deleted by the selector that did not claim it"
+        );
+        assert!(!subject.join("other.esp").exists(), "reached by both, not excepted");
+        assert!(!subject.join("mine.esp").exists(), "reached by the pattern alone");
+    }
+
+    /// And an exception that neither selector reaches is still an error, which
+    /// is the check the fix must not weaken.
+    #[test]
+    fn an_exception_neither_selector_reaches_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(dir.path(), &["shared.esp"], &["shared.esp", "a.nif"]);
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let action = FilePruneAction {
+            paths: vec!["*.nif".to_string()],
+            conflicts_with: vec!["Partner".to_string()],
+            under: None,
+            except: vec!["nowhere.dds".to_string()],
+        };
+        let err = apply(&action, &cx).expect_err("nothing selects nowhere.dds");
+        assert!(err.to_string().contains("nowhere.dds"), "{err}");
     }
 }

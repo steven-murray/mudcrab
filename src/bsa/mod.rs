@@ -69,19 +69,22 @@ pub const FLAG_FOLDER_NAMES: u32 = 0x0000_0001;
 pub const FLAG_FILE_NAMES: u32 = 0x0000_0002;
 /// Archive flag: payloads are zlib-compressed by default.
 pub const FLAG_COMPRESSED: u32 = 0x0000_0004;
-/// Bits 8-10, set by every real Oblivion archive.
+/// Bits 8-10, the shape every archive Bethesda shipped declares.
 ///
 /// Not documented anywhere reliable, and the engine's loader reads only the
-/// name and compression bits below -- but all 74 archives on this machine set
-/// these three, Bethesda's seventeen included, and `0x703` is the plain
-/// uncompressed shape they share. An archive mudcrab wrote used to be the only
-/// one anywhere with them clear.
+/// name and compression bits above. The case for writing them is the corpus,
+/// tallied in `MOFAM-test/notes/bsa-header-flags.csv`: of 74 real archives,
+/// **all 74** set bits 9 and 10, and **all 18 of Bethesda's own** set bit 8 as
+/// well, making `0x703` the plain uncompressed shape. Five mod-author archives
+/// clear bit 8 and are otherwise unremarkable, so it is not load-bearing --
+/// but following the game's own files where they are unanimous beats leaving
+/// mudcrab's archives the only ones with all three clear, which is what
+/// writing `0x003` did.
 ///
-/// Left out deliberately: `0x10` and `0x80`, which do vary. `0x80` is BSArch's
-/// habit (Bethesda sets it on one archive of seventeen), and `0x10` tracks
-/// something about content that no reading of the corpus has pinned down.
-/// Writing a bit whose value differs between real archives would be a guess;
-/// writing one they all agree on is not.
+/// Left out deliberately: `0x10` and `0x80`, which genuinely vary. `0x80` is
+/// BSArch's habit (Bethesda sets it on one archive of eighteen) and `0x10`
+/// tracks something the corpus does not pin down. Writing a bit real archives
+/// disagree about would be a guess; writing one they agree on is not.
 pub const FLAG_CONVENTIONAL: u32 = 0x0000_0700;
 
 /// Size-field bit meaning "this file's compression differs from the archive

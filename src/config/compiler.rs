@@ -84,10 +84,6 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     })
 }
 
-/// Desugar the top-level `[ini]` table into game-scoped ini_set actions.
-///
-/// These target Oblivion.ini specifically; game-scoped writes are redirected to
-/// the MO2 profile-local copy, never the original in the game directory.
 /// The filename a `manual:` descriptor already carries.
 ///
 /// `--archive-search-path` matches an archive by its `file_name`, and for a
@@ -104,6 +100,10 @@ fn manual_file_name(path: Option<&str>) -> Option<String> {
     (!name.is_empty()).then(|| name.to_string())
 }
 
+/// Desugar the top-level `[ini]` table into game-scoped ini_set actions.
+///
+/// These target Oblivion.ini specifically; game-scoped writes are redirected to
+/// the MO2 profile-local copy, never the original in the game directory.
 fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
     ini.iter()
         .map(|(key, value)| {

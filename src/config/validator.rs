@@ -77,11 +77,31 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
         }
     }
 
+    // Oblivion indexes a plugin's FormIDs by a single byte, so a load order
+    // cannot hold more than 255 active plugins. Past that the game does not
+    // complain: it loads the first 255 and the rest are simply not there, which
+    // looks like a mod that failed to install rather than a list that is too
+    // long. Merges are how a list gets back under -- so the number to report is
+    // the one that names them.
+    if modlist.plugins.len() > PLUGIN_LIMIT {
+        anyhow::bail!(
+            "load order has {} active plugins, {} over Oblivion's limit of {PLUGIN_LIMIT}. \
+             The game loads the first {PLUGIN_LIMIT} and silently ignores the rest. Merge some \
+             plugins, or drop them from the `plugins` array.",
+            modlist.plugins.len(),
+            modlist.plugins.len() - PLUGIN_LIMIT,
+        );
+    }
+
     validate_merges(modlist, &flattened_mods)?;
     detect_cycles(&flattened_mods)?;
 
     Ok(())
 }
+
+/// Active plugins Oblivion can load. The mod index is one byte, and `0xFF` is
+/// reserved for the save's own in-memory records.
+const PLUGIN_LIMIT: usize = 255;
 
 /// Every mod id a mod's actions declare a conflict against.
 fn conflict_partners(spec: &ModEntry) -> impl Iterator<Item = &String> {

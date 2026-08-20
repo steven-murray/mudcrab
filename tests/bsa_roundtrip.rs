@@ -498,9 +498,9 @@ fn packing_stores_a_repeated_payload_once() {
     );
 }
 
-/// Every real Oblivion archive sets bits 8-10, Bethesda's own included, and the
-/// plain uncompressed shape they share is `0x703`. mudcrab wrote `0x003`, which
-/// no archive the game has ever loaded does.
+/// All 18 archives Bethesda shipped set bits 8-10, and `0x703` is the plain
+/// uncompressed shape among them. mudcrab wrote `0x003`, which not one of the
+/// 74 archives in `MOFAM-test/notes/bsa-header-flags.csv` does.
 #[test]
 fn a_packed_archive_declares_the_flags_every_real_one_does() {
     let source = tempfile::tempdir().unwrap();
