@@ -69,6 +69,20 @@ pub const FLAG_FOLDER_NAMES: u32 = 0x0000_0001;
 pub const FLAG_FILE_NAMES: u32 = 0x0000_0002;
 /// Archive flag: payloads are zlib-compressed by default.
 pub const FLAG_COMPRESSED: u32 = 0x0000_0004;
+/// Bits 8-10, set by every real Oblivion archive.
+///
+/// Not documented anywhere reliable, and the engine's loader reads only the
+/// name and compression bits below -- but all 74 archives on this machine set
+/// these three, Bethesda's seventeen included, and `0x703` is the plain
+/// uncompressed shape they share. An archive mudcrab wrote used to be the only
+/// one anywhere with them clear.
+///
+/// Left out deliberately: `0x10` and `0x80`, which do vary. `0x80` is BSArch's
+/// habit (Bethesda sets it on one archive of seventeen), and `0x10` tracks
+/// something about content that no reading of the corpus has pinned down.
+/// Writing a bit whose value differs between real archives would be a guess;
+/// writing one they all agree on is not.
+pub const FLAG_CONVENTIONAL: u32 = 0x0000_0700;
 
 /// Size-field bit meaning "this file's compression differs from the archive
 /// default".

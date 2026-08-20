@@ -15,10 +15,9 @@ pub const KIND_MESHES: u32 = 0x0000_0001;
 pub const KIND_TEXTURES: u32 = 0x0000_0002;
 /// `.xml`.
 pub const KIND_MENUS: u32 = 0x0000_0004;
-/// `.wav`, and the `.lip` files that accompany voice lines.
+/// `.wav`.
 pub const KIND_SOUNDS: u32 = 0x0000_0008;
-/// `.mp3`, and `.lip` again -- authors disagree about which bucket a lip file
-/// belongs in, so it is declared under both.
+/// `.mp3` and `.lip`.
 pub const KIND_VOICES: u32 = 0x0000_0010;
 /// Anything under `shaders\`.
 pub const KIND_SHADERS: u32 = 0x0000_0020;
@@ -68,7 +67,13 @@ fn kind_of(path: &str) -> u32 {
         "xml" => KIND_MENUS,
         "wav" => KIND_SOUNDS,
         "mp3" => KIND_VOICES,
-        "lip" => KIND_SOUNDS | KIND_VOICES,
+        // Voices alone. `Oblivion - Voices1.bsa` holds 16603 `.mp3` and 16595
+        // `.lip` files and declares `0x010`; `Oblivion - Sounds.bsa` is 1533
+        // `.wav` files and declares `0x008`. Bethesda separates the two
+        // cleanly, so a lip file is not a sound. Declaring it as both used to
+        // look like the safe direction -- it made every voiced mod's archive
+        // claim a kind it does not hold.
+        "lip" => KIND_VOICES,
         "spt" => KIND_TREES,
         "fnt" | "tex" => KIND_FONTS,
         // Anything the engine has no dedicated bucket for. `.kf`, `.egm`,
@@ -106,13 +111,23 @@ mod tests {
         );
     }
 
+    /// The shape of `Oblivion - Voices1.bsa`, which declares `0x010` over
+    /// 16603 mp3s and 16595 lips. An archive of voice lines is not an archive
+    /// of sounds.
     #[test]
-    fn a_voice_line_declares_both_sounds_and_voices() {
-        // Real archives split on this: some put `.lip` under sounds, some under
-        // voices. Declaring both is the safe direction -- an over-declared kind
-        // costs a lookup, an under-declared one loses the asset.
+    fn a_voice_line_is_voices_only() {
         assert_eq!(
             derive(["sound\\voice\\a.mp3", "sound\\voice\\a.lip"]),
+            KIND_VOICES
+        );
+    }
+
+    /// And a mod that ships both -- Feldscar has `sound\fx` as well as voice
+    /// lines -- declares both, because it holds both.
+    #[test]
+    fn fx_alongside_voices_declares_both() {
+        assert_eq!(
+            derive(["sound\\fx\\thud.wav", "sound\\voice\\a.mp3"]),
             KIND_SOUNDS | KIND_VOICES
         );
     }

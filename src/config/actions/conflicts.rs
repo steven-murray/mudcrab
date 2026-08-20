@@ -163,7 +163,7 @@ pub(super) mod tests {
 
     /// A partner mod that exists on disk, so `staged_paths` reads its folder
     /// rather than trying to predict it from archives that are not there.
-    pub(super) fn instance(
+    pub(in crate::config::actions) fn instance(
         root: &std::path::Path,
         partner_files: &[&str],
         subject_files: &[&str],
@@ -179,7 +179,7 @@ pub(super) mod tests {
         (mods_dir.clone(), mods_dir.join("Subject"))
     }
 
-    pub(super) fn settings(mods_dir: PathBuf) -> InstallSettings {
+    pub(in crate::config::actions) fn settings(mods_dir: PathBuf) -> InstallSettings {
         InstallSettings {
             cache_dir: mods_dir.join("cache"),
             mods_dir,
@@ -197,7 +197,7 @@ pub(super) mod tests {
         }
     }
 
-    pub(super) fn partner() -> PersonalizedMod {
+    pub(in crate::config::actions) fn partner() -> PersonalizedMod {
         PersonalizedMod {
             id: "Partner".to_string(),
             oracle_name: None,

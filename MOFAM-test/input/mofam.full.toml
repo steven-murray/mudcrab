@@ -260,6 +260,17 @@ plugins = [
 	"tbskGuardsFeatures_UOP_Patch.esp",
 	"tbskGuardsFeaturesMergedVanillaAddons.esp",
 	"Unused Magic Items Integrated.esp",
+	# Part 25. Gottshaw, Reedstand, Sutch and the Dispensation patch are Part 36
+	# merge sources, hidden in the Oracle and active here until that merge exists.
+	"Feldscar.esp",
+	"Frostcrag Village.esp",
+	"Gottshaw Village.esp",
+	"Molapi.esp",
+	"Reedstand.esp",
+	"Sutch Village.esp",
+	"Urasek.esp",
+	"Vergayun.esp",
+	"DispMiscPatch_Ducks and Swans - Reedstand Patch.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -6305,3 +6316,192 @@ plugins = ["Travelling Equipment.esp"]
 path = "nexus:oblivion/50205/1000031591"
 download_handler = "nexus"
 file_name = "Travelling Equipment-50205-1-0-1-1655646100.7z"
+
+# ── Part 25 - ARTHMOOR'S TOWNS ──────────────────────────────────────────────
+#
+# One archetype, eight times. Each village ships as a base archive (a) plus a
+# separately-hosted voice-acting archive (b); the guide says to drag both into
+# BSArch Pro, pack one BSA named after the village, delete the loose folders,
+# and disable mod b.
+#
+# Modelled as **one mod with two archives**, not two mods. mudcrab installs a
+# mod's archives in order into the same folder, later overwriting earlier, which
+# is exactly the overlay BSArch Pro's "Replace All" performs -- so the VA files
+# win where they collide, and the b mod never has to exist as an installed-but-
+# disabled entry. The Oracle keeps eight empty, disabled `*_VA` folders; those
+# show as extras in `diff` and hold nothing.
+#
+# `pack_bsa` needs no `include` here: a BSA cannot store a file outside a
+# folder, so the `.esp` and `.txt` at the mod root stay loose on their own and
+# everything below `meshes/`, `sound/`, `textures/` and `video/` goes in. That
+# is the Oracle's shape in all eight cases, verified by comparing every path and
+# the exact payload byte count of all eight BSAs.
+#
+# All sixteen archives are manual: afkmods for the base mods, MediaFire and Mega
+# for the VA files. None is on Nexus, so none has a file id.
+
+[[mods]]
+id = "Feldscar"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Feldscar.esp"]
+
+[[mods.archives]]
+path = "manual:Feldscar.7z"
+
+# Guide 1b: "select Replace All" -- 852 of the base mod's voice files are
+# re-recorded here, so this layer has to land second.
+[[mods.archives]]
+path = "manual:Feldscar_-_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Feldscar.bsa"
+prune_packed = true
+
+[[mods]]
+id = "Frostcrag Village"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Frostcrag Village.esp"]
+
+[[mods.archives]]
+path = "manual:Frostcrag Village.7z"
+
+[[mods.archives]]
+path = "manual:Frostcrag_Village_-_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Frostcrag Village.bsa"
+prune_packed = true
+
+[[mods]]
+id = "Gottshaw Village"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Gottshaw Village.esp"]
+
+[[mods.archives]]
+path = "manual:Gottshaw Village.7z"
+
+[[mods.archives]]
+path = "manual:Gottshaw_Village_-_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Gottshaw Village.bsa"
+prune_packed = true
+
+[[mods]]
+id = "Molapi"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Molapi.esp"]
+
+[[mods.archives]]
+path = "manual:Molapi.7z"
+
+# Guide 4b: "select Replace All" -- 552 overlapping voice files.
+[[mods.archives]]
+path = "manual:Molapi_-_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Molapi.bsa"
+prune_packed = true
+
+# Guide 5b says "Drag the sound folder from **4b**" -- Molapi's VA archive, not
+# Reedstand's. A copy-paste slip: 4b holds `sound/voice/Molapi.esp/`, which
+# Reedstand.esp cannot address. 5b is what this row means.
+[[mods]]
+id = "Reedstand"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Reedstand.esp"]
+
+[[mods.archives]]
+path = "manual:Reedstand.7z"
+
+[[mods.archives]]
+path = "manual:Reedstand_-_VA.7z"
+
+# The guide names "meshes, sound & textures"; this archive also ships a
+# `video/` folder, which the Oracle packed too. Packing everything below the
+# root covers it either way -- see notes/part-25-arthmoors-towns.md.
+[[mods.actions]]
+action = "pack_bsa"
+output = "Reedstand.bsa"
+prune_packed = true
+
+[[mods]]
+id = "Sutch Village"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Sutch Village.esp"]
+
+[[mods.archives]]
+path = "manual:Sutch Village.7z"
+
+[[mods.archives]]
+path = "manual:Sutch Village - VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Sutch Village.bsa"
+prune_packed = true
+
+# Guide 7 lists only "meshes & textures" from 7a, then says to delete the loose
+# "meshes, sound & textures" folders -- so 7a's own `sound/` was meant to be
+# packed and the first bullet just omits it. Following the bullet literally
+# would drop 440 voice files the mod ships. The Oracle packed 7a's sound, which
+# settles the reading.
+[[mods]]
+id = "Urasek"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Urasek.esp"]
+
+[[mods.archives]]
+path = "manual:Urasek.7z"
+
+# Guide 7b: "select Replace All". The Oracle's Urasek.bsa kept the base mod's
+# bytes for all 608 overlapping voice files instead -- the only one of the three
+# "Replace All" rows where the replacement did not take. See report 1.
+[[mods.archives]]
+path = "manual:Urasek_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Urasek.bsa"
+prune_packed = true
+
+[[mods]]
+id = "Vergayun"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["Vergayun.esp"]
+
+[[mods.archives]]
+path = "manual:Vergayun.7z"
+
+[[mods.archives]]
+path = "manual:Vergayun_-_VA.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Vergayun.bsa"
+prune_packed = true
+
+# Guide 9: "Select just 'Compatibility Patches for Arthmoor's Mods' & name the
+# mod this way. Once installed, delete every esp except: DispMiscPatch_Ducks
+# and Swans - Reedstand Patch.esp". One folder out of sixteen in the same patch
+# collection Parts 7, 23 and 30 draw from.
+[[mods]]
+id = "Compatibility Patches for Arthmoor's Mods"
+section = ["25 - ARTHMOOR'S TOWNS"]
+plugins = ["DispMiscPatch_Ducks and Swans - Reedstand Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "custom-data-folder"
+data_folder = "Compatibility Patches for Arthmoor's Mods"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["*.esp"]
+except = ["DispMiscPatch_Ducks and Swans - Reedstand Patch.esp"]

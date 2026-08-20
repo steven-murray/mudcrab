@@ -232,11 +232,15 @@ pub struct FilePruneAction {
     pub under: Option<String>,
     /// Paths to leave alone even though the selection names them.
     ///
-    /// A conflict relationship is a statement about two mods, and occasionally
-    /// one file inside it is a deliberate exception. Listing it here keeps the
-    /// relationship stated honestly instead of degrading it into a path list --
-    /// and an `except` naming a file the selection did *not* pick is an error,
-    /// so a carve-out cannot quietly outlive the reason for it.
+    /// Applies to both selectors. For `conflicts_with` it keeps a relationship
+    /// stated honestly instead of degrading it into a path list when one file
+    /// inside it is a deliberate exception. For `paths` it spells the guide's
+    /// recurring "delete every esp except X" directly, rather than as a
+    /// hand-copied list of all the others -- which goes stale the moment the
+    /// archive gains a file.
+    ///
+    /// An `except` that no selector picks is an error either way, so a
+    /// carve-out cannot quietly outlive the reason for it.
     #[serde(default)]
     pub except: Vec<String>,
 }
