@@ -51,6 +51,7 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
             mod_target,
             &action.conflicts_with,
             action.under.as_deref(),
+            &action.except,
         )? {
             hide_path(&mod_target.join(&relative))?;
             hidden_by_conflict += 1;

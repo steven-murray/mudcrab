@@ -230,6 +230,15 @@ pub struct FilePruneAction {
     /// Restrict a `conflicts_with` selection to one subtree.
     #[serde(default)]
     pub under: Option<String>,
+    /// Paths to leave alone even though the selection names them.
+    ///
+    /// A conflict relationship is a statement about two mods, and occasionally
+    /// one file inside it is a deliberate exception. Listing it here keeps the
+    /// relationship stated honestly instead of degrading it into a path list --
+    /// and an `except` naming a file the selection did *not* pick is an error,
+    /// so a carve-out cannot quietly outlive the reason for it.
+    #[serde(default)]
+    pub except: Vec<String>,
 }
 
 /// Rename staged files to `<name>.mohidden`, MO2's way of dropping something
@@ -254,6 +263,15 @@ pub struct FileHideAction {
     /// Restrict a `conflicts_with` selection to one subtree.
     #[serde(default)]
     pub under: Option<String>,
+    /// Paths to leave alone even though the selection names them.
+    ///
+    /// A conflict relationship is a statement about two mods, and occasionally
+    /// one file inside it is a deliberate exception. Listing it here keeps the
+    /// relationship stated honestly instead of degrading it into a path list --
+    /// and an `except` naming a file the selection did *not* pick is an error,
+    /// so a carve-out cannot quietly outlive the reason for it.
+    #[serde(default)]
+    pub except: Vec<String>,
 }
 
 /// Move a staged file or folder somewhere else inside the same mod.

@@ -249,6 +249,17 @@ plugins = [
 	"DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp",
 	"lGet rid of Small Souls - Soulgem Prices.esp",
 	"Better Traps.esp",
+	# Part 24. The last four are Part 36 merge sources, hidden in the Oracle
+	# and active here until that merge exists.
+	"Weapons Of Morrowind.esp",
+	"Unique Artifacts for Unique People.esp",
+	"JBlades!1.1.esp",
+	"tbskGuardsFeatures.esp",
+	"Travelling Equipment.esp",
+	"Unique Artifacts for Unique People - Distribution.esp",
+	"tbskGuardsFeatures_UOP_Patch.esp",
+	"tbskGuardsFeaturesMergedVanillaAddons.esp",
+	"Unused Magic Items Integrated.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -2527,52 +2538,63 @@ bain_subpackages = [
 # OOO Enhanced-47187-5-33-1748819369.7z on this machine is a corrupt download of
 # a different build; this is the file the guide actually names.
 #
-# The guide's next step -- hide the files that conflict with Colourful Clothing
-# and WAC, delete them, then pack the remaining textures into OOO Enhanced.bsa --
-# is NOT here. It references mods from Parts 10 and 24, and the guide says to
-# return after Part 24. Packing now would archive exactly the files that step
-# removes. Until then the textures stay loose, and this mod's `textures/` shows
-# against the Oracle's packed `OOO Enhanced.bsa`.
+# Guide 11's follow-up, which the guide defers to after Part 24: "hide the files
+# that conflict with Colourful Clothing and WAC, delete them, then pack the
+# remaining textures into OOO Enhanced.bsa". Both partners now exist, so it runs.
 #
-# Its final form, written now so the row is not carrying a shape we intend to
-# throw away. Inert until Part 24 authors the Colourful Clothing mods, because
-# `validate` rejects a conflicts_with naming a mod the list does not have -- and
-# that rejection is the point of it.
+# Stated as a relationship rather than as 1725 paths. mudcrab derives the file
+# list from the modlist, which is the whole point: a real build has no finished
+# install to read it off. Validated against the list read off the Oracle when
+# Part 9 was built by hand -- all 1725 reproduced, nothing missing.
 #
-# The WAC half already reproduces 577 of the 578 files the Oracle hides by hand
-# for these mods; see notes/conflict-index-validation.md.
-#
-# One exception is needed. `meshes/realswords/nord/chainmailm1.nif` is the single
-# file of the 578 with a *loose* competitor as well as WAC's packed one --
-# `WAC - Integration - Roberts Conversion`, which outranks everything here and
-# wins the path regardless. Steven keeps it deliberately, and it is not a defect:
-# removing it changes nothing in game. See notes/conflict-index-validation.md.
-#
-#   [[mods.actions]]
-#   action = "file_prune"
-#   conflicts_with = [
-#     "WAC Waalx Animals & Creatures",
-#     "WAC - Integration",
-#     "HGEC Equipment Replacer for WAC",
-#     "WAC - Integration - Roberts Conversion",
-#     "WAC - Integration - HGEC Gauntlets Conversion",
-#     # Part 24, not yet authored:
-#     # "Colourful Clothing - Collection - Seamless OCOv2",
-#   ]
-#
-#   [[mods.actions]]
-#   action = "pack_bsa"
-#   output = "OOO Enhanced.bsa"
-#   prune_packed = true
+# `except` carries the one deliberate disagreement. WAC provides
+# `meshes/realswords/nord/chainmailm1.nif`, so the relationship selects it, but
+# Steven keeps it: `WAC - Integration - Roberts Conversion` ships a *loose* copy
+# that outranks everything here and wins the path regardless, so removing it
+# changes nothing in game. See notes/conflict-index-validation.md.
 [[mods]]
 id = "OOO Enhanced 5.3 (03.25) - Resources"
 oracle_name = "OOO Enhanced 5.3b - Resources"  # renamed when the Oracle moved to 5.3b
-section = ["9 - OVERHAULS OSCURO"]
+section = ["24 - NEW WEAPONS & ARMOURS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/47187/1000041194"
 download_handler = "nexus"
 file_name = "OOO Enhanced - Resources-47187-5-3b-1742488154.7z"
+# Windows Explorer thumbnail caches ship in this archive -- 4 spelled
+# `thumbs.db` and 10 `Thumbs.db`. MO2 strips them on install and mudcrab does
+# not, so they are excluded here rather than packed into the BSA.
+#
+# Both spellings are listed because archive-side globs are case-*sensitive*
+# while staged-tree ones are not. That asymmetry is a known deferred item and
+# this is another instance of it: one pattern looks like it covers the case and
+# silently catches 4 of 14. See notes/ooo-enhanced-thumbs-db.txt.
+exclude = ["**/thumbs.db", "**/Thumbs.db"]
+
+[[mods.actions]]
+action = "file_prune"
+conflicts_with = [
+  "WAC Waalx Animals & Creatures",
+  "WAC - Integration",
+  "HGEC Equipment Replacer for WAC",
+  "WAC - Integration - Roberts Conversion",
+  "WAC - Integration - HGEC Gauntlets Conversion",
+  "Colourful Clothing - Collection - Seamless OCOv2",
+]
+except = ["meshes/realswords/nord/chainmailm1.nif"]
+
+# "pack the remaining *textures*" -- meshes stay loose, which is what the
+# Oracle's BSA contains too (3580 textures, no meshes).
+#
+# `prune_packed` removes the loose copies afterwards. The Oracle kept them, so
+# its BSA is shadowed by the very files it holds: MO2 gives loose files
+# precedence over archives regardless of priority, so nothing in that archive is
+# ever read. Ours is the reading the instruction only makes sense under.
+[[mods.actions]]
+action = "pack_bsa"
+output = "OOO Enhanced.bsa"
+include = ["textures/**"]
+prune_packed = true
 
 # Guide 1: "Download this file > WACv_1beta.7z only", then "Install manually &
 # deselect everything except: Waalx Animals & Creatures.esm, WAC.bsa".
@@ -6051,3 +6073,235 @@ plugins = ["Enemy Spell Variety.esp"]
 path = "nexus:oblivion/53501/1000036581"
 download_handler = "nexus"
 file_name = "Enemy Spell Variety-53501-1-0-1697742770.7z"
+
+# ── Part 24 - NEW WEAPONS & ARMOURS ─────────────────────────────────────────
+#
+# 12 guide rows (row 7 splits into a-e), 16 mods. The section the whole
+# conflict-resolution machinery has been waiting for: row 8 brings Colourful
+# Clothing, which is OOO Enhanced Resources' second conflict partner.
+
+# Guide 1: "pack the mod using BSArch & be sure to name your BSA as 'Weapons of
+# Morrowind'. Then delete the loose Textures & Meshes folders." mudcrab writes
+# BSAs natively -- no BSArch, no WINE.
+#
+# The Oracle did NOT do this: its folder still has loose Meshes and Textures and
+# no BSA. Following the guide means this mod diffs wholesale until Steven packs
+# his, so it is the largest deliberate difference in the section.
+[[mods]]
+id = "Weapons Of Morrowind"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["Weapons Of Morrowind.esp"]
+
+[[mods.archives]]
+# "1st main file".
+path = "nexus:oblivion/45440/1000007651"
+download_handler = "nexus"
+file_name = "Weapons Of Morrowind-45440-1-0.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Weapons of Morrowind.bsa"
+include = ["meshes/**", "textures/**"]
+prune_packed = true
+
+[[mods]]
+id = "Unique Artifacts for Unique People"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["Unique Artifacts for Unique People.esp", "Unique Artifacts for Unique People - Distribution.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49871/1000034571"
+download_handler = "nexus"
+file_name = "Unique Artifacts for Unique People-49871-1-6-2-1683089691.7z"
+
+# Guide 3: "select just 02 Extended UI Weapon Backstory Descriptions". The other
+# three subpackages are MOBS/OMOBS/OOO patches this list does not want.
+[[mods]]
+id = "Unique Artifacts for Unique People - Patches"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49871/1000034572"
+download_handler = "nexus"
+file_name = "Unique Artifacts for Unique People - Patches-49871-1-6-2-1683089737.7z"
+layout = "bain"
+bain_subpackages = ["02 Extended UI Weapon Backstory Descriptions"]
+
+# Guide 4: "main file & hide Jblades!.esp". Row 5 replaces it with
+# `JBlades!1.1.esp`, so the original must not load. The Oracle *deleted* it
+# rather than hiding it; the guide says hide, so this differs by one
+# `.mohidden` file that the Oracle does not have at all.
+[[mods]]
+id = "JaySuS Blades"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/18529/27849"
+download_handler = "nexus"
+file_name = "JaySuS Blades-18529.rar"
+
+[[mods.actions]]
+action = "file_hide"
+paths = ["JBlades!.esp"]
+
+[[mods]]
+id = "Proper Jaysus Blades VOL 1 FIX"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["JBlades!1.1.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53167/1000039626"
+download_handler = "nexus"
+file_name = "Jaysus Blades Plugin fixes for Ultimate Leveling-53167-1-3-1728756241.rar"
+
+# Guide 6: "[QAC]" and "right click the Local Guards Features > Data folder &
+# Set as \ directory". That instruction is load-bearing, not decoration: the
+# wrapper also holds an `Oscuro's Oblivion Overhaul Patch` folder with its own
+# plugin, and auto-detection refuses the archive outright rather than guess
+# between them. The guide says which, so say it.
+[[mods]]
+id = "Local Guards Features"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["tbskGuardsFeatures.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45517/1000010180"
+download_handler = "nexus"
+file_name = "Local Guards Features 1.1-45517-1-1.7z"
+data_folder = "Local Guards Features/Data"
+
+# [[mods.actions]]
+# action = "qac"
+
+[[mods]]
+id = "Local Guards Features Unofficial Patch"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["tbskGuardsFeatures_UOP_Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49896/1000029931"
+download_handler = "nexus"
+file_name = "Local Guards Features Unofficial Patch-49896-1-0-1641133187.7z"
+
+# Guide 7b-d each say "Once installed delete <addon>.esp" -- row 7e's merged
+# vanilla addons replaces all three, so the individual plugins must not load.
+[[mods]]
+id = "Local Guards Features - Kvatch Addon"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48779/1000030559"
+download_handler = "nexus"
+file_name = "Local Guards Features - Kvatch Addon-48779-1-1-1646680917.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["tbskGuardsFeaturesKvatchAddon.esp"]
+
+# Guide 7c. Missing from the Oracle -- never installed there -- but its archive
+# is in the downloads folder, so it builds. Shows as extra in ours.
+[[mods]]
+id = "Local Guards Features - Thorn Addon"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49043/1000020961"
+download_handler = "nexus"
+file_name = "Local Guards Features - Thorn Addon-49043-1-0-1544956288.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["tbskGuardsFeaturesThornAddon.esp"]
+
+[[mods]]
+id = "Local Guards Features - White Stallion Addon"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50482/1000025993"
+download_handler = "nexus"
+file_name = "Local Guards Features - White Stallion Addon-50482-1-0-1603638276.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["tbskGuardsFeaturesWhiteStallionAddon.esp"]
+
+[[mods]]
+id = "Local Guards Features - Gaius Prentus Addon"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["tbskGuardsFeaturesMergedVanillaAddons.esp"]
+
+[[mods.archives]]
+# Guide 7e: "Local Guards Features - Merged Vanilla Addons (Bashed Patch
+# Mergeable)".
+path = "nexus:oblivion/52015/1000032754"
+download_handler = "nexus"
+file_name = "Local Guards Features - Merged Vanilla Addons (Bashed Patch Mergeable)-52015-1-0-1667843174.7z"
+
+# Guide 8, "(Seamless OCOv2 main file)", then: "Using BAE, extract the archive
+# to the mod's install location; delete the archive & Colorful Clothing -
+# Collection.esp." The archive holds exactly those two files. mudcrab reads and
+# writes BSAs natively, so `extract_bsa` replaces BAE.
+#
+# The guide's REMINDER right after this row -- "Revisit OOO Enhanced Resources &
+# perform the post-install steps" -- is what the whole conflict-resolution
+# mechanism was built for; see the OOO Enhanced row in Part 9.
+[[mods]]
+id = "Colourful Clothing - Collection - Seamless OCOv2"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53708/1000037424"
+download_handler = "nexus"
+file_name = "Colorful Clothing - Collection - Seamless OCOv2-53708-1-1-1705249536.7z"
+
+[[mods.actions]]
+action = "extract_bsa"
+archive = "Colorful Clothing - Collection.bsa"
+
+# The guide says to delete the archive *and* the esp; `extract_bsa` already
+# removes the archive it unpacked, so only the plugin is left to prune.
+[[mods.actions]]
+action = "file_prune"
+paths = ["Colorful Clothing - Collection.esp"]
+
+[[mods]]
+id = "AI Enhanced - Colorful Clothing - Middleclass"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+# Guide 9: "(1k)".
+path = "nexus:oblivion/52163/1000031768"
+download_handler = "nexus"
+file_name = "AI Enhanced - Colorful Clothing - Middleclass Textures-52163-2-0-1657669289.rar"
+
+[[mods]]
+id = "AI Enhanced - Colorful Clothing - Upperclass"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+
+[[mods.archives]]
+# Guide 10: "(1k)".
+path = "nexus:oblivion/52165/1000031776"
+download_handler = "nexus"
+file_name = "AI Enhanced - Colorful Clothing - Upperclass Textures-52165-1-1-1657724832.rar"
+
+[[mods]]
+id = "Unused Magic Items Integrated"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["Unused Magic Items Integrated.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49404/1000022197"
+download_handler = "nexus"
+file_name = "Unused Magic Items Integrated-49404-1-0-1559241170.zip"
+
+[[mods]]
+id = "Travelling Equipment - Cloaks and Backpacks"
+section = ["24 - NEW WEAPONS & ARMOURS"]
+plugins = ["Travelling Equipment.esp"]
+
+[[mods.archives]]
+# Guide 12: "main file only".
+path = "nexus:oblivion/50205/1000031591"
+download_handler = "nexus"
+file_name = "Travelling Equipment-50205-1-0-1-1655646100.7z"
