@@ -856,6 +856,7 @@ mod tests {
         };
 
         let plan = PersonalizedPlan {
+            guide: None,
             schema_version: 1,
             name: "Nexus Test".to_string(),
             responses: std::collections::HashMap::new(),
@@ -928,6 +929,7 @@ mod tests {
         };
 
         let plan = PersonalizedPlan {
+            guide: None,
             schema_version: 1,
             name: "Nexus Missing Key".to_string(),
             responses: std::collections::HashMap::new(),

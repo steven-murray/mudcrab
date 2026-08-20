@@ -36,6 +36,7 @@ pub fn build_plan(compiled: &CompiledModlist, headless: bool) -> anyhow::Result<
     }
 
     Ok(PersonalizedPlan {
+        guide: compiled.guide.clone(),
         schema_version: compiled.schema_version,
         name: compiled.name.clone(),
         responses,

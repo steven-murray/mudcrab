@@ -5,6 +5,12 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceModlist {
     pub name: String,
+    /// When the guide this list follows was published, and how to recognise a
+    /// file newer than it. Optional: a list that is not transcribing a guide
+    /// has nothing to compare against, and `diff` simply says nothing about
+    /// archive age.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guide: Option<GuideProvenance>,
     #[serde(default)]
     pub inputs: HashMap<String, InputSpec>,
     #[serde(default)]
@@ -15,6 +21,30 @@ pub struct SourceModlist {
     pub plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
     pub post_install_actions: Vec<PostInstallAction>,
+}
+
+/// What `diff` needs to say whether an archive predates the guide being followed.
+///
+/// This is a property of *a modlist*, not of mudcrab. MOFAM was published in
+/// March 2025; the next list will not be. Hardcoding either field would build
+/// one guide's specifics into a general tool -- and the tool is the part meant
+/// to outlive the guide.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct GuideProvenance {
+    /// Publication date, `YYYY-MM-DD`. An archive published after it is one the
+    /// guide cannot have meant, however the guide phrased its instruction.
+    pub published: String,
+    /// The Nexus file id that corresponds to `published`, if it is known.
+    ///
+    /// Nexus appears to allocate file ids in ascending order, so an id doubles
+    /// as an upload date -- which dates archives whose filenames carry no
+    /// timestamp, and beats `nexusLastModified`, that being frequently the day
+    /// the file was *downloaded*. Optional because deriving it takes a corpus:
+    /// collect archives that have both a file id and a filename timestamp, sort
+    /// by id, and read off the boundary at `published`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_id: Option<u64>,
 }
 
 impl SourceModlist {
@@ -536,6 +566,8 @@ pub struct BuildLayer {
 pub struct CompiledModlist {
     pub schema_version: u32,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guide: Option<GuideProvenance>,
     pub input_count: usize,
     pub mod_count: usize,
     pub plugin_count: usize,
@@ -615,6 +647,8 @@ pub enum InputValue {
 pub struct PersonalizedPlan {
     pub schema_version: u32,
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub guide: Option<GuideProvenance>,
     pub responses: HashMap<String, InputValue>,
     pub mod_order: Vec<String>,
     pub selected_mods: Vec<String>,

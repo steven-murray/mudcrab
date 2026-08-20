@@ -403,6 +403,20 @@ pub struct DiffArgs {
     /// Report format.
     #[arg(long, value_enum, default_value_t = DiffFormat::Text)]
     pub format: DiffFormat,
+    /// Publication date of the guide the list follows, `YYYY-MM-DD`.
+    ///
+    /// Normally read from the modlist's `[guide]` table and carried through the
+    /// plan; give it here to compare two directories without one, or to override
+    /// what the plan says. Without either, archive age is not reported.
+    #[arg(long, value_name = "YYYY-MM-DD")]
+    pub guide_date: Option<String>,
+    /// Nexus file id corresponding to `--guide-date`.
+    ///
+    /// Nexus allocates file ids in ascending order, so an id dates a file whose
+    /// name carries no timestamp. Optional; without it those archives report as
+    /// unknown age rather than being guessed at.
+    #[arg(long, value_name = "ID", requires = "guide_date")]
+    pub guide_file_id: Option<u64>,
     #[command(flatten)]
     pub filter: FilterArgs,
 }

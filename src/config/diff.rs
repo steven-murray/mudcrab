@@ -40,7 +40,43 @@ const MO2_HIDDEN_SUFFIX: &str = ".mohidden";
 /// The guide frequently says only "use the top file on the page", so an Oracle
 /// archive stamped after this date is a file the guide never actually named --
 /// drift the author has to consciously accept rather than assume.
-const GUIDE_CUTOFF: i64 = 1_740_787_200;
+/// When the guide being followed was published, and the Nexus file id that
+/// corresponds to it.
+///
+/// Carried from the modlist rather than hardcoded. mudcrab compiles *a* modlist;
+/// MOFAM's March 2025 publication date is a fact about MOFAM, and building it
+/// into the binary would make every future list wrong by default. `None` means
+/// the list is not transcribing a guide, and `diff` then says nothing about
+/// archive age -- which is the honest answer, not a missing feature.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GuideEra {
+    /// Seconds since the epoch.
+    pub published: i64,
+    pub file_id: Option<u64>,
+}
+
+impl GuideEra {
+    /// Read from a plan's `[guide]` table. `None` when it declares none, and an
+    /// error when the date it declares cannot be parsed -- a typo there would
+    /// otherwise silently disable every age check in the report.
+    pub fn from_provenance(
+        guide: Option<&crate::config::schema::GuideProvenance>,
+    ) -> anyhow::Result<Option<Self>> {
+        let Some(guide) = guide else {
+            return Ok(None);
+        };
+        let published = parse_ymd(&guide.published).ok_or_else(|| {
+            anyhow::anyhow!(
+                "modlist [guide] published = \"{}\" is not a YYYY-MM-DD date",
+                guide.published
+            )
+        })?;
+        Ok(Some(Self {
+            published,
+            file_id: guide.file_id,
+        }))
+    }
+}
 
 /// Plausible range for a Unix timestamp embedded in a Nexus filename: 2001-09
 /// to 2100. Nexus also puts bare mod ids in those filenames (`...-19039.7z`),
@@ -147,6 +183,11 @@ pub struct DiffSettings {
     pub filter: ModFilter,
     /// Section paths and declared archive names, when a plan was supplied.
     pub plan: Option<PlanIndex>,
+    /// The guide this list follows. From the modlist's `[guide]` table, or from
+    /// `--guide-date`/`--guide-file-id` for a comparison run without a plan.
+    /// `None` means archive age is not reported, which is the honest answer
+    /// when nothing has said what the archives should be compared against.
+    pub era: Option<GuideEra>,
 }
 
 /// What a plan tells us about a mod that the directories themselves cannot.
@@ -401,7 +442,7 @@ pub fn diff_all(settings: &DiffSettings) -> anyhow::Result<DiffReport> {
     let ours = list_mod_dirs(&settings.mods_dir)?;
     let oracle = list_mod_dirs(&settings.oracle_dir)?;
 
-    let candidates = union_candidates(&ours, &oracle, settings);
+    let candidates = union_candidates(&ours, &oracle, settings, settings.era);
     let diffs = compare_in_parallel(&candidates);
 
     Ok(assemble_report(diffs, settings))
@@ -418,6 +459,9 @@ struct Candidate {
     ours: Option<PathBuf>,
     oracle: Option<PathBuf>,
     plan_file_names: Vec<String>,
+    /// The guide this list follows, if it declares one. Carried per candidate
+    /// so the parallel comparison needs no shared state.
+    era: Option<GuideEra>,
 }
 
 /// Directory names in a mods folder, keyed by lowercased name.
@@ -451,6 +495,7 @@ fn union_candidates(
     ours: &BTreeMap<String, PathBuf>,
     oracle: &BTreeMap<String, PathBuf>,
     settings: &DiffSettings,
+    era: Option<GuideEra>,
 ) -> Vec<Candidate> {
     let mut keys: Vec<String> = ours.keys().chain(oracle.keys()).cloned().collect();
     // An aliased mod we have not built yet has no key on either side under our
@@ -511,6 +556,7 @@ fn union_candidates(
             ours: ours_path.cloned(),
             oracle: oracle_path.cloned(),
             plan_file_names: entry.map(|entry| entry.file_names.clone()).unwrap_or_default(),
+            era,
         });
     }
 
@@ -593,7 +639,7 @@ fn compare_mod(candidate: &Candidate) -> ModDiff {
     };
 
     if let Some(oracle_dir) = &candidate.oracle {
-        diff.version = Some(read_version_info(oracle_dir, &candidate.plan_file_names));
+        diff.version = Some(read_version_info(oracle_dir, &candidate.plan_file_names, candidate.era));
     }
 
     // Nothing is read for a mod that exists on only one side: there is no
@@ -864,7 +910,11 @@ fn sha256_file(path: &Path) -> std::io::Result<String> {
     Ok(format!("{:x}", hasher.finalize()))
 }
 
-fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionInfo {
+fn read_version_info(
+    oracle_dir: &Path,
+    plan_file_names: &[String],
+    era: Option<GuideEra>,
+) -> VersionInfo {
     let meta = std::fs::read_to_string(oracle_dir.join(MO2_META_FILE))
         .ok()
         .map(|text| parse_meta_ini(&text))
@@ -887,6 +937,7 @@ fn read_version_info(oracle_dir: &Path, plan_file_names: &[String]) -> VersionIn
             meta.nexus_last_modified.as_deref(),
             meta.mod_id,
             meta.file_id,
+            era,
         ),
         oracle_installation_file: installation_file,
         plan_file_name,
@@ -942,27 +993,6 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
         .any(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
 }
 
-/// The Nexus file id separating files published before the guide from files
-/// published after it.
-///
-/// Nexus appears to allocate file ids in ascending order, so an id doubles as an
-/// upload date. Calibrated against the archives in this list carrying both a
-/// file id and a Unix timestamp in their filename: 406 of them, of which 405
-/// were usable, and across those 405 the two orderings agree exactly. The
-/// boundary is clean -- largest pre-guide id 1_000_040_927 (2025-02-23),
-/// smallest post-guide id 1_000_040_999 (2025-03-01), nothing in between.
-/// Legacy ids, five or six digits, fall far below either.
-///
-/// The 406th is Part 20's VGR patch, whose two versions' MO2 sidecars both claim
-/// the same file id -- which is itself why that row is written up as unresolved.
-/// Excluded rather than allowed to widen the boundary.
-///
-/// The value is baked in, so a user who has never seen a reference instance gets
-/// the same answers -- which is the real gain over `nexusLastModified`, and the
-/// reason this constant is worth having. It is *not* an independently verified
-/// property of Nexus site-wide: it is one game's corpus over one year, and
-/// re-calibrating means finding the boundary again from filename timestamps.
-const GUIDE_FILE_ID: u64 = 1_000_040_999;
 
 /// Date the Oracle's archive, to decide whether the March 2025 guide could
 /// have meant this file.
@@ -973,7 +1003,7 @@ const GUIDE_FILE_ID: u64 = 1_000_040_999;
 ///    (`<title>-<modid>-<version parts>-<unix timestamp>.7z`). This names the
 ///    exact file, so it is preferred -- but Nexus only started doing it at some
 ///    point, and older archives end in the bare mod id or nothing useful.
-/// 2. The Nexus file id, against [`GUIDE_FILE_ID`].
+/// 2. The Nexus file id, against the boundary the modlist declares.
 ///
 /// `nexusLastModified` used to be the second source and is no longer consulted
 /// at all: it is frequently the date MO2 fetched rather than the date the file
@@ -988,7 +1018,16 @@ pub fn classify_guide_age(
     nexus_last_modified: Option<&str>,
     mod_id: Option<u64>,
     file_id: Option<u64>,
+    era: Option<GuideEra>,
 ) -> GuideAge {
+    // No guide, nothing to be older or newer than. Said once here rather than
+    // threaded through every branch below.
+    let Some(era) = era else {
+        return GuideAge::Unknown {
+            reason: "the modlist declares no [guide], so there is no date to compare against"
+                .to_string(),
+        };
+    };
     let name = installation_file.map(str::trim).filter(|name| !name.is_empty());
 
     // `nexusLastModified` on a mod that did not come from Nexus is not a date
@@ -1015,7 +1054,7 @@ pub fn classify_guide_age(
     };
 
     if let Some(timestamp) = parse_trailing_timestamp(name) {
-        return classify_timestamp(timestamp);
+        return classify_timestamp(timestamp, era);
     }
 
     // The file id dates the file, and far more reliably than
@@ -1027,8 +1066,12 @@ pub fn classify_guide_age(
     // Gated on `from_nexus` for the same reason the date below is: a `meta.ini`
     // field can be MO2 bookkeeping rather than provenance, and a stray number
     // would otherwise become a confident answer with nothing behind it.
-    if let Some(file_id) = file_id.filter(|_| from_nexus).filter(|id| *id > 0) {
-        return if file_id < GUIDE_FILE_ID {
+    if let Some((file_id, boundary)) = file_id
+        .filter(|_| from_nexus)
+        .filter(|id| *id > 0)
+        .zip(era.file_id)
+    {
+        return if file_id < boundary {
             GuideAge::PreGuide {
                 timestamp: 0,
                 date: format!("Nexus file id {file_id}"),
@@ -1058,9 +1101,9 @@ pub fn classify_guide_age(
     }
 }
 
-fn classify_timestamp(timestamp: i64) -> GuideAge {
+fn classify_timestamp(timestamp: i64, era: GuideEra) -> GuideAge {
     let date = format_date(timestamp);
-    if timestamp >= GUIDE_CUTOFF {
+    if timestamp >= era.published {
         GuideAge::PostGuide { timestamp, date }
     } else {
         GuideAge::PreGuide { timestamp, date }
@@ -1085,6 +1128,26 @@ fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
 /// Render a Unix timestamp as `YYYY-MM-DD` (UTC).
 ///
 /// Hand-rolled rather than pulling in a date crate for one format string.
+/// Seconds since the epoch for a `YYYY-MM-DD` date, at midnight UTC.
+fn parse_ymd(value: &str) -> Option<i64> {
+    let mut parts = value.trim().split('-');
+    let year: i64 = parts.next()?.parse().ok()?;
+    let month: i64 = parts.next()?.parse().ok()?;
+    let day: i64 = parts.next()?.parse().ok()?;
+    if parts.next().is_some() || !(1..=12).contains(&month) || !(1..=31).contains(&day) {
+        return None;
+    }
+
+    // Days from the civil epoch -- Howard Hinnant's algorithm, which is exact
+    // for the whole proleptic Gregorian range and needs no date library.
+    let year = if month <= 2 { year - 1 } else { year };
+    let era = if year >= 0 { year } else { year - 399 } / 400;
+    let year_of_era = year - era * 400;
+    let day_of_year = (153 * (if month > 2 { month - 3 } else { month + 9 }) + 2) / 5 + day - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    Some((era * 146_097 + day_of_era - 719_468) * 86_400)
+}
+
 fn format_date(timestamp: i64) -> String {
     let days = timestamp.div_euclid(86_400);
     let z = days + 719_468;
@@ -1411,6 +1474,14 @@ fn render_version_notes(out: &mut String, report: &DiffReport) {
 
 #[cfg(test)]
 mod tests {
+
+    /// The era MOFAM declares, for tests about dating rather than about where
+    /// the era comes from. Mirrors the `[guide]` table in
+    /// `MOFAM-test/input/mofam.full.toml`.
+    const MOFAM: Option<GuideEra> = Some(GuideEra {
+        published: 1_740_787_200,
+        file_id: Some(1_000_040_999),
+    });
     use super::*;
     use tempfile::tempdir;
 
@@ -1457,14 +1528,14 @@ mod tests {
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
         assert_eq!(
-            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(MODERN_FILE_ID)),
+            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(MODERN_FILE_ID), MOFAM),
             GuideAge::PreGuide {
                 timestamp: 1_647_873_144,
                 date: "2022-03-21".to_string()
             }
         );
         assert_eq!(
-            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(MODERN_FILE_ID)),
+            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(MODERN_FILE_ID), MOFAM),
             GuideAge::PostGuide {
                 timestamp: 1_750_000_000,
                 date: "2025-06-15".to_string()
@@ -1473,19 +1544,20 @@ mod tests {
         // A filename with no timestamp used to be unanswerable. The file id
         // answers it now, which is the point of the boundary.
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(MODERN_FILE_ID)),
+            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(MODERN_FILE_ID), MOFAM),
             GuideAge::PreGuide { .. }
         ));
         // With neither a timestamp nor a file id there is still nothing to go on.
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory.7z"), None, Some(19039), Some(0)),
+            classify_guide_age(Some("Anvil Morning Glory.7z"), None, Some(19039), Some(0), MOFAM),
             GuideAge::Unknown { .. }
         ));
-        assert!(matches!(classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID)), GuideAge::Unknown { .. }));
+        assert!(matches!(classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID), MOFAM), GuideAge::Unknown { .. }));
     }
 
     fn compare_trees(ours: &Path, oracle: &Path) -> ModDiff {
         compare_mod(&Candidate {
+            era: MOFAM,
             id: "Example".to_string(),
             oracle_name: None,
             section: vec!["7 - CHARACTER AND NPCS".to_string()],
@@ -1545,10 +1617,10 @@ mod tests {
         // A hand-installed mod has no `installationFile`, and MO2's
         // `nexusLastModified` is then just when the folder was written. Reading
         // it would date a 2019 archive to today and flag it POST-GUIDE.
-        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID));
+        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID), MOFAM);
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID));
+        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID), MOFAM);
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 
@@ -1558,7 +1630,7 @@ mod tests {
         // modid=0. MO2 still wrote nexusLastModified=2026-01-25 -- the day it
         // was installed here, not the day the file was published -- and reading
         // it flagged a fifteen-year-old archive as newer than the guide.
-        let age = classify_guide_age(Some("WACv_1beta.7z"), Some("2026-01-25T20:19:46Z"), Some(0), Some(0));
+        let age = classify_guide_age(Some("WACv_1beta.7z"), Some("2026-01-25T20:19:46Z"), Some(0), Some(0), MOFAM);
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
         match age {
             GuideAge::Unknown { reason } => assert!(reason.contains("no recorded Nexus file"), "{reason}"),
@@ -1573,6 +1645,7 @@ mod tests {
             Some("2026-01-25T20:19:46Z"),
             Some(7),
             None,
+            MOFAM,
         );
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
@@ -1583,12 +1656,13 @@ mod tests {
             Some("2026-01-25T20:19:46Z"),
             Some(1318),
             Some(52000),
+            MOFAM,
         );
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
 
         // A filename timestamp names *this file* whoever hosted it, so it
         // survives modid=0 -- only the Nexus-derived date is dropped.
-        let age = classify_guide_age(Some("Mod-1-0-1647873144.7z"), None, Some(0), Some(0));
+        let age = classify_guide_age(Some("Mod-1-0-1647873144.7z"), None, Some(0), Some(0), MOFAM);
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
@@ -1601,6 +1675,7 @@ mod tests {
             Some("2026-01-01T00:00:00Z"),
             Some(50682),
             Some(MODERN_FILE_ID),
+            MOFAM,
         );
         match age {
             GuideAge::PreGuide { date, .. } => assert_eq!(date, "2022-03-21"),
@@ -1641,8 +1716,11 @@ mod tests {
 
     #[test]
     fn the_cutoff_constant_is_the_guides_publication_date() {
-        assert_eq!(format_date(GUIDE_CUTOFF), "2025-03-01");
-        assert_eq!(format_date(GUIDE_CUTOFF - 1), "2025-02-28");
+        // The date MOFAM declares, parsed back through the same arithmetic.
+        let era = MOFAM.expect("MOFAM declares a guide");
+        assert_eq!(format_date(era.published), "2025-03-01");
+        assert_eq!(format_date(era.published - 1), "2025-02-28");
+        assert_eq!(parse_ymd("2025-03-01"), Some(era.published));
         assert_eq!(format_date(0), "1970-01-01");
     }
 }
@@ -1701,7 +1779,15 @@ mod archive_name_tests {
 
 #[cfg(test)]
 mod file_id_age_tests {
-    use super::{classify_guide_age, GuideAge};
+
+    /// The era MOFAM declares, for tests about dating rather than about where
+    /// the era comes from. Mirrors the `[guide]` table in
+    /// `MOFAM-test/input/mofam.full.toml`.
+    const MOFAM: Option<GuideEra> = Some(GuideEra {
+        published: 1_740_787_200,
+        file_id: Some(1_000_040_999),
+    });
+    use super::{classify_guide_age, GuideAge, GuideEra};
 
     #[test]
     fn a_file_id_outweighs_a_download_stamped_meta_ini() {
@@ -1714,6 +1800,7 @@ mod file_id_age_tests {
             Some("2026-01-26T00:06:25Z"),
             Some(29314),
             Some(54124),
+            MOFAM,
         );
         match age {
             GuideAge::PreGuide { date, .. } => assert!(date.contains("54124"), "{date}"),
@@ -1728,6 +1815,7 @@ mod file_id_age_tests {
             Some("2026-01-26T00:00:00Z"),
             Some(45111),
             Some(1000006810),
+            MOFAM,
         );
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
@@ -1741,14 +1829,15 @@ mod file_id_age_tests {
             None,
             Some(51197),
             Some(1000041917),
+            MOFAM,
         );
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
 
         // And the boundary itself: the smallest post-guide id observed.
-        let age = classify_guide_age(Some("Sneak Vignette.7z"), None, Some(1), Some(1000040999));
+        let age = classify_guide_age(Some("Sneak Vignette.7z"), None, Some(1), Some(1000040999), MOFAM);
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
         // ...against the largest pre-guide id observed.
-        let age = classify_guide_age(Some("Better dungeons.7z"), None, Some(1), Some(1000040927));
+        let age = classify_guide_age(Some("Better dungeons.7z"), None, Some(1), Some(1000040927), MOFAM);
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
@@ -1761,6 +1850,7 @@ mod file_id_age_tests {
             Some("2026-01-26T00:06:25Z"),
             Some(123),
             Some(4567),
+            MOFAM,
         );
         match age {
             GuideAge::PreGuide { date, .. } => assert!(date.starts_with("2020"), "{date}"),
@@ -1771,7 +1861,15 @@ mod file_id_age_tests {
 
 #[cfg(test)]
 mod file_id_provenance_tests {
-    use super::{classify_guide_age, GuideAge};
+
+    /// The era MOFAM declares, for tests about dating rather than about where
+    /// the era comes from. Mirrors the `[guide]` table in
+    /// `MOFAM-test/input/mofam.full.toml`.
+    const MOFAM: Option<GuideEra> = Some(GuideEra {
+        published: 1_740_787_200,
+        file_id: Some(1_000_040_999),
+    });
+    use super::{classify_guide_age, GuideAge, GuideEra};
 
     #[test]
     fn a_file_id_without_a_mod_id_behind_it_proves_nothing() {
@@ -1780,10 +1878,10 @@ mod file_id_provenance_tests {
         // mod id. A stray small file id with no Nexus mod behind it must not
         // become "definitely older than the guide"; the honest answer is that
         // the age is unknown.
-        let age = classify_guide_age(Some("Hand Named.7z"), None, Some(0), Some(4567));
+        let age = classify_guide_age(Some("Hand Named.7z"), None, Some(0), Some(4567), MOFAM);
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("Hand Named.7z"), None, None, Some(4567));
+        let age = classify_guide_age(Some("Hand Named.7z"), None, None, Some(4567), MOFAM);
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 }
