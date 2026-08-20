@@ -93,6 +93,7 @@ fn hide(paths: &[&str]) -> ModAction {
     ModAction::FileHide(FileHideAction {
         conflicts_with: Vec::new(),
         under: None,
+        except: Vec::new(),
         paths: paths.iter().map(|s| s.to_string()).collect(),
     })
 }
@@ -101,6 +102,7 @@ fn prune(paths: &[&str]) -> ModAction {
     ModAction::FilePrune(FilePruneAction {
         conflicts_with: Vec::new(),
         under: None,
+        except: Vec::new(),
         paths: paths.iter().map(|s| s.to_string()).collect(),
     })
 }
@@ -861,11 +863,13 @@ fn a_prune_or_hide_with_nothing_to_act_on_is_rejected() {
             paths: Vec::new(),
             conflicts_with: Vec::new(),
             under: None,
+            except: Vec::new(),
         }),
         ModAction::FileHide(FileHideAction {
             paths: Vec::new(),
             conflicts_with: Vec::new(),
             under: None,
+            except: Vec::new(),
         }),
     ] {
         let name = action.name();
@@ -892,6 +896,7 @@ fn conflicts_with_naming_an_unknown_mod_is_rejected() {
             paths: Vec::new(),
             conflicts_with: vec!["No Such Mod".to_string()],
             under: None,
+            except: Vec::new(),
         })],
         dir.path(),
         &target,

@@ -49,6 +49,7 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
             mod_target,
             &action.conflicts_with,
             action.under.as_deref(),
+            &action.except,
         )?;
         for relative in &files {
             let path = mod_target.join(relative);

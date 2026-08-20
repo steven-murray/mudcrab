@@ -25,6 +25,7 @@ pub(super) fn conflicting_files(
     mod_target: &Path,
     conflicts_with: &[String],
     under: Option<&str>,
+    except: &[String],
 ) -> anyhow::Result<Vec<String>> {
     let mut theirs = BTreeSet::new();
     let mut skipped = Vec::new();
@@ -102,6 +103,37 @@ pub(super) fn conflicting_files(
         }
     }
 
+    // A carve-out that carves nothing out is stale -- the archives moved, or
+    // the relationship changed -- and silently keeping it would leave a reason
+    // recorded for a thing that no longer happens.
+    let excepted: BTreeSet<String> = except.iter().map(|path| path.to_lowercase()).collect();
+    let mut unused: Vec<&String> = except.iter().collect();
+    matched.retain(|relative| {
+        let key = relative.to_lowercase();
+        if excepted.contains(&key) {
+            unused.retain(|path| path.to_lowercase() != key);
+            tracing::info!(
+                owner = cx.owner,
+                path = %relative,
+                "kept a file the conflict selection named, per `except`"
+            );
+            return false;
+        }
+        true
+    });
+    if !unused.is_empty() {
+        anyhow::bail!(
+            "{}: conflicts_with `except` names {} that the selection did not pick. \
+             Either the path is wrong or the exception is no longer needed.",
+            cx.owner,
+            unused
+                .iter()
+                .map(|path| format!("'{path}'"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+    }
+
     // Same rule as a `file_prune` pattern that matches nothing: a selection
     // resolving to no files is the shape of the first failed pass at Part 9,
     // and it succeeds silently while leaving every conflicting file in place.
@@ -122,7 +154,7 @@ pub(super) fn conflicting_files(
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
     use crate::config::install::InstallSettings;
     use crate::config::schema::PersonalizedMod;
@@ -131,7 +163,7 @@ mod tests {
 
     /// A partner mod that exists on disk, so `staged_paths` reads its folder
     /// rather than trying to predict it from archives that are not there.
-    fn instance(
+    pub(super) fn instance(
         root: &std::path::Path,
         partner_files: &[&str],
         subject_files: &[&str],
@@ -147,7 +179,7 @@ mod tests {
         (mods_dir.clone(), mods_dir.join("Subject"))
     }
 
-    fn settings(mods_dir: PathBuf) -> InstallSettings {
+    pub(super) fn settings(mods_dir: PathBuf) -> InstallSettings {
         InstallSettings {
             cache_dir: mods_dir.join("cache"),
             mods_dir,
@@ -165,7 +197,7 @@ mod tests {
         }
     }
 
-    fn partner() -> PersonalizedMod {
+    pub(super) fn partner() -> PersonalizedMod {
         PersonalizedMod {
             id: "Partner".to_string(),
             oracle_name: None,
@@ -196,7 +228,8 @@ mod tests {
             active_plugins: &Default::default(),
         };
 
-        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None).unwrap();
+        let files =
+            conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[]).unwrap();
         assert_eq!(files, ["meshes/shared.nif"]);
     }
 
@@ -222,7 +255,7 @@ mod tests {
             active_plugins: &Default::default(),
         };
 
-        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None)
+        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[])
             .expect("a selection that already ran is not a failure");
         assert!(files.is_empty(), "nothing left to hide, and nothing rehidden");
     }
@@ -250,7 +283,7 @@ mod tests {
         // Note the subject has a hidden file: being hidden is not on its own
         // enough to satisfy the check, only being hidden *and* provided by the
         // named mod.
-        let err = conflicting_files(&cx, &subject, &["Partner".to_string()], None)
+        let err = conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[])
             .expect_err("no overlap at all");
         assert!(err.to_string().contains("selected no files"), "{err}");
     }
@@ -274,7 +307,58 @@ mod tests {
         };
 
         let files =
-            conflicting_files(&cx, &subject, &["Partner".to_string()], Some("textures")).unwrap();
+            conflicting_files(&cx, &subject, &["Partner".to_string()], Some("textures"), &[]).unwrap();
         assert_eq!(files, ["textures/shared.dds"]);
+    }
+}
+
+#[cfg(test)]
+mod except_tests {
+    use super::tests::{instance, partner, settings};
+    use super::*;
+
+    #[test]
+    fn a_named_exception_is_kept_and_a_stale_one_is_an_error() {
+        // Part 24's `chainmailm1.nif`: WAC provides it, so the relationship
+        // selects it, but Steven keeps it deliberately -- a loose copy in
+        // another mod wins that path regardless.
+        let dir = tempfile::tempdir().unwrap();
+        let (mods_dir, subject) = instance(
+            dir.path(),
+            &["meshes/a.nif", "meshes/keep.nif"],
+            &["meshes/a.nif", "meshes/keep.nif"],
+        );
+        let settings = settings(mods_dir);
+        let plan = [partner()];
+        let cx = ActionCx {
+            owner: "Subject",
+            settings: &settings,
+            mod_target: Some(&subject),
+            plan_mods: &plan,
+            active_plugins: &Default::default(),
+        };
+
+        let files = conflicting_files(
+            &cx,
+            &subject,
+            &["Partner".to_string()],
+            None,
+            &["meshes/keep.nif".to_string()],
+        )
+        .unwrap();
+        assert_eq!(files, ["meshes/a.nif"], "the exception survives the selection");
+
+        // An exception the selection never picks is stale: the archives moved,
+        // or the relationship changed, and the recorded reason now describes
+        // nothing.
+        let err = conflicting_files(
+            &cx,
+            &subject,
+            &["Partner".to_string()],
+            None,
+            &["meshes/not-in-either.nif".to_string()],
+        )
+        .expect_err("a carve-out that carves nothing is stale");
+        assert!(err.to_string().contains("not-in-either.nif"), "{err}");
     }
 }
