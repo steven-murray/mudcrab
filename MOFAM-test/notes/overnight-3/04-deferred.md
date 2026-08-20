@@ -1,34 +1,31 @@
 # 4. Decisions deferred — these need your call
 
-## D0. The list is at 254 plugins of 255. Nothing more fits.
+## D0. The 255-plugin ceiling — resolved by following the plan, but check me
 
-**This is the blocker, and it is why the run stops at Part 26a.**
+Part 26a took the load order to **254 of Oblivion's 255**. Nothing else fitted.
 
-Part 26a took the load order to 254. Part 26b adds ~20 more, Part 27 more again.
-The next section cannot be built until a merge frees space, which is exactly
-what your own plan predicted (SP7 = Part 26a + Unique Forts).
+I did not defer this, because on reading the guide it turned out not to be a
+decision. The obvious merge — Unique Forts, which folds the ten Better Forts
+installed tonight into one plugin — needs an eleventh source, the UFM
+Consistency Patch. I first read that as a Part 35/36 mod that would have to be
+pulled forward out of order. It is not: **the guide's Part 36 row 3 is the
+consistency patch and row 4 is the merge that eats it**, so the patch arrives
+*with* the merge. Building it early is the plan's own SP7 and nothing else
+moves.
 
-The obvious merge is **Unique Forts**: it folds the ten Better Forts installed
-tonight into one plugin, saving nine slots. Its sources are eleven, and ten are
-now installed. The eleventh is `MOFAM - UFM Consistency Patch`, from the guide's
-own mod page — a **Part 35/36 mod**.
+Done: **254 → 245**. The merge reports the same counts as the build you and I
+verified by hand in August (7912 records, 2004 remapped, 56 clobbered; TES4Edit
+0 errors; Fort Naso walked), and the oracle test still passes.
 
-So there are three ways forward and I did not want to pick one for you:
+**What I want you to check**: that building a Part 36 merge at this point,
+rather than at the end, is what you want. The cost is that the merge will need
+rebuilding once the rest of the list exists — FormIDs shift, so any save made
+against it now is throwaway, which your plan already says. The benefit is that
+the build can continue at all.
 
-1. **Pull the consistency patches forward.** Install `MOFAM - UFM Consistency
-   Patch` out of guide order so Unique Forts can be built complete and matches
-   your Oracle's merge exactly. Cleanest result, breaks guide order.
-2. **Build merges from available sources**, behind a `--allow-missing-sources`
-   flag that does not exist yet. Your plan anticipated this for SP9. The merged
-   plugin then differs from your Oracle's and has to be rebuilt at the end
-   anyway — and FormIDs shift, so any save made against it is throwaway.
-3. **Stop adding plugins**, and build the remaining sections' *assets* only,
-   leaving their plugins out of the load order until the merges exist.
-
-My recommendation is **(1)**. The consistency patches are small, they are from
-the guide's own page rather than a third party, and they are the difference
-between a merge that matches yours and one that does not. Guide order is a
-presentation choice; the 255 limit is not.
+The same reasoning applies to the next section. Part 26b's twenty rows are
+**exactly** the TACE merge's twenty sources, so 26b + TACE is a net **+1**
+plugin, not +20. That is SP8, and it is the natural next step.
 
 ## D1. Merge-source hides are now 86 of 136 differences
 

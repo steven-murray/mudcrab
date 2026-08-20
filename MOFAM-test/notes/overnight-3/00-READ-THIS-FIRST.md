@@ -1,27 +1,33 @@
 # Third overnight run — start here
 
-**Parts 25 and 26a are built and verified.** 68 mods added, every difference
-accounted for.
+**Parts 25 and 26a are built and verified, and the Unique Forts merge with
+them.** 70 mods added, every difference accounted for.
 
 | Part | rows | mods | identical | notes file |
 |---|---|---|---|---|
 | 25 Arthmoor's Towns | 9 | 9 | 0 | `part-25-arthmoors-towns.md` |
 | 26a New & Modified Locations | 57 | 59 | **35** | `part-26a-new-and-modified-locations.md` |
+| 36 Unique Forts merge (SP7) | 2 | 2 | 1 | same file, last section |
 
 Part 25 shows zero identical and that is expected, not a failure: all eight
 villages pack a BSA, and a BSA that holds the same files as yours is still a
 different file. The tool now says which — see report 3.
 
 **Full-list state: 373 of 730 compared are byte-for-byte identical**, up from
-328 when the run started. 212 mods are from sections not yet built. 453 tests,
+328 when the run started. 212 mods are from sections not yet built. 456 tests,
 clippy clean, working tree clean.
 
 ## Read this first, though
 
-**The run stopped at Part 26a because the load order is full.** 254 plugins of
-Oblivion's 255. Nothing else fits until a merge frees space, and the obvious
-merge needs one source from Part 35. That is `04-deferred.md` item **D0** and
-it needs your call before the next section can start.
+Part 26a filled the load order — **254 plugins of Oblivion's 255** — and nothing
+else fitted. Rather than stop, I built the Unique Forts merge, which is the
+plan's SP7 and, on reading the guide, needed nothing pulled out of order: its
+consistency patch is Part 36's own row 3. The load order is back to **245**.
+
+That is the one call tonight I would most like you to look at, and it is
+`04-deferred.md` item **D0**. The next section is set up to follow the same
+shape: Part 26b's twenty rows are exactly the TACE merge's twenty sources, so
+26b + TACE is a net **+1** plugin.
 
 ## The four reports
 
