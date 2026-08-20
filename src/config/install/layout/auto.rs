@@ -41,7 +41,9 @@ pub(crate) fn detect_auto_root(
             anyhow::bail!(
                 "unsupported archive layout for {source_label}: plugin '{plugin}' is not in one of \
                  the supported roots (/plugin.esp, /Data/plugin.esp, /{mod_id}/plugin.esp, \
-                 /{mod_id}/Data/plugin.esp), and no single wrapper folder holds every plugin"
+                 /{mod_id}/Data/plugin.esp), and no single wrapper folder holds every plugin. \
+                 Run `mudcrab inspect` on the archive to see its shape, then name the data folder \
+                 with layout = \"custom-data-folder\" and data_folder = \"<folder>\"."
             );
         };
 
@@ -174,6 +176,18 @@ fn detect_content_wrapper(
         {
             let candidate = join_under(&prefix, &children.dirs[0]);
             if has_expected_content(listing, &candidate) {
+                // The same question the root branch asks, asked here too. A
+                // wrapper holding a plugin directly *and* another inside a
+                // subfolder is content in two places, and taking the wrapper
+                // installs the deeper one under `Data/` where nothing loads it.
+                // Returning the moment content appeared skipped this, which is
+                // the silent mis-install this function exists to prevent.
+                check_for_rival_content(
+                    listing,
+                    source_label,
+                    &candidate,
+                    &listing.children(&candidate),
+                )?;
                 return Ok(Some(candidate));
             }
             children = listing.children(&candidate);
@@ -213,14 +227,16 @@ fn check_for_rival_content(
     if has_expected_content(listing, prefix) && !hits.is_empty() {
         anyhow::bail!(
             "unsupported archive layout for {source_label}: expected game-content roots were found \
-             both at {here} and below it, in {}",
+             both at {here} and below it, in {}. Name the one you want with \
+             layout = \"custom-data-folder\" and data_folder = \"<folder>\".",
             hits.join(", ")
         );
     }
     if hits.len() > 1 {
         anyhow::bail!(
             "unsupported archive layout for {source_label}: expected game-content roots were found \
-             in multiple sibling directories under {here}: {}",
+             in multiple sibling directories under {here}: {}. Name the one you want with \
+             layout = \"custom-data-folder\" and data_folder = \"<folder>\".",
             hits.join(", ")
         );
     }
@@ -503,5 +519,47 @@ mod wrapper_tests {
         let message = err.to_string();
         assert!(message.contains("archive root"), "{message}");
         assert!(message.contains("Alternative"), "{message}");
+    }
+}
+
+#[cfg(test)]
+mod rival_content_at_depth_tests {
+    use super::*;
+
+    fn resolve(files: &[&str], mod_id: &str) -> anyhow::Result<String> {
+        let paths: Vec<String> = files.iter().map(ToString::to_string).collect();
+        detect_auto_root(&Listing::new(&paths), mod_id, "archive.7z")
+    }
+
+    /// The Part 26a review's finding. The root branch rejects a level whose
+    /// content sits in two places; the descent branch returned the moment it
+    /// saw content, without asking the same question. So a wrapper holding one
+    /// plugin directly *and* another inside a subfolder was accepted as
+    /// unambiguous, and the second plugin installed to `extra/PluginB.esp` --
+    /// under `Data/`, where the game never looks. No error, no warning.
+    #[test]
+    fn a_wrapper_with_content_at_two_depths_is_rejected() {
+        let err = resolve(
+            &["Wrapper/PluginA.esp", "Wrapper/Extra/PluginB.esp"],
+            "Some Mod",
+        )
+        .expect_err("two depths of content under one wrapper cannot be resolved");
+        assert!(err.to_string().contains("Extra"), "{err}");
+    }
+
+    /// And the shape that motivated the descent still resolves: one wrapper,
+    /// everything at the same depth inside it.
+    #[test]
+    fn a_wrapper_with_content_at_one_depth_still_resolves() {
+        let root = resolve(
+            &[
+                "SomeMod [updated]/thing.esp",
+                "SomeMod [updated]/other.esp",
+                "SomeMod [updated]/meshes/x.nif",
+            ],
+            "Some Mod",
+        )
+        .expect("one unambiguous wrapper");
+        assert_eq!(root, "SomeMod [updated]");
     }
 }

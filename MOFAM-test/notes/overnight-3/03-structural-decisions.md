@@ -79,7 +79,8 @@ complain — it loads the first 255 and the rest are simply absent, which looks
 like a mod that failed to install.
 
 This is engine knowledge, not MOFAM knowledge, so it lives in `validate`. With
-Part 26a in, the list stands at **254**. It matters now.
+Part 26a in, the list stood at **255** — exactly on the cap, with no
+headroom. It matters now.
 
 ## 3.7 Two ergonomics fixes
 
@@ -106,4 +107,21 @@ glued to the one below it, and a note citing a file that did not exist — writi
 that file out found my own doc comment had overclaimed (bit 8 is set by 69 of
 74, not all 74).
 
-**Part 26a** — see the section notes.
+**Part 26a** — a silent mis-install in the wrapper fallback I had just widened.
+`detect_content_wrapper` asks "is this level's content in more than one place?"
+at the archive root, but the descent branch returned the moment it saw content
+without asking. So an archive shaped `Wrapper/PluginA.esp` +
+`Wrapper/Extra/PluginB.esp` was accepted as one unambiguous wrapper, and
+`PluginB.esp` installed to `extra/PluginB.esp` — inside `Data/`, where the game
+never looks. No error. The reviewer built the repro; I reproduced it as a test
+before fixing it, and the fix is the same check the root branch already makes.
+
+It also caught **two counts I had wrong in the same way**: I counted the
+`plugins` array by lines (one line holds two entries, so 255 read as 254) and
+guide rows with a leading-digit pattern (row 26's number is preceded by a stray
+`*`, so 58 read as 57). Both were reported to Steven before being checked, which
+is the mistake, not the arithmetic. Parsed rather than grepped now.
+
+And it noted that the layout errors say what failed but not what to do about
+it. All three now point at `mudcrab inspect` and the
+`layout = "custom-data-folder"` override.

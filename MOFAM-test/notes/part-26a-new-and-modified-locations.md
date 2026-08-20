@@ -1,11 +1,17 @@
 # Part 26a — New & Modified Locations
 
-The guide's largest section: 57 rows, and the one the plan flagged as crossing
-the 255-plugin limit. It does not, quite — the list stands at **254 of 255**
-with Part 26a in and no merges built. Part 26b is what needs the TACE merge
-first.
+The guide's largest section: **58 rows**, and the one the plan flagged as
+crossing the 255-plugin limit. It does not cross it — it lands exactly on it.
+With Part 26a in and no merges built the load order is **255 of 255**, with no
+headroom at all.
 
-**35 of 59 identical on the first build.** All 24 differences are explained
+(Both of those numbers were wrong in my first write-up: I counted the `plugins`
+array by lines, and one line holds two entries, so I reported 254; and I counted
+guide rows with a pattern that missed row 26, whose number is preceded by a
+stray `*` left over from the previous row's italics. Parsed rather than grepped,
+it is 58 rows and 255 plugins. The Part 26a review caught both.)
+
+**35 of 59 identical on the first build** — 58 guide rows, plus the split of row 33 into two mods. All 24 differences are explained
 below; none is a defect.
 
 ## Structure
@@ -74,8 +80,10 @@ for the pass to clean.
 
 ## Problems with the guide
 
-1. **Numbering.** 27 and 45 are absent, 19 is printed as 29, and there are two
-   rows labelled 47a.
+1. **Numbering.** 27 and 45 are absent; 19 is printed as 29, so **29 appears
+   twice**; there are two rows labelled 47a; and row 26's number carries a
+   stray `*` from the previous row's unclosed italics, which is enough to hide
+   it from anything scanning for a leading digit.
 2. **Row 26 names the wrong folder.** "HESU Skyrim Temple v1.2"; the archive
    calls it "HESU The Skyrim Temple v1.2".
 3. **Row 46 names the wrong mod.** The page is "Glowing Stones", the archive and
@@ -99,13 +107,13 @@ all hosted on afkmods with no Nexus file id to date them by.
 
 ## SP7 — the Unique Forts merge
 
-Part 26a filled the load order (254 of 255), so the next section could not be
-authored until a merge freed space. The guide's Part 36 rows 3 and 4 are the
+Part 26a filled the load order exactly (255 of 255), so the next section could
+not be authored at all until a merge freed space. The guide's Part 36 rows 3 and 4 are the
 consistency patch and the merge that consumes it, and the plan's SP7 puts them
 here for exactly this reason — the patch is installed *as part of* building the
 merge, so nothing is pulled out of order beyond the merge itself.
 
-Eleven plugins in, one out: **254 → 245**.
+Eleven plugins in, one out: **255 → 246**.
 
     merge: built  sources=11  records=7912  groups=319  remapped=2004
                   clobbered=56  hidden=11

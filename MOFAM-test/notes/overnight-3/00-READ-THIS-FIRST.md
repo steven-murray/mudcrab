@@ -6,7 +6,7 @@ them.** 70 mods added, every difference accounted for.
 | Part | rows | mods | identical | notes file |
 |---|---|---|---|---|
 | 25 Arthmoor's Towns | 9 | 9 | 0 | `part-25-arthmoors-towns.md` |
-| 26a New & Modified Locations | 57 | 59 | **35** | `part-26a-new-and-modified-locations.md` |
+| 26a New & Modified Locations | 58 | 59 | **35** | `part-26a-new-and-modified-locations.md` |
 | 36 Unique Forts merge (SP7) | 2 | 2 | 1 | same file, last section |
 
 Part 25 shows zero identical and that is expected, not a failure: all eight
@@ -19,10 +19,10 @@ clippy clean, working tree clean.
 
 ## Read this first, though
 
-Part 26a filled the load order — **254 plugins of Oblivion's 255** — and nothing
+Part 26a filled the load order — **255 plugins of Oblivion's 255, exactly on the cap** — and nothing
 else fitted. Rather than stop, I built the Unique Forts merge, which is the
 plan's SP7 and, on reading the guide, needed nothing pulled out of order: its
-consistency patch is Part 36's own row 3. The load order is back to **245**.
+consistency patch is Part 36's own row 3. The load order is back to **246**.
 
 That is the one call tonight I would most like you to look at, and it is
 `04-deferred.md` item **D0**.

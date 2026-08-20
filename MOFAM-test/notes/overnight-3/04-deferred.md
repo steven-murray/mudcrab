@@ -2,7 +2,7 @@
 
 ## D0. The 255-plugin ceiling — resolved by following the plan, but check me
 
-Part 26a took the load order to **254 of Oblivion's 255**. Nothing else fitted.
+Part 26a took the load order to **255 of Oblivion's 255 — exactly on it**. Nothing else fitted.
 
 I did not defer this, because on reading the guide it turned out not to be a
 decision. The obvious merge — Unique Forts, which folds the ten Better Forts
@@ -13,7 +13,7 @@ consistency patch and row 4 is the merge that eats it**, so the patch arrives
 *with* the merge. Building it early is the plan's own SP7 and nothing else
 moves.
 
-Done: **254 → 245**. The merge reports the same counts as the build you and I
+Done: **255 → 246**. The merge reports the same counts as the build you and I
 verified by hand in August (7912 records, 2004 remapped, 56 clobbered; TES4Edit
 0 errors; Fort Naso walked), and the oracle test still passes.
 
@@ -48,7 +48,7 @@ eleven of its sources live in Part 26a or in Part 36 itself. TACE reaches
 forward two sections.
 
 **I reverted Part 26b** rather than leave a half-built section: the modlist is
-back at 245 plugins and the install re-run is clean. What I did **not** do is
+back at 246 plugins and the install re-run is clean. What I did **not** do is
 delete the 22 Part 26b mod folders that had already been written under
 `MudCrab Test/mods` before the merge failed — they are your files and the
 standing rule is that you remove things under `~/Games`. They are inert (no
@@ -56,7 +56,7 @@ plugin of theirs is in the load order) but they are there.
 
 The three ways forward, and I did not want to pick:
 
-1. **Pull `Tales of Cyrodiil` forward** (one mod, one plugin, 245 → 246) purely
+1. **Pull `Tales of Cyrodiil` forward** (one mod, one plugin, 246 → 247) purely
    to satisfy the master, then build 26b + TACE. Smallest change, but it drags
    a Part 28 quest mod into Part 26b, and its Part 28 row 38 companion — the
    voice addon needing a BSArch repack — logically comes with it.
