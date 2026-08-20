@@ -355,3 +355,46 @@ fn rejects_merge_with_empty_sources() {
 
     assert!(err.to_string().contains("lists no source plugins"));
 }
+
+/// Oblivion indexes a plugin's FormIDs by one byte, so a load order longer than
+/// 255 does not fail loudly: the game loads the first 255 and the rest are
+/// simply absent, which reads as a mod that failed to install.
+#[test]
+fn rejects_a_load_order_over_the_plugin_limit() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    let plugins: Vec<String> = (0..256).map(|n| format!("  \"mod{n:03}.esp\",")).collect();
+    std::fs::write(
+        &path,
+        format!(
+            "name = \"X\"\n\nplugins = [\n{}\n]\n",
+            plugins.join("\n")
+        ),
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let msg = validate(&source)
+        .expect_err("256 plugins is one too many")
+        .to_string();
+    assert!(msg.contains("256"), "{msg}");
+    assert!(msg.contains("255"), "{msg}");
+    // The message has to say what to do about it, not only that it happened.
+    assert!(msg.contains("Merge"), "{msg}");
+}
+
+/// And exactly 255 is fine, which is the number a finished list sits at.
+#[test]
+fn accepts_a_load_order_at_the_plugin_limit() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    let plugins: Vec<String> = (0..255).map(|n| format!("  \"mod{n:03}.esp\",")).collect();
+    std::fs::write(
+        &path,
+        format!("name = \"X\"\n\nplugins = [\n{}\n]\n", plugins.join("\n")),
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    validate(&source).expect("255 is the limit, not one past it");
+}

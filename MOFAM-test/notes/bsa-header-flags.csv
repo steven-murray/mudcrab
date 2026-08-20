@@ -1,0 +1,75 @@
+path,archive_flags,file_flags
+mod,AI Powered Landscape Retexture.bsa,0x00000703,0x00000002
+mod,Av Latta Magicka.bsa,0x00000793,0x0000000b
+mod,Better Dark Brotherhood Sanctuary.bsa,0x00000703,0x00000003
+mod,Better Dungeons.bsa,0x00000703,0x00000003
+mod,Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.bsa,0x00000783,0x00000003
+mod,Bounty Quests.bsa,0x00000603,0x00000003
+mod,Character Customization Expanded.bsa,0x00000783,0x00000103
+mod,Evenstars Colourwheel LOD Update.bsa,0x00000783,0x00000003
+mod,Feldscar.bsa,0x00000793,0x0000001b
+mod,Frostcrag Village.bsa,0x00000783,0x00000013
+mod,Gottshaw Village.bsa,0x00000783,0x00000013
+mod,HackdirtTheDeepOnes.bsa,0x00000703,0x00000003
+mod,Harvest [Flora].bsa,0x00000703,0x00000003
+mod,FGRebuild.bsa,0x00000603,0x00000003
+mod,MGRebuildN01.bsa,0x00000603,0x00000003
+mod,Legion Forester Outposts.bsa,0x00000787,0x00000003
+mod,Maskar's Oblivion Overhaul - Meshes.bsa,0x00000703,0x00000003
+mod,Maskar's Oblivion Overhaul - Misc.bsa,0x00000703,0x00000004
+mod,Maskar's Oblivion Overhaul - Sounds.bsa,0x00000703,0x00000018
+mod,Maskar's Oblivion Overhaul - Textures.bsa,0x00000703,0x00000002
+mod,Maskar's Oblivion Overhaul - Meshes.bsa,0x00000703,0x00000003
+mod,Maskar's Oblivion Overhaul - Sounds.bsa,0x00000703,0x00000018
+mod,Maskar's Oblivion Overhaul - Textures.bsa,0x00000703,0x00000002
+mod,MergedLOD - LODs.bsa,0x00000783,0x00000101
+mod,MergedLOD - Meshes.bsa,0x00000783,0x00000001
+mod,Molapi.bsa,0x00000783,0x00000013
+mod,OUT Dungeons.bsa,0x00000703,0x00000002
+mod,OCRAFT.bsa,0x00000783,0x00000003
+mod,OOO Enhanced.bsa,0x00000703,0x00000002
+mod,Oscuro's_Oblivion_Overhaul.bsa,0x00000793,0x0000001b
+mod,OOOShiveringIsles.bsa,0x00000793,0x0000001b
+mod,OUT Essentials.bsa,0x00000783,0x00000003
+mod,Enhanced Grabbing - Assets.bsa,0x00000707,0x00000009
+mod,Enhanced Grabbing - Voices.bsa,0x00000707,0x00000010
+mod,Really Textured Normal Maps.bsa,0x00000703,0x00000002
+mod,Reedstand.bsa,0x00000793,0x0000001b
+mod,Simple Horse Utilities.bsa,0x00000783,0x00000003
+mod,Sutch Village.bsa,0x00000793,0x0000001b
+mod,Tales of Cyrodiil.bsa,0x00000703,0x00000010
+mod,The Ayleid Steps.bsa,0x00000707,0x0000000b
+mod,The Lost Spires.bsa,0x00000707,0x0000001b
+mod,thievery.bsa,0x00000793,0x0000001b
+mod,Ultimate Leveling.bsa,0x00000703,0x0000000b
+mod,Unique Artifacts for Unique People.bsa,0x00000783,0x00000003
+mod,xulBrenaRiverRavine.bsa,0x00000603,0x00000013
+mod,xulRollingHills_EV.bsa,0x00000603,0x0000000b
+mod,DLCShiveringIsles - Faces.bsa,0x00000707,0x00000002
+mod,Urasek.bsa,0x00000783,0x00000013
+mod,Vergayun.bsa,0x00000783,0x00000013
+mod,Bounty Quests - Voiced Addon.bsa,0x00000713,0x00000018
+mod,SM Plugin Refurbish Lite - Voiced Addon.bsa,0x00000713,0x00000018
+mod,The Ayleid Steps2.bsa,0x00000713,0x00000018
+mod,WACIntegration.bsa,0x00000703,0x0000001b
+mod,Weapons Of Morrowind.bsa,0x00000783,0x00000003
+mod,All Natural - Real Lights.bsa,0x00000703,0x0000000b
+mod,WorldMapsForAllWorldspaces.bsa,0x00000703,0x00000002
+bethesda,DLCBattlehornCastle.bsa,0x00000703,0x0000001b
+bethesda,DLCFrostcrag.bsa,0x00000707,0x0000001b
+bethesda,DLCHorseArmor.bsa,0x00000703,0x0000001b
+bethesda,DLCOrrery.bsa,0x00000707,0x0000001b
+bethesda,DLCShiveringIsles - Meshes.bsa,0x00000703,0x11500041
+bethesda,DLCShiveringIsles - Sounds.bsa,0x00000703,0x00000008
+bethesda,DLCShiveringIsles - Textures.bsa,0x00000703,0x00000002
+bethesda,DLCShiveringIsles - Voices.bsa,0x00000703,0x00000010
+bethesda,DLCThievesDen.bsa,0x00000703,0x0000001b
+bethesda,DLCVileLair.bsa,0x00000707,0x0000001b
+bethesda,Knights.bsa,0x00000703,0x0000001b
+bethesda,Oblivion - Meshes.bsa,0x00000787,0x00000041
+bethesda,Oblivion - Misc.bsa,0x00000703,0x000001a4
+bethesda,Oblivion - Sounds.bsa,0x00000713,0x00000008
+bethesda,Oblivion - Textures - Compressed.bsa,0x00000707,0x00000002
+bethesda,Oblivion - Voices1.bsa,0x00000703,0x00000010
+bethesda,Oblivion - Voices2.bsa,0x00000703,0x3a8d0010
+bethesda,ArchiveInvalidationInvalidated!.bsa,0x00000703,0x00000002

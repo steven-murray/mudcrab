@@ -46,13 +46,17 @@ pub(super) fn apply(action: &FileHideAction, cx: &ActionCx<'_>) -> anyhow::Resul
     // case-insensitive resolution the guide-written ones below do.
     let mut hidden_by_conflict = 0usize;
     if !action.conflicts_with.is_empty() {
-        for relative in super::conflicts::conflicting_files(
+        let selection = super::conflicts::conflicting_files(
             cx,
             mod_target,
             &action.conflicts_with,
             action.under.as_deref(),
             &action.except,
-        )? {
+        )?;
+        // This action has only the one selector, so an exception it did not
+        // pick is unaccounted for full stop.
+        super::conflicts::reject_unused_exceptions(cx.owner, &selection.unused_except)?;
+        for relative in selection.files {
             hide_path(&mod_target.join(&relative))?;
             hidden_by_conflict += 1;
         }

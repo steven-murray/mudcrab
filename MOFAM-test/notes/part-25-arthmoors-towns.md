@@ -71,10 +71,34 @@ built. Same class as the other 50-odd merge-source hides.
 
 Every village BSA now has **the same size, the same file list and the same
 payloads** as the Oracle's. What remains is the archive-flags word (see
-`notes/bsa-header-flags.md`) and the physical ordering of the payload region,
+`notes/bsa-header-flags.csv`) and the physical ordering of the payload region,
 neither of which is content.
 
 Reedstand additionally declares `0x100` (miscellaneous) in its *file* flags
 where BSArch did not: it holds a `video/` file, and Bethesda's own
 `Oblivion - Misc.bsa` sets that bit for exactly this kind of content. Ours is
 the more accurate declaration.
+
+## The BSA header corpus
+
+`bsa-header-flags.csv` next to this file is every BSA on this machine — 56 from
+mods, 18 from Bethesda's own game and DLC install — with the two header flag
+words each declares. It is what the writer's `FLAG_CONVENTIONAL` rests on, and
+what makes the claim checkable rather than a remembered impression.
+
+| | archives | set bits 9+10 | set bit 8 |
+|---|---|---|---|
+| Bethesda | 18 | 18 | 18 |
+| mod authors | 56 | 56 | 51 |
+
+The five that clear bit 8 are `Bounty Quests.bsa`, `FGRebuild.bsa`,
+`MGRebuildN01.bsa`, `xulBrenaRiverRavine.bsa` and `xulRollingHills_EV.bsa` —
+all ordinary, all loading fine, so bit 8 is not load-bearing. mudcrab writes
+`0x703` because that is the shape the game's own files are unanimous about, not
+because anything is known to depend on it.
+
+Regenerate with:
+
+    find ~/Games/.../mods "$GAME_DIR" -iname '*.bsa' | while read f; do
+      mudcrab inspect "$f" | grep '^flags:'
+    done
