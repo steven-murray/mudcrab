@@ -31,6 +31,21 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
 
     let flattened_mods = modlist.flatten_mods()?;
 
+    // Plugins some merge with `hide_sources` swallows. Collected first because
+    // the per-mod check below has to know about a merge declared further down
+    // the file than the mod whose plugin it takes.
+    let merged_away: HashSet<String> = flattened_mods
+        .values()
+        .filter_map(|spec| spec.merge.as_ref())
+        .filter(|merge| merge.hide_sources)
+        .flat_map(|merge| {
+            merge
+                .sources
+                .iter()
+                .map(|source| source.plugin.to_ascii_lowercase())
+        })
+        .collect();
+
     for (mod_id, spec) in &flattened_mods {
         for dep in &spec.dependencies {
             if !flattened_mods.contains_key(dep) {
@@ -59,9 +74,17 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
             if !is_plugin_filename(plugin) {
                 anyhow::bail!("mod {mod_id} declares invalid plugin filename {plugin}");
             }
+            // A plugin a merge consumes is deliberately absent from the load
+            // order -- `validate_merges` rejects it for being there. The mod
+            // still declares it, because the mod really does ship it, and that
+            // is worth recording whether or not it survives to the load order.
+            if merged_away.contains(&plugin.to_ascii_lowercase()) {
+                continue;
+            }
             if !modlist.plugins.iter().any(|entry| entry == plugin) {
                 anyhow::bail!(
-                    "mod {mod_id} declares plugin {plugin} that is missing from global plugins load order"
+                    "mod {mod_id} declares plugin {plugin} that is missing from global plugins \
+                     load order, and no merge consumes it"
                 );
             }
         }

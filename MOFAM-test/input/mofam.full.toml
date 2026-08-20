@@ -306,16 +306,9 @@ plugins = [
 	"Nobody Goes into the Mountains but Hunters.esp",
 	"Better Dungeons.esp",
 	"BrumaGuildReconstructed.esp",
-	"Unique Forts Fort Aurus.esp",
-	"Unique Forts Fort Doublecross.esp",
-	"Unique Forts Fort Facian.esp",
-	"Unique Forts Fort Hastrel.esp",
-	"Unique Forts Fort Irony.esp",
-	"Unique Forts Fort Naso.esp",
-	"Unique Forts Fort Rayles.esp",
-	"Unique Forts Fort Redman.esp",
-	"Unique Forts Fort Teleman.esp",
-	"Unique Forts Fort Vlastarus.esp",
+	# The ten Better Forts are now sources for Unique Forts Merged (Part 36
+	# row 4), so they are hidden by the merge and out of the load order.
+	"Unique Forts Merged.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -7293,3 +7286,55 @@ plugins = ["OblivionDeadLands.esp"]
 path = "nexus:oblivion/50437/1000025837"
 download_handler = "nexus"
 file_name = "Deadlands-50437-v-b4final-1600883389.zip"
+
+# ── Part 36 - zMERGED PLUGINS (partial) ─────────────────────────────────────
+#
+# Only the Unique Forts merge, built here rather than at the end of the list
+# because Part 26a takes the load order to 254 of Oblivion's 255 and nothing
+# else fits until it exists. This is the plan's SP7, and the guide's own rows
+# 3 and 4 of Part 36 -- the consistency patch is installed as part of building
+# the merge, not as a separate step somewhere earlier.
+#
+# The remaining five merges come later, with their own sections' sources.
+
+# Guide 36 row 3. A source of the merge below, so it never enters the load
+# order; the merge hides it.
+[[mods]]
+id = "MOFAM - UFM Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041289"
+download_handler = "nexus"
+file_name = "UFM Consistency Patch-52949-03-25-1743346464.7z"
+# From mod page 52949, which is MOFAM's own, so a post-guide date here is the
+# guide updating itself rather than version drift.
+
+# Guide 36 row 4. Eleven plugins in, one out: ten Better Forts from Part 26a
+# and the consistency patch above.
+#
+# The output filename is a contract, not a preference -- the Bash Tags in the
+# Conflict Resolution mod name it exactly, and the bashed patch degrades in
+# silence if it does not match.
+[[mods]]
+id = "Unique Forts Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Unique Forts Merged.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "Better Fort Aurus", plugin = "Unique Forts Fort Aurus.esp" },
+    { mod = "Better Fort Doublecross", plugin = "Unique Forts Fort Doublecross.esp" },
+    { mod = "Better Fort Facian", plugin = "Unique Forts Fort Facian.esp" },
+    { mod = "Better Fort Hastrel", plugin = "Unique Forts Fort Hastrel.esp" },
+    { mod = "Better Fort Irony", plugin = "Unique Forts Fort Irony.esp" },
+    { mod = "Better Fort Naso", plugin = "Unique Forts Fort Naso.esp" },
+    { mod = "Better Fort Rayles", plugin = "Unique Forts Fort Rayles.esp" },
+    { mod = "Better Fort Redman", plugin = "Unique Forts Fort Redman.esp" },
+    { mod = "Better Fort Teleman", plugin = "Unique Forts Fort Teleman.esp" },
+    { mod = "Better Fort Vlastarus", plugin = "Unique Forts Fort Vlastarus.esp" },
+    { mod = "MOFAM - UFM Consistency Patch", plugin = "UFM Consistency Patch.esp" },
+  ]

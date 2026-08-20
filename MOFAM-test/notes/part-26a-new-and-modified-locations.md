@@ -96,3 +96,38 @@ to match March 2025's, so it is worth knowing which six they are.
 
 Four rows are UNKNOWN AGE: the three Hesu mods and Bruma Guild Reconstructed,
 all hosted on afkmods with no Nexus file id to date them by.
+
+## SP7 — the Unique Forts merge
+
+Part 26a filled the load order (254 of 255), so the next section could not be
+authored until a merge freed space. The guide's Part 36 rows 3 and 4 are the
+consistency patch and the merge that consumes it, and the plan's SP7 puts them
+here for exactly this reason — the patch is installed *as part of* building the
+merge, so nothing is pulled out of order beyond the merge itself.
+
+Eleven plugins in, one out: **254 → 245**.
+
+    merge: built  sources=11  records=7912  groups=319  remapped=2004
+                  clobbered=56  hidden=11
+
+Those are the same counts as the build verified in `merge-verification.md`
+(TES4Edit: 7913 records, 0 errors; Fort Naso walked in game).
+
+`Unique Forts Merged.esp` is 787647 bytes against zMerge's 785730. That is
+serialisation, not content: `tests/merge_oracle.rs::merges_unique_forts`
+compares the two record-for-record and edge-for-edge and passes. The `map.json`
+one-byte difference and the `merge.json` / `fidCache.json` / `mudcrab-merge.json`
+asymmetry are the two tools' own bookkeeping files.
+
+### What it needed from the validator
+
+Two rules were in direct contradiction: a mod must declare the plugins it ships
+and every declared plugin must be in the load order, but a merge with
+`hide_sources` requires its sources **out** of the load order. Authoring the
+merge made both fire at once.
+
+Both rules are right. `validate` now collects the plugins some merge swallows
+before checking the mods, so a mod can declare a plugin a merge consumes — it
+really does ship it, and that is worth recording — while a plugin *no* merge
+consumes is still required to be in the load order, which is the silent failure
+the original rule exists to catch.

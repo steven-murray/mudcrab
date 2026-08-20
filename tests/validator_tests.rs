@@ -398,3 +398,57 @@ fn accepts_a_load_order_at_the_plugin_limit() {
     let source = load_modlist(&path).expect("modlist should parse");
     validate(&source).expect("255 is the limit, not one past it");
 }
+
+/// A merge with `hide_sources` takes its sources out of the load order, so the
+/// mods that ship them cannot also be required to have them there. Both rules
+/// are right; they just have to know about each other.
+#[test]
+fn a_mod_may_declare_a_plugin_a_merge_consumes() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        r#"
+name = "Merge Test"
+plugins = ["Merged.esp"]
+
+[[mods]]
+id = "source-mod"
+plugins = ["Source.esp"]
+
+[[mods]]
+id = "the-merge"
+type = "merge"
+
+  [mods.merge]
+  output = "Merged.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [{ mod = "source-mod", plugin = "Source.esp" }]
+"#,
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    validate(&source).expect("the merge accounts for Source.esp");
+}
+
+/// And a plugin no merge consumes is still required to be in the load order --
+/// otherwise the mod ships something the game will never load, silently.
+#[test]
+fn a_mod_declaring_an_unmerged_plugin_outside_the_load_order_is_an_error() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(
+        &path,
+        "name = \"X\"\n\nplugins = []\n\n[[mods]]\nid = \"lonely\"\nplugins = [\"Orphan.esp\"]\n",
+    )
+    .expect("fixture should be written");
+
+    let source = load_modlist(&path).expect("modlist should parse");
+    let msg = validate(&source)
+        .expect_err("nothing consumes Orphan.esp")
+        .to_string();
+    assert!(msg.contains("Orphan.esp"), "{msg}");
+    assert!(msg.contains("no merge consumes it"), "{msg}");
+}
