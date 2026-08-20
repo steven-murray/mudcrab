@@ -348,7 +348,17 @@ fn install_rejects_noncanonical_plugin_layouts() {
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
-    make_zip_with_files(&archive, &[("foo/bar/plugin_bad.esp", b"bad")]);
+    // Two sibling wrappers, each holding a plugin. There is no single folder
+    // that is "the" content root, so nothing can place these -- unlike a single
+    // unambiguous wrapper chain, which install now descends (see
+    // `install_descends_a_wrapper_folder_holding_a_plugin`).
+    make_zip_with_files(
+        &archive,
+        &[
+            ("foo/plugin_bad.esp", b"bad"),
+            ("other/plugin_worse.esp", b"worse"),
+        ],
+    );
 
     let source = format!(
         "name = \"Bad Layout Test\"\n\n[[mods]]\nid = \"bad\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
@@ -400,6 +410,71 @@ fn install_rejects_noncanonical_plugin_layouts() {
         .arg(&game_dir)
         .assert()
         .failure();
+}
+
+/// The Part 26a case. `SI Unmarked Locations` ships its plugins inside
+/// `SIUnmarkedLocations [updated]/` -- a wrapper named after neither the mod nor
+/// `Data`, so none of the four canonical plugin roots reaches it. Wrapper
+/// descent already handled this shape for archives with no plugin in them; an
+/// archive with a plugin used to be rejected outright.
+#[test]
+fn install_descends_a_wrapper_folder_holding_a_plugin() {
+    let dir = tempdir().expect("temp dir should be created");
+    let archive = dir.path().join("wrapped.zip");
+    let modlist = dir.path().join("modlist.toml");
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    let cache = dir.path().join("cache");
+    let mods_dir = dir.path().join("mods");
+    let game_dir = dir.path().join("game");
+    std::fs::create_dir_all(&game_dir).expect("game dir should be created");
+
+    make_zip_with_files(
+        &archive,
+        &[
+            ("SomeMod [updated]/thing.esp", b"plugin"),
+            ("SomeMod [updated]/meshes/thing.nif", b"mesh"),
+        ],
+    );
+
+    let source = format!(
+        "name = \"Wrapper Test\"\n\n[[mods]]\nid = \"wrapped\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        archive.display()
+    );
+    std::fs::write(&modlist, source).expect("fixture modlist should be written");
+
+    for stage in [
+        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
+        vec!["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()],
+    ] {
+        Command::cargo_bin("mudcrab")
+            .expect("binary should build")
+            .env("GAME_DIR", &game_dir)
+            .args(&stage)
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .env("GAME_DIR", &game_dir)
+        .arg("install")
+        .arg(&plan)
+        .arg("--cache")
+        .arg(&cache)
+        .arg("--mods-dir")
+        .arg(&mods_dir)
+        .arg("--game-dir")
+        .arg(&game_dir)
+        .assert()
+        .success();
+
+    // The wrapper is stripped, not preserved: the plugin has to sit where the
+    // game looks for it.
+    assert!(mods_dir.join("wrapped").join("thing.esp").exists());
+    assert!(mods_dir.join("wrapped").join("meshes/thing.nif").exists());
+    assert!(!mods_dir.join("wrapped").join("SomeMod [updated]").exists());
 }
 
 fn make_zip_with_files(path: &std::path::Path, entries: &[(&str, &[u8])]) {

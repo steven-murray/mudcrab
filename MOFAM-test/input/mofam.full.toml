@@ -6565,3 +6565,731 @@ data_folder = "Compatibility Patches for Arthmoor's Mods"
 action = "file_prune"
 paths = ["*.esp"]
 except = ["DispMiscPatch_Ducks and Swans - Reedstand Patch.esp"]
+
+# ── Part 26a - NEW & MODIFIED LOCATIONS ─────────────────────────────────────
+#
+# The guide's largest section. Its numbering is defective in the transcription
+# and on the page: 27 and 45 are absent, and there are two rows labelled 47a.
+# Row order below follows the guide; the numbers are the guide's, not a count.
+
+# Guide 1-2: the two guild rebuilds. Both ship a BSA plus its plugin.
+[[mods]]
+id = "Improved Fighters Guild ENG"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["FGRebuild.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53987/1000042290"
+download_handler = "nexus"
+file_name = "Improved Fighters Guild ENG-53987-1-3-1749830129.7z"
+# oracle version 1.3.0.0
+
+[[mods]]
+id = "Improved Mages Guild ENG"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["MGRebuildN01.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54006/1000039928"
+download_handler = "nexus"
+file_name = "Improved Mages Guild ENG-54006-1-1-1731688313.7z"
+
+# Guide 3-4: the OOO + All Natural patches for each. Both plugins are Prebash
+# merge sources, hidden in the Oracle.
+[[mods]]
+id = "Improved Fighters Guild ENG OOO and All Natural Patch"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["FGE Compatibility.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54336/1000039226"
+download_handler = "nexus"
+file_name = "Improved Fighters Guild OOO Patch-54336-1-1-1725091547.rar"
+
+[[mods]]
+id = "Improved Mages Guild ENG OOO and ALL NATURAL PATCH"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["MGE Compatibility.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54348/1000041942"
+download_handler = "nexus"
+file_name = "Improved Magic Guild Compatibility Patch-54348-1-3-1747591512.rar"
+
+# Guide 5: meshes only, no plugin.
+[[mods]]
+id = "Improved Fighters Guild ENG - Town Guard Shields Preview Patch"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54287/1000039026"
+download_handler = "nexus"
+file_name = "IFG Eng - Town Guard Shields Preview Patch-54287-1-1-1722632246.rar"
+
+# Guide 6 [QAC]: "All The Districts - Merged". The guide also asks for two
+# records to be deleted in xEdit afterwards -- a Light and the Tamriel
+# worldspace override, to drop the Waterfront district. mudcrab has no scripted
+# record deletion yet, so that step is NOT applied here; see report 4.
+[[mods]]
+id = "ImpeREAL City - Unique Districts"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["ImpeREAL City Unique Districts - All the Districts - Merged.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/19589/78172"
+download_handler = "nexus"
+file_name = "ImpeREAL City - Unique Districts - All The Districts - Merged-19589.7z"
+
+# Guide 7 [MI] [QAC]: "right click Files & select Set as \ Directory, and
+# disable The Imperial Water - BETTER CITIES.esp plugin" -- both halves happen
+# in the installer, so the Better Cities plugin never lands.
+[[mods]]
+id = "The Imperial Waters"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["The Imperial Water.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/25804/72004"
+download_handler = "nexus"
+file_name = "The Imperial Waters 1-2-25804-1-2.7z"
+layout = "custom-data-folder"
+data_folder = "Files"
+exclude = ["The Imperial Water - BETTER CITIES.esp"]
+
+[[mods]]
+id = "Ice's Waterfront Tunnel"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["IceWaterfrontTunnel.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51749/1000030239"
+download_handler = "nexus"
+file_name = "IceWaterfrontTunnel-51749-1-0-1644330416.rar"
+
+[[mods]]
+id = "Add some flavor - Roadside inns"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Add some flavor - Roadside inns.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53257/1000040280"
+download_handler = "nexus"
+file_name = "Add some flavor - Roadside inns-53257-1-2-1735535474.zip"
+
+[[mods]]
+id = "Add some flavor - priories"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Add some flavor - Priories.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53149/1000039365"
+download_handler = "nexus"
+file_name = "Add some flavor - priories-53149-1-5-1726362338.zip"
+
+# Guide 11: "Of the 3 plugins we only require
+# DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp so delete
+# the other two." Said as the guide says it rather than as a list of the other
+# two, which would go stale the next time the collection grows.
+[[mods]]
+id = "Miscellaneous Patch Collection by Dispensation - Add Some Flavor mods"
+oracle_name = "Miscellaneous Patch Collection by Dipensation - Add Some Flavor Mods"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "custom-data-folder"
+data_folder = "Add Some Flavor mods patches"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["*.esp"]
+except = ["DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp"]
+
+[[mods]]
+id = "ImpeREAL Empire - Unique Castles"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["ImpeREAL Empire - Unique Castles - All The Castles - Merged.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/22446/77782"
+download_handler = "nexus"
+file_name = "ImpeREAL Empire Unique Castles - All The Castles - Merged-22446-2-0.7z"
+
+# Guide 13: "1st main file". Meshes only.
+[[mods]]
+id = "ImpeREAL Castles - Skingrad Patch"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41114/87378"
+download_handler = "nexus"
+file_name = "ImpeREAL Castles - Unofficial Castle Skingrad Patch 7z-41114-1-0.7z"
+
+# Guide 14: "first main file only".
+[[mods]]
+id = "County Gates"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["County Gates.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50778/1000026816"
+download_handler = "nexus"
+file_name = "County Gates-50778-1-0-0-1612303879.zip"
+
+[[mods]]
+id = "County Gates - Town Guard Shields Preview Patch"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53034/1000034909"
+download_handler = "nexus"
+file_name = "Patch-53034-1-1685933399.7z"
+
+# Guide 16 [MI]: the plugin sits in `ArenaChampionVilla.v2/Data`, the readme
+# beside it. The data folder is named explicitly so the plugin lands at the
+# mod's root rather than inside a `data/` of its own.
+[[mods]]
+id = "Arena Champion's Villa"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["AgronakChampionHouse.v1.01.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50321/1000032517"
+download_handler = "nexus"
+file_name = "Arena Champion Villa-50321-2-0-1665361296.7z"
+layout = "custom-data-folder"
+data_folder = "ArenaChampionVilla.v2/Data"
+
+# Guide 17: "1st main file".
+[[mods]]
+id = "Knightly Orders for Cities"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Knightly Orders for Cities.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49934/1000024267"
+download_handler = "nexus"
+file_name = "Knightly Orders for Cities-49934-1-2-1584835030.7z"
+
+# Guide 18-24: seven of the Unique Landscapes suite. The guide numbers these
+# 18, 29 (a typo for 19), 20, 21, 22, 23, 24.
+[[mods]]
+id = "Unique Landscapes - River Ethe"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulRiverEthe.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/17330/1000031949"
+download_handler = "nexus"
+file_name = "UL River Ethe v2.0.2-17330-2-0-2-1659175943.7z"
+
+[[mods]]
+id = "Unique Landscapes - Panther River"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulPantherRiver.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/20332/1000043731"
+download_handler = "nexus"
+file_name = "UL - Panther River-20332-2-0-1-1766916032.7z"
+
+[[mods]]
+id = "Unique Landscapes - Imperial Isle"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulImperialIsle.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/9531/1000043733"
+download_handler = "nexus"
+file_name = "UL Imperial Isle-9531-2-0-3-1766916273.7z"
+
+[[mods]]
+id = "Unique Landscapes - Brena River Ravine"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulBrenaRiverRavine.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/23573/1000043739"
+download_handler = "nexus"
+file_name = "UL Brena River Ravine-23573-2-0-2-1766917102.7z"
+
+[[mods]]
+id = "Unique Landscapes - Ancient Yews"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulAncientYews.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/11458/1000031941"
+download_handler = "nexus"
+file_name = "UL Ancient Yews v2.0.1-11458-2-0-1-1659173750.7z"
+
+[[mods]]
+id = "Unique Landscapes - Rolling Hills"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulRollingHills_EV.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/10768/1000043730"
+download_handler = "nexus"
+file_name = "UL - Rolling Hills-10768-2-0-3-1766915929.7z"
+
+[[mods]]
+id = "Unique Landscapes - Cloudtop Mountains"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xulCloudtopMountains.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/16677/1000023741"
+download_handler = "nexus"
+file_name = "UL Cloudtop Mountains v2.0.1-16677-2-0-1-1579344398.7z"
+
+# Guide 25, 26, 28: three mods out of a fifteen-mod collection in one archive,
+# each its own folder. The guide names row 26 "HESU Skyrim Temple v1.2"; the
+# archive calls it "HESU The Skyrim Temple v1.2".
+[[mods]]
+id = "The Hesu Mod Collection - The Valenwood Mine"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["HESU ValenwoodMine.esp"]
+
+[[mods.archives]]
+path = "manual:Hesu Mods.7z"
+layout = "custom-data-folder"
+data_folder = "Hesu Mods/HESU The Valenwood Mine v1.2"
+
+[[mods]]
+id = "The Hesu Mod Collection - Skyrim Temple"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["HESU SkyrimTemple.esp"]
+
+[[mods.archives]]
+path = "manual:Hesu Mods.7z"
+layout = "custom-data-folder"
+data_folder = "Hesu Mods/HESU The Skyrim Temple v1.2"
+
+[[mods]]
+id = "The Hesu Mod Collection - Smoke town"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["HESU SmokeTown.esp"]
+
+[[mods.archives]]
+path = "manual:Hesu Mods.7z"
+layout = "custom-data-folder"
+data_folder = "Hesu Mods/HESU Smoke Town v1.1"
+
+# Guide 29: "expand 01 Diversity Addons > drag LFO - All Races Addon.esp to the
+# 00 Core folder", the same for 02's single plugin, then set 00 Core as the data
+# directory. Three archive entries over the same file, because that is what
+# "take these three folders" is -- and mudcrab installs a mod's archives in
+# order into one folder. 01 ships three addons and the guide takes one.
+[[mods]]
+id = "Legion Forester Outposts Revisited"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = [
+  "Legion Forester Outposts.esp",
+  "LFO - All Races Addon.esp",
+  "LFO - Local Guards Features Patch.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/51512/1000034957"
+download_handler = "nexus"
+file_name = "Legion Forester Outposts Revisited-51512-2-1-1686348616.7z"
+layout = "custom-data-folder"
+data_folder = "Legion Forester Outposts Revisited/00 Core"
+
+[[mods.archives]]
+path = "nexus:oblivion/51512/1000034957"
+download_handler = "nexus"
+file_name = "Legion Forester Outposts Revisited-51512-2-1-1686348616.7z"
+layout = "custom-data-folder"
+data_folder = "Legion Forester Outposts Revisited/01 Diversity Addons"
+include = ["LFO - All Races Addon.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51512/1000034957"
+download_handler = "nexus"
+file_name = "Legion Forester Outposts Revisited-51512-2-1-1686348616.7z"
+layout = "custom-data-folder"
+data_folder = "Legion Forester Outposts Revisited/02 Local Guards Features Patch"
+
+# Guide 30: the optional file. A Prebash merge source.
+[[mods]]
+id = "Legion Forester Outposts Revisited OCO Eyes for all Races"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["LFO OCO New Eyes.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51512/1000034918"
+download_handler = "nexus"
+file_name = "LFO OCO New Eyes Addon-51512-Latest-1685989930.7z"
+
+# Guide 31-32: "main file only", then the UL-compatible build [QAC]. Both ship
+# a plugin of the same name; the compatible one installs second and wins the
+# path, which is why the load order names it once.
+[[mods]]
+id = "Nobody Goes into the Mountains but Hunters"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Nobody Goes into the Mountains but Hunters.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49092/1000021128"
+download_handler = "nexus"
+file_name = "Nobody Goes into the Mountains but Hunters-49092-1-0-1547350502.7z"
+
+[[mods]]
+id = "Nobody Goes into the Mountains but Hunters - UL compat"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49092/1000021204"
+download_handler = "nexus"
+file_name = "Nobody Goes into the Mountains but Hunters - UL Compilation Compatible-49092-1-0-1548549782.7z"
+
+# Guide 33: "Main files Better Dungeons + Better Dungeons BSA, install
+# separately" -- so two mods, one holding the plugin and one the archive.
+[[mods]]
+id = "Better dungeons"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Better Dungeons.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/40392/1000040927"
+download_handler = "nexus"
+file_name = "Better Dungeons-40392-15-1740270430.7z"
+
+[[mods]]
+id = "Better dungeons - BSA"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/40392/1000006370"
+download_handler = "nexus"
+file_name = "Better Dungeons BSA-40392-12.rar"
+
+[[mods]]
+id = "Bruma Guild Reconstructed"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["BrumaGuildReconstructed.esp"]
+
+[[mods.archives]]
+path = "manual:Bruma Guild Reconstructed.7z"
+
+# Guide 35-44: "the 'Best Of...' that are all lightweight implementation & we
+# create our own merge later to retrieve plugin-space". All ten plugins are
+# sources for Part 36's Unique Forts merge and are hidden in the Oracle.
+
+[[mods]]
+id = "Better Fort Aurus"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Aurus.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50682/1000030646"
+download_handler = "nexus"
+file_name = "Better Fort Aurus-50682-1-1-1647873144.7z"
+
+[[mods]]
+id = "Better Fort Doublecross"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Doublecross.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51325/1000030744"
+download_handler = "nexus"
+file_name = "Better Fort Doublecross-51325-1-1-1648907211.7z"
+
+[[mods]]
+id = "Better Fort Facian"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Facian.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51464/1000029296"
+download_handler = "nexus"
+file_name = "Better Fort Facian-51464-1-0-1633876302.7z"
+
+[[mods]]
+id = "Better Fort Hastrel"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Hastrel.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50538/1000040614"
+download_handler = "nexus"
+file_name = "Better Fort Hastrel-50538-1-1-1737810150.7z"
+
+[[mods]]
+id = "Better Fort Irony"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Irony.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51841/1000033274"
+download_handler = "nexus"
+file_name = "Better Fort Irony-51841-2-0-1672059311.7z"
+
+[[mods]]
+id = "Better Fort Naso"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Naso.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50586/1000026289"
+download_handler = "nexus"
+file_name = "Better Fort Naso-50586-1-0-1607268158.7z"
+
+[[mods]]
+id = "Better Fort Rayles"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Rayles.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51148/1000030698"
+download_handler = "nexus"
+file_name = "Better Fort Rayles-51148-1-1-1648407617.7z"
+
+[[mods]]
+id = "Better Fort Redman"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Redman.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51444/1000030788"
+download_handler = "nexus"
+file_name = "Better Fort Redman-51444-1-2-1649445129.7z"
+
+[[mods]]
+id = "Better Fort Teleman"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Teleman.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51594/1000029723"
+download_handler = "nexus"
+file_name = "Better Fort Teleman-51594-1-0-1638707188.7z"
+
+[[mods]]
+id = "Better Fort Vlastarus"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Unique Forts Fort Vlastarus.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52603/1000033275"
+download_handler = "nexus"
+file_name = "Better Fort Vlastarus-52603-1-0-1672059906.7z"
+
+# Guide 46 [QAC]: the mod page is "Glowing Stones", the archive and plugin are
+# "Glowing Wonders".
+[[mods]]
+id = "Glowing Stones"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Glowing Wonders.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43331/1000000560"
+download_handler = "nexus"
+file_name = "Glowing Wonders-43331-v1-0.zip"
+
+# Guide 47a: "Reworked Post - Carved Letters".
+[[mods]]
+id = "Reworked Posts"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Reworked Posts.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47223/1000027320"
+download_handler = "nexus"
+file_name = "Reworked Post - Carved Letters-47223-1-6-1616519667.7z"
+
+# Guide 47a, 47b, 47c: the village patches for the above. The guide labels the
+# first of these 47a as well, so there are two rows numbered 47a. All three
+# plugins are Prebash merge sources.
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Reedstand"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xxReworkedReedstand.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47299/1000015234"
+download_handler = "nexus"
+file_name = "Reworked Posts and Reedstand Village Patch-47299-1-1.7z"
+
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Gottshaw"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xxreworkedgottshaw.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47299/1000015231"
+download_handler = "nexus"
+file_name = "Reworked Posts and Gottshaw Village Patch-47299-1-1.7z"
+
+[[mods]]
+id = "Patch for Arthmoor Villages and Reworked Posts - Sutch"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["xxreworkedSutch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47299/1000015223"
+download_handler = "nexus"
+file_name = "Reworked Posts and Sutch Village Patch-47299-1-0.7z"
+
+# Guide 48: "Using BAE, extract both archives to the mod's folder & delete both
+# archives & Dagger_Data.esp once this is performed", then keep only the .esm
+# and six named folders out of the twenty the two archives unpack to.
+#
+# The prune list is what to delete rather than what to keep, because that is
+# what the action can express -- but every pattern must match something, so a
+# folder that stops shipping fails the install instead of silently changing
+# what is kept.
+[[mods]]
+id = "Dagger_Data"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Dagger_Data.esm"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53539/1000039061"
+download_handler = "nexus"
+file_name = "Dagger_Data-53539-0-4-1723329712.rar"
+layout = "custom-data-folder"
+data_folder = "Dagger_Data/00 Core"
+
+[[mods.actions]]
+action = "extract_bsa"
+archive = "Dagger_Data - Meshes.bsa"
+
+[[mods.actions]]
+action = "extract_bsa"
+archive = "Dagger_Data - Textures.bsa"
+
+# Keep: the esm, meshes/dag/{architecture,dungeons,clutter} and
+# textures/{dag,landscape,plants}. Everything else the two archives brought.
+[[mods.actions]]
+action = "file_prune"
+paths = [
+  "Dagger_Data.esp",
+  "meshes/dag/creatures",
+  "meshes/dag/effects",
+  "meshes/dag/furniture",
+  "meshes/dag/landscape",
+  "meshes/dag/plants",
+  "meshes/dag/rocks",
+  "meshes/dag/sky",
+  "meshes/dag/trees",
+  "meshes/dungeons",
+  "meshes/effects",
+  "meshes/harvest_marker.nif",
+  "meshes/pt",
+  "meshes/skybox",
+  "textures/cellars",
+  "textures/daggerfall",
+  "textures/effects",
+  "textures/lowres",
+  "textures/menus",
+  "textures/menus50",
+  "textures/menus80",
+  "textures/meo",
+  "textures/momo",
+  "textures/sky",
+  "textures/trees",
+  "trees",
+]
+
+[[mods]]
+id = "The Chorrol Graveyard Overhaul"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["The Chorrol Graveyard.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53786/1000037632"
+download_handler = "nexus"
+file_name = "The Chorrol Graveyard-53786-1-0-1707192313.zip"
+
+[[mods]]
+id = "Cheydinhal Cemetery Overhaul"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Cheydinhal Cemetery Overhaul.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53797/1000037693"
+download_handler = "nexus"
+file_name = "Cheydinhal Cemetery Overhaul-53797-1-0-1707591500.rar"
+
+[[mods]]
+id = "Gogan's Family Cemetery"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Gogan's Family Cemetery.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53768/1000037603"
+download_handler = "nexus"
+file_name = "Gogan's Family Cemetery-53768-1-0-1707020747.zip"
+
+[[mods]]
+id = "Better Odiil Farm"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["Better Odiil Farm.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52638/1000033371"
+download_handler = "nexus"
+file_name = "Better Odiil Farm-52638-1-0-1672902481.rar"
+
+# Guide 53: "Once installed delete SI Unmarked Locations without markers.esp".
+[[mods]]
+id = "SI Unmarked Locations"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["SI Unmarked Locations with markers.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51169/1000028590"
+download_handler = "nexus"
+file_name = "SI Unmarked Locations Update-51169-1-1-1628191894.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["SI Unmarked Locations without markers.esp"]
+
+[[mods]]
+id = "SI New Sheoth Outskirts"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["SINSOutskirts.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51232/1000032072"
+download_handler = "nexus"
+file_name = "SI New Sheoth Outskirts Update 1.4.1-51232-1-4-1-1661274257.7z"
+
+[[mods]]
+id = "SI Driftdwell"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["SI Driftdwell.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52324/1000032352"
+download_handler = "nexus"
+file_name = "SI Driftdwell 1.2-52324-1-2-1663783942.7z"
+
+[[mods]]
+id = "SI Whispersins"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["SI Whispersins.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51623/1000034495"
+download_handler = "nexus"
+file_name = "SI Whispersins 1.2-51623-1-2-1682521197.7z"
+
+# Guide 57: "main file only".
+[[mods]]
+id = "Deadlands"
+section = ["26a - NEW & MODIFIED LOCATIONS"]
+plugins = ["OblivionDeadLands.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50437/1000025837"
+download_handler = "nexus"
+file_name = "Deadlands-50437-v-b4final-1600883389.zip"

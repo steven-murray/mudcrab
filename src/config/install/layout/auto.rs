@@ -20,15 +20,30 @@ pub(crate) fn detect_auto_root(
     mod_id: &str,
     source_label: &str,
 ) -> anyhow::Result<String> {
+    let plugins = listing.plugin_paths("");
+
     let mut inferred: Option<AutoLayoutKind> = None;
-    for plugin in listing.plugin_paths("") {
-        let layout = classify_plugin_layout(&plugin, mod_id).ok_or_else(|| {
-            anyhow::anyhow!(
+    for plugin in &plugins {
+        let Some(layout) = classify_plugin_layout(plugin, mod_id) else {
+            // The plugin is somewhere none of the four shapes reach -- almost
+            // always inside a wrapper folder named after something other than
+            // the mod: a version, the author's own spelling, the file name from
+            // the mod page. That is exactly what the wrapper descent below
+            // resolves, and it was previously unreachable whenever an archive
+            // contained a plugin at all.
+            if let Some(wrapper) = detect_content_wrapper(listing, source_label, &listing.children(""))?
+                && plugins
+                    .iter()
+                    .all(|path| strip_dir_prefix(path, &wrapper).is_some())
+            {
+                return Ok(wrapper);
+            }
+            anyhow::bail!(
                 "unsupported archive layout for {source_label}: plugin '{plugin}' is not in one of \
                  the supported roots (/plugin.esp, /Data/plugin.esp, /{mod_id}/plugin.esp, \
-                 /{mod_id}/Data/plugin.esp)"
-            )
-        })?;
+                 /{mod_id}/Data/plugin.esp), and no single wrapper folder holds every plugin"
+            );
+        };
 
         if let Some(existing) = inferred
             && existing != layout
