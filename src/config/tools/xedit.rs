@@ -55,7 +55,6 @@ pub(crate) fn apply_qac_action(
     settings: &InstallSettings,
     mod_target: &Path,
 ) -> anyhow::Result<()> {
-    use globset::{Glob, GlobSetBuilder};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let tes4edit_config = settings.tools.tes4edit.as_ref().ok_or_else(|| {
@@ -70,48 +69,7 @@ pub(crate) fn apply_qac_action(
         .ok_or_else(|| anyhow::anyhow!("{owner_label} qac action requires --game-dir"))?;
     let game_data = game_dir.join("Data");
 
-    // Plugin glob patterns, resolved relative to the mod's staged data folder.
-    let patterns = &action.plugins;
-
-    // Build a globset to match files in the mod's staging dir.
-    let mut builder = GlobSetBuilder::new();
-    for pattern in patterns {
-        builder.add(
-            Glob::new(pattern)
-                .map_err(|err| anyhow::anyhow!("{owner_label} qac: invalid glob '{pattern}': {err}"))?,
-        );
-    }
-    let globset = builder.build().map_err(|err| {
-        anyhow::anyhow!("{owner_label} qac: failed to build glob set: {err}")
-    })?;
-
-    // Collect matching plugin files from the staging dir.
-    let matched: Vec<PathBuf> = {
-        let mut v = Vec::new();
-        for entry in std::fs::read_dir(mod_target).map_err(|err| {
-            anyhow::anyhow!("{owner_label} qac: failed to read staging dir {}: {err}", mod_target.display())
-        })? {
-            let entry = entry.map_err(|err| {
-                anyhow::anyhow!("{owner_label} qac: failed to read dir entry: {err}")
-            })?;
-            let name = entry.file_name();
-            let name_str = name.to_string_lossy();
-            if globset.is_match(name_str.as_ref()) {
-                v.push(entry.path());
-            }
-        }
-        v
-    };
-
-    if matched.is_empty() {
-        tracing::warn!(
-            owner = owner_label,
-            patterns = ?patterns,
-            staging_dir = %mod_target.display(),
-            "qac: no plugin files matched; action is a no-op"
-        );
-        return Ok(());
-    }
+    let matched = resolve_plugin_patterns(mod_target, &action.plugins, owner_label)?;
 
     for plugin_path in &matched {
         let plugin_name = plugin_path
@@ -299,6 +257,91 @@ pub(crate) fn apply_qac_action(
 }
 
 
+/// Which staged files a `qac` action's patterns name.
+///
+/// Each entry is tried as a literal filename first and only then as a glob.
+/// Oblivion filenames contain brackets -- `Harvest [Flora] - DLCFrostcrag.esp`
+/// -- and a glob reads `[Flora]` as a character class, so the name of a real
+/// file on disk matches nothing at all. Writing the filename and having it
+/// find that file is the behaviour anyone would expect; `DLC*.esp` still
+/// globs, because no file is named that.
+fn resolve_plugin_patterns(
+    mod_target: &Path,
+    patterns: &[String],
+    owner_label: &str,
+) -> anyhow::Result<Vec<PathBuf>> {
+    use globset::{Glob, GlobSetBuilder};
+
+    // Each entry is tried as a literal filename first and only then as a glob.
+    // Oblivion filenames contain brackets -- `Harvest [Flora] - DLCFrostcrag.esp`
+    // -- and a glob reads `[Flora]` as a character class, so the name of a real
+    // file on disk matches nothing at all. Writing the filename and having it
+    // find that file is the behaviour anyone would expect; `DLC*.esp` still
+    // globs, because no file is named that.
+    let names: Vec<String> = {
+        let mut v = Vec::new();
+        for entry in std::fs::read_dir(mod_target).map_err(|err| {
+            anyhow::anyhow!(
+                "{owner_label} qac: failed to read staging dir {}: {err}",
+                mod_target.display()
+            )
+        })? {
+            let entry = entry.map_err(|err| {
+                anyhow::anyhow!("{owner_label} qac: failed to read dir entry: {err}")
+            })?;
+            v.push(entry.file_name().to_string_lossy().into_owned());
+        }
+        v
+    };
+
+    let mut matched: Vec<PathBuf> = Vec::new();
+    for pattern in patterns {
+        let literal: Vec<&String> = names
+            .iter()
+            .filter(|name| name.eq_ignore_ascii_case(pattern))
+            .collect();
+
+        let hits: Vec<&String> = if literal.is_empty() {
+            let glob = Glob::new(pattern).map_err(|err| {
+                anyhow::anyhow!("{owner_label} qac: invalid glob '{pattern}': {err}")
+            })?;
+            let matcher = GlobSetBuilder::new()
+                .add(glob)
+                .build()
+                .map_err(|err| {
+                    anyhow::anyhow!("{owner_label} qac: failed to build glob set: {err}")
+                })?;
+            names.iter().filter(|name| matcher.is_match(*name)).collect()
+        } else {
+            literal
+        };
+
+        // A pattern that finds nothing used to warn and carry on, which meant a
+        // plugin the guide says to clean was quietly left dirty and the run
+        // still reported success.
+        if hits.is_empty() {
+            anyhow::bail!(
+                "{owner_label} qac: '{pattern}' matched no file in {}. It holds: {}",
+                mod_target.display(),
+                if names.is_empty() {
+                    "nothing".to_string()
+                } else {
+                    names.join(", ")
+                }
+            );
+        }
+
+        for name in hits {
+            let path = mod_target.join(name);
+            if !matched.contains(&path) {
+                matched.push(path);
+            }
+        }
+    }
+
+    Ok(matched)
+}
+
 /// Where xEdit writes the log for this run.
 ///
 /// Beside the executable, named for it. Returns `None` rather than guessing if
@@ -485,6 +528,54 @@ fn locate_plugin(name: &str, game_data: &Path, mods_dir: &Path) -> Option<PathBu
 mod tests {
     use super::*;
     use std::io::Write;
+
+    /// The pattern that made this necessary. Oblivion filenames contain
+    /// brackets, and a glob reads `[Flora]` as a character class, so the name
+    /// of a real file on disk matched nothing -- and the action warned and
+    /// carried on, leaving a plugin the guide says to clean dirty.
+    #[test]
+    fn a_bracketed_filename_matches_itself_and_a_glob_still_globs() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        for name in [
+            "Harvest [Flora] - DLCFrostcrag.esp",
+            "Harvest [Flora] - Shivering Isles.esp",
+            "DLCOrrery.esp",
+            "DLCVileLair.esp",
+            "readme.txt",
+        ] {
+            std::fs::write(dir.path().join(name), b"x").expect("fixture");
+        }
+
+        let literal = "Harvest [Flora] - DLCFrostcrag.esp";
+        assert_eq!(
+            resolve_plugin_patterns(dir.path(), &[literal.to_string()], "test").expect("literal"),
+            vec![dir.path().join(literal)],
+            "a filename should find the file with that name"
+        );
+
+        let mut globbed = resolve_plugin_patterns(dir.path(), &["DLC*.esp".to_string()], "test")
+            .expect("glob");
+        globbed.sort();
+        assert_eq!(
+            globbed,
+            vec![dir.path().join("DLCOrrery.esp"), dir.path().join("DLCVileLair.esp")],
+            "a pattern no file is named should still glob"
+        );
+    }
+
+    /// Matching nothing used to be a warning, so a run could report success
+    /// having cleaned nothing at all.
+    #[test]
+    fn a_pattern_that_matches_nothing_is_an_error() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Thing.esp"), b"x").expect("fixture");
+
+        let err = resolve_plugin_patterns(dir.path(), &["Absent.esp".to_string()], "test")
+            .expect_err("should refuse");
+        let message = err.to_string();
+        assert!(message.contains("Absent.esp"), "{message}");
+        assert!(message.contains("Thing.esp"), "should list what is there: {message}");
+    }
 
     #[test]
     fn the_finish_marker_is_only_read_from_this_run() {
