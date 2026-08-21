@@ -404,6 +404,20 @@ plugins = [
 	"more books teach.esp",
 	"Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
 	"Dahyka_OCO_Patch.esp",
+	# Part 31. Seven of these are Prebash merge sources, hidden in the Oracle and
+	# active here until Part 36.
+	"Symphony of Violence.esp",
+	"GOSH.esp",
+	"Vicious Trolls Sound Attenuator.esp",
+	"DialogTweaks.esp",
+	"00 Realistic Player Speech.esp",
+	"DialogTweaksTweakedTrespassing.esp",
+	"Consistent Beggar Voices.esp",
+	"ExpandedGreetings.esp",
+	"Louder Chapel Bells.esp",
+	"Voices for Female Dremora NPCs.esp",
+	"YourMotherWasAHamster.esp",
+	"DisableDetectLifeDuringDialog.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -8727,3 +8741,210 @@ plugins = ["Dahyka_OCO_Patch.esp"]
 path = "nexus:oblivion/49864/1000024110"
 download_handler = "nexus"
 file_name = "Oblivion Character Overhaul V2 - Dahyka's Vanilla Racials and Birthsigns Improved Patch (OCO Uses Merged Teeth)-49864-1-0-1583602006.7z"
+
+# ── Part 31 - AUDIO & DIALOGUE IMPROVEMENTS ─────────────────────────────────
+
+[[mods]]
+id = "Symphony of Violence - Combat Sound Enhancement"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["Symphony of Violence.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/13987/17269"
+download_handler = "nexus"
+file_name = "Symphony of Violence 0_5-13987.rar"
+
+# Guide 2: "Once installed delete GOSH Region Ambiance.esp".
+[[mods]]
+id = "GOSH - Gecko's Oblivion Sound overHaul"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["GOSH.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45214/1000009969"
+download_handler = "nexus"
+file_name = "GOSH v2-1-45214-2-1.zip"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["GOSH Region Ambiance.esp"]
+
+[[mods]]
+id = "Vicious Trolls Sound Replacer"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["Vicious Trolls Sound Attenuator.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50294/1000025365"
+download_handler = "nexus"
+file_name = "Vicious Trolls Sound Replacer-50294-1-0-1595476269.zip"
+
+# Guide 4: the "Goblin Aesthetics Tweak - Sound Replacer" file only.
+[[mods]]
+id = "Diablo-like Goblins - Sound Replacer"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48477/1000019351"
+download_handler = "nexus"
+file_name = "Goblin Aesthetics Tweak - Sound Replacer-48477-1-0.rar"
+
+# Guide 5: "within Dialog TFR Costs.ini, set TrespassDialogRestore to 0".
+[[mods]]
+id = "Dialogue Tweaks Fixes and Restorations"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["DialogTweaks.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/44862/1000010425"
+download_handler = "nexus"
+file_name = "Dialog Tweaks 1_21-44862-1-21.zip"
+
+[[mods.actions]]
+action = "ini_set"
+file = "ini/Dialog TFR Costs.ini"
+format = "set-to"
+key = "TrespassDialogRestore"
+value = 0
+
+[[mods]]
+id = "Realistic Player Dialogue Overhaul"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["00 Realistic Player Speech.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46243/1000024642"
+download_handler = "nexus"
+file_name = "Realistic Player Dialogue Overhaul 2020-46243-2-2-1588543843.rar"
+
+[[mods]]
+id = "Miguick's Dialogue Tweaks Trespassing Tweaked"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["DialogTweaksTweakedTrespassing.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50891/1000027166"
+download_handler = "nexus"
+file_name = "miguick Dialogue Tweaks Tweaked Trespassing-50891-1-00-1615184311.7z"
+
+# Guide 8: "main file only".
+[[mods]]
+id = "Horse Hoof Sounds"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45112/1000007732"
+download_handler = "nexus"
+file_name = "Horse Hoof Sounds-45112-.zip"
+
+[[mods]]
+id = "Consistent Beggar Voices"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["Consistent Beggar Voices.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48336/1000035704"
+download_handler = "nexus"
+file_name = "Consistent Beggar Voices 2023-48336-1-4-1691831023.rar"
+
+[[mods]]
+id = "Nightmarish Oblivion Gate Sounds"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45609/1000008151"
+download_handler = "nexus"
+file_name = "New Oblivion Gate FX-45609-1-1.rar"
+
+[[mods]]
+id = "Expanded Greetings"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["ExpandedGreetings.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/33979/1000015328"
+download_handler = "nexus"
+file_name = "Expanded Greetings-33979-1-1.7z"
+
+[[mods]]
+id = "Louder Chapel Bells"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["Louder Chapel Bells.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52468/1000032738"
+download_handler = "nexus"
+file_name = "Louder Chapel Bells-52468-1-0-1667473915.7z"
+
+[[mods]]
+id = "Voices for Female Dremora NPCs"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["Voices for Female Dremora NPCs.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52498/1000032898"
+download_handler = "nexus"
+file_name = "Voices for Female Dremora NPCs-52498-1-0-1669081670.7z"
+
+# Guide 14: Swearing Rats. The guide itself says "I can understand if you omit
+# it", and the Oracle does -- there is no such mod there. Omitted here too, on
+# that reading; see report 4.
+
+# Guide 15: "main file only... set aaTauntQuest.aaTauntMult to 1".
+[[mods]]
+id = "Your Mother Was A Hamster"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["YourMotherWasAHamster.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/42960/92966"
+download_handler = "nexus"
+file_name = "YourMotherWasAHamster_v1_0-42960-1-0.7z"
+
+[[mods.actions]]
+action = "ini_set"
+file = "ini/YourMotherWasAHamster.ini"
+format = "set-to"
+key = "aaTauntQuest.aaTauntMult"
+value = 1
+
+[[mods]]
+id = "Female Grunts Replacer"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54471/1000039500"
+download_handler = "nexus"
+file_name = "Female Grunts Replacer-54471-1-1727470091.zip"
+
+[[mods]]
+id = "Quieter Dragon Sounds (For MOO)"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54072/1000038507"
+download_handler = "nexus"
+file_name = "Quieter Dragon Sounds-54072-1-0-1717487258.7z"
+
+# Guide 18 [MI]: a Data wrapper, plus a LauncherMusic.wav beside it that is not
+# game content.
+[[mods]]
+id = "Enhanced Music Overhaul"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54652/1000041430"
+download_handler = "nexus"
+file_name = "Enhanced Music Overhaul-54652-2-0-1744930408.zip"
+layout = "custom-data-folder"
+data_folder = "Data"
+
+[[mods]]
+id = "Disable Detect Life During Dialog"
+section = ["31 - AUDIO & DIALOGUE IMPROVEMENTS"]
+plugins = ["DisableDetectLifeDuringDialog.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54942/1000041084"
+download_handler = "nexus"
+file_name = "Disable Detect Life During Dialog-54942-1-0-1741361609.zip"
