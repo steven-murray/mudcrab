@@ -51,37 +51,23 @@ plugins = [
 	"DLCOrrery - Unofficial Patch.esp",
 	"DLCVileLair - Unofficial Patch.esp",
 	"DLCMehrunesRazor - Unofficial Patch.esp",
-	"DLCSpellTomes - Unofficial Patch.esp",
 	"DLCThievesDen - Unofficial Patch.esp",
 	"DLCThievesDen - Unofficial Patch - SSSB.esp",
 	"DLCBattlehornCastle - Unofficial Patch.esp",
 	"DLCFrostcrag - Unofficial Patch.esp",
 	"Knights - Unofficial Patch.esp",
-	"Oblivion Citadel Door Fix.esp",
-	"AyleidWellMessage.esp", 
-	"Bibliophilia.esp", 
 	"Creature Fix Compendium.esp", 
 	"DLCMergedBooks.esp", 
-	"DLCSpellTomes-No Attack.esp", 
-	"DLCThievesDen - BarterForUpgrd.esp", 
-	"DLCVileLair - Tweaks.esp", 
-	"GoblinTribesFixed.esp", 
-	"GuardInfamyGreetingFix.esp", 
-	"Imperial City Landscape Fix.esp", 
 	"Knights Infamy.esp", 
 	"Lava Does Fire Damage.esp", 
 	"LessMaddeningShiveringIsles.esp", 
-	"Locked Fighters Guild Doors Bug Fix.esp", 
 	"MigMaster.esm",
 	"MigMiscellanea.esp", 
 	"Mind your head - signs repositioned.esp",
-	"Minotaur Horns Fix.esp",
 	"SB_SkillBonusItems.esp",
     "SB_WeaponDropFix.esp",
-	"UOPTalosBridgeCollisionFix.esp", 
 	"Walk through Oblivion Gates.esp",
 	"Achievements.esp", 
-	"ApparatusIcons.esp", 
 	"Better Enemy Health.esp", 
 	"BookTrackerUpdatedv1.1.esp", 
 	"Cliff_BetterLetters.esp", 
@@ -100,9 +86,7 @@ plugins = [
 	"QZ Easy Menus.esp", 
 	"Quest Log Manager.esp", 
 	"WorldMapsForAllWorldspaces.esp", 
-	"lVanilla Style Loading Screens Addon.esp",
 	"Evenstars Colourwheel LOD Update.esp",
-	"Bruma Frostcrag Spire LOD.esp",
 	"lVWD for Leyawiin.esp",
 	"IC LOD.esp",
 	"MergedLOD.esp",
@@ -110,75 +94,45 @@ plugins = [
 	# and is `.mohidden` in the Oracle; here they stay active, because the merge
 	# that replaces them does not exist yet. Part 36 removes them from this list.
 	"Oblivion_Character_Overhaul.esp",
-	"Oblivion_Character_Overhaul_Faces.esp",
 	"Ragdolls.esp",
 	"EVE_KnightsoftheNine.esp",
 	"Character Customization Expanded.esp",
-	"NPC Hair Matches Beard.esp",
-	"OCO uses merged teeth.esp",
-	"OCOv2 Beast Races Enhanced.esp",
-	"Improved NPC Faces for OCOv2.esp",
-	"OCOv2 - DLC Addon.esp",
-	"OCO Unused Eyes and DLC Eyes Incorporated.esp",
-	"Baurus tweak.esp",
-	"Siren's Deception Beautified.esp",
-	"DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp",
 	# Part 8. The last two are Part 36 merge sources, hidden in the Oracle and
-	# active here until that merge exists.
+	# consumed by that merge in both instances.
 	"Maskar's Oblivion Overhaul.esp",
 	"BasicHarvest4MOO.esp",
 	"MOO Loading Screens - New Pics.esp",
-	"OCOv2 - MOO Patch.esp",
-	"MOO MOBS Patch.esp",
 	# Part 9. Oscuro's master leads; the OOO Adaptation plugins and the two
 	# OOO Enhanced patches are Part 36 merge sources, hidden in the Oracle and
-	# active here until that merge exists.
+	# consumed by that merge in both instances.
 	"Oscuro's_Oblivion_Overhaul.esm",
 	"Oscuro's_Oblivion_Overhaul.esp",
-	"Oscuro's_Oblivion_Overhaul - Knights of Nine.esp",
 	"EVE_StockEquipmentReplacer for OOO.esp",
 	"OOOShiveringIsles.esp",
-	"OOOShiveringIsles_OCO_Patch.esp",
 	"OOO Enhanced.esp",
-	"DLCHorseArmor - OOO Adaptation.esp",
 	"DLCOrrery - OOO Adaptation.esp",
-	"DLCVileLair - OOO Adaptation.esp",
-	"DLCMehrunesRazor - OOO Adaptation.esp",
-	"DLCThievesDen - OOO Adaptation.esp",
-	"DLCBattlehornCastle - OOO Adaptation.esp",
-	"DLCFrostcrag - OOO Adaptation.esp",
 	"Knights of Nine - OOO Enhanced Adaptation.esp",
-	"OOO Enhanced - Shivering Isles.esp",
-	"OOO Enhanced - Av Latta Magica Compatibility Patch.esp",
 	# Part 10. WAC's master leads. The other three are Part 36 merge sources,
-	# hidden in the Oracle and active here until that merge exists.
+	# consumed by that merge, so they are hidden in both instances.
 	"Waalx Animals & Creatures.esm",
 	"WACIntegration.esp",
-	"WACIntegration - MOO Patch.esp",
-	"WAC - HGEC Equipment Replacer.esp",
-	"WAC Integration HGEC Gauntlets Patch.esp",
 	# Part 11. The first five are dummy plugins mudcrab writes, existing only so
 	# Oblivion loads the BSA of the same stem. `lLet there be Flowers.esp` is
 	# spelled with the author's leading `l`. The Harvest [Flora] add-ons and
 	# Let there be Flowers are Part 36 merge sources, hidden in the Oracle and
-	# active here until that merge exists.
+	# consumed by that merge in both instances.
 	"OUT Essentials.esp",
 	"OUT Dungeons.esp",
 	"Really Textured Normal Maps.esp",
 	"Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.esp",
 	"AI Powered Landscape Retexture.esp",
-	"lLet there be Flowers.esp",
 	"Harvest [Flora].esp",
-	"Harvest [Flora] - DLCFrostcrag.esp",
-	"Harvest [Flora] - DLCVileLair.esp",
-	"Harvest [Flora] - Shivering Isles.esp",
 	# Part 12. All Natural's three core plugins live in optional/ and so are not
 	# in the load order; only Real Lights is. `drifting mist.esp` is row 5's
 	# corrected copy -- row 4's is parked in optional/. The candelabra fix and
 	# both Cava Obscura plugins are Part 36 merge sources, hidden in the Oracle
-	# and active here until that merge exists.
+	# and consumed by that merge in both instances.
 	"All Natural - Real Lights.esp",
-	"All Natural - Real Lights - candelabra pathgrid fix.esp",
 	"NAO.esp",
 	"drifting mist.esp",
 	"Atmosphere additional effects.esp",
@@ -187,12 +141,9 @@ plugins = [
 	"Better Rainbows.esp",
 	"RoadLights.esp",
 	"ILOO.esp",
-	"Cava Obscura - Cyrodiil.esp",
-	"Cava Obscura - SI.esp",
 	# Part 16. Row 27's MageGuild_simbol.esp is parked in optional/ and so is not
 	# in the load order; this is row 28's mergeable copy, a Part 36 merge source
-	# hidden in the Oracle and active here until that merge exists.
-	"MageGuild_simbol.esp",
+	# consumed by that merge, so they are hidden in both instances.
 	# Part 14. ORC180 ships this and the guide wants it. The Oracle runs ORC
 	# 315F, which ships no plugin, so this is a permanent difference.
 	"ORC.esp",
@@ -200,43 +151,20 @@ plugins = [
 	"WindowLightingSystem.esp",
 	"Diverse Chapels Vanilla.esp",
 	# Part 19. Three load normally; the other six are Part 36 merge sources,
-	# hidden in the Oracle and active here until that merge exists.
+	# consumed by that merge, so they are hidden in both instances.
 	"Ducks and Swans.esp",
 	"BettysButterflies.esp",
 	"Simple Horse Utilities.esp",
-	"Better minotaurs.esp",
-	"KingofMisc.esp",
-	"BattlehornLich.esp",
-	"BetterLorgrenBenirus_NoStaffEdit.esp",
-	"CoopArmoredLegionHorses.esp",
-	"DLCHorseArmor - Mane Enabled.esp",
 	# Part 20. Two load normally; the other nine are Part 36 merge sources,
-	# hidden in the Oracle and active here until that merge exists.
+	# consumed by that merge, so they are hidden in both instances.
 	"Vanilla Gear Redux.esp",
 	"MagicArrows.esp",
-	"Weapon Improvement Project.esp",
-	"Shivering Isles Female Armor Displays.esp",
-	"Goblin Totem Staff Icon.esp",
-	"Banes Steel Helm Replacer.esp",
-	"ReteroX_ClosedIronHelmet_v1.esp",
-	"ReteroX_ClosedEbonyHelmet_v1.esp",
-	"Initial Glow Redux.esp",
-	"Initial Glow Redux - Creatures.esp",
-	"Female Amulets.esp",
 	# Part 21. All six are Part 36 merge sources, hidden in the Oracle and
-	# active here until that merge exists.
-	"Book Jackets Oblivion.esp",
-	"Knights - Book Jackets.esp",
-	"Book Jackets DLC Misc.esp",
-	"Alluring Wine Bottles.esp",
-	"PotionReplacer.esp",
-	"SavillaStoneEnhanced.esp",
+	# consumed by that merge in both instances.
 	# Part 22. Both are Part 36 merge sources, hidden in the Oracle and active
 	# here until that merge exists.
-	"Alternate ghost shader.esp",
-	"Improved Fires and Flames - Increased Sound.esp",
 	# Part 23. Eight load normally; the last four are Part 36 merge sources,
-	# hidden in the Oracle and active here until that merge exists.
+	# consumed by that merge, so they are hidden in both instances.
 	"Dynamic Oblivion Combat.esp",
 	"De-Nock Arrows.esp",
 	"StarX Vampire Deaths.esp",
@@ -245,23 +173,15 @@ plugins = [
 	"lGet rid of small Souls.esp",
 	"De Rerum Dirennis.esp",
 	"Enemy Spell Variety.esp",
-	"Av Latta Magicka - Rebalance Complete.esp",
-	"DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp",
-	"lGet rid of Small Souls - Soulgem Prices.esp",
-	"Better Traps.esp",
 	# Part 24. The last four are Part 36 merge sources, hidden in the Oracle
-	# and active here until that merge exists.
+	# and consumed by that merge in both instances.
 	"Weapons Of Morrowind.esp",
 	"Unique Artifacts for Unique People.esp",
 	"JBlades!1.1.esp",
 	"tbskGuardsFeatures.esp",
 	"Travelling Equipment.esp",
-	"Unique Artifacts for Unique People - Distribution.esp",
-	"tbskGuardsFeatures_UOP_Patch.esp",
-	"tbskGuardsFeaturesMergedVanillaAddons.esp",
-	"Unused Magic Items Integrated.esp",
 	# Part 25. Gottshaw, Reedstand, Sutch and the Dispensation patch are Part 36
-	# merge sources, hidden in the Oracle and active here until that merge exists.
+	# merge sources, consumed by that merge, so they are hidden in both instances.
 	"Feldscar.esp",
 	"Frostcrag Village.esp",
 	"Gottshaw Village.esp",
@@ -270,21 +190,17 @@ plugins = [
 	"Sutch Village.esp",
 	"Urasek.esp",
 	"Vergayun.esp",
-	"DispMiscPatch_Ducks and Swans - Reedstand Patch.esp",
 	# Part 26a. The Better Forts feed Part 36's Unique Forts merge; the two LFO
 	# addons, the two guild compatibility patches, the LFO eye addon, the three
 	# Reworked Posts patches and the Dispensation patch feed Prebash. All are
-	# hidden in the Oracle and active here until those merges exist.
+	# consumed by those merges, so they are hidden in both instances.
 	"FGRebuild.esp",
 	"MGRebuildN01.esp",
-	"FGE Compatibility.esp",
-	"MGE Compatibility.esp",
 	"ImpeREAL City Unique Districts - All the Districts - Merged.esp",
 	"The Imperial Water.esp",
 	"IceWaterfrontTunnel.esp",
 	"Add some flavor - Roadside inns.esp",
 	"Add some flavor - Priories.esp",
-	"DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp",
 	"ImpeREAL Empire - Unique Castles - All The Castles - Merged.esp",
 	"County Gates.esp",
 	"AgronakChampionHouse.v1.01.esp",
@@ -300,9 +216,6 @@ plugins = [
 	"HESU SkyrimTemple.esp",
 	"HESU SmokeTown.esp",
 	"Legion Forester Outposts.esp",
-	"LFO - All Races Addon.esp",
-	"LFO - Local Guards Features Patch.esp",
-	"LFO OCO New Eyes.esp",
 	"Nobody Goes into the Mountains but Hunters.esp",
 	"Better Dungeons.esp",
 	"BrumaGuildReconstructed.esp",
@@ -311,56 +224,28 @@ plugins = [
 	"Unique Forts Merged.esp",
 	# Part 26b. All twenty feed the TACE merge, which is Part 36's job -- they
 	# stay in the load order until it exists.
-	"Add some flavor - Talos bridge.esp",
-	"Enhanced Cyrodiil - Cities.esp",
-	"Add some flavor - city gates - without IC.esp",
-	"Cheydinhal Castle Courtyard.esp",
-	"Cheydinhal Peach Tree Island.esp",
-	"CheydinhalGarden.esp",
-	"Chorrol Castle Courtyard.esp",
-	"ChorrolGreatOakReplacer.esp",
-	"Chorrol Park.esp",
-	"Chorrol LCH.esp",
-	"Falling leaves Chorrol.esp",
-	"SkingradDeuglified.esp",
-	"Skingrad Castle Courtyard.esp",
-	"Anvil the city of Dibella.esp",
-	"Anvil_MorningGlory_Mixed.esp",
-	"Falling Rubbish Bravil.esp",
-	"Falling Pollen Leyawiin.esp",
-	"Slightly Different Bruma.esp",
-	"Bruma Greenhouses.esp",
-	"Gardens of Cyrodill-Knights of the Thorn Lodge.esp",
 	# Part 27. Pinarus and the SI Trainers are Prebash merge sources, hidden in
-	# the Oracle and active here until Part 36.
+	# the Oracle and consumed by their merges in both instances.
 	"More Mythic Dawn Agents.esp",
 	"Very Horny Knights.esp",
 	"Shivering Isles Raiders.esp",
 	"Countess.esp",
-	"PinarusInventiusActualHunter.esp",
 	"Tavern Goers 2 - Redux.esp",
 	"Street Vendors of Cyrodiil.esp",
 	"DaedraShrinesProddedWithAStick.esp",
 	"CulusTheMighty.esp",
-	"ShiveringIslesTrainersPartial.esp",
 	# Part 28. Nine of these are Prebash merge sources, hidden in the Oracle and
-	# active here until Part 36.
+	# consumed by their merges in both instances.
 	"ProgressTracker.esp",
 	"CIBFilterPatch.esp",
 	"CIBLppSupport.esp",
 	"Oblivion Content Restoration Project.esp",
-	"Oblivion Content Restoration Project -- Knights.esp",
-	"DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp",
-	"DispMiscPatch_OCRP_VGR_Patch.esp",
 	"The Lost Spires.esp",
 	"The Lost Spires - Cleaned Up Scribe.esp",
 	"The Lost Spires - Assorted Fixes.esp",
-	"The Lost Spires - NPC AI Addon.esp",
 	"Bashed Delayers - MERGE ONLY.esp",
 	"The Ayleid Steps.esp",
-	"The Ayleid Steps - Voiced Addon.esp",
 	"The Ayleid Steps - The Guardian's Atlas.esp",
-	"The Ayleid Steps - Patches.esp",
 	"BrotherhoodRenewed.esp",
 	"Better Dark Brotherhood Sanctuary.esp",
 	"thievery.esp",
@@ -369,24 +254,16 @@ plugins = [
 	"lSinderion's Serendipity.esp",
 	"SM Plugin Refurbish Lite.esp",
 	"SM Plugin Refurbish Lite OBSE.esp",
-	"SM Plugin Refurbish Lite Knights Infamy.esp",
-	"DaedricRequirements.esp",
 	"Shivering Isles - New Dukes.esp",
 	"HackdirtTheDeepOnes.esp",
 	"TheWellOfMinlorada.esp",
 	"AFK_Weye.esp",
-	"DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp",
-	"AFK_Weye - Typo and Grammatical Patch.esp",
 	"Tales of Cyrodiil.esp",
 	# Part 29. All four of these are Prebash merge sources bar NIARA, hidden in
-	# the Oracle and active here until Part 36.
-	"FasterHorses.esp",
-	"MehrunesDagonWalk.esp",
-	"Wolf Animations Restored.esp",
-	"Wolf Animations Restored - MOO Patch.esp",
+	# the Oracle and consumed by their merges in both instances.
 	"NIARA.esp",
 	# Part 30. The AULIAS script patch, More Books Teach and the Dahyka OCO patch
-	# are Prebash merge sources, hidden in the Oracle and active here until Part 36.
+	# are Prebash merge sources, consumed by their merges, so they are hidden in both instances.
 	"Ultimate Leveling.esp",
 	"OCRAFT.esp",
 	"OCRAFT - Integration.esp",
@@ -399,30 +276,17 @@ plugins = [
 	"MigPickpocket.esp",
 	"MigTraining.esp",
 	"Auto Update Leveled Items And Spells.esp",
-	"Auto Update Leveled Items And Spells - Script Patch.esp",
 	"Gentleman's Smart Level Scaling Overhaul.esp",
-	"more books teach.esp",
 	"Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
-	"Dahyka_OCO_Patch.esp",
 	# Part 31. Seven of these are Prebash merge sources, hidden in the Oracle and
-	# active here until Part 36.
-	"Symphony of Violence.esp",
+	# consumed by their merges in both instances.
 	"GOSH.esp",
-	"Vicious Trolls Sound Attenuator.esp",
 	"DialogTweaks.esp",
-	"00 Realistic Player Speech.esp",
-	"DialogTweaksTweakedTrespassing.esp",
 	"Consistent Beggar Voices.esp",
-	"ExpandedGreetings.esp",
-	"Louder Chapel Bells.esp",
-	"Voices for Female Dremora NPCs.esp",
 	"YourMotherWasAHamster.esp",
 	"DisableDetectLifeDuringDialog.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
-	"xxReworkedReedstand.esp",
-	"xxreworkedgottshaw.esp",
-	"xxreworkedSutch.esp",
 	"Dagger_Data.esm",
 	"The Chorrol Graveyard.esp",
 	"Cheydinhal Cemetery Overhaul.esp",
@@ -435,19 +299,18 @@ plugins = [
 	"OblivionDeadLands.esp",
 	# Part 32. Bravil Barrel Fix is a Late Loaders merge source and
 	# PekCOBLBookJackets a Prebash one; both are hidden in the Oracle and active
-	# here until Part 36. The Oracle also leaves Cobl Filter Late MERGE ONLY and
-	# the Buffet Plate disabler present but unticked -- see the Part 32 note.
+	# consumed by their merges in both instances. The Oracle also leaves Cobl
+	# Filter Late MERGE ONLY and the Buffet Plate disabler present but unticked
+	# -- see the Part 32 note.
 	"Cobl Main.esm",
 	"Cobl Glue.esp",
 	"Cobl Si.esp",
 	"Cobl Filter Late MERGE ONLY.esp",
 	"Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
-	"Cobl Glue - Bravil Barrel Fix.esp",
-	"PekCOBLBookJackets.esp",
 	"Cobl for DLC Homes.esp",
 	# Part 33. The four weightless/respawning plugins are Prebash merge sources
 	# and the two Improved Guild patches are Late Loaders ones; all six are hidden
-	# in the Oracle and active here until Part 36.
+	# in the Oracle and consumed by their merges in both instances.
 	"SMO.esp",
 	"AutoHaggle.esp",
 	"za_bankmod.esp",
@@ -462,12 +325,6 @@ plugins = [
 	"Camping.esp",
 	"Note to Self.esp",
 	"QuestsMakeFriends.esp",
-	"WeightlessAmmoConsumablesPotions.esp",
-	"weightlessstones.esp",
-	"aesrespawningamberstumpsandmadnessoredeposits.esp",
-	"aesrespawninggoldandsilverveins.esp",
-	"Improved FG Patch.esp",
-	"Improved MG Patch.esp",
 	"SneakVignette.esp",
 	"DrowningVisuals.esp",
 	# Part 34. Filter patches: each names masters it does not require, so MO2
@@ -481,20 +338,23 @@ plugins = [
 	# Two spaces before the dash, as the archive spells it.
 	"Unique Landscapes Separate  - OOO Adaptation.esp",
 	# Part 35. Nine of these twelve are OOO Patches Merged sources, hidden in the
-	# Oracle and active here until Part 36.
+	# Oracle and consumed by their merges in both instances.
 	"Improved Chests (OOO Compatible).esp",
-	"OOO_Unoficial-Patch.esp",
 	"Cobl Tweaks - OOO.esp",
-	"BDBS - Oscuro's Oblivion Overhaul.esp",
-	"UAUP - OOO Patch.esp",
 	# Two spaces before "(Extended)", as the archive spells it.
-	"Weapons Of Morrowind - OOO  (Extended) Patch.esp",
 	"Bounty Quests OOO Patch.esp",
-	"PotionReplacer OOO Patch.esp",
-	"tbskGuardsFeatures OOO Patch.esp",
-	"OOO Spectral Fix.esp",
-	"OOOCoblTweaksFix.esp",
-	"Arthmoor Villages - OOO Adaptation.esp",
+	# Part 36. The five merge outputs. Every plugin they consume stays declared
+	# above -- the merge's `hide_sources` is what takes those out of the load
+	# order, so removing them here would only hide the accounting.
+	#
+	# These names are the contract the Conflict Resolution mod's Bash Tags match
+	# on. Part 37 replaces this whole array with a fixed loadorder.txt; until then
+	# the merges sit at the end, which is sane rather than correct.
+	"OOO Patches Merged.esp",
+	"TACE Merge.esp",
+	"Prebash Merge.esp",
+	"Late Loaders Merged.esp",
+	"NPC Merge.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -9068,7 +8928,7 @@ data_folder = "KMM Higher-Res Welkynd Textures for Cobl Ayleid Meteoric Weapons 
 
 # Guide 4: "delete Salmo the Baker, Cobl.esp". The Bravil Barrel Fix is a Late
 # Loaders merge source (Part 36 row 8) and so is hidden in the Oracle; it stays
-# active here until that merge is built.
+# consumed by that merge in both instances.
 [[mods]]
 id = "Cobl Unofficial Patch"
 section = ["32 - COMMON OBLIVION (COBL)"]
@@ -9096,7 +8956,7 @@ file_name = "Pekkas COBL Books jackets-51953-v1-0-1651433078.7z"
 exclude = ["**/PekCOBLBookJackets.esp"]
 
 # Guide 6: the replacer esp for row 5. A Prebash merge source (Part 36 row 6),
-# hidden in the Oracle and active here until Part 36.
+# consumed by their merges, so they are hidden in both instances.
 [[mods]]
 id = "Wrye Bash Collection of Mergeable Mods - Pekkas COBL Books Jackets"
 section = ["32 - COMMON OBLIVION (COBL)"]
@@ -9357,7 +9217,7 @@ download_handler = "nexus"
 file_name = "Quests make friends-51792-1-1-1730288420.7z"
 
 # Guide 15-17. All four plugins are Prebash merge sources, hidden in the Oracle
-# and active here until Part 36.
+# and consumed by their merges in both instances.
 [[mods]]
 id = "Weightless Arrows-Potions-Other Consumables"
 section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
@@ -9436,7 +9296,7 @@ layout = "simple"
 
 # Guide 19: five of AsteriaSennall's fixes bundled by the guide author. Both
 # plugins are Late Loaders merge sources, hidden in the Oracle and active here
-# until Part 36. The archive is a packaged MO2 mod folder; its meta.ini is
+# in both instances. The archive is a packaged MO2 mod folder; its meta.ini is
 # dropped, as with the ConScribe settings above.
 [[mods]]
 id = "AsteriaSennall's MOFAM Fixes"
@@ -9574,7 +9434,7 @@ bain_subpackages = ["01 Separate UL"]
 # ---------------------------------------------------------------------------
 #
 # Nine of this section's twelve plugins are OOO Patches Merged sources (Part 36
-# row 2), hidden in the Oracle and active here until that merge is built. The
+# row 2), consumed by that merge and so hidden in both instances. The
 # three that are not are Improved Chests, Cobl Tweaks - OOO and the Bounty
 # Quests patch.
 #
@@ -9735,3 +9595,321 @@ file_name = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)-52949-03-25-1743
 layout = "custom-data-folder"
 data_folder = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)"
 exclude = ["**/meta.ini"]
+
+# ---------------------------------------------------------------------------
+# Part 36 - zMERGED PLUGINS (the remaining five)
+# ---------------------------------------------------------------------------
+#
+# Unique Forts is above, built at Part 26a because nothing else fit under 255
+# until it existed. These five are the rest.
+#
+# Each merge's output filename is a contract: the Bash Tags in the Conflict
+# Resolution mod name them exactly, and the bashed patch degrades in silence if
+# a name does not match. Do not "tidy" any `output` here.
+#
+# `hide_sources = true` throughout, which is what MO2's Merge Plugins Hide does
+# by hand and what makes the Oracle's source plugins `.mohidden`.
+#
+# All six consistency patches come from mod page 52949, the guide's own, so a
+# post-guide date on them is the guide updating itself rather than drift. Each
+# archive is a packaged MO2 mod folder, so its bundled meta.ini is dropped.
+
+# Guide 36 row 1 -- a source of OOO Patches Merged.
+[[mods]]
+id = "OPM Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041288"
+download_handler = "nexus"
+file_name = "OPM Consistency Patch-52949-03-25-1743346420.zip"
+layout = "custom-data-folder"
+data_folder = "OPM Consistency Patch"
+exclude = ["**/meta.ini"]
+
+# Guide 36 row 2 (the patch above the Prebash list): "ABSOLUTELY CRUCIAL to have
+# this given core-CR is performed within it." Its plugin is named
+# `Merge Consistency Patch.esp`, not after the mod.
+[[mods]]
+id = "MOFAM - Prebash Merge Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041290"
+download_handler = "nexus"
+file_name = "Prebash Merge Consistency Patch-52949-03-25-1743346512.7z"
+layout = "custom-data-folder"
+data_folder = "Prebash Merge Consistency Patch"
+exclude = ["**/meta.ini"]
+
+# Guide 36 row 4 -- a source of the TACE merge.
+[[mods]]
+id = "MOFAM - TACE Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041291"
+download_handler = "nexus"
+file_name = "TACE Consistency Patch-52949-03-25-1743346554.zip"
+layout = "custom-data-folder"
+data_folder = "TACE Consistency Patch"
+exclude = ["**/meta.ini"]
+
+# Guide 36 row 6. The archive's folder is "Land Magic"; the Oracle's mod folder
+# is "MOFAM - Land Magic".
+[[mods]]
+id = "MOFAM - Land Magic"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000039517"
+download_handler = "nexus"
+file_name = "Land Magic Patch-52949-09-24-1727617037.7z"
+layout = "custom-data-folder"
+data_folder = "Land Magic"
+exclude = ["**/meta.ini"]
+
+# Guide 36 row 7 -- a source of Late Loaders Merged.
+[[mods]]
+id = "MOFAM - Late Loaders Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041292"
+download_handler = "nexus"
+file_name = "Late Loaders Consistency Patch-52949-03-25-1743346586.zip"
+layout = "custom-data-folder"
+data_folder = "Late Loaders Consistency Patch"
+exclude = ["**/meta.ini"]
+
+# Guide 36 row 9: "just over 1400 NPCs fully CR'd with the build."
+[[mods]]
+id = "MOFAM - NPC Merge Consistency Patch"
+section = ["36 - zMERGED PLUGINS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041293"
+download_handler = "nexus"
+file_name = "NPC Merge Consistency Patch-52949-03-25-1743346632.zip"
+layout = "custom-data-folder"
+data_folder = "NPC Merge Consistency Patch"
+exclude = ["**/meta.ini"]
+
+[[mods]]
+id = "OOO Patches Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "OOO Patches Merged.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "OOO - KotN Patch", plugin = "Oscuro's_Oblivion_Overhaul - Knights of Nine.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCFrostcrag - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCHorseArmor - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCBattlehornCastle - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCMehrunesRazor - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCThievesDen - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "DLCVileLair - OOO Adaptation.esp" },
+    { mod = "OOO Enhanced", plugin = "OOO Enhanced - Shivering Isles.esp" },
+    { mod = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)", plugin = "Arthmoor Villages - OOO Adaptation.esp" },
+    { mod = "Better Dark Brotherhood Sanctuary - OOO Patch", plugin = "BDBS - Oscuro's Oblivion Overhaul.esp" },
+    { mod = "Unique Artifacts for Unique People - OOO Patch", plugin = "UAUP - OOO Patch.esp" },
+    { mod = "Weapons Of Morrowind - OOO (Extended) Patch", plugin = "Weapons Of Morrowind - OOO  (Extended) Patch.esp" },
+    { mod = "Retextured Potions - OOO Patch", plugin = "PotionReplacer OOO Patch.esp" },
+    { mod = "Local Guards Features - OOO Patch", plugin = "tbskGuardsFeatures OOO Patch.esp" },
+    { mod = "OOO Spectral Fix", plugin = "OOO Spectral Fix.esp" },
+    { mod = "OOO CoblTweaks Fix", plugin = "OOOCoblTweaksFix.esp" },
+    { mod = "OOO - Oscuro's Oblivion Overhaul - Updated (Unofficial patch)", plugin = "OOO_Unoficial-Patch.esp" },
+    { mod = "OOO Enhanced", plugin = "OOO Enhanced - Av Latta Magica Compatibility Patch.esp" },
+    { mod = "OPM Consistency Patch", plugin = "OPM Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "TACE Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "TACE Merge.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "Gardens of Cyrodiil - Anvil the city of Dibella", plugin = "Anvil the city of Dibella.esp" },
+    { mod = "Anvil Morning Glory", plugin = "Anvil_MorningGlory_Mixed.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Cheydinhal", plugin = "Cheydinhal Castle Courtyard.esp" },
+    { mod = "Gardens of Cyrodiil - Cheydinhal Peach Tree Island", plugin = "Cheydinhal Peach Tree Island.esp" },
+    { mod = "Cheydinhal Garden", plugin = "CheydinhalGarden.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Chorrol", plugin = "Chorrol Castle Courtyard.esp" },
+    { mod = "Gardens of Cyrodiil - Chorrol Park", plugin = "Chorrol Park.esp" },
+    { mod = "Chorrol Great Oak Replacer", plugin = "ChorrolGreatOakReplacer.esp" },
+    { mod = "Falling Leaves Chorrol - Project Ambience", plugin = "Falling leaves Chorrol.esp" },
+    { mod = "Chorrol Lower Class Houses", plugin = "Chorrol LCH.esp" },
+    { mod = "Falling Pollen Leyawiin - Project Ambience", plugin = "Falling Pollen Leyawiin.esp" },
+    { mod = "Falling Rubbish Bravil - Project Ambience", plugin = "Falling Rubbish Bravil.esp" },
+    { mod = "Gardens of Cyrodiil - Knights of the Thorn Lodge", plugin = "Gardens of Cyrodill-Knights of the Thorn Lodge.esp" },
+    { mod = "Gardens of Cyrodiil - Castle Courtyards - Skingrad", plugin = "Skingrad Castle Courtyard.esp" },
+    { mod = "People Live Here - Skingrad Enhancement Mod", plugin = "SkingradDeuglified.esp" },
+    { mod = "Add some flavor - city gates", plugin = "Add some flavor - city gates - without IC.esp" },
+    { mod = "Enhanced Cyrodiil - Cities", plugin = "Enhanced Cyrodiil - Cities.esp" },
+    { mod = "Add some flavor - Talos Bridge", plugin = "Add some flavor - Talos bridge.esp" },
+    { mod = "Gardens of Cyrodiil - Bruma Greenhouses", plugin = "Bruma Greenhouses.esp" },
+    { mod = "Slightly Different Bruma", plugin = "Slightly Different Bruma.esp" },
+    { mod = "MOFAM - TACE Consistency Patch", plugin = "TACE Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "Prebash Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Prebash Merge.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "Unofficial Oblivion Patch - UOP", plugin = "Oblivion Citadel Door Fix.esp" },
+    { mod = "UOP Talos Bridge Collision Fix", plugin = "UOPTalosBridgeCollisionFix.esp" },
+    { mod = "Unofficial Oblivion DLC Patches - UODP", plugin = "DLCSpellTomes - Unofficial Patch.esp" },
+    { mod = "Av Latta Magicka - Oblivion Magic Overhaul", plugin = "Av Latta Magicka - Rebalance Complete.esp" },
+    { mod = "Signs of Mage Guilde English version - Mergeable", plugin = "MageGuild_simbol.esp" },
+    { mod = "Weightless Arrows-Potions-Other Consumables", plugin = "WeightlessAmmoConsumablesPotions.esp" },
+    { mod = "Weightless Varla and Welkynd stones", plugin = "weightlessstones.esp" },
+    { mod = "Respawning Hollowed Amber Stumps and Madness Ore Deposits", plugin = "aesrespawningamberstumpsandmadnessoredeposits.esp" },
+    { mod = "Respawning Hollowed Amber Stumps and Madness Ore Deposits - Gold and Silver", plugin = "aesrespawninggoldandsilverveins.esp" },
+    { mod = "Vile Lair DLC - Tweaks and Fixes", plugin = "DLCVileLair - Tweaks.esp" },
+    { mod = "Thieves Den Barter for Upgrades", plugin = "DLCThievesDen - BarterForUpgrd.esp" },
+    { mod = "Faster Horses", plugin = "FasterHorses.esp" },
+    { mod = "Initial Glow Redux", plugin = "Initial Glow Redux - Creatures.esp" },
+    { mod = "Initial Glow Redux", plugin = "Initial Glow Redux.esp" },
+    { mod = "Get rid of small Souls - Empty Soulgems Prices", plugin = "lGet rid of Small Souls - Soulgem Prices.esp" },
+    { mod = "Bibliophilia", plugin = "Bibliophilia.esp" },
+    { mod = "Banes Steel Helm Replacer", plugin = "Banes Steel Helm Replacer.esp" },
+    { mod = "Closed Iron Helmet", plugin = "ReteroX_ClosedIronHelmet_v1.esp" },
+    { mod = "Closed Ebony Helmet", plugin = "ReteroX_ClosedEbonyHelmet_v1.esp" },
+    { mod = "Imperial City Landscape Fix", plugin = "Imperial City Landscape Fix.esp" },
+    { mod = "Alternate ghost effect", plugin = "Alternate ghost shader.esp" },
+    { mod = "Oblivion Content Restoration Project - Knights", plugin = "Oblivion Content Restoration Project -- Knights.esp" },
+    { mod = "Miguick's Dialogue Tweaks Trespassing Tweaked", plugin = "DialogTweaksTweakedTrespassing.esp" },
+    { mod = "Realistic Player Dialogue Overhaul", plugin = "00 Realistic Player Speech.esp" },
+    { mod = "Vanilla Style Loading Screens Addon", plugin = "lVanilla Style Loading Screens Addon.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Reedstand", plugin = "xxReworkedReedstand.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Gottshaw", plugin = "xxreworkedgottshaw.esp" },
+    { mod = "Patch for Arthmoor Villages and Reworked Posts - Sutch", plugin = "xxreworkedSutch.esp" },
+    { mod = "Louder Chapel Bells", plugin = "Louder Chapel Bells.esp" },
+    { mod = "Pinarus Inventius - Actual Hunter", plugin = "PinarusInventiusActualHunter.esp" },
+    { mod = "Unused Magic Items Integrated", plugin = "Unused Magic Items Integrated.esp" },
+    { mod = "Voices for Female Dremora NPCs", plugin = "Voices for Female Dremora NPCs.esp" },
+    { mod = "The Ayleid Steps - Compatibility Patches", plugin = "The Ayleid Steps - Patches.esp" },
+    { mod = "Let there be Flowers", plugin = "lLet there be Flowers.esp" },
+    { mod = "Guard Infamy Greeting Fix", plugin = "GuardInfamyGreetingFix.esp" },
+    { mod = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods", plugin = "AyleidWellMessage.esp" },
+    { mod = "Goblin Tribes Fixed", plugin = "GoblinTribesFixed.esp" },
+    { mod = "Expanded Greetings", plugin = "ExpandedGreetings.esp" },
+    { mod = "Local Guards Features - Gaius Prentus Addon", plugin = "tbskGuardsFeaturesMergedVanillaAddons.esp" },
+    { mod = "No Annoying Conjurer Attack (Spell Tomes DLC fix)", plugin = "DLCSpellTomes-No Attack.esp" },
+    { mod = "SM DLC Plugin Refurbish", plugin = "SM Plugin Refurbish Lite Knights Infamy.esp" },
+    { mod = "Bruma Frostcrag Spire LOD", plugin = "Bruma Frostcrag Spire LOD.esp" },
+    { mod = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation", plugin = "MehrunesDagonWalk.esp" },
+    { mod = "Better Traps", plugin = "Better Traps.esp" },
+    { mod = "Fame Based Daedric Quest Requirements", plugin = "DaedricRequirements.esp" },
+    { mod = "Claws whiskers and Seamless tails only", plugin = "OCOv2 Beast Races Enhanced.esp" },
+    { mod = "HGEC Equipment Replacer for WAC", plugin = "WAC - HGEC Equipment Replacer.esp" },
+    { mod = "Unique Wolf Animations Restored", plugin = "Wolf Animations Restored.esp" },
+    { mod = "Voiced Addons Collection for Mods (ElevenLabs) - The Ayleid Steps", plugin = "The Ayleid Steps - Voiced Addon.esp" },
+    { mod = "Patch for Vanilla Gear Redux Reasonable Flavor - Clipping and fpv fixes", plugin = "Shivering Isles Female Armor Displays.esp" },
+    { mod = "Oblivion Character Overhaul Version 2 Patches", plugin = "DispMiscPatch_OCOv2 - Adoring Fan No Beard.esp" },
+    { mod = "Compatibility Patches for Arthmoor's Mods", plugin = "DispMiscPatch_Ducks and Swans - Reedstand Patch.esp" },
+    { mod = "WAC - Integration - HGEC Gauntlets Conversion", plugin = "WAC Integration HGEC Gauntlets Patch.esp" },
+    { mod = "The Lost Spires - NPC AI Addon", plugin = "The Lost Spires - NPC AI Addon.esp" },
+    { mod = "Locked Fighters Guild Doors Bug Fix", plugin = "Locked Fighters Guild Doors Bug Fix.esp" },
+    { mod = "Miscellaneous Patch Collection by Dispensation - Add Some Flavor mods", plugin = "DispMiscPatch_AddSomeFlavorRoadsideInns - GottshawVillage Patch.esp" },
+    { mod = "Icons for Alchemy Apparatus", plugin = "ApparatusIcons.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - DLCFrostcrag.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - DLCVileLair.esp" },
+    { mod = "Harvest Flora", plugin = "Harvest [Flora] - Shivering Isles.esp" },
+    { mod = "Vanilla Amulets fix for HGEC", plugin = "Female Amulets.esp" },
+    { mod = "More Books Teach", plugin = "more books teach.esp" },
+    { mod = "Book Jackets Oblivion High Res BAIN", plugin = "Book Jackets Oblivion.esp" },
+    { mod = "Book Jackets KOTN", plugin = "Knights - Book Jackets.esp" },
+    { mod = "Book Jackets for Misc DLC", plugin = "Book Jackets DLC Misc.esp" },
+    { mod = "Alluring Wine Bottles with Real Glass", plugin = "Alluring Wine Bottles.esp" },
+    { mod = "Better minotaurs", plugin = "Better minotaurs.esp" },
+    { mod = "Better Lorgren Benirus", plugin = "BetterLorgrenBenirus_NoStaffEdit.esp" },
+    { mod = "Unique Liches", plugin = "KingofMisc.esp" },
+    { mod = "Unique Liches - Battlehorn Lich", plugin = "BattlehornLich.esp" },
+    { mod = "Weapon Improvement Project", plugin = "Weapon Improvement Project.esp" },
+    { mod = "Goblin Totem Staff Icon", plugin = "Goblin Totem Staff Icon.esp" },
+    { mod = "Wrye Bash Collection of Mergeable Mods - Pekkas COBL Books Jackets", plugin = "PekCOBLBookJackets.esp" },
+    { mod = "Improved Fires and Flames", plugin = "Improved Fires and Flames - Increased Sound.esp" },
+    { mod = "Symphony of Violence - Combat Sound Enhancement", plugin = "Symphony of Violence.esp" },
+    { mod = "Vicious Trolls Sound Replacer", plugin = "Vicious Trolls Sound Attenuator.esp" },
+    { mod = "Retextured Potions", plugin = "PotionReplacer.esp" },
+    { mod = "Coop's TW3 Oblivion Horse Replacer", plugin = "CoopArmoredLegionHorses.esp" },
+    { mod = "Coop's TW3 Oblivion Horse Replacer", plugin = "DLCHorseArmor - Mane Enabled.esp" },
+    { mod = "Shivering Isles Trainers (Partial)", plugin = "ShiveringIslesTrainersPartial.esp" },
+    { mod = "Savilla's Stone Enhanced", plugin = "SavillaStoneEnhanced.esp" },
+    { mod = "Miscellaneous Patch Collection by Dispensation - AFK Weye", plugin = "DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp" },
+    { mod = "AFK_Weye - Typo and Grammatical Patch", plugin = "AFK_Weye - Typo and Grammatical Patch.esp" },
+    { mod = "Minotaur Horn Drop Fix", plugin = "Minotaur Horns Fix.esp" },
+    { mod = "MOFAM - Prebash Merge Consistency Patch", plugin = "Merge Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "Late Loaders Merged"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "Late Loaders Merged.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "WAC - Integration", plugin = "WACIntegration - MOO Patch.esp" },
+    { mod = "Weather - All Natural Real Lights - Candelabra pathgrid fix", plugin = "All Natural - Real Lights - candelabra pathgrid fix.esp" },
+    { mod = "Av Latta Magicka - Migcks Misc Elemental Fists Poison Patch", plugin = "DispMiscPatch_Av Latta Magicka - Migck Misc Poison Fists Patch.esp" },
+    { mod = "Local Guards Features Unofficial Patch", plugin = "tbskGuardsFeatures_UOP_Patch.esp" },
+    { mod = "Legion Forester Outposts Revisited", plugin = "LFO - Local Guards Features Patch.esp" },
+    { mod = "Oblivion Content Restoration Project Patches", plugin = "DispMiscPatch_OCRP_VGR_Patch.esp" },
+    { mod = "Oblivion Content Restoration Project Patches", plugin = "DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp" },
+    { mod = "AULIAS - Script Patch", plugin = "Auto Update Leveled Items And Spells - Script Patch.esp" },
+    { mod = "Cobl Unofficial Patch", plugin = "Cobl Glue - Bravil Barrel Fix.esp" },
+    { mod = "OCOv2 -MOO Patch", plugin = "OCOv2 - MOO Patch.esp" },
+    { mod = "MOBS patch for Maskar's Oblivion Overhaul", plugin = "MOO MOBS Patch.esp" },
+    { mod = "Unique Wolf Animations Restored", plugin = "Wolf Animations Restored - MOO Patch.esp" },
+    { mod = "Improved Mages Guild ENG OOO and ALL NATURAL PATCH", plugin = "MGE Compatibility.esp" },
+    { mod = "AsteriaSennall's MOFAM Fixes", plugin = "Improved MG Patch.esp" },
+    { mod = "Improved Fighters Guild ENG OOO and All Natural Patch", plugin = "FGE Compatibility.esp" },
+    { mod = "AsteriaSennall's MOFAM Fixes", plugin = "Improved FG Patch.esp" },
+    { mod = "MOFAM - Land Magic", plugin = "LandMagicPatch.esp" },
+    { mod = "Cava Obscura", plugin = "Cava Obscura - Cyrodiil.esp" },
+    { mod = "Cava Obscura", plugin = "Cava Obscura - SI.esp" },
+    { mod = "MOFAM - Late Loaders Consistency Patch", plugin = "Late Loaders Consistency Patch.esp" },
+  ]
+
+[[mods]]
+id = "NPC Merge"
+section = ["36 - zMERGED PLUGINS"]
+type = "merge"
+
+  [mods.merge]
+  output = "NPC Merge.esp"
+  method = "clobber"
+  hide_sources = true
+  sources = [
+    { mod = "Legion Forester Outposts Revisited", plugin = "LFO - All Races Addon.esp" },
+    { mod = "Oblivion Character Overhaul - Advanced Edition", plugin = "Oblivion_Character_Overhaul_Faces.esp" },
+    { mod = "Legion Forester Outposts Revisited OCO Eyes for all Races", plugin = "LFO OCO New Eyes.esp" },
+    { mod = "NPC Hair Matches Beard - Updated", plugin = "NPC Hair Matches Beard.esp" },
+    { mod = "OCOv2 Uses Merged Teeth", plugin = "OCO uses merged teeth.esp" },
+    { mod = "Improved NPC Faces for OCOv2", plugin = "Improved NPC Faces for OCOv2.esp" },
+    { mod = "Oblivion Character Overhaul v2 - DLC Addon", plugin = "OCOv2 - DLC Addon.esp" },
+    { mod = "Unused OCOv2 Eyes and DLC Characters Incorporated", plugin = "OCO Unused Eyes and DLC Eyes Incorporated.esp" },
+    { mod = "OOO Shivering Isles - OCO Compatibility Patch", plugin = "OOOShiveringIsles_OCO_Patch.esp" },
+    { mod = "OCOv2 Baurus tweak", plugin = "Baurus tweak.esp" },
+    { mod = "Sirens Deception Beautified", plugin = "Siren's Deception Beautified.esp" },
+    { mod = "Unique Artifacts for Unique People", plugin = "Unique Artifacts for Unique People - Distribution.esp" },
+    { mod = "OCOv2 - Race Rebalance Mods Patches", plugin = "Dahyka_OCO_Patch.esp" },
+    { mod = "MOFAM - NPC Merge Consistency Patch", plugin = "NPC Merge Consistency Patch.esp" },
+  ]

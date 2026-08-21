@@ -798,3 +798,60 @@ fn an_unparseable_guide_date_is_an_error() {
     let text = String::from_utf8(output).expect("utf-8");
     assert!(text.contains("YYYY-MM-DD"), "unexpected error:\n{text}");
 }
+
+#[path = "support/esp.rs"]
+mod esp;
+
+/// A differing plugin should say *what* differs, not just that the bytes do.
+///
+/// The `.mohidden` spelling is the case that matters most: once a merge exists,
+/// every plugin it consumed is hidden on both sides, so these are the files a
+/// post-merge diff is actually made of.
+#[test]
+fn a_differing_plugin_reports_records_and_masters_even_when_hidden() {
+    let fixture = Fixture::new();
+    fixture.write_plan(&plan_mod("thing", &["s"], None));
+
+    let shared = esp::record(b"WEAP", 0x0100_0001, 0, &[esp::field(b"EDID", &esp::zstring("a"))]);
+    let extra = esp::record(b"WEAP", 0x0100_0002, 0, &[esp::field(b"EDID", &esp::zstring("b"))]);
+
+    let ours_dir = fixture.ours().join("thing");
+    let oracle_dir = fixture.oracle().join("thing");
+    std::fs::create_dir_all(&ours_dir).expect("ours mod dir");
+    std::fs::create_dir_all(&oracle_dir).expect("oracle mod dir");
+
+    // Ours holds one record the Oracle does not, and one master more.
+    std::fs::write(
+        ours_dir.join("Thing.esp.mohidden"),
+        esp::plugin(
+            &["Oblivion.esm", "Extra.esm"],
+            &[esp::group(*b"WEAP", 0, &[shared.clone(), extra])],
+        ),
+    )
+    .expect("ours plugin");
+    std::fs::write(
+        oracle_dir.join("Thing.esp.mohidden"),
+        esp::plugin(&["Oblivion.esm"], &[esp::group(*b"WEAP", 0, &[shared])]),
+    )
+    .expect("oracle plugin");
+
+    let output = fixture.diff().output().expect("diff should run");
+    let text = String::from_utf8_lossy(&output.stdout).to_string();
+
+    assert!(
+        text.contains("1 records only in ours"),
+        "should name the extra record; got:\n{text}"
+    );
+    assert!(
+        text.contains("2 vs 1 records"),
+        "should give both totals; got:\n{text}"
+    );
+    assert!(
+        text.contains("masters differ (2 vs 1"),
+        "should report the master lists; got:\n{text}"
+    );
+    assert!(
+        text.contains("only ours: extra.esm"),
+        "should name the master only we carry; got:\n{text}"
+    );
+}
