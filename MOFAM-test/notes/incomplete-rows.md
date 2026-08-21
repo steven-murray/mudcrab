@@ -110,9 +110,67 @@ has to be sane, not correct.
 
 ---
 
-## C. Fixed — kept for the record
+## C. Open on the Oracle side
 
-- ~~AFK Weye (Part 28 row 33) repack~~ — done in the Oracle 2026-08-21.
-- ~~Urasek (Part 25 row 7) "Replace All"~~ — repacked in the Oracle 2026-08-21.
-- ~~Thorn Addon (Part 24 row 7c) plugin deletion~~ — done in the Oracle.
-- ~~Part 30/31 INI values~~ — corrected in the Oracle.
+Not mudcrab gaps — things in `MOFAM-03.25` that a re-check on 2026-08-21 found
+still outstanding after Steven's fixing pass.
+
+### C1. `AKF Weye.bsa` is misnamed and will not load
+
+The AFK Weye repack landed — 246 MB, built 22:26 — under the name
+**`AKF Weye.bsa`**. The `F` and `K` are transposed.
+
+Oblivion loads `<plugin stem>.bsa` for an active plugin. The plugin is
+`AFK_Weye.esp`, so the engine looks for `AFK_Weye.bsa` and finds nothing;
+`AKF Weye.bsa` is referenced by nothing in the profile. **The whole repack is
+inert** — every mesh, texture and voice line in it is invisible to the game.
+
+Renaming it to `AFK_Weye.bsa` is the entire fix.
+
+### C2. Urasek's repack did not change its contents
+
+`Urasek.bsa` was rebuilt (22:00) but holds the same payload as before:
+63,083,533 bytes, which is the base mod's bytes for all 608 files the VA
+archive overlaps. Ours is 58,223,187 — the VA bytes, per the guide's
+"Replace All".
+
+Same file count, same paths, so the rebuild worked; the overlay order or the
+prompt answer is what did not.
+
+### C3. Nine of Ultimate Leveling's fifteen edits are still unapplied
+
+Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
+1000, `ini_xp_level_mult` 400). Nine still hold the archive's defaults:
+
+| setting | archive & Oracle | guide |
+|---|---|---|
+| `ini_xp_skill_level_points_journeyman` | 3 | 2 |
+| `ini_xp_skill_level_points_expert` | 4 | 3 |
+| `ini_xp_skill_level_points_minor` | 15 | 10 |
+| `ini_xp_read_skillbook_minor` | 2 | 4 |
+| `ini_xp_read_skillbook_major` | 4 | 8 |
+| `ini_xp_train_minor` | 3 | 2 |
+| `ini_xp_train_major` | 5 | 3 |
+| `ini_rested_bonus` | 50 | 20 |
+| `ini_horseshoe_total` | 150 | 0 |
+
+Plus `ini_xp_kill_other`, which the guide does not mention and the Oracle sets
+to 10 against the archive's 25.
+
+### C4. Cosmetic, listed so they are not re-investigated
+
+- `MigTraining.ini` line 65 (`fTrainerAdvancedMult`) has one tab in the Oracle
+  where the archive has two. No instruction touches that line; the file has been
+  hand-edited. The value edit itself is now correct.
+- `YourMotherWasAHamster.ini` reads `1.0` in the Oracle and `1` here. Same
+  number.
+
+## D. Fixed — kept for the record
+
+- ~~Thorn Addon (Part 24 row 7c) plugin deletion~~ — done; the mod is now
+  byte-identical.
+- ~~Mehrunes Dagon archive~~ — refreshed; the mod is now byte-identical, and
+  the stale-cache defect it exposed is fixed in mudcrab.
+- ~~`migTrainingQ.bDisplaySkillNumbers`~~ — now 1, per the guide.
+- ~~Ultimate Leveling's `ini_xp_kill_companion` / `_pet` / `_follower`~~ — back
+  to the archive's 50/50/50, matching ours.

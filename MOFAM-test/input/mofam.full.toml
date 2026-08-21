@@ -8373,15 +8373,6 @@ file_name = "Lich - Skeleton handtohand Animations-48606-Final.rar"
 
 # Guide 7: "Once installed delete MehrunesDagonWalk.esp" -- the mergeable build
 # in row 8 replaces it.
-#
-# The archive's root also holds **six unrelated mod archives** the author
-# packaged by mistake: Nirnroot retexture, Oblivion Races Unlocked, Painters
-# Touch, two Paladin Mod files and Pet your animals. Extracting the archive
-# faithfully puts all six in the mod folder, which is what happened the first
-# time this row ran.
-#
-# `include` takes only what the mod actually is. That also satisfies the
-# guide's delete instruction, by never unpacking the plugin in the first place.
 [[mods]]
 id = "Mehrunes Dagon Walking Animation"
 section = ["29 - ANIMATIONS"]
@@ -8390,7 +8381,10 @@ section = ["29 - ANIMATIONS"]
 path = "nexus:oblivion/52126/1000031702"
 download_handler = "nexus"
 file_name = "Mehrunes Dagon Walking Animation-52126-1-1-1656778512.zip"
-include = ["meshes/**"]
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["MehrunesDagonWalk.esp"]
 
 # Guide 8: the mergeable build of row 7's plugin, from a collection.
 [[mods]]

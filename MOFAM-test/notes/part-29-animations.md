@@ -4,27 +4,40 @@ Ten rows. **7 of 10 identical.** The other three differ only by a Prebash merge
 source hidden in the Oracle: Faster Horses, Mehrunes Dagon Walk (the mergeable
 build from row 8) and both Unique Wolf Animations plugins.
 
-## Row 7 ships six other people's mods
+## Row 7's archive was locally modified — corrected
 
-`Mehrunes Dagon Walking Animation-52126-1-1-1656778512.zip` contains, at its
-root, **six unrelated mod archives** the author appears to have packaged by
-accident:
+**An earlier version of this note said the mod author had packaged their
+downloads folder by accident. That was wrong**, and the correction matters
+because the fix I made rested on it.
 
-    Nirnroot retexture-45018-1-0.rar
-    Oblivion Races Unlocked 3.5-48323-3-5.zip
-    Painters Touch 1024-43678-1-0.7z
-    Paladin Mod - OBME Patch-49096-1-0-1577041773.7z
-    Paladin Mod 1_4 - Manual-41095-1-4.7z
-    Pet your animals-48398-3-0-1542606226.zip
+`Mehrunes Dagon Walking Animation-52126-1-1-1656778512.zip` on this machine had
+six unrelated mod archives at its root — Nirnroot retexture, Oblivion Races
+Unlocked, Painters Touch, two Paladin Mod files, Pet your animals. Steven
+modified the zip locally by accident; the file on Nexus was always fine. He has
+since refreshed it: 14.7 MB down to 76 KB, containing exactly
+`MehrunesDagonWalk.esp` and `meshes/`.
 
-Extracting the archive faithfully puts all six in the mod folder, which is
-exactly what happened the first time this row ran — mudcrab was behaving
-correctly and the archive is wrong. The row now uses `include = ["meshes/**"]`,
-which takes only what the mod is and incidentally satisfies the guide's "delete
-MehrunesDagonWalk.esp" by never unpacking it.
+The row is back to a plain extract plus the guide's `file_prune` of the plugin.
+The `include = ["meshes/**"]` workaround is gone — it was papering over a local
+accident, not an upstream defect, and leaving it would have quietly dropped the
+plugin if the archive ever changed again.
 
-Worth knowing because nothing about the install *looked* wrong: the mod folder
-had the meshes the game needs, plus 14 MB of inert junk beside them.
+### What it exposed in mudcrab, which was real
+
+Refreshing the archive did **not** fix the install. mudcrab's cache is keyed by
+a derived name — mod id, archive index, file id — which says nothing about
+content, and the cache hit short-circuits before adoption. So the next install
+happily unpacked the stale 14.7 MB copy again.
+
+`download::cache_entry_is_stale` now compares the cached entry's size against
+the file it was adopted from and re-adopts when they differ:
+
+    WARN cached archive no longer matches the file it came from; re-adopting
+         cached_bytes=14755535 source_bytes=76159
+
+Compared by size, not by hash: the cache holds tens of gigabytes, this runs once
+per archive per install, and a size change is what a replaced download looks
+like. A same-size different-content swap is not worth reading 50 GB to catch.
 
 ## Structure
 

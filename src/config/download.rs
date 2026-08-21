@@ -129,6 +129,47 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     Ok(())
 }
 
+/// Whether a cached archive no longer matches the file it was adopted from.
+///
+/// The cache is keyed by a *derived* name -- mod id, archive index, file id --
+/// which says nothing about content. Re-download an archive under its own name
+/// in a search path and the derived name is unchanged, so the cache keeps
+/// serving the old bytes forever. That is not hypothetical: a MOFAM archive was
+/// repaired in place and the next install still unpacked the broken copy,
+/// silently, because the cache hit short-circuits before adoption.
+///
+/// Compared by size, not by hash. The cache holds tens of gigabytes and this
+/// runs once per archive per install; a size change is what a replaced download
+/// looks like, and a same-size different-content replacement is not a case
+/// worth reading 50GB to catch.
+pub(crate) fn cache_entry_is_stale(
+    cached: &Path,
+    file_name: Option<&str>,
+    search_paths: &[PathBuf],
+) -> bool {
+    let Some(source) = find_local_archive(file_name, search_paths) else {
+        // Nothing to compare against, so nothing to say. An archive with no
+        // local twin is the cache's own business.
+        return false;
+    };
+
+    let (Ok(cached_meta), Ok(source_meta)) = (cached.metadata(), source.metadata()) else {
+        return false;
+    };
+    if cached_meta.len() == source_meta.len() {
+        return false;
+    }
+
+    tracing::warn!(
+        cached = %cached.display(),
+        source = %source.display(),
+        cached_bytes = cached_meta.len(),
+        source_bytes = source_meta.len(),
+        "cached archive no longer matches the file it came from; re-adopting"
+    );
+    true
+}
+
 /// Resolution order for one archive: cache, then the read-only search paths,
 /// then the network. The first two never touch the network at all, which is the
 /// whole point -- a large modlist is mostly archives the machine already has.
@@ -146,7 +187,9 @@ async fn download_with_retry(
         .and_then(|name| name.to_str())
         .unwrap_or_default();
 
-    if let Some(existing) = resolve_cache_path(cache_dir, cache_name) {
+    if let Some(existing) = resolve_cache_path(cache_dir, cache_name)
+        && !cache_entry_is_stale(&existing, file_name, &settings.archive_search_paths)
+    {
         tracing::info!(source = %path, destination = %existing.display(), "archive already cached, skipping download");
         return Ok(DownloadOutcome::Cached(existing));
     }
@@ -697,6 +740,16 @@ pub fn build_layer_cache_file_name(
         })
         .collect();
     format!("{safe_id}_{archive_index}_layer{layer_index}_{safe_tail}")
+}
+
+/// Test hook for `cache_entry_is_stale`, which is otherwise private to the
+/// resolution path.
+pub fn cache_entry_is_stale_for_test(
+    cached: &Path,
+    file_name: Option<&str>,
+    search_paths: &[PathBuf],
+) -> bool {
+    cache_entry_is_stale(cached, file_name, search_paths)
 }
 
 #[cfg(test)]
