@@ -146,19 +146,17 @@ pub(crate) fn apply_qac_action(
         })?;
 
         let qac_result = (|| -> anyhow::Result<()> {
-            // Link/copy master ESMs from the real game Data folder so xEdit can
-            // resolve master file references during cleaning.
-            for entry in std::fs::read_dir(&game_data).map_err(|err| {
-                anyhow::anyhow!("qac: failed to read game data dir {}: {err}", game_data.display())
-            })? {
-                let entry = entry?;
-                let name = entry.file_name();
-                let name_s = name.to_string_lossy();
-                let is_esm = name_s.to_ascii_lowercase().ends_with(".esm");
-                if is_esm {
-                    link_or_copy(&entry.path(), &temp_data.join(&name))?;
-                }
-            }
+            // Every master the plugin needs, into the sandbox.
+            //
+            // Not "every .esm in the game Data folder": under MO2 the game's
+            // Data folder holds Oblivion.esm and little else, and a plugin's
+            // masters live in mod folders -- OOO's esm, the DLC esps, another
+            // mod's plugin. Copying only the game folder left xEdit sitting on
+            // a missing-masters dialog with nothing in its log, which looks
+            // exactly like a hang.
+            //
+            // Masters have masters, so this is a closure, not a list.
+            stage_masters(plugin_path, &temp_data, &game_data, &settings.mods_dir, owner_label)?;
 
             // Copy the plugin to clean into the sandbox.
             let temp_plugin = temp_data.join(&plugin_name);
@@ -198,9 +196,16 @@ pub(crate) fn apply_qac_action(
                 .map(|meta| meta.len())
                 .unwrap_or(0);
 
-            let mut child = settings
-                .tools
-                .windows_tool_command(&qac_exe)?
+            let mut command = settings.tools.windows_tool_command(&qac_exe)?;
+            // Its own process group, so closing it closes the whole Proton
+            // tree. Killing the launcher alone leaves the real xEdit window
+            // running -- which is what happened the first time a plugin hung.
+            #[cfg(unix)]
+            {
+                use std::os::unix::process::CommandExt;
+                command.process_group(0);
+            }
+            let mut child = command
                 .args([
                     "-TES4",
                     "-QAC",
@@ -236,15 +241,13 @@ pub(crate) fn apply_qac_action(
                         plugin = plugin_name,
                         "qac: xEdit reported Quick Clean finished; closing it"
                     );
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    close_process_tree(&mut child);
                     finished = true;
                     break;
                 }
 
                 if start.elapsed() > QAC_TIMEOUT {
-                    let _ = child.kill();
-                    let _ = child.wait();
+                    close_process_tree(&mut child);
                     break;
                 }
 
@@ -361,6 +364,121 @@ fn newest_save_file(data_dir: &Path, plugin_name: &str) -> anyhow::Result<Option
     }
 
     Ok(best.map(|(_, path)| path))
+}
+
+/// End the tool and everything it started.
+///
+/// `Child::kill` reaches only the process mudcrab spawned, which under Proton
+/// is a launcher; the window belongs to a grandchild and survives. The child
+/// leads its own process group, so signalling the negative pid takes the tree.
+fn close_process_tree(child: &mut std::process::Child) {
+    #[cfg(unix)]
+    {
+        let _ = std::process::Command::new("kill")
+            .arg("-TERM")
+            .arg("--")
+            .arg(format!("-{}", child.id()))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        let _ = std::process::Command::new("kill")
+            .arg("-KILL")
+            .arg("--")
+            .arg(format!("-{}", child.id()))
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
+
+/// Copy `plugin`'s masters, and their masters, into the sandbox.
+///
+/// Looked for in the game's Data folder first, then in any installed mod
+/// folder, matching case-insensitively and seeing through MO2's `.mohidden`
+/// suffix -- a merge's source plugin is hidden but is still somebody's master.
+fn stage_masters(
+    plugin: &Path,
+    temp_data: &Path,
+    game_data: &Path,
+    mods_dir: &Path,
+    owner_label: &str,
+) -> anyhow::Result<()> {
+    let mut pending = vec![plugin.to_path_buf()];
+    let mut staged: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+    while let Some(current) = pending.pop() {
+        let parsed = match crate::plugin::Plugin::read(&current) {
+            Ok(parsed) => parsed,
+            // A master we cannot parse is still worth copying in -- xEdit is a
+            // better judge of its own formats than this reader is.
+            Err(err) => {
+                tracing::debug!(
+                    owner = owner_label,
+                    plugin = %current.display(),
+                    error = %err,
+                    "qac: could not read masters from this file; staging it anyway"
+                );
+                continue;
+            }
+        };
+
+        for master in parsed.masters.masters() {
+            let name = master.as_str();
+            let key = name.to_ascii_lowercase();
+            if !staged.insert(key) {
+                continue;
+            }
+
+            let Some(source) = locate_plugin(name, game_data, mods_dir) else {
+                anyhow::bail!(
+                    "{owner_label} qac: {} needs master '{name}', which is not in {} or any mod \
+                     under {}. xEdit would wait on a missing-masters dialog rather than fail.",
+                    current.display(),
+                    game_data.display(),
+                    mods_dir.display(),
+                );
+            };
+
+            let destination = temp_data.join(name);
+            link_or_copy(&source, &destination)?;
+            pending.push(destination);
+        }
+    }
+
+    Ok(())
+}
+
+/// Find a plugin by name, in the game Data folder or any installed mod.
+fn locate_plugin(name: &str, game_data: &Path, mods_dir: &Path) -> Option<PathBuf> {
+    let matches = |entry: &std::fs::DirEntry| -> bool {
+        let file = entry.file_name();
+        let file = file.to_string_lossy();
+        file.eq_ignore_ascii_case(name)
+            || file.eq_ignore_ascii_case(&format!("{name}{}", crate::config::mo2::MO2_HIDDEN_SUFFIX))
+    };
+
+    if let Ok(entries) = std::fs::read_dir(game_data)
+        && let Some(hit) = entries.flatten().find(matches)
+    {
+        return Some(hit.path());
+    }
+
+    let mods = std::fs::read_dir(mods_dir).ok()?;
+    for mod_dir in mods.flatten() {
+        if !mod_dir.file_type().is_ok_and(|kind| kind.is_dir()) {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(mod_dir.path())
+            && let Some(hit) = entries.flatten().find(matches)
+        {
+            return Some(hit.path());
+        }
+    }
+
+    None
 }
 
 #[cfg(test)]
