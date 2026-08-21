@@ -6,7 +6,8 @@ guide's row asks. Nothing here fails; each one succeeds and leaves the instance
 slightly short of the guide, which is exactly why it needs writing down rather
 than trusting to a diff that has other things to say.
 
-Kept current as sections are built. Last updated after Part 35.
+Kept current as sections are built. Last updated after Part 40 — the
+list is now built end to end, so this is the finish-line checklist.
 
 ---
 
@@ -65,7 +66,30 @@ engine — deleting a record by FormID and re-deriving the GRUPs is well within
 what the merge code already does. This is the largest missing feature in the
 list and the one most worth building.
 
-### A3. BAIN Wizard scripts — Part 28 row 5 (Configuration Items Begone)
+### A3. The Bashed Patch itself — Part 38 row 1
+
+The download is the **configuration only**: one `.dat` under `Bash Patches/`,
+which installs identically to the Oracle's. The patch plugin,
+`Bashed Patch, 0.esp`, is what Wrye Bash writes after the row's twelve-step GUI
+procedure, and mudcrab has no way to produce it.
+
+The mod folder and its configuration are staged, so the procedure has somewhere
+to start and the Import step has a file to import. What remains is the row as
+written: open Wrye Bash through MO2, place the patch above Conflict Resolution
+and below `NPC Merge.esp`, Deactivate All, Activate Non-Mergeable, tick
+`Conflict Resolution.esp`, `OOO Patches Merged.esp` and `NPC Merge.esp`, Rebuild
+Patch, deselect the latter two in the "Deactivate Prior to Patching" popup,
+Import the configuration, Build Patch, then move the plugin out of Overwrite into
+the mod.
+
+**Effect if left**: no bashed patch, so levelled lists and the tweaks the guide
+routes through it never merge. This is the single thing between the build and a
+playthrough.
+
+`Bashed Patch, 0.esp` is deliberately absent from the load order until it exists;
+Part 37's note records that as one of three departures from the published order.
+
+### A4. BAIN Wizard scripts — Part 28 row 5 (Configuration Items Begone)
 
 The package ships a `Wizard.txt`. mudcrab selects subpackages, which covers the
 plugins, but the wizard also *writes* files based on the answers.
@@ -99,84 +123,18 @@ archive ships.
 **Fix**: uncomment before the final build. Budget the time; it is a plugin-load
 per marked row.
 
-### B2. LOOT / load order
+### B2. ~~LOOT / load order~~ — settled at Part 37
 
-`post-install-actions = ["loot-sort"]` is commented out: LOOT opens a GUI that
-needs a human, so an unattended run stalls until the 180-second timeout. The
-load order is whatever `mofam.full.toml`'s `plugins` array says.
-
-Part 37 replaces this with a fixed `loadorder.txt` anyway, so the interim only
-has to be sane, not correct.
-
----
+`loot-sort` was never needed. The load order is the modlist's `plugins` array,
+and Part 37 made that array identical to the guide's published `loadorder.txt`,
+entry for entry. No GUI, no interim.
 
 ## C. Open on the Oracle side
 
-Not mudcrab gaps — things in `MOFAM-03.25` that a re-check on 2026-08-21 found
-still outstanding after Steven's fixing pass.
+Not mudcrab gaps — things in `MOFAM-03.25` still outstanding as of 2026-08-22.
+Most of what was here has been fixed; see section D.
 
-### C1. `AFK Weye.bsa` is still misnamed and will not load
-
-The transposed `AKF` is fixed — the file is now **`AFK Weye.bsa`**, 246,570,540
-bytes. But the separator is a **space**, and the plugin is `AFK_Weye.esp`, with
-an **underscore**.
-
-Oblivion loads any BSA whose filename *starts with* an active plugin's stem.
-That rule was checked against this very instance rather than assumed: of the 237
-plugin stems in the profile, 13 BSAs have no exactly-matching stem, and 12 of
-them load because of the prefix rule —
-
-```
-Bounty Quests - Voiced Addon.bsa              <- Bounty Quests.esp
-DLCShiveringIsles - Faces.bsa                 <- DLCShiveringIsles.esp
-Enhanced Grabbing - Assets.bsa                <- Enhanced Grabbing.esp
-Maskar's Oblivion Overhaul - Meshes.bsa       <- Maskar's Oblivion Overhaul.esp
-MergedLOD - LODs.bsa                          <- MergedLOD.esm
-SM Plugin Refurbish Lite - Voiced Addon.bsa   <- SM Plugin Refurbish Lite.esp
-The Ayleid Steps2.bsa                         <- The Ayleid Steps.esp
-...and five more
-```
-
-`AFK Weye.bsa` is the **only** BSA in the whole instance that begins with no
-plugin stem. `AFK_Weye` is not a prefix of `AFK Weye`.
-
-Renaming it to `AFK_Weye.bsa` is the entire fix. Anything starting `AFK_Weye`
-works — `AFK_Weye - Voices.bsa` would too — but the underscore is not optional.
-The loose folders are gone now, so unlike before the assets are not reaching the
-game by the loose path either: the mod currently contributes its plugin and
-nothing else.
-
-### C2. Bank of Cyrodiil (Part 33 rows 3-4) is short of the row in three ways
-
-1. **The repack never happened.** Row 4 says to repack textures/meshes/sound as
-   `za_bankmod` with BSArch and delete the loose folders. The Oracle still has
-   loose `meshes/`, `sound/` and `Textures/`, and no BSA.
-2. **The voice copy hit the Linux case hazard.** The base mod's own installer
-   writes `sound/voice/`; the ElevenLabs addon ships `Sound/Voice/`. Copying one
-   over the other produced **two directories**, `sound/voice/` (the base mod's 31
-   files) and `sound/Voice/` (the addon's 538). Nothing was replaced.
-3. **`Bank of Cyrodiil Voices (ElevenLabs)` is still enabled** (`+` in
-   `modlist.txt`) where the row says to disable it.
-
-Ours packs all 547 assets into `za_bankmod.bsa` — the same 547 paths the Oracle
-has loose, compared case-insensitively — with the addon's copies winning, which
-is what "replacing when prompted" means.
-
-### C3. The three Base Object Swapper integrations are installed to the wrong path
-
-Part 33 row 18. Base Object Swapper reads its rules from
-`Data/BaseObjectSwapper/*.ini`. Each archive is one ini inside a
-`BaseObjectSwapper/` folder — a lone top-level directory, which is the shape MO2
-strips as a wrapper.
-
-The Oracle's `Cobl - Food.ini`, `OCRAFT - Stations.ini` and `OOO - Treasure.ini`
-all sit at the **mod root**, where the OBSE plugin will not look for them. The
-convention is settled independently by `OCRAFT - Stations for Sale`, which has a
-proper `BaseObjectSwapper/` folder in both instances.
-
-Moving each ini into a `BaseObjectSwapper/` subfolder of its mod is the fix.
-
-### C4. Nine of Ultimate Leveling's fifteen edits are still unapplied
+### C1. Nine of Ultimate Leveling's fifteen edits are still unapplied
 
 Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 1000, `ini_xp_level_mult` 400). Nine still hold the archive's defaults:
@@ -196,7 +154,7 @@ Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 Plus `ini_xp_kill_other`, which the guide does not mention and the Oracle sets
 to 10 against the archive's 25.
 
-### C5. Cosmetic, listed so they are not re-investigated
+### C2. Cosmetic, listed so they are not re-investigated
 
 - `MigTraining.ini` line 65 (`fTrainerAdvancedMult`) has one tab in the Oracle
   where the archive has two. No instruction touches that line; the file has been
@@ -216,3 +174,17 @@ to 10 against the archive's 25.
 - ~~Urasek's repack kept the base mod's bytes~~ — repacked correctly on the
   second pass. `mudcrab inspect` now reports 58,223,187 bytes of payload on both
   sides, so the "Replace All" overlay took.
+- ~~`AFK Weye.bsa` was named with a space where the plugin has an underscore~~ —
+  fixed by Steven.
+- ~~Bank of Cyrodiil was never repacked, its voice copy split into
+  `sound/voice` and `sound/Voice`, and the voices mod was left enabled~~ — fixed
+  by Steven.
+- ~~The three Base Object Swapper integrations had their ini at the mod root
+  rather than under `BaseObjectSwapper/`~~ — fixed by Steven, who notes it is a
+  known misbehaviour of MO2's installer with these archives. The plugin's own
+  binary settles the requirement: `BaseObjectSwapperOB.dll` contains the strings
+  `Data\BaseObjectSwapper` and *"No .ini files were found in
+  Data\BaseObjectSwapper folder, aborting..."*.
+- ~~SupreMe Overhaul kept its sound folder~~ — deleted by Steven, per the guide.
+- ~~Camping and the Greed Arena voiced addon were not installed~~ — installed by
+  Steven.
