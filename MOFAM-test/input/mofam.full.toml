@@ -480,6 +480,21 @@ plugins = [
 	"Cava Obscura - Filter Patch For Mods.esp",
 	# Two spaces before the dash, as the archive spells it.
 	"Unique Landscapes Separate  - OOO Adaptation.esp",
+	# Part 35. Nine of these twelve are OOO Patches Merged sources, hidden in the
+	# Oracle and active here until Part 36.
+	"Improved Chests (OOO Compatible).esp",
+	"OOO_Unoficial-Patch.esp",
+	"Cobl Tweaks - OOO.esp",
+	"BDBS - Oscuro's Oblivion Overhaul.esp",
+	"UAUP - OOO Patch.esp",
+	# Two spaces before "(Extended)", as the archive spells it.
+	"Weapons Of Morrowind - OOO  (Extended) Patch.esp",
+	"Bounty Quests OOO Patch.esp",
+	"PotionReplacer OOO Patch.esp",
+	"tbskGuardsFeatures OOO Patch.esp",
+	"OOO Spectral Fix.esp",
+	"OOOCoblTweaksFix.esp",
+	"Arthmoor Villages - OOO Adaptation.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -9553,3 +9568,170 @@ download_handler = "nexus"
 file_name = "Unique Landscapes - OOO Adaptation-48463-2-12-1745572029.rar"
 layout = "bain"
 bain_subpackages = ["01 Separate UL"]
+
+# ---------------------------------------------------------------------------
+# Part 35 - OSCURO'S PATCHES
+# ---------------------------------------------------------------------------
+#
+# Nine of this section's twelve plugins are OOO Patches Merged sources (Part 36
+# row 2), hidden in the Oracle and active here until that merge is built. The
+# three that are not are Improved Chests, Cobl Tweaks - OOO and the Bounty
+# Quests patch.
+#
+# Four of the archives are guide-page downloads packaged as MO2 mod folders, so
+# their bundled meta.ini is dropped -- mudcrab writes that file.
+
+# Guide 1: "Within the BAIN Installer, select just Improved Chests (OOO
+# Compatible)". The download is not a BAIN package -- it holds two plain
+# folders, the wanted one and `OLDChests` -- so the choice is a data folder.
+[[mods]]
+id = "Improved Chests"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["Improved Chests (OOO Compatible).esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51815/1000030628"
+download_handler = "nexus"
+file_name = "Improved Chests (OOO Compatible)-51815-1-11-1647585622.zip"
+layout = "custom-data-folder"
+data_folder = "Improved Chests (OOO Compatible)"
+
+[[mods]]
+id = "OOO - Oscuro's Oblivion Overhaul - Updated (Unofficial patch)"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["OOO_Unoficial-Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54069/1000038499"
+download_handler = "nexus"
+file_name = "OOO_Update_Patch_Full-54069-1b-1717462917.7z"
+
+# Guide 3: this is where the Oracle's `Cobl Tweaks - OOO.esp` comes from -- not
+# from Part 32's wizard, whose Tweaks answer that row's own deletion cancels.
+[[mods]]
+id = "COBL Tweaks - MOFAM Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["Cobl Tweaks - OOO.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000037702"
+download_handler = "nexus"
+file_name = "COBL Tweaks - MOFAM Patch-52949-02-24-1707663022.zip"
+layout = "custom-data-folder"
+data_folder = "COBL Tweaks - MOFAM Patch"
+exclude = ["**/meta.ini"]
+
+[[mods]]
+id = "Better Dark Brotherhood Sanctuary - OOO Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["BDBS - Oscuro's Oblivion Overhaul.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48560/1000019586"
+download_handler = "nexus"
+file_name = "BDBS - Oscuro's Oblivion Overhaul-48560-1-01.7z"
+
+# Guide 5: "select just 01 OOO Patch".
+[[mods]]
+id = "Unique Artifacts for Unique People - OOO Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["UAUP - OOO Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49871/1000034572"
+download_handler = "nexus"
+file_name = "Unique Artifacts for Unique People - Patches-49871-1-6-2-1683089737.7z"
+layout = "bain"
+bain_subpackages = ["01 OOO Patch"]
+
+# Two spaces before "(Extended)", as the archive spells it.
+[[mods]]
+id = "Weapons Of Morrowind - OOO (Extended) Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["Weapons Of Morrowind - OOO  (Extended) Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52307/1000032203"
+download_handler = "nexus"
+file_name = "Weapons Of Morrowind - OOO (Extended) Patch-52307-1-0-1662509181.7z"
+
+# Guide 7: "Install manually & deselect everything except Bounty Quests OOO
+# Patch.esp." The archive is the full Bounty Quests 3.0 installer, already
+# installed in Part 28; only its OOO patch is wanted here.
+[[mods]]
+id = "Bounty Quests Fixed and Polished - OOO Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["Bounty Quests OOO Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48330/1000037053"
+download_handler = "nexus"
+file_name = "Bounty Quests Version 3.0 Installation Files-48330-3-0-1701382589.7z"
+include = ["Bounty Quests OOO Patch.esp"]
+
+[[mods]]
+id = "Retextured Potions - OOO Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["PotionReplacer OOO Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49256/1000021611"
+download_handler = "nexus"
+file_name = "Retextured Potions - OOO Patch-49256-1-0-1553338577.7z"
+
+# Guide 9: "right click the Local Guards Features > Oscuro's Oblivion Overhaul
+# Patch and select Set as \ directory", then name the mod
+# 'Local Guards Features - OOO Patch'. Same archive as Part 27's Local Guards
+# Features; a different folder out of it.
+[[mods]]
+id = "Local Guards Features - OOO Patch"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["tbskGuardsFeatures OOO Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45517/1000010180"
+download_handler = "nexus"
+file_name = "Local Guards Features 1.1-45517-1-1.7z"
+layout = "custom-data-folder"
+data_folder = "Local Guards Features/Oscuro's Oblivion Overhaul Patch"
+
+[[mods]]
+id = "OOO Spectral Fix"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["OOO Spectral Fix.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000036246"
+download_handler = "nexus"
+file_name = "OOO Spectral Fix-52949-09-23-1695471445.zip"
+layout = "custom-data-folder"
+data_folder = "OOO Spectral Fix"
+exclude = ["**/meta.ini"]
+
+[[mods]]
+id = "OOO CoblTweaks Fix"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["OOOCoblTweaksFix.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000034973"
+download_handler = "nexus"
+file_name = "OOO CoblTweaks Fix-52949-06-23-1-1686491739.7z"
+layout = "custom-data-folder"
+data_folder = "OOO CoblTweaks Fix"
+exclude = ["**/meta.ini"]
+
+# Guide 12: a master-cleaned variant of Saldron's original, cut down to the
+# Arthmoor mods this list uses so it costs one plugin slot after the merge.
+[[mods]]
+id = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)"
+section = ["35 - OSCURO'S PATCHES"]
+plugins = ["Arthmoor Villages - OOO Adaptation.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041287"
+download_handler = "nexus"
+file_name = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)-52949-03-25-1743346361.zip"
+layout = "custom-data-folder"
+data_folder = "Various OOO Adaptations (Arthmoor mods MOFAM Edit)"
+exclude = ["**/meta.ini"]

@@ -284,7 +284,44 @@ pub(crate) fn install_mod_archives(
                 anyhow::anyhow!("failed to create {}: {err}", target_root.display())
             })?;
 
-            extracted_count += extract_archive(&source, target_root, &mod_entry.id, archive, &filters, active_plugins)?;
+            let extracted = extract_archive(
+                &source,
+                target_root,
+                &mod_entry.id,
+                archive,
+                &filters,
+                active_plugins,
+            )?;
+
+            // An archive that contributes nothing is a mistake, not a result.
+            // Every earlier version of this reported "installed" over an empty
+            // folder, so an `include` that matched no entry -- one wrong
+            // component in the path, a wrapper folder stripped before the
+            // filter ran -- looked exactly like a success until a diff months
+            // later noticed the mod had no files in it.
+            //
+            // `game_root_files` is the one archive that legitimately leaves the
+            // mod folder empty: everything it holds goes to the game root.
+            if extracted == 0 && archive.game_root_files.is_empty() {
+                anyhow::bail!(
+                    "mod '{}': archive {} contributed no files.{}{} Run `mudcrab inspect` on \
+                     the archive to see the entry names its layout produces.",
+                    mod_entry.id,
+                    source.display(),
+                    if archive.include.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" include = {:?} matched nothing;", archive.include)
+                    },
+                    if archive.exclude.is_empty() {
+                        String::new()
+                    } else {
+                        format!(" exclude = {:?} may have taken everything;", archive.exclude)
+                    },
+                );
+            }
+
+            extracted_count += extracted;
         }
     }
 

@@ -571,6 +571,65 @@ fn install_rejects_an_inner_archive_the_container_does_not_hold() {
         .stderr(predicates::str::contains("inner_archive 'missing.zip' is not in"));
 }
 
+/// An `include` that matches nothing used to install a mod with no files in it
+/// and report success. The mistake is easy: here the pattern names the wrapper
+/// folder that auto-detection has already stripped by the time filters run.
+#[test]
+fn install_rejects_an_archive_that_contributes_no_files() {
+    let dir = tempdir().expect("temp dir should be created");
+    let archive = dir.path().join("mod.zip");
+    let modlist = dir.path().join("modlist.toml");
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    let cache = dir.path().join("cache");
+    let mods_dir = dir.path().join("mods");
+    let game_dir = dir.path().join("game");
+    std::fs::create_dir_all(&game_dir).expect("game dir should be created");
+
+    make_zip_with_files(
+        &archive,
+        &[
+            ("Data/wanted.esp", b"plugin"),
+            ("Data/meshes/thing.nif", b"mesh"),
+        ],
+    );
+
+    let source = format!(
+        "name = \"Empty Test\"\n\n[[mods]]\nid = \"empty\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninclude = [\"Data/wanted.esp\"]\n",
+        archive.display()
+    );
+    std::fs::write(&modlist, source).expect("fixture modlist should be written");
+
+    for stage in [
+        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
+        vec!["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()],
+    ] {
+        Command::cargo_bin("mudcrab")
+            .expect("binary should build")
+            .env("GAME_DIR", &game_dir)
+            .args(&stage)
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .env("GAME_DIR", &game_dir)
+        .arg("install")
+        .arg(&plan)
+        .arg("--cache")
+        .arg(&cache)
+        .arg("--mods-dir")
+        .arg(&mods_dir)
+        .arg("--game-dir")
+        .arg(&game_dir)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("contributed no files"))
+        .stderr(predicates::str::contains("matched nothing"));
+}
+
 fn run_pipeline(
     game_dir: &std::path::Path,
     modlist: &std::path::Path,
