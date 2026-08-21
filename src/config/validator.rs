@@ -2,7 +2,12 @@ use crate::config::schema::{InputType, ModAction, ModEntry, ModType, SourceModli
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
-pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
+/// Check a modlist, returning anything worth saying that is not fatal.
+///
+/// The split matters: a modlist that cannot be built is an error, and a modlist
+/// that can be built but will not behave as its author expects is a warning.
+/// `--strict` is what turns the second into the first.
+pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
     if modlist.name.trim().is_empty() {
         anyhow::bail!("modlist name must not be empty");
     }
@@ -106,20 +111,25 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<()> {
     // looks like a mod that failed to install rather than a list that is too
     // long. Merges are how a list gets back under -- so the number to report is
     // the one that names them.
+    // A warning rather than an error: a list mid-build legitimately runs over
+    // while the merges that will bring it back under are still unwritten, and
+    // refusing to install it would make the intermediate state unreachable.
+    // What must not happen is running over *silently*.
+    let mut warnings = Vec::new();
     if modlist.plugins.len() > PLUGIN_LIMIT {
-        anyhow::bail!(
+        warnings.push(format!(
             "load order has {} active plugins, {} over Oblivion's limit of {PLUGIN_LIMIT}. \
-             The game loads the first {PLUGIN_LIMIT} and silently ignores the rest. Merge some \
-             plugins, or drop them from the `plugins` array.",
+             The game loads the first {PLUGIN_LIMIT} and silently ignores the rest, so this \
+             list cannot be played until merges bring it back under.",
             modlist.plugins.len(),
             modlist.plugins.len() - PLUGIN_LIMIT,
-        );
+        ));
     }
 
     validate_merges(modlist, &flattened_mods)?;
     detect_cycles(&flattened_mods)?;
 
-    Ok(())
+    Ok(warnings)
 }
 
 /// Active plugins Oblivion can load. The mod index is one byte, and `0xFF` is

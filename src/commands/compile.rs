@@ -3,7 +3,9 @@ use crate::config;
 
 pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
     let source = config::loader::load_modlist(&args.input)?;
-    config::validator::validate(&source)?;
+    for warning in config::validator::validate(&source)? {
+        tracing::warn!("{warning}");
+    }
     let compiled = config::compiler::compile(source)?;
 
     if let Some(parent) = args.output.parent()
