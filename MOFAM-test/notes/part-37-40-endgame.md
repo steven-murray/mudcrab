@@ -16,20 +16,30 @@ and exposes the file through a public API endpoint, which is what was read. **No
 Oracle involvement** — a user with the guide gets the same file by clicking the
 link.
 
-Our profile's `plugins.txt` is now byte-identical to it after three documented
-departures:
+Our profile's `plugins.txt` is now **identical to it, with no renaming needed**,
+after two documented omissions:
 
-| Departure | Why |
+| Omission | Why |
 |---|---|
-| `OUT Dungeons.esp` for `OUT - Dungeons.esp` | The archive spells it without the dash, and so do both instances. The published list is stale on this one entry. |
-| `Swearing Rats.esp` omitted | The guide's own Part 31 row 14 says "I can understand if you omit it". The Oracle omits it. |
-| `Bashed Patch, 0.esp` absent | Wrye Bash writes it; see Part 38 below. |
+| `Swearing Rats.esp` | The guide's own Part 31 row 14 says "I can understand if you omit it". The Oracle omits it. |
+| `Bashed Patch, 0.esp` | Wrye Bash writes it; see Part 38 below. |
 
-For the record, the Oracle's own `loadorder.txt` departs from the published list
-in four places of its own — it lacks `Diverse Effect Icons OBSE.esp`,
-`Street Vendors of Cyrodiil.esp` and `Swearing Rats.esp`, and shares our
-`OUT Dungeons.esp` spelling. On the first two, this build follows the published
-list and the Oracle does not.
+A first pass found four differences rather than two, and three of them turned out
+to be the Oracle rather than this build:
+
+- **`OUT - Dungeons`**. This list had packed it unhyphenated, following the
+  Oracle. The guide's row 8 says *"ensure the bsa naming matches 'OUT -
+  Dungeons'"* and the published order agrees; row 7's unhyphenated mention is the
+  guide contradicting itself. Steven has since renamed the Oracle's copy, so the
+  guide, the published order and both instances now agree, and the `pack_bsa` and
+  `create_dummy_plugin` outputs here were renamed to match.
+- **`Diverse Effect Icons OBSE.esp`** and **`Street Vendors of Cyrodiil.esp`**
+  were missing from the Oracle and present in the published order. Both are now
+  installed there; both mods are byte-identical between the instances.
+- **Street Vendors' version.** This list had used 2.92, because 2.91 — the
+  version the guide names — was not on the machine and the Oracle had no copy to
+  compare against. Both are now fixed and the entry is 2.91 exactly, matched
+  pair, byte-identical on both halves.
 
 ### The ORC.esp inconsistency this exposed
 

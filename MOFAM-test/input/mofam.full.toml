@@ -40,11 +40,8 @@ guide = { published = "2025-03-18", file_id = 1000041165 }
 # now does, in order, entry for entry.
 #
 # Source: https://loadorderlibrary.com/lists/mofam-oblivion-2 (244 entries,
-# "All plugins active prior to BP"). Four deliberate departures:
+# "All plugins active prior to BP"). Three deliberate departures:
 #
-#   * `OUT Dungeons.esp` where the published list has `OUT - Dungeons.esp`.
-#     The archive and both instances spell it without the dash; the published
-#     list is stale on this one entry.
 #   * `Swearing Rats.esp` omitted. The guide's own Part 31 row 14 says "I can
 #     understand if you omit it", and the Oracle does.
 #   * `Bashed Patch, 0.esp` absent -- Wrye Bash produces it and that is a GUI
@@ -121,7 +118,7 @@ plugins = [
 	"Diverse Effect Icons OBSE.esp",
 	"Cliff_BetterLetters.esp",
 	"OUT Essentials.esp",
-	"OUT Dungeons.esp",
+	"OUT - Dungeons.esp",
 	"Really Textured Normal Maps.esp",
 	"Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.esp",
 	"AI Powered Landscape Retexture.esp",
@@ -2800,18 +2797,23 @@ file_name = "2x Dungeons-49351-2-0-1-1560513516.7z"
 # oracle version 2.0.1.0
 
 # Guide 8: "pack this mod using BSArch the provided dummy plugin & ensure the
-# bsa naming matches 'OUT - Dungeons'". The guide contradicts itself -- row 7
-# calls the mod "OUT Dungeons" with no hyphen -- and only the .bsa/.esp stems
-# matching each other is load-bearing, so the Oracle's unhyphenated choice is
-# followed here.
+# bsa naming matches 'OUT - Dungeons'". Row 7 calls the mod "OUT Dungeons"
+# without the hyphen, so the guide does contradict itself -- but row 8 is the
+# row giving the instruction, the guide's published load order says
+# `OUT - Dungeons.esp`, and the Oracle now spells it that way too. All three
+# agree; the earlier unhyphenated choice here followed the Oracle before it was
+# corrected.
+#
+# What is load-bearing either way is that the .bsa and .esp stems match, so that
+# the engine loads the archive off the plugin.
 [[mods.actions]]
 action = "pack_bsa"
-output = "OUT Dungeons.bsa"
+output = "OUT - Dungeons.bsa"
 prune_packed = true
 
 [[mods.actions]]
 action = "create_dummy_plugin"
-output = "OUT Dungeons.esp"
+output = "OUT - Dungeons.esp"
 
 [[mods]]
 id = "Really Textured Normal Maps - Updated"
@@ -7630,30 +7632,33 @@ file_name = "Tavern Goers 2 - Redux Merged-48660-5-0-1678133943.7z"
 # Guide 8: "main file v. 2.91 + optional Street Vendors of Cyrodiil v2.91 - Not
 # in IC; install separately".
 #
-# Two problems, both in the reports. **v2.91 is not on this machine at all** --
-# the downloads hold 2.8, 2.9, 2.92 and 2.93 -- and the Oracle does not have
-# this mod in any version, so there is nothing to compare against. 2.92 is the
-# nearest *matched pair* (both the main file and the Not-in-IC variant exist at
-# that version), which beats pairing 2.9's main file with 2.8's variant. It
-# postdates the guide by two months and `diff` says so.
+# v2.91 exactly, both halves -- the version the guide names. An earlier pass
+# used 2.92 because 2.91 was not on this machine and the Oracle had no copy to
+# compare against; both are now fixed, so the workaround is gone.
+#
+# `manual:` rather than `nexus:` because neither archive carries a Nexus file id
+# here: the sidecars record none and the Oracle's `meta.ini` has `fileid=0`. The
+# filename is enough to resolve them from an `--archive-search-path`.
 #
 # The second archive is the same plugin built without the Imperial City
 # vendors; installed after, it wins the path, which is what "install
-# separately" produces in MO2.
+# separately" produces in MO2. The Oracle keeps the version in that folder's
+# name.
 [[mods]]
 id = "Street Vendors of Cyrodiil"
 section = ["27 - NEW & MODIFIED NPCS"]
 plugins = ["Street Vendors of Cyrodiil.esp"]
 
 [[mods.archives]]
-path = "manual:Street Vendors of Cyrodiil v2.92-48143-2-92-1746972397.7z"
+path = "manual:Street Vendors of Cyrodiil v2.91-48143-2-91-1743274849.7z"
 
 [[mods]]
 id = "Street Vendors of Cyrodiil - Not in IC"
+oracle_name = "Street Vendors of Cyrodiil v2.91 - Not in IC"
 section = ["27 - NEW & MODIFIED NPCS"]
 
 [[mods.archives]]
-path = "manual:Street Vendors of Cyrodiil v2.92 - Not in IC-48143-2-92-1746973898.7z"
+path = "manual:Street Vendors of Cyrodiil v2.91 - Not in IC-48143-2-91-1743276882.7z"
 
 # Guide 9: "main file only".
 [[mods]]
