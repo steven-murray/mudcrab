@@ -385,6 +385,25 @@ plugins = [
 	"Wolf Animations Restored.esp",
 	"Wolf Animations Restored - MOO Patch.esp",
 	"NIARA.esp",
+	# Part 30. The AULIAS script patch, More Books Teach and the Dahyka OCO patch
+	# are Prebash merge sources, hidden in the Oracle and active here until Part 36.
+	"Ultimate Leveling.esp",
+	"OCRAFT.esp",
+	"OCRAFT - Integration.esp",
+	"OCRAFT - Cobl Glue.esp",
+	"OCRAFT - Stations for Sale.esp",
+	"Maskar's Oblivion Overhaul - OCRAFT Patch.esp",
+	"Oscuro's Oblivion Overhaul - OCRAFT Patch.esp",
+	"Fundament.esm",
+	"MigFEA.esp",
+	"MigPickpocket.esp",
+	"MigTraining.esp",
+	"Auto Update Leveled Items And Spells.esp",
+	"Auto Update Leveled Items And Spells - Script Patch.esp",
+	"Gentleman's Smart Level Scaling Overhaul.esp",
+	"more books teach.esp",
+	"Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
+	"Dahyka_OCO_Patch.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -8405,3 +8424,306 @@ plugins = ["NIARA.esp"]
 path = "nexus:oblivion/53184/1000035417"
 download_handler = "nexus"
 file_name = "NPC Idle Animation Restoration and Additions-53184-1-0-1689599135.7z"
+
+# ── Part 30 - SKILLS & LEVELLING ────────────────────────────────────────────
+
+# Guide 1: fifteen INI edits across two files, all in Oblivion's script-style
+# `set X to Y` form.
+[[mods]]
+id = "Ultimate Leveling"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Ultimate Leveling.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49134/1000024936"
+download_handler = "nexus"
+file_name = "Ultimate Leveling 1_9_5_2-49134-1-1591294792.7z"
+
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_kill_show_level"
+value = 1
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_skill_cap"
+value = 200
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_level_mult"
+value = 400
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_level_base"
+value = 1000
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_skill_level_points_journeyman"
+value = 2
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_skill_level_points_expert"
+value = 3
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_skill_level_points_minor"
+value = 10
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_read_skillbook_minor"
+value = 4
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_read_skillbook_major"
+value = 8
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_train_minor"
+value = 2
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_xp_train_major"
+value = 3
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_horseshoe_total"
+value = 0
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_UI_horseshoes"
+value = 0
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling for advanced users.ini"
+format = "set-to"
+key = "ULVL.ini_rested_bonus"
+value = 20
+[[mods.actions]]
+action = "ini_set"
+file = "Ultimate Leveling.ini"
+format = "set-to"
+key = "ULVL.ini_add_horseshoes"
+value = 0
+
+[[mods]]
+id = "OCRAFT - Oblivion Crafting Framework"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["OCRAFT.esp", "OCRAFT - Integration.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51796/1000040735"
+download_handler = "nexus"
+file_name = "OCRAFT-51796-1-04-1738777732.7z"
+
+[[mods]]
+id = "OCRAFT - Cobl Glue"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["OCRAFT - Cobl Glue.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54430/1000040755"
+download_handler = "nexus"
+file_name = "OCRAFT - Cobl Glue-54430-1-01-1738947167.7z"
+
+# Guide 4: "1st main file".
+[[mods]]
+id = "OCRAFT - Stations for Sale"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["OCRAFT - Stations for Sale.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54541/1000043966"
+download_handler = "nexus"
+file_name = "OCRAFT - Stations for Sale-54541-1-43-1769532332.7z"
+
+[[mods]]
+id = "OCRAFT - Compatibility Settings"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = [
+  "Maskar's Oblivion Overhaul - OCRAFT Patch.esp",
+  "Oscuro's Oblivion Overhaul - OCRAFT Patch.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/53220/1000035658"
+download_handler = "nexus"
+file_name = "OCRAFT - Compatilbility Settings-53220-1-2-1691500438.zip"
+
+# Guide 6: "Once installed delete Bundlement.esp."
+[[mods]]
+id = "Fundament"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Fundament.esm"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41005/1000008481"
+download_handler = "nexus"
+file_name = "Fundament R4 U3-41005-4-03.zip"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["Bundlement.esp"]
+
+# Guide 7: "select just 00 Core".
+#
+# The row also asks for nine lines to be pasted into `Custom Trainers.ini` --
+# three `set`/`set`/`SetStage` triples that register custom trainers. That is a
+# raw block append, not a key/value edit, and mudcrab has no action for it.
+# **Not applied**; see report 4.
+[[mods]]
+id = "FEA - Fundament Enchanting Addons"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["MigFEA.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/41553/1000011201"
+download_handler = "nexus"
+file_name = "FEA 2_1_3-41553-2-1-3.zip"
+layout = "bain"
+bain_subpackages = ["00 Core"]
+
+[[mods]]
+id = "PSO - Pickpocket Skill Overhaul"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["MigPickpocket.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48118/1000018383"
+download_handler = "nexus"
+file_name = "PSO - Pickpocket Skill Overhaul-48118-1-4.zip"
+
+# Guide 9: five parameters set to 1.
+[[mods]]
+id = "Dynamic Training Cost"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["MigTraining.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46373/1000011401"
+download_handler = "nexus"
+file_name = "Dynamic Training Cost 1_1-46373-1-1.zip"
+
+[[mods.actions]]
+action = "ini_set"
+file = "ini/MigTraining.ini"
+format = "set-to"
+key = "migTrainingQ.bDisplaySkillNumbers"
+value = 1
+[[mods.actions]]
+action = "ini_set"
+file = "ini/MigTraining.ini"
+format = "set-to"
+key = "migTrainingQ.bTrainSkillAdjust"
+value = 1
+[[mods.actions]]
+action = "ini_set"
+file = "ini/MigTraining.ini"
+format = "set-to"
+key = "migTrainingQ.bTrainAttAdjust"
+value = 1
+[[mods.actions]]
+action = "ini_set"
+file = "ini/MigTraining.ini"
+format = "set-to"
+key = "migTrainingQ.bTrainerSkillAdjust"
+value = 1
+[[mods.actions]]
+action = "ini_set"
+file = "ini/MigTraining.ini"
+format = "set-to"
+key = "migTrainingQ.bTrainDispAdjust"
+value = 1
+
+# Guide 10: "change Set AULIAS.FotMCostMult to 0".
+[[mods]]
+id = "Auto Update Leveled Items And Spells"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Auto Update Leveled Items And Spells.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/39635/83293"
+download_handler = "nexus"
+file_name = "AULIAS_1_2_5-39635-1-2-5.zip"
+
+[[mods.actions]]
+action = "ini_set"
+file = "Auto Update Leveled Items And Spells.ini"
+format = "set-to"
+key = "AULIAS.FotMCostMult"
+value = 0
+
+# Guide 11: "Main file only".
+[[mods]]
+id = "AULIAS - Script Patch"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Auto Update Leveled Items And Spells - Script Patch.esp"]
+
+[[mods.archives]]
+path = "manual:AULIAS - Script Patch ElderScrollsFan001-52229-1-7-1764642680.7z"
+
+# Guide 12: the mod page is "Gent's Level Scaling Overhaul - Alternate
+# Version"; the plugin is "Gentleman's Smart Level Scaling Overhaul".
+[[mods]]
+id = "Gentleman's Smart Level Scaling Overhaul"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Gentleman's Smart Level Scaling Overhaul.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54700/1000040169"
+download_handler = "nexus"
+file_name = "Gent's Level Scaling Overhaul - Alternate Version-54700-1-0-1734506831.zip"
+
+[[mods]]
+id = "More Books Teach"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["more books teach.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/3075/2490"
+download_handler = "nexus"
+file_name = "More Books Teach-3075.rar"
+
+[[mods]]
+id = "Dahyka's Vanilla Racials and Birthsigns Improved"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47639/1000016680"
+download_handler = "nexus"
+file_name = "Dahyka's Vanilla Racials and Birthsigns Improvedv2.2-47639-2-2.rar"
+
+[[mods]]
+id = "OCOv2 - Race Rebalance Mods Patches"
+section = ["30 - SKILLS & LEVELLING"]
+plugins = ["Dahyka_OCO_Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49864/1000024110"
+download_handler = "nexus"
+file_name = "Oblivion Character Overhaul V2 - Dahyka's Vanilla Racials and Birthsigns Improved Patch (OCO Uses Merged Teeth)-49864-1-0-1583602006.7z"
