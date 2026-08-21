@@ -134,6 +134,17 @@ pub(crate) fn install_mod_archives(
         return install_mod_from_files(mod_entry, settings, target_root);
     }
 
+    // An empty mod is the folder and nothing else. It still has to exist: MO2
+    // only offers a mod as a destination for a tool's output once it is there.
+    if mod_entry.mod_type == Some(ModType::Empty) {
+        if !settings.dry_run {
+            std::fs::create_dir_all(target_root).map_err(|err| {
+                anyhow::anyhow!("failed to create {}: {err}", target_root.display())
+            })?;
+        }
+        return Ok(0);
+    }
+
     let mut extracted_count = 0usize;
 
     for (archive_index, archive) in mod_entry.archives.iter().enumerate() {

@@ -440,6 +440,14 @@ pub enum ModType {
     BuildFromFiles,
     /// Produced by merging plugins from other mods; see `[mods.merge]`.
     Merge,
+    /// A mod folder with nothing in it, on purpose.
+    ///
+    /// MO2 users make these routinely as somewhere for a tool's output to live
+    /// rather than leaving it in Overwrite: xEdit's reference cache, a script
+    /// extender's logs, a patch a GUI tool writes later. The folder and its
+    /// `meta.ini` are the whole point -- the contents arrive at runtime, from
+    /// outside the modlist.
+    Empty,
 }
 
 /// How overlapping records are resolved when two sources define the same one.

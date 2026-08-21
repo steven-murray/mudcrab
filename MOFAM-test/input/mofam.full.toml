@@ -32,19 +32,49 @@ guide = { published = "2025-03-18", file_id = 1000041165 }
 # - Part 1 CLEANED MASTERS: implemented.
 # - Part 2 first-pass captured below.
 
+# The load order, and Part 37's whole subject.
+#
+# Part 37 says to paste the guide's published `loadorder.txt` into the MO2
+# profile. Here the array *is* the load order -- `install` writes the profile
+# from it -- so the row is this list agreeing with the published one, which it
+# now does, in order, entry for entry.
+#
+# Source: https://loadorderlibrary.com/lists/mofam-oblivion-2 (244 entries,
+# "All plugins active prior to BP"). Four deliberate departures:
+#
+#   * `OUT Dungeons.esp` where the published list has `OUT - Dungeons.esp`.
+#     The archive and both instances spell it without the dash; the published
+#     list is stale on this one entry.
+#   * `Swearing Rats.esp` omitted. The guide's own Part 31 row 14 says "I can
+#     understand if you omit it", and the Oracle does.
+#   * `Bashed Patch, 0.esp` absent -- Wrye Bash produces it and that is a GUI
+#     step. See `incomplete-rows.md`.
+#   * `ORC.esp` absent from both, because Part 36's Prebash merge consumes it.
+#
+# Every other plugin a mod declares is either here or consumed by a merge;
+# `mudcrab validate` enforces exactly that, so this array cannot drift from the
+# mods without failing.
+
 plugins = [
 	"Oblivion.esm",
+	"Av Latta Magicka.esm",
 	"MergedLOD.esm",
-	"DLCHorseArmor.esp",
-	"DLCOrrery.esp",
-	"DLCVileLair.esp",
-	"DLCMehrunesRazor.esp",
-	"DLCSpellTomes.esp",
-	"DLCThievesDen.esp",
+	"Oscuro's_Oblivion_Overhaul.esm",
+	"Cobl Main.esm",
+	"Fundament.esm",
+	"MigMaster.esm",
+	"Waalx Animals & Creatures.esm",
+	"Dagger_Data.esm",
 	"DLCBattlehornCastle.esp",
+	"DLCSpellTomes.esp",
 	"DLCFrostcrag.esp",
-	"DLCShiveringIsles.esp",
+	"DLCMehrunesRazor.esp",
+	"DLCThievesDen.esp",
+	"DLCVileLair.esp",
+	"DLCOrrery.esp",
+	"DLCHorseArmor.esp",
 	"Knights.esp",
+	"DLCShiveringIsles.esp",
 	"Unofficial Oblivion Patch.esp",
 	"Unofficial Shivering Isles Patch.esp",
 	"DLCHorseArmor - Unofficial Patch.esp",
@@ -56,132 +86,71 @@ plugins = [
 	"DLCBattlehornCastle - Unofficial Patch.esp",
 	"DLCFrostcrag - Unofficial Patch.esp",
 	"Knights - Unofficial Patch.esp",
-	"Creature Fix Compendium.esp", 
-	"DLCMergedBooks.esp", 
-	"Knights Infamy.esp", 
-	"Lava Does Fire Damage.esp", 
-	"LessMaddeningShiveringIsles.esp", 
-	"MigMaster.esm",
-	"MigMiscellanea.esp", 
-	"Mind your head - signs repositioned.esp",
+	"MigMiscellanea.esp",
+	"SB_WeaponDropFix.esp",
 	"SB_SkillBonusItems.esp",
-    "SB_WeaponDropFix.esp",
+	"LessMaddeningShiveringIsles.esp",
+	"Lava Does Fire Damage.esp",
+	"Knights Infamy.esp",
+	"DLCMergedBooks.esp",
+	"Creature Fix Compendium.esp",
 	"Walk through Oblivion Gates.esp",
-	"Achievements.esp", 
-	"Better Enemy Health.esp", 
-	"BookTrackerUpdatedv1.1.esp", 
-	"Cliff_BetterLetters.esp", 
-	"Display Stats.esp", 
-	"Diverse Effect Icons OBSE.esp", 
-	"Dynamic Map.esp", 
-	"Enhanced Hotkeys.esp", 
-	"Extended UI.esp", 
-	"Follower Status.esp", 
-	"LINK.esp", 
-	"Loot Feed.esp", 
-	"LootMenu.esp", 
-	"Map Marker Overhaul - SI additions.esp", 
-	"Map Marker Overhaul.esp", "Marking the Landmarks.esp", 
-	"MigStatsCheck.esp", 
-	"QZ Easy Menus.esp", 
-	"Quest Log Manager.esp", 
-	"WorldMapsForAllWorldspaces.esp", 
+	"Mind your head - signs repositioned.esp",
 	"Evenstars Colourwheel LOD Update.esp",
 	"lVWD for Leyawiin.esp",
 	"IC LOD.esp",
 	"MergedLOD.esp",
-	# Part 7. Every one of these except the first four is a Part 36 merge source
-	# and is `.mohidden` in the Oracle; here they stay active, because the merge
-	# that replaces them does not exist yet. Part 36 removes them from this list.
-	"Oblivion_Character_Overhaul.esp",
-	"Ragdolls.esp",
-	"EVE_KnightsoftheNine.esp",
-	"Character Customization Expanded.esp",
-	# Part 8. The last two are Part 36 merge sources, hidden in the Oracle and
-	# consumed by that merge in both instances.
-	"Maskar's Oblivion Overhaul.esp",
-	"BasicHarvest4MOO.esp",
-	"MOO Loading Screens - New Pics.esp",
-	# Part 9. Oscuro's master leads; the OOO Adaptation plugins and the two
-	# OOO Enhanced patches are Part 36 merge sources, hidden in the Oracle and
-	# consumed by that merge in both instances.
-	"Oscuro's_Oblivion_Overhaul.esm",
-	"Oscuro's_Oblivion_Overhaul.esp",
-	"EVE_StockEquipmentReplacer for OOO.esp",
-	"OOOShiveringIsles.esp",
-	"OOO Enhanced.esp",
-	"DLCOrrery - OOO Adaptation.esp",
-	"Knights of Nine - OOO Enhanced Adaptation.esp",
-	# Part 10. WAC's master leads. The other three are Part 36 merge sources,
-	# consumed by that merge, so they are hidden in both instances.
-	"Waalx Animals & Creatures.esm",
-	"WACIntegration.esp",
-	# Part 11. The first five are dummy plugins mudcrab writes, existing only so
-	# Oblivion loads the BSA of the same stem. `lLet there be Flowers.esp` is
-	# spelled with the author's leading `l`. The Harvest [Flora] add-ons and
-	# Let there be Flowers are Part 36 merge sources, hidden in the Oracle and
-	# consumed by that merge in both instances.
+	"LINK.esp",
+	"Achievements.esp",
+	"Dynamic Map.esp",
+	"WorldMapsForAllWorldspaces.esp",
+	"Marking the Landmarks.esp",
+	"Map Marker Overhaul.esp",
+	"Map Marker Overhaul - SI additions.esp",
+	"LootMenu.esp",
+	"Loot Feed.esp",
+	"Follower Status.esp",
+	"Extended UI.esp",
+	"QZ Easy Menus.esp",
+	"Display Stats.esp",
+	"MigStatsCheck.esp",
+	"Enhanced Hotkeys.esp",
+	"BookTrackerUpdatedv1.1.esp",
+	"Better Enemy Health.esp",
+	"Quest Log Manager.esp",
+	"Diverse Effect Icons OBSE.esp",
+	"Cliff_BetterLetters.esp",
 	"OUT Essentials.esp",
 	"OUT Dungeons.esp",
 	"Really Textured Normal Maps.esp",
 	"Bomret's Texture Pack for Shivering Isles v1 with meshes from USIP.esp",
 	"AI Powered Landscape Retexture.esp",
 	"Harvest [Flora].esp",
-	# Part 12. All Natural's three core plugins live in optional/ and so are not
-	# in the load order; only Real Lights is. `drifting mist.esp` is row 5's
-	# corrected copy -- row 4's is parked in optional/. The candelabra fix and
-	# both Cava Obscura plugins are Part 36 merge sources, hidden in the Oracle
-	# and consumed by that merge in both instances.
 	"All Natural - Real Lights.esp",
 	"NAO.esp",
+	"BrumasNorthernLights.esp",
 	"drifting mist.esp",
 	"Atmosphere additional effects.esp",
-	"BrumasNorthernLights.esp",
 	"Falling Leaves.esp",
 	"Better Rainbows.esp",
 	"RoadLights.esp",
-	"ILOO.esp",
-	# Part 16. Row 27's MageGuild_simbol.esp is parked in optional/ and so is not
-	# in the load order; this is row 28's mergeable copy, a Part 36 merge source
-	# consumed by that merge, so they are hidden in both instances.
-	# Part 14. ORC180 ships this and the guide wants it. The Oracle runs ORC
-	# 315F, which ships no plugin, so this is a permanent difference.
-	"ORC.esp",
-	# Part 17. Neither is a merge source; both load normally.
 	"WindowLightingSystem.esp",
 	"Diverse Chapels Vanilla.esp",
-	# Part 19. Three load normally; the other six are Part 36 merge sources,
-	# consumed by that merge, so they are hidden in both instances.
 	"Ducks and Swans.esp",
 	"BettysButterflies.esp",
-	"Simple Horse Utilities.esp",
-	# Part 20. Two load normally; the other nine are Part 36 merge sources,
-	# consumed by that merge, so they are hidden in both instances.
 	"Vanilla Gear Redux.esp",
 	"MagicArrows.esp",
-	# Part 21. All six are Part 36 merge sources, hidden in the Oracle and
-	# consumed by that merge in both instances.
-	# Part 22. Both are Part 36 merge sources, hidden in the Oracle and active
-	# here until that merge exists.
-	# Part 23. Eight load normally; the last four are Part 36 merge sources,
-	# consumed by that merge, so they are hidden in both instances.
 	"Dynamic Oblivion Combat.esp",
 	"De-Nock Arrows.esp",
 	"StarX Vampire Deaths.esp",
-	"Av Latta Magicka.esm",
 	"Av Latta Magicka.esp",
 	"lGet rid of small Souls.esp",
 	"De Rerum Dirennis.esp",
-	"Enemy Spell Variety.esp",
-	# Part 24. The last four are Part 36 merge sources, hidden in the Oracle
-	# and consumed by that merge in both instances.
 	"Weapons Of Morrowind.esp",
 	"Unique Artifacts for Unique People.esp",
 	"JBlades!1.1.esp",
 	"tbskGuardsFeatures.esp",
 	"Travelling Equipment.esp",
-	# Part 25. Gottshaw, Reedstand, Sutch and the Dispensation patch are Part 36
-	# merge sources, consumed by that merge, so they are hidden in both instances.
 	"Feldscar.esp",
 	"Frostcrag Village.esp",
 	"Gottshaw Village.esp",
@@ -189,13 +158,6 @@ plugins = [
 	"Reedstand.esp",
 	"Sutch Village.esp",
 	"Urasek.esp",
-	"Vergayun.esp",
-	# Part 26a. The Better Forts feed Part 36's Unique Forts merge; the two LFO
-	# addons, the two guild compatibility patches, the LFO eye addon, the three
-	# Reworked Posts patches and the Dispensation patch feed Prebash. All are
-	# consumed by those merges, so they are hidden in both instances.
-	"FGRebuild.esp",
-	"MGRebuildN01.esp",
 	"ImpeREAL City Unique Districts - All the Districts - Merged.esp",
 	"The Imperial Water.esp",
 	"IceWaterfrontTunnel.esp",
@@ -205,12 +167,10 @@ plugins = [
 	"County Gates.esp",
 	"AgronakChampionHouse.v1.01.esp",
 	"Knightly Orders for Cities.esp",
-	"xulRiverEthe.esp",
-	"xulPantherRiver.esp",
+	"xulRollingHills_EV.esp",
 	"xulImperialIsle.esp",
 	"xulBrenaRiverRavine.esp",
 	"xulAncientYews.esp",
-	"xulRollingHills_EV.esp",
 	"xulCloudtopMountains.esp",
 	"HESU ValenwoodMine.esp",
 	"HESU SkyrimTemple.esp",
@@ -219,13 +179,15 @@ plugins = [
 	"Nobody Goes into the Mountains but Hunters.esp",
 	"Better Dungeons.esp",
 	"BrumaGuildReconstructed.esp",
-	# The ten Better Forts are now sources for Unique Forts Merged (Part 36
-	# row 4), so they are hidden by the merge and out of the load order.
-	"Unique Forts Merged.esp",
-	# Part 26b. All twenty feed the TACE merge, which is Part 36's job -- they
-	# stay in the load order until it exists.
-	# Part 27. Pinarus and the SI Trainers are Prebash merge sources, hidden in
-	# the Oracle and consumed by their merges in both instances.
+	"Vergayun.esp",
+	"Glowing Wonders.esp",
+	"Reworked Posts.esp",
+	"Better Odiil Farm.esp",
+	"SI Unmarked Locations with markers.esp",
+	"SINSOutskirts.esp",
+	"SI Driftdwell.esp",
+	"SI Whispersins.esp",
+	"OblivionDeadLands.esp",
 	"More Mythic Dawn Agents.esp",
 	"Very Horny Knights.esp",
 	"Shivering Isles Raiders.esp",
@@ -234,16 +196,30 @@ plugins = [
 	"Street Vendors of Cyrodiil.esp",
 	"DaedraShrinesProddedWithAStick.esp",
 	"CulusTheMighty.esp",
-	# Part 28. Nine of these are Prebash merge sources, hidden in the Oracle and
-	# consumed by their merges in both instances.
+	"NIARA.esp",
+	"Ultimate Leveling.esp",
+	"OCRAFT.esp",
+	"OCRAFT - Integration.esp",
+	"OCRAFT - Cobl Glue.esp",
+	"OCRAFT - Stations for Sale.esp",
+	"MigFEA.esp",
+	"MigPickpocket.esp",
+	"MigTraining.esp",
+	"Auto Update Leveled Items And Spells.esp",
+	"Gentleman's Smart Level Scaling Overhaul.esp",
+	"GOSH.esp",
+	"DialogTweaks.esp",
+	"Consistent Beggar Voices.esp",
+	"YourMotherWasAHamster.esp",
+	"DisableDetectLifeDuringDialog.esp",
 	"ProgressTracker.esp",
-	"CIBFilterPatch.esp",
 	"CIBLppSupport.esp",
 	"Oblivion Content Restoration Project.esp",
 	"The Lost Spires.esp",
 	"The Lost Spires - Cleaned Up Scribe.esp",
 	"The Lost Spires - Assorted Fixes.esp",
-	"Bashed Delayers - MERGE ONLY.esp",
+	"The Chorrol Graveyard.esp",
+	"Cheydinhal Cemetery Overhaul.esp",
 	"The Ayleid Steps.esp",
 	"The Ayleid Steps - The Guardian's Atlas.esp",
 	"BrotherhoodRenewed.esp",
@@ -259,64 +235,14 @@ plugins = [
 	"TheWellOfMinlorada.esp",
 	"AFK_Weye.esp",
 	"Tales of Cyrodiil.esp",
-	# Part 29. All four of these are Prebash merge sources bar NIARA, hidden in
-	# the Oracle and consumed by their merges in both instances.
-	"NIARA.esp",
-	# Part 30. The AULIAS script patch, More Books Teach and the Dahyka OCO patch
-	# are Prebash merge sources, consumed by their merges, so they are hidden in both instances.
-	"Ultimate Leveling.esp",
-	"OCRAFT.esp",
-	"OCRAFT - Integration.esp",
-	"OCRAFT - Cobl Glue.esp",
-	"OCRAFT - Stations for Sale.esp",
-	"Maskar's Oblivion Overhaul - OCRAFT Patch.esp",
-	"Oscuro's Oblivion Overhaul - OCRAFT Patch.esp",
-	"Fundament.esm",
-	"MigFEA.esp",
-	"MigPickpocket.esp",
-	"MigTraining.esp",
-	"Auto Update Leveled Items And Spells.esp",
-	"Gentleman's Smart Level Scaling Overhaul.esp",
-	"Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
-	# Part 31. Seven of these are Prebash merge sources, hidden in the Oracle and
-	# consumed by their merges in both instances.
-	"GOSH.esp",
-	"DialogTweaks.esp",
-	"Consistent Beggar Voices.esp",
-	"YourMotherWasAHamster.esp",
-	"DisableDetectLifeDuringDialog.esp",
-	"Glowing Wonders.esp",
-	"Reworked Posts.esp",
-	"Dagger_Data.esm",
-	"The Chorrol Graveyard.esp",
-	"Cheydinhal Cemetery Overhaul.esp",
-	"Gogan's Family Cemetery.esp",
-	"Better Odiil Farm.esp",
-	"SI Unmarked Locations with markers.esp",
-	"SINSOutskirts.esp",
-	"SI Driftdwell.esp",
-	"SI Whispersins.esp",
-	"OblivionDeadLands.esp",
-	# Part 32. Bravil Barrel Fix is a Late Loaders merge source and
-	# PekCOBLBookJackets a Prebash one; both are hidden in the Oracle and active
-	# consumed by their merges in both instances. The Oracle also leaves Cobl
-	# Filter Late MERGE ONLY and the Buffet Plate disabler present but unticked
-	# -- see the Part 32 note.
-	"Cobl Main.esm",
 	"Cobl Glue.esp",
 	"Cobl Si.esp",
-	"Cobl Filter Late MERGE ONLY.esp",
-	"Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
 	"Cobl for DLC Homes.esp",
-	# Part 33. The four weightless/respawning plugins are Prebash merge sources
-	# and the two Improved Guild patches are Late Loaders ones; all six are hidden
-	# in the Oracle and consumed by their merges in both instances.
 	"SMO.esp",
 	"AutoHaggle.esp",
 	"za_bankmod.esp",
-	# Declared by both Crime has witnesses and its Responsibility Tweak: the tweak
-	# ships a plugin of the same name, so it replaces rather than adds.
 	"kuerteeCrimeHasWitnesses.esp",
+	"Enemy Spell Variety.esp",
 	"Reznod_Mannequin.esp",
 	"Enhanced Grabbing.esp",
 	"Take or Equip.esp",
@@ -324,37 +250,54 @@ plugins = [
 	"AoG - Greed Arena.esp",
 	"Camping.esp",
 	"Note to Self.esp",
+	"Simple Horse Utilities.esp",
 	"QuestsMakeFriends.esp",
 	"SneakVignette.esp",
 	"DrowningVisuals.esp",
-	# Part 34. Filter patches: each names masters it does not require, so MO2
-	# reports missing masters for all seven and the guide says to ignore that.
-	"Ragdolls for Oblivion - Filter Patch for Mods.esp",
-	"OCOv2 - Filter Patch for Mods.esp",
-	"BasicHarvestFilterPatch.esp",
-	"MOBSification of MODS.esp",
-	"DispMiscPatch_OCRAFT - Filter Patch for Mods.esp",
-	"Cava Obscura - Filter Patch For Mods.esp",
-	# Two spaces before the dash, as the archive spells it.
-	"Unique Landscapes Separate  - OOO Adaptation.esp",
-	# Part 35. Nine of these twelve are OOO Patches Merged sources, hidden in the
-	# Oracle and consumed by their merges in both instances.
+	"Character Customization Expanded.esp",
+	"Oblivion_Character_Overhaul.esp",
+	"Ragdolls.esp",
+	"EVE_KnightsoftheNine.esp",
+	"WACIntegration.esp",
+	"Oscuro's_Oblivion_Overhaul.esp",
+	"xulRiverEthe.esp",
+	"xulPantherRiver.esp",
+	"Gogan's Family Cemetery.esp",
+	"FGRebuild.esp",
+	"MGRebuildN01.esp",
+	"EVE_StockEquipmentReplacer for OOO.esp",
+	"DLCOrrery - OOO Adaptation.esp",
+	"OOO Enhanced.esp",
+	"Dahyka's Vanilla Racial and Birthsign Tweaksv2.2.esp",
+	"Knights of Nine - OOO Enhanced Adaptation.esp",
+	"OOOShiveringIsles.esp",
 	"Improved Chests (OOO Compatible).esp",
 	"Cobl Tweaks - OOO.esp",
-	# Two spaces before "(Extended)", as the archive spells it.
 	"Bounty Quests OOO Patch.esp",
-	# Part 36. The five merge outputs. Every plugin they consume stays declared
-	# above -- the merge's `hide_sources` is what takes those out of the load
-	# order, so removing them here would only hide the accounting.
-	#
-	# These names are the contract the Conflict Resolution mod's Bash Tags match
-	# on. Part 37 replaces this whole array with a fixed loadorder.txt; until then
-	# the merges sit at the end, which is sane rather than correct.
 	"OOO Patches Merged.esp",
-	"TACE Merge.esp",
+	"Unique Forts Merged.esp",
 	"Prebash Merge.esp",
+	"TACE Merge.esp",
+	"OCOv2 - Filter Patch for Mods.esp",
+	"MOBSification of MODS.esp",
+	"Ragdolls for Oblivion - Filter Patch for Mods.esp",
+	"BasicHarvestFilterPatch.esp",
+	"Cobl Filter Late MERGE ONLY.esp",
+	"Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
+	"Bashed Delayers - MERGE ONLY.esp",
+	"CIBFilterPatch.esp",
+	"DispMiscPatch_OCRAFT - Filter Patch for Mods.esp",
+	"Unique Landscapes Separate  - OOO Adaptation.esp",
+	"Cava Obscura - Filter Patch For Mods.esp",
+	"Maskar's Oblivion Overhaul.esp",
+	"Maskar's Oblivion Overhaul - OCRAFT Patch.esp",
+	"Oscuro's Oblivion Overhaul - OCRAFT Patch.esp",
+	"BasicHarvest4MOO.esp",
+	"MOO Loading Screens - New Pics.esp",
+	"ILOO.esp",
 	"Late Loaders Merged.esp",
 	"NPC Merge.esp",
+	"Conflict Resolution.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -9811,6 +9754,13 @@ type = "merge"
     { mod = "No Annoying Conjurer Attack (Spell Tomes DLC fix)", plugin = "DLCSpellTomes-No Attack.esp" },
     { mod = "SM DLC Plugin Refurbish", plugin = "SM Plugin Refurbish Lite Knights Infamy.esp" },
     { mod = "Bruma Frostcrag Spire LOD", plugin = "Bruma Frostcrag Spire LOD.esp" },
+    # The guide's list has ORC.esp here, and this build installs ORC v180 (Part
+    # 14 row 4), which ships one. An earlier decision dropped it on the premise
+    # that Linux would run ORC 315F, which ships no plugin -- but 315F is not
+    # what Part 14 installs, so the premise never applied to this list. Left out,
+    # ORC.esp stayed loose in the load order where neither the guide's published
+    # order nor the Oracle has it.
+    { mod = "Oblivion Reloaded Combined(ORC) v180", plugin = "ORC.esp" },
     { mod = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation", plugin = "MehrunesDagonWalk.esp" },
     { mod = "Better Traps", plugin = "Better Traps.esp" },
     { mod = "Fame Based Daedric Quest Requirements", plugin = "DaedricRequirements.esp" },
@@ -9913,3 +9863,117 @@ type = "merge"
     { mod = "OCOv2 - Race Rebalance Mods Patches", plugin = "Dahyka_OCO_Patch.esp" },
     { mod = "MOFAM - NPC Merge Consistency Patch", plugin = "NPC Merge Consistency Patch.esp" },
   ]
+
+# ---------------------------------------------------------------------------
+# Part 38 - CONFLICT RESOLUTION & AUTOMATION
+# ---------------------------------------------------------------------------
+
+# Guide 38 row 1: "Create an empty mod called 'Bashed Patch' & add the Bash
+# Patches folder from here that contains the configuration."
+#
+# The download is the configuration only -- one `.dat` under `Bash Patches/`.
+# The patch itself, `Bashed Patch, 0.esp`, is what Wrye Bash writes after the
+# twelve-step GUI procedure the row goes on to describe, and mudcrab has no way
+# to produce it. The folder and its configuration are staged here so that
+# procedure has somewhere to start; the plugin is recorded as outstanding in
+# `notes/incomplete-rows.md`.
+[[mods]]
+id = "Bashed Patch"
+section = ["38 - CONFLICT RESOLUTION & AUTOMATION"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041294"
+download_handler = "nexus"
+file_name = "Bashed Patch Config-52949-03-25-1743346738.zip"
+layout = "custom-data-folder"
+data_folder = "Bashed Patch Config"
+exclude = ["**/meta.ini"]
+
+# Guide 38 row 2. "The final plugin that ties the room together."
+#
+# Its `BashTags/` folder is the naming contract Part 36 keeps warning about: one
+# file per plugin Wrye Bash needs tag hints for, named for that plugin exactly.
+# Four of our six merges are named there -- Late Loaders Merged, NPC Merge, OOO
+# Patches Merged and Prebash Merge -- and all four match, which is the check that
+# those filenames came out right. TACE Merge and Unique Forts Merged have no tag
+# file, so nothing checks their names here; they are unverified rather than
+# wrong. The other three files cover Conflict Resolution itself and the two
+# OCRAFT patches.
+[[mods]]
+id = "MOFAM - Conflict Resolution"
+section = ["38 - CONFLICT RESOLUTION & AUTOMATION"]
+plugins = ["Conflict Resolution.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041295"
+download_handler = "nexus"
+file_name = "Conflict Resolution-52949-03-25-1743346777.zip"
+layout = "custom-data-folder"
+data_folder = "Conflict Resolution"
+exclude = ["**/meta.ini"]
+
+# ---------------------------------------------------------------------------
+# Part 39 - SLOWLODGEN
+# ---------------------------------------------------------------------------
+#
+# Nothing to install here. The row says to run slowLODGen and paste its two
+# BSAs and two plugins into the empty `Merged LOD` mod from Part 5 -- and offers
+# the author's own output as a download for anyone who would rather not. This
+# build took that download at Part 5, so `Merged LOD` already holds
+# `MergedLOD - LODs.bsa`, `MergedLOD - Meshes.bsa`, `MergedLOD.esm` and
+# `MergedLOD.esp`, matching the Oracle's four files exactly.
+#
+# The row's placement instructions are satisfied by Part 37's order:
+# `MergedLOD.esm` sits immediately after `Av Latta Magicka.esm`, and the dummy
+# `MergedLOD.esp` sits last in the Part 5 block, after `IC LOD.esp`.
+
+# ---------------------------------------------------------------------------
+# Part 40 - UTILITIES & MO2 ADVICE
+# ---------------------------------------------------------------------------
+#
+# Row 1 (4gb Ram Patcher) patches `Oblivion.exe` in the game root and the row
+# says it was already run during setup -- it is kept on the page "for
+# safekeeping", not installed as a mod. Row 3 (FormID Finder) and row 6
+# (ConScribe settings, installed at Part 33) are the other two rows with nothing
+# to do here. See the Part 40 note.
+
+# Guide 40 row 2.
+#
+# A blank plugin, for occupying a load-order slot while testing. The guide does
+# not ask for it to be active and the published load order does not contain it,
+# so `DUMMY.esp` is hidden rather than declared: left visible in an enabled mod,
+# MO2 would offer it as a new undecided plugin on every launch.
+[[mods]]
+id = "Dummy ESP"
+section = ["40 - UTILITIES & MO2 ADVICE"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000034625"
+download_handler = "nexus"
+file_name = "Dummy ESP-52949-05-23-1683552930.7z"
+layout = "custom-data-folder"
+data_folder = "Dummy ESP"
+exclude = ["**/meta.ini"]
+
+[[mods.actions]]
+action = "file_hide"
+paths = ["DUMMY.esp"]
+
+# Guide 40 rows 5 and 7: mod folders that exist so a tool's output has somewhere
+# to live other than MO2's Overwrite. Empty on purpose -- Blockhead, MenuQue,
+# Piip and SKYBSA fill the first two at runtime, and xEdit fills the third (the
+# Oracle's copy holds 67 `.refcache` files, none of which came from a download).
+[[mods]]
+id = "OBSE Logs & Inis"
+section = ["40 - UTILITIES & MO2 ADVICE"]
+type = "empty"
+
+[[mods]]
+id = "ConScribe Logs"
+section = ["40 - UTILITIES & MO2 ADVICE"]
+type = "empty"
+
+[[mods]]
+id = "TES4Edit Cache"
+section = ["40 - UTILITIES & MO2 ADVICE"]
+type = "empty"
