@@ -433,6 +433,18 @@ plugins = [
 	"SI Driftdwell.esp",
 	"SI Whispersins.esp",
 	"OblivionDeadLands.esp",
+	# Part 32. Bravil Barrel Fix is a Late Loaders merge source and
+	# PekCOBLBookJackets a Prebash one; both are hidden in the Oracle and active
+	# here until Part 36. The Oracle also leaves Cobl Filter Late MERGE ONLY and
+	# the Buffet Plate disabler present but unticked -- see the Part 32 note.
+	"Cobl Main.esm",
+	"Cobl Glue.esp",
+	"Cobl Si.esp",
+	"Cobl Filter Late MERGE ONLY.esp",
+	"Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
+	"Cobl Glue - Bravil Barrel Fix.esp",
+	"PekCOBLBookJackets.esp",
+	"Cobl for DLC Homes.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -8942,3 +8954,129 @@ plugins = ["DisableDetectLifeDuringDialog.esp"]
 path = "nexus:oblivion/54942/1000041084"
 download_handler = "nexus"
 file_name = "Disable Detect Life During Dialog-54942-1-0-1741361609.zip"
+
+# ---------------------------------------------------------------------------
+# Part 32 - COMMON OBLIVION (COBL)
+# ---------------------------------------------------------------------------
+
+# Guide 1: a BAIN Wizard -- "Stable", packages "Tweaks", option "Cobl Tweaks -
+# SI" -- followed by "delete every plugin except" four names. Read together the
+# two halves cancel: the archive's own Wizard.txt selects `00 Cobl Core` and
+# `01 StableCore` for Stable, then for the SI option keeps `Cobl Tweaks -
+# SI.esp` and deselects the other eight esps in `02 Tweaks`. That one surviving
+# esp is not among the four the row then keeps, so it is deleted again. What
+# reaches the game is Core plus StableCore and nothing else, which is what the
+# subpackage list below installs: 2266 files, matching the Oracle's exactly.
+[[mods]]
+id = "Cobl"
+section = ["32 - COMMON OBLIVION (COBL)"]
+plugins = [
+  "Cobl Main.esm",
+  "Cobl Glue.esp",
+  "Cobl Si.esp",
+  "Cobl Filter Late MERGE ONLY.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/21104/1000025650"
+download_handler = "nexus"
+file_name = "Cobl-21104-174-1598559328.7z"
+layout = "bain"
+bain_subpackages = ["00 Cobl Core", "01 StableCore"]
+
+# Guide 2: the Apachii and COBL manual-install file, minus the four Apachii
+# folders. Only the Meteoric arrows and their textures survive -- 7 of 34.
+[[mods]]
+id = "TIBs Compact Quivers - Thinner Arrow Holders Apachii and COBL"
+section = ["32 - COMMON OBLIVION (COBL)"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45111/1000008026"
+download_handler = "nexus"
+file_name = "TIBs Compact Quivers - Manual install - Apachii and COBL-45111-2-0.rar"
+exclude = [
+  "meshes/Weapons/Apachii/**",
+  "meshes/Weapons/apachiiMale/**",
+  "textures/apachii/**",
+  "textures/apachiiMale/**",
+]
+
+# Guide 3: one folder out of the Complete Bundle's 34. The bundle ships both a
+# "High-Res" and a "Higher-Res" variant of this texture set and the guide names
+# the latter; the Oracle's three files are 349672/349672/699216 bytes, which is
+# Higher-Res (High-Res is a quarter of that).
+[[mods]]
+id = "Khettienna's Mini-Mods - Welkynd Textures"
+section = ["32 - COMMON OBLIVION (COBL)"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46187/1000017566"
+download_handler = "nexus"
+file_name = "Khettienna's Mini Mods Complete Bundle-46187-2017-08-19.7z"
+layout = "custom-data-folder"
+data_folder = "KMM Higher-Res Welkynd Textures for Cobl Ayleid Meteoric Weapons v1.0"
+
+# Guide 4: "delete Salmo the Baker, Cobl.esp". The Bravil Barrel Fix is a Late
+# Loaders merge source (Part 36 row 8) and so is hidden in the Oracle; it stays
+# active here until that merge is built.
+[[mods]]
+id = "Cobl Unofficial Patch"
+section = ["32 - COMMON OBLIVION (COBL)"]
+plugins = [
+  "Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
+  "Cobl Glue - Bravil Barrel Fix.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/51517/1000036013"
+download_handler = "nexus"
+file_name = "Cobl Unofficial Patch-51517-1-1-1693804500.7z"
+exclude = ["**/Salmo the Baker, Cobl.esp"]
+
+# Guide 5: assets only -- the esp is deleted here and supplied by row 6's
+# mergeable replacer instead.
+[[mods]]
+id = "Pek COBL Book Jackets - Stand Alone"
+section = ["32 - COMMON OBLIVION (COBL)"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51953/1000031030"
+download_handler = "nexus"
+file_name = "Pekkas COBL Books jackets-51953-v1-0-1651433078.7z"
+exclude = ["**/PekCOBLBookJackets.esp"]
+
+# Guide 6: the replacer esp for row 5. A Prebash merge source (Part 36 row 6),
+# hidden in the Oracle and active here until Part 36.
+[[mods]]
+id = "Wrye Bash Collection of Mergeable Mods - Pekkas COBL Books Jackets"
+section = ["32 - COMMON OBLIVION (COBL)"]
+plugins = ["PekCOBLBookJackets.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52823/1000034041"
+download_handler = "nexus"
+file_name = "Pekkas COBL Books Jackets - Mergeable-52823-1-0-1679149543.7z"
+
+[[mods]]
+id = "Cobl for DLC Homes"
+section = ["32 - COMMON OBLIVION (COBL)"]
+plugins = ["Cobl for DLC Homes.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53063/1000035010"
+download_handler = "nexus"
+file_name = "Cobl for DLC Homes-53063-1-0-1686814054.7z"
+
+# Guide 8: two texture files out of 4594, for a missing COBL ingredient texture.
+# The row asks for the mod to be renamed; the Oracle left the folder under the
+# mod's own name, so `oracle_name` carries that across.
+[[mods]]
+id = "Legacy of the Champion (Cobl Porridge DDS)"
+oracle_name = "Legacy of the Champion"
+section = ["32 - COMMON OBLIVION (COBL)"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52047/1000031575"
+download_handler = "nexus"
+file_name = "Legacy of the Champion - Hobbit Home-52047-0-09b-1655329286.7z"
+include = ["Textures/Custom/3bears/porridge.dds", "Textures/Custom/3bears/porridge_n.dds"]
