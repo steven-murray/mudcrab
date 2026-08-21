@@ -331,6 +331,18 @@ plugins = [
 	"Slightly Different Bruma.esp",
 	"Bruma Greenhouses.esp",
 	"Gardens of Cyrodill-Knights of the Thorn Lodge.esp",
+	# Part 27. Pinarus and the SI Trainers are Prebash merge sources, hidden in
+	# the Oracle and active here until Part 36.
+	"More Mythic Dawn Agents.esp",
+	"Very Horny Knights.esp",
+	"Shivering Isles Raiders.esp",
+	"Countess.esp",
+	"PinarusInventiusActualHunter.esp",
+	"Tavern Goers 2 - Redux.esp",
+	"Street Vendors of Cyrodiil.esp",
+	"DaedraShrinesProddedWithAStick.esp",
+	"CulusTheMighty.esp",
+	"ShiveringIslesTrainersPartial.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -7596,3 +7608,140 @@ plugins = ["Gardens of Cyrodill-Knights of the Thorn Lodge.esp"]
 path = "nexus:oblivion/54522/1000040546"
 download_handler = "nexus"
 file_name = "Gardens of Cyrodill-Knights of the Thorn Lodge-54522-1-1-1737301278.7z"
+
+# ── Part 27 - NEW & MODIFIED NPCs ───────────────────────────────────────────
+
+# Guide 1: one file out of a collection, "More Mythic Dawn Agents - Cleaned".
+[[mods]]
+id = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods - More Mythic Dawn Agents"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["More Mythic Dawn Agents.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52833/1000034128"
+download_handler = "nexus"
+file_name = "More Mythic Dawn Agents - Cleaned-52833-1-1-1679491507.7z"
+
+# Guide 2: the "Very Horny Knights" file from Vanilla Remastered 1K.
+[[mods]]
+id = "Vanilla Remastered 1K - Very Horny Knights"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["Very Horny Knights.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50903/1000029853"
+download_handler = "nexus"
+file_name = "Very Horny Knights-50903-1-2-1640180910.7z"
+
+[[mods]]
+id = "Shivering Isles Raiders"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["Shivering Isles Raiders.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51291/1000029976"
+download_handler = "nexus"
+file_name = "Shivering Isles Raiders-51291-1-1-1641642889.7z"
+
+[[mods]]
+id = "Countess"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["Countess.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49602/1000022858"
+download_handler = "nexus"
+file_name = "Countess-49602-1-0-1567040949.7z"
+
+[[mods]]
+id = "Pinarus Inventius - Actual Hunter"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["PinarusInventiusActualHunter.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48701/1000020036"
+download_handler = "nexus"
+file_name = "Pinarus Inventius - Actual Hunter-48701-1.7z"
+
+# Guide 6 [MI]: textures only, wrapped twice -- a folder named after the mod,
+# then a Data folder inside it.
+[[mods]]
+id = "Akatosh Retexture by themythofstrider"
+section = ["27 - NEW & MODIFIED NPCS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/29321/54113"
+download_handler = "nexus"
+file_name = "Akatosh Retexture by themythofstrider-29321.7z"
+layout = "custom-data-folder"
+data_folder = "Akatosh Retexture by themythofstrider/Data"
+
+# Guide 7: "main file, Merged".
+[[mods]]
+id = "Tavern Goers 2 - Redux"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["Tavern Goers 2 - Redux.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48660/1000033919"
+download_handler = "nexus"
+file_name = "Tavern Goers 2 - Redux Merged-48660-5-0-1678133943.7z"
+
+# Guide 8: "main file v. 2.91 + optional Street Vendors of Cyrodiil v2.91 - Not
+# in IC; install separately".
+#
+# Two problems, both in the reports. **v2.91 is not on this machine at all** --
+# the downloads hold 2.8, 2.9, 2.92 and 2.93 -- and the Oracle does not have
+# this mod in any version, so there is nothing to compare against. 2.92 is the
+# nearest *matched pair* (both the main file and the Not-in-IC variant exist at
+# that version), which beats pairing 2.9's main file with 2.8's variant. It
+# postdates the guide by two months and `diff` says so.
+#
+# The second archive is the same plugin built without the Imperial City
+# vendors; installed after, it wins the path, which is what "install
+# separately" produces in MO2.
+[[mods]]
+id = "Street Vendors of Cyrodiil"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["Street Vendors of Cyrodiil.esp"]
+
+[[mods.archives]]
+path = "manual:Street Vendors of Cyrodiil v2.92-48143-2-92-1746972397.7z"
+
+[[mods]]
+id = "Street Vendors of Cyrodiil - Not in IC"
+section = ["27 - NEW & MODIFIED NPCS"]
+
+[[mods.archives]]
+path = "manual:Street Vendors of Cyrodiil v2.92 - Not in IC-48143-2-92-1746973898.7z"
+
+# Guide 9: "main file only".
+[[mods]]
+id = "Daedric Shrines Prodded With A Stick"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["DaedraShrinesProddedWithAStick.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46930/1000013707"
+download_handler = "nexus"
+file_name = "Shrines 2.0- All Fifteen vanilla shrines poked and prodded-46930-2-0.7z"
+
+[[mods]]
+id = "Culus the Mighty"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["CulusTheMighty.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48164/1000018137"
+download_handler = "nexus"
+file_name = "Culus the Mighty 1.0-48164-1-0.rar"
+
+[[mods]]
+id = "Shivering Isles Trainers (Partial)"
+section = ["27 - NEW & MODIFIED NPCS"]
+plugins = ["ShiveringIslesTrainersPartial.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50718/1000026660"
+download_handler = "nexus"
+file_name = "Shivering Isles Trainers (Partial)-50718-1-1-1610913491.zip"
