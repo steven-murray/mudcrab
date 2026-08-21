@@ -6,7 +6,7 @@ guide's row asks. Nothing here fails; each one succeeds and leaves the instance
 slightly short of the guide, which is exactly why it needs writing down rather
 than trusting to a diff that has other things to say.
 
-Kept current as sections are built. Last updated after Part 32.
+Kept current as sections are built. Last updated after Part 35.
 
 ---
 
@@ -146,7 +146,37 @@ The loose folders are gone now, so unlike before the assets are not reaching the
 game by the loose path either: the mod currently contributes its plugin and
 nothing else.
 
-### C3. Nine of Ultimate Leveling's fifteen edits are still unapplied
+### C2. Bank of Cyrodiil (Part 33 rows 3-4) is short of the row in three ways
+
+1. **The repack never happened.** Row 4 says to repack textures/meshes/sound as
+   `za_bankmod` with BSArch and delete the loose folders. The Oracle still has
+   loose `meshes/`, `sound/` and `Textures/`, and no BSA.
+2. **The voice copy hit the Linux case hazard.** The base mod's own installer
+   writes `sound/voice/`; the ElevenLabs addon ships `Sound/Voice/`. Copying one
+   over the other produced **two directories**, `sound/voice/` (the base mod's 31
+   files) and `sound/Voice/` (the addon's 538). Nothing was replaced.
+3. **`Bank of Cyrodiil Voices (ElevenLabs)` is still enabled** (`+` in
+   `modlist.txt`) where the row says to disable it.
+
+Ours packs all 547 assets into `za_bankmod.bsa` — the same 547 paths the Oracle
+has loose, compared case-insensitively — with the addon's copies winning, which
+is what "replacing when prompted" means.
+
+### C3. The three Base Object Swapper integrations are installed to the wrong path
+
+Part 33 row 18. Base Object Swapper reads its rules from
+`Data/BaseObjectSwapper/*.ini`. Each archive is one ini inside a
+`BaseObjectSwapper/` folder — a lone top-level directory, which is the shape MO2
+strips as a wrapper.
+
+The Oracle's `Cobl - Food.ini`, `OCRAFT - Stations.ini` and `OOO - Treasure.ini`
+all sit at the **mod root**, where the OBSE plugin will not look for them. The
+convention is settled independently by `OCRAFT - Stations for Sale`, which has a
+proper `BaseObjectSwapper/` folder in both instances.
+
+Moving each ini into a `BaseObjectSwapper/` subfolder of its mod is the fix.
+
+### C4. Nine of Ultimate Leveling's fifteen edits are still unapplied
 
 Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 1000, `ini_xp_level_mult` 400). Nine still hold the archive's defaults:
@@ -166,7 +196,7 @@ Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 Plus `ini_xp_kill_other`, which the guide does not mention and the Oracle sets
 to 10 against the archive's 25.
 
-### C4. Cosmetic, listed so they are not re-investigated
+### C5. Cosmetic, listed so they are not re-investigated
 
 - `MigTraining.ini` line 65 (`fTrainerAdvancedMult`) has one tab in the Oracle
   where the archive has two. No instruction touches that line; the file has been
