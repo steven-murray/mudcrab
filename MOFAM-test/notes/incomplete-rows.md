@@ -86,8 +86,30 @@ the mod.
 routes through it never merge. This is the single thing between the build and a
 playthrough.
 
-`Bashed Patch, 0.esp` is deliberately absent from the load order until it exists;
-Part 37's note records that as one of three departures from the published order.
+### The one trap: it must be declared before it is built
+
+`install` rewrites `plugins.txt` from the modlist on every run. Build the patch
+without declaring it and the next mudcrab run drops it from the profile — the
+file stays on disk, the game stops loading it, and nothing says so.
+
+So the `Bashed Patch` mod already declares `plugins = ["Bashed Patch, 0.esp"]`
+and the load order already lists it at the published position, between
+`NPC Merge.esp` and `Conflict Resolution.esp`, which is exactly where the row
+says to put it. Until the file exists, `install` leaves it out and logs
+`omitting plugins from plugins.txt because they are not installed yet`. The
+moment Wrye Bash writes it into the mod folder, it appears in the profile at that
+position with no further edit.
+
+### Before starting
+
+- The row's own preamble: open xEdit and **Sort Masters** across the whole load
+  order first.
+- `MOFAM - Conflict Resolution` is installed and active — the row requires it,
+  because its `BashTags/` folder carries the tags for the merges.
+- The three plugins the row has you tick all exist and are active:
+  `Conflict Resolution.esp`, `OOO Patches Merged.esp`, `NPC Merge.esp`.
+- The configuration to Import is at
+  `mods/Bashed Patch/Bash Patches/Bashed Patch, 0.esp_Configuration.dat`.
 
 ### A4. BAIN Wizard scripts — Part 28 row 5 (Configuration Items Begone)
 

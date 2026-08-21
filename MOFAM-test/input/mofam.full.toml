@@ -40,13 +40,15 @@ guide = { published = "2025-03-18", file_id = 1000041165 }
 # now does, in order, entry for entry.
 #
 # Source: https://loadorderlibrary.com/lists/mofam-oblivion-2 (244 entries,
-# "All plugins active prior to BP"). Three deliberate departures:
+# "All plugins active prior to BP"). Two deliberate departures:
 #
 #   * `Swearing Rats.esp` omitted. The guide's own Part 31 row 14 says "I can
 #     understand if you omit it", and the Oracle does.
-#   * `Bashed Patch, 0.esp` absent -- Wrye Bash produces it and that is a GUI
-#     step. See `incomplete-rows.md`.
 #   * `ORC.esp` absent from both, because Part 36's Prebash merge consumes it.
+#
+# `Bashed Patch, 0.esp` is listed here at its published position but does not
+# exist yet: Wrye Bash writes it (Part 38 row 1), and until it does `install`
+# leaves it out of plugins.txt rather than naming a file that is not there.
 #
 # Every other plugin a mod declares is either here or consumed by a merge;
 # `mudcrab validate` enforces exactly that, so this array cannot drift from the
@@ -294,6 +296,7 @@ plugins = [
 	"ILOO.esp",
 	"Late Loaders Merged.esp",
 	"NPC Merge.esp",
+	"Bashed Patch, 0.esp",
 	"Conflict Resolution.esp",
 ]
 
@@ -9885,6 +9888,12 @@ type = "merge"
 [[mods]]
 id = "Bashed Patch"
 section = ["38 - CONFLICT RESOLUTION & AUTOMATION"]
+# Declared before it exists, on purpose. `install` omits a plugin from
+# plugins.txt while its file is absent and starts listing it the moment Wrye
+# Bash drops it in -- at the position below, which is the one the row requires.
+# Without this the patch would be written, then dropped from the profile by the
+# next mudcrab run.
+plugins = ["Bashed Patch, 0.esp"]
 
 [[mods.archives]]
 path = "nexus:oblivion/52949/1000041294"
