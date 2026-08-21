@@ -52,6 +52,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                             layout: archive.layout,
                             data_folder: archive.data_folder.clone(),
                             target_subdir: archive.target_subdir.clone(),
+                            inner_archive: archive.inner_archive.clone(),
                             bain_subpackages: archive.bain_subpackages.clone(),
                             fomod_selections: archive.fomod_selections.clone(),
                             build: archive.build.clone(),

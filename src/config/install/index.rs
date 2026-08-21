@@ -203,6 +203,20 @@ fn reject_unmodelled(mod_entry: &PersonalizedMod) -> anyhow::Result<()> {
         );
     }
 
+    if let Some(archive) = mod_entry
+        .archives
+        .iter()
+        .find(|archive| archive.inner_archive.is_some())
+    {
+        anyhow::bail!(
+            "cannot predict the files mod '{}' contributes: its content is inside '{}', a second \
+             archive that has to be unpacked before its layout can be read. Install it first, or \
+             name a different mod.",
+            mod_entry.id,
+            archive.inner_archive.as_deref().unwrap_or_default(),
+        );
+    }
+
     let changes_the_set: Vec<&str> = mod_entry
         .actions
         .iter()

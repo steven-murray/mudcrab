@@ -431,6 +431,29 @@ pub(crate) fn extract_archive(
     filters: &ArchiveFilters,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<usize> {
+    if let Some(inner) = archive.inner_archive.as_deref() {
+        return extract_nested_archive(
+            source,
+            target_root,
+            mod_id,
+            archive,
+            filters,
+            active_plugins,
+            inner,
+        );
+    }
+
+    plan_and_extract(source, target_root, mod_id, archive, filters, active_plugins)
+}
+
+fn plan_and_extract(
+    source: &Path,
+    target_root: &Path,
+    mod_id: &str,
+    archive: &CompiledArchive,
+    filters: &ArchiveFilters,
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<usize> {
     let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
     with_planned_archive(source, target_root, &destination_root, |paths, reader| {
         plan_archive(
@@ -443,6 +466,82 @@ pub(crate) fn extract_archive(
             active_plugins,
         )
     })
+}
+
+/// Install a mod whose content is packed inside a second archive.
+///
+/// Two extractions rather than one. The inner archive goes through the whole
+/// layout pipeline, because that is where the game content is and so that is
+/// what `layout`, `data_folder` and the rest are describing. The container's
+/// own files -- readmes, screenshots -- are staged at the mod root, which is
+/// where they sit in the container. The container entry itself is never
+/// written: it is packaging, not content.
+///
+/// `filters` apply to both halves, so an `exclude` can drop a container readme
+/// as readily as an inner texture. One rule for the pair is easier to predict
+/// than a split, and the alternative -- filters that quietly stop applying
+/// halfway through a mod -- is the kind of thing only noticed by a diff.
+#[allow(clippy::too_many_arguments)]
+fn extract_nested_archive(
+    source: &Path,
+    target_root: &Path,
+    mod_id: &str,
+    archive: &CompiledArchive,
+    filters: &ArchiveFilters,
+    active_plugins: &HashSet<String>,
+    inner: &str,
+) -> anyhow::Result<usize> {
+    let paths = list_archive_paths(source)?;
+    let entry = paths
+        .iter()
+        .find(|path| path.eq_ignore_ascii_case(inner))
+        .cloned()
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "mod '{mod_id}': inner_archive '{inner}' is not in {} ({} entries). Run \
+                 `mudcrab inspect` on the archive to see what it holds.",
+                source.display(),
+                paths.len()
+            )
+        })?;
+
+    let staging_dir = staging_dir_for(target_root)?;
+    std::fs::create_dir_all(&staging_dir).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to create staging dir {}: {err}",
+            staging_dir.display()
+        )
+    })?;
+
+    let result = (|| -> anyhow::Result<usize> {
+        extract_entries(source, &staging_dir, &BTreeSet::from([entry.clone()]))?;
+        let nested = staging_dir.join(&entry);
+
+        let destination_root = destination_for(target_root, archive.target_subdir.as_deref())?;
+        let container_files =
+            with_planned_archive(source, target_root, &destination_root, |paths, _| {
+                let leftovers: Vec<String> = paths
+                    .iter()
+                    .filter(|path| **path != entry)
+                    .cloned()
+                    .collect();
+                Ok(plan::plan_simple(&leftovers, filters))
+            })?;
+
+        let inner_files = plan_and_extract(
+            &nested,
+            target_root,
+            mod_id,
+            archive,
+            filters,
+            active_plugins,
+        )?;
+
+        Ok(container_files + inner_files)
+    })();
+
+    let _ = std::fs::remove_dir_all(&staging_dir);
+    result
 }
 
 /// Which layout applies, and what it decides.
