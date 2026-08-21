@@ -309,6 +309,28 @@ plugins = [
 	# The ten Better Forts are now sources for Unique Forts Merged (Part 36
 	# row 4), so they are hidden by the merge and out of the load order.
 	"Unique Forts Merged.esp",
+	# Part 26b. All twenty feed the TACE merge, which is Part 36's job -- they
+	# stay in the load order until it exists.
+	"Add some flavor - Talos bridge.esp",
+	"Enhanced Cyrodiil - Cities.esp",
+	"Add some flavor - city gates - without IC.esp",
+	"Cheydinhal Castle Courtyard.esp",
+	"Cheydinhal Peach Tree Island.esp",
+	"CheydinhalGarden.esp",
+	"Chorrol Castle Courtyard.esp",
+	"ChorrolGreatOakReplacer.esp",
+	"Chorrol Park.esp",
+	"Chorrol LCH.esp",
+	"Falling leaves Chorrol.esp",
+	"SkingradDeuglified.esp",
+	"Skingrad Castle Courtyard.esp",
+	"Anvil the city of Dibella.esp",
+	"Anvil_MorningGlory_Mixed.esp",
+	"Falling Rubbish Bravil.esp",
+	"Falling Pollen Leyawiin.esp",
+	"Slightly Different Bruma.esp",
+	"Bruma Greenhouses.esp",
+	"Gardens of Cyrodill-Knights of the Thorn Lodge.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -7338,3 +7360,239 @@ type = "merge"
     { mod = "Better Fort Vlastarus", plugin = "Unique Forts Fort Vlastarus.esp" },
     { mod = "MOFAM - UFM Consistency Patch", plugin = "UFM Consistency Patch.esp" },
   ]
+
+# ── Part 26b - TOWN & CITY EXTRAS (TACE) ────────────────────────────────────
+#
+# "Enjoy a one-plugin merge of all of the below." All twenty rows are sources
+# for the TACE merge, which is Part 36 row 6 and is built there -- not here.
+#
+# An earlier attempt built it at this point, to keep the load order under 255.
+# It cannot be: TACE's consistency patch takes `Tales of Cyrodiil.esp` as a
+# master, and that is Part 28 row 37. The merge has to wait for its own
+# section, so these twenty plugins stay in the load order until then and the
+# list runs over the limit in the meantime. See notes/part-26b.
+
+[[mods]]
+id = "Add some flavor - Talos Bridge"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Add some flavor - Talos bridge.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52658/1000037987"
+download_handler = "nexus"
+file_name = "Add some flavor - Talos bridge-52658-1-5-1710020012.zip"
+
+# Guide 2 [MI]: "right click Enhanced Cyrodiil - Cities > Standard folder &
+# select Set as \ directory". The archive also ships an Alternative build.
+[[mods]]
+id = "Enhanced Cyrodiil - Cities"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Enhanced Cyrodiil - Cities.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47205/1000014911"
+download_handler = "nexus"
+file_name = "Cities Enhanced-47205-.zip"
+layout = "custom-data-folder"
+data_folder = "Enhanced Cyrodiil - Cities/Standard"
+
+[[mods]]
+id = "Add some flavor - city gates"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Add some flavor - city gates - without IC.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52564/1000033384"
+download_handler = "nexus"
+file_name = "Add some flavor - city gates - without IC-52564-1-2-1673002927.zip"
+
+# Guide 4, 7 and 13: three separate downloads from one mod page, a castle
+# courtyard each.
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Cheydinhal"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Cheydinhal Castle Courtyard.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54179/1000038767"
+download_handler = "nexus"
+file_name = "Cheydinhal Castle Courtyard-54179-1-0-1719842072.7z"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Cheydinhal Peach Tree Island"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Cheydinhal Peach Tree Island.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54050/1000038447"
+download_handler = "nexus"
+file_name = "Cheydinhal Peach Tree Island-54050-1-0-1716730360.7z"
+
+[[mods]]
+id = "Cheydinhal Garden"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["CheydinhalGarden.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49544/1000022701"
+download_handler = "nexus"
+file_name = "Cheydinhal Garden-49544-1-0-1564772910.zip"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Chorrol"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Chorrol Castle Courtyard.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54179/1000038994"
+download_handler = "nexus"
+file_name = "Chorrol Castle Courtyard-54179-1-0-1722334208.7z"
+
+# Guide 8 [MI]: "Right click 01 Classic Bark & select Set as Data Directory."
+# Four bark variants ship; the guide takes the first.
+[[mods]]
+id = "Chorrol Great Oak Replacer"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["ChorrolGreatOakReplacer.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46950/1000016332"
+download_handler = "nexus"
+file_name = "Chorrol Great Oak Replacer-46950-1-1.rar"
+layout = "custom-data-folder"
+data_folder = "Chorrol Great Oak Replacer/01 Classic Bark"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Chorrol Park"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Chorrol Park.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53900/1000038074"
+download_handler = "nexus"
+file_name = "Chorrol Park-53900-0-5-1711277661.7z"
+
+# Guide 10: a BAIN package, "select: 00 Core, 01 Vanilla". The other two 01
+# options are Better Cities and Open Cities builds of the same plugin.
+[[mods]]
+id = "Chorrol Lower Class Houses"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Chorrol LCH.esp"]
+
+[[mods.archives]]
+path = "manual:Chorrol Lower Class Houses.7z"
+layout = "bain"
+bain_subpackages = ["00 Core", "01 Vanilla"]
+
+[[mods]]
+id = "Falling Leaves Chorrol - Project Ambience"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Falling leaves Chorrol.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46462/1000011703"
+download_handler = "nexus"
+file_name = "Falling Leaves Chorrol - Project Ambience-46462-0-1.rar"
+
+# Guide 12 [QAC]: the MOO Compatibility main file. The guide then asks for
+# three wild edits to be removed in xEdit -- a cell block, a reference and a
+# sub-block override. mudcrab has no scripted record deletion, so that step is
+# NOT applied; the same gap as Part 26a row 6.
+[[mods]]
+id = "People Live Here - Skingrad Enhancement Mod"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["SkingradDeuglified.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52456/1000032767"
+download_handler = "nexus"
+file_name = "MOO Compatibility-52456-v1-0-1668149861.zip"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Castle Courtyards - Skingrad"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Skingrad Castle Courtyard.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54179/1000038879"
+download_handler = "nexus"
+file_name = "Skingrad Castle Courtyard-54179-1-0-1721138607.7z"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Anvil the city of Dibella"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Anvil the city of Dibella.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54371/1000039271"
+download_handler = "nexus"
+file_name = "Anvil the city of Dibella-54371-0-9-1725300330.7z"
+
+# Guide 15 [MI] [QAC]: "Right-click Data & set as Data Directory, then deselect
+# every esp except Anvil_MorningGlory_Mixed." Four colour variants ship.
+[[mods]]
+id = "Anvil Morning Glory"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Anvil_MorningGlory_Mixed.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/19039/28951"
+download_handler = "nexus"
+file_name = "Anvil Morning Glory-19039.7z"
+layout = "custom-data-folder"
+data_folder = "Anvil Morning Glory/Data"
+exclude = [
+  "Anvil_MorningGlory_Blue.esp",
+  "Anvil_MorningGlory_Orange.esp",
+  "Anvil_MorningGlory_Purple.esp",
+]
+
+[[mods]]
+id = "Falling Rubbish Bravil - Project Ambience"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Falling Rubbish Bravil.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46467/1000011716"
+download_handler = "nexus"
+file_name = "Falling Rubbish Bravil -Project Ambience-46467-0-1.rar"
+
+[[mods]]
+id = "Falling Pollen Leyawiin - Project Ambience"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Falling Pollen Leyawiin.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46463/1000011704"
+download_handler = "nexus"
+file_name = "Falling Pollen Leyawiin - Project Ambience-46463-0-1.rar"
+
+[[mods]]
+id = "Slightly Different Bruma"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Slightly Different Bruma.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54442/1000039461"
+download_handler = "nexus"
+file_name = "Slightly Different Bruma-54442-0-3-1727054843.zip"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Bruma Greenhouses"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Bruma Greenhouses.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54002/1000038341"
+download_handler = "nexus"
+file_name = "Bruma Greenhouses-54002-1-01-1714986606.7z"
+
+[[mods]]
+id = "Gardens of Cyrodiil - Knights of the Thorn Lodge"
+section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
+plugins = ["Gardens of Cyrodill-Knights of the Thorn Lodge.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54522/1000040546"
+download_handler = "nexus"
+file_name = "Gardens of Cyrodill-Knights of the Thorn Lodge-54522-1-1-1737301278.7z"
