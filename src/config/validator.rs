@@ -178,6 +178,18 @@ fn validate_merges(
             _ => {}
         }
 
+        // An empty mod that declares content is a contradiction, and the
+        // contradiction always resolves the wrong way: install writes the
+        // folder and silently ignores everything else the entry asked for.
+        if spec.mod_type == Some(ModType::Empty)
+            && (!spec.archives.is_empty() || !spec.files.is_empty() || !spec.plugins.is_empty())
+        {
+            anyhow::bail!(
+                "mod {mod_id} has type = \"empty\" but declares archives, files or plugins; an \
+                 empty mod is the folder and nothing else"
+            );
+        }
+
         let Some(merge) = &spec.merge else { continue };
 
         if !spec.archives.is_empty() || !spec.files.is_empty() {
