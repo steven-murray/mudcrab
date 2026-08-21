@@ -844,7 +844,7 @@ fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentD
             oracle_size: oracle.size,
             ours_sha256: None,
             oracle_sha256: None,
-            note: describe_bsa_difference(&ours.path, &oracle.path),
+            note: describe_difference(&ours.path, &oracle.path),
         }));
     }
 
@@ -870,8 +870,31 @@ fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentD
         oracle_size: oracle.size,
         ours_sha256: Some(ours_sha256),
         oracle_sha256: Some(oracle_sha256),
-        note: describe_bsa_difference(&ours.path, &oracle.path),
+        note: describe_difference(&ours.path, &oracle.path),
     }))
+}
+
+/// The file name a hidden plugin would have if it were not hidden.
+///
+/// MO2 hides a plugin by appending `.mohidden` rather than moving it, so the
+/// real extension is one component further in.
+fn visible_name(path: &Path) -> Option<String> {
+    let name = path.file_name()?.to_str()?;
+    Some(match name
+        .to_ascii_lowercase()
+        .strip_suffix(crate::config::mo2::MO2_HIDDEN_SUFFIX)
+    {
+        Some(_) => name[..name.len() - crate::config::mo2::MO2_HIDDEN_SUFFIX.len()].to_string(),
+        None => name.to_string(),
+    })
+}
+
+/// What kind of file is this, and what does that let us say about the difference?
+///
+/// One place to add a format to, rather than a chain of `or_else` at each of
+/// the two call sites.
+fn describe_difference(ours: &Path, oracle: &Path) -> Option<String> {
+    describe_bsa_difference(ours, oracle).or_else(|| describe_plugin_difference(ours, oracle))
 }
 
 /// Say what two differing BSAs differ *in*, rather than only that they do.
@@ -958,6 +981,135 @@ fn describe_bsa_difference(ours: &Path, oracle: &Path) -> Option<String> {
             "file flags {:#06x} vs {:#06x}",
             ours_bsa.file_flags, oracle_bsa.file_flags
         ));
+    }
+
+    Some(parts.join("; "))
+}
+
+/// Say what two differing plugins differ *in*.
+///
+/// The counterpart to `describe_bsa_difference`, and needed for the same
+/// reason: a plugin is a container, and two of them can differ in the header's
+/// version-control words, in record order, or in one edited value, and the file
+/// size says nothing about which. Every merge in Part 36 and every `[QAC]` row
+/// lands here, so without this each one costs a manual xEdit session to reach
+/// an answer the bytes already contain.
+///
+/// Records are keyed by FormID and valued by a digest of their fields, so a
+/// record that moved and a record that changed are told apart -- and so are
+/// records present on only one side.
+///
+/// Returns `None` for anything that is not a readable plugin. An unreadable one
+/// is a difference worth leaving unexplained rather than papering over.
+fn describe_plugin_difference(ours: &Path, oracle: &Path) -> Option<String> {
+    // `.mohidden` has to come off first. A merge's source plugins are hidden on
+    // both sides the moment the merge exists, so the files whose difference most
+    // needs explaining are precisely the ones whose extension is no longer
+    // `.esp` -- and reading the extension straight would skip every one of them.
+    let is_plugin = |path: &Path| {
+        visible_name(path).is_some_and(|name| {
+            let lower = name.to_ascii_lowercase();
+            lower.ends_with(".esp") || lower.ends_with(".esm")
+        })
+    };
+    if !is_plugin(ours) || !is_plugin(oracle) {
+        return None;
+    }
+
+    let ours_plugin = crate::plugin::Plugin::read(ours).ok()?;
+    let oracle_plugin = crate::plugin::Plugin::read(oracle).ok()?;
+
+    let index = |plugin: &crate::plugin::Plugin| -> BTreeMap<u32, [u8; 32]> {
+        plugin
+            .records()
+            .map(|record| {
+                let mut hasher = Sha256::new();
+                hasher.update(record.signature);
+                for field in record.fields() {
+                    hasher.update(field.signature);
+                    hasher.update(&field.data);
+                }
+                (record.form_id.0, hasher.finalize().into())
+            })
+            .collect()
+    };
+    let ours_index = index(&ours_plugin);
+    let oracle_index = index(&oracle_plugin);
+
+    let only_ours = ours_index
+        .keys()
+        .filter(|id| !oracle_index.contains_key(*id))
+        .count();
+    let only_oracle = oracle_index
+        .keys()
+        .filter(|id| !ours_index.contains_key(*id))
+        .count();
+    let changed = ours_index
+        .iter()
+        .filter(|(id, digest)| oracle_index.get(*id).is_some_and(|other| other != *digest))
+        .count();
+
+    let mut parts = Vec::new();
+    if only_ours + only_oracle + changed == 0 {
+        parts.push(format!("same {} records, same contents", ours_index.len()));
+    } else {
+        if only_ours > 0 {
+            parts.push(format!("{only_ours} records only in ours"));
+        }
+        if only_oracle > 0 {
+            parts.push(format!("{only_oracle} records only in the oracle"));
+        }
+        if changed > 0 {
+            parts.push(format!("{changed} records differ"));
+        }
+        parts.push(format!(
+            "{} vs {} records",
+            ours_index.len(),
+            oracle_index.len()
+        ));
+    }
+
+    // Masters are the other half of a plugin's identity: same records against a
+    // different master list is a different plugin, and the record digests alone
+    // would not say so.
+    let names = |plugin: &crate::plugin::Plugin| -> Vec<String> {
+        plugin
+            .masters
+            .masters()
+            .iter()
+            .map(|name| name.as_str().to_ascii_lowercase())
+            .collect()
+    };
+    let ours_masters = names(&ours_plugin);
+    let oracle_masters = names(&oracle_plugin);
+    if ours_masters != oracle_masters {
+        let missing: Vec<&String> = oracle_masters
+            .iter()
+            .filter(|name| !ours_masters.contains(name))
+            .collect();
+        let extra: Vec<&String> = ours_masters
+            .iter()
+            .filter(|name| !oracle_masters.contains(name))
+            .collect();
+        if missing.is_empty() && extra.is_empty() {
+            parts.push("same masters, different order".to_string());
+        } else {
+            parts.push(format!(
+                "masters differ ({} vs {}{}{})",
+                ours_masters.len(),
+                oracle_masters.len(),
+                if extra.is_empty() {
+                    String::new()
+                } else {
+                    format!("; only ours: {}", extra.iter().copied().cloned().collect::<Vec<_>>().join(", "))
+                },
+                if missing.is_empty() {
+                    String::new()
+                } else {
+                    format!("; only oracle: {}", missing.iter().copied().cloned().collect::<Vec<_>>().join(", "))
+                },
+            ));
+        }
     }
 
     Some(parts.join("; "))
