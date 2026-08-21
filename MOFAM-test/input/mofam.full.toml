@@ -343,6 +343,41 @@ plugins = [
 	"DaedraShrinesProddedWithAStick.esp",
 	"CulusTheMighty.esp",
 	"ShiveringIslesTrainersPartial.esp",
+	# Part 28. Nine of these are Prebash merge sources, hidden in the Oracle and
+	# active here until Part 36.
+	"ProgressTracker.esp",
+	"CIBFilterPatch.esp",
+	"CIBLppSupport.esp",
+	"Oblivion Content Restoration Project.esp",
+	"Oblivion Content Restoration Project -- Knights.esp",
+	"DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp",
+	"DispMiscPatch_OCRP_VGR_Patch.esp",
+	"The Lost Spires.esp",
+	"The Lost Spires - Cleaned Up Scribe.esp",
+	"The Lost Spires - Assorted Fixes.esp",
+	"The Lost Spires - NPC AI Addon.esp",
+	"Bashed Delayers - MERGE ONLY.esp",
+	"The Ayleid Steps.esp",
+	"The Ayleid Steps - Voiced Addon.esp",
+	"The Ayleid Steps - The Guardian's Atlas.esp",
+	"The Ayleid Steps - Patches.esp",
+	"BrotherhoodRenewed.esp",
+	"Better Dark Brotherhood Sanctuary.esp",
+	"thievery.esp",
+	"Bounty Quests.esp",
+	"No More Wild Goose Chases.esp",
+	"lSinderion's Serendipity.esp",
+	"SM Plugin Refurbish Lite.esp",
+	"SM Plugin Refurbish Lite OBSE.esp",
+	"SM Plugin Refurbish Lite Knights Infamy.esp",
+	"DaedricRequirements.esp",
+	"Shivering Isles - New Dukes.esp",
+	"HackdirtTheDeepOnes.esp",
+	"TheWellOfMinlorada.esp",
+	"AFK_Weye.esp",
+	"DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp",
+	"AFK_Weye - Typo and Grammatical Patch.esp",
+	"Tales of Cyrodiil.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -7745,3 +7780,488 @@ plugins = ["ShiveringIslesTrainersPartial.esp"]
 path = "nexus:oblivion/50718/1000026660"
 download_handler = "nexus"
 file_name = "Shivering Isles Trainers (Partial)-50718-1-1-1610913491.zip"
+
+# ── Part 28 - NEW & MODIFIED QUESTS ─────────────────────────────────────────
+
+# Guide 1-4: the Progress Tracker suite.
+#
+# The guide's packaging instructions for rows 2 and 4 -- "create a new folder
+# called 'ini', within it another called 'progresstracker', cut & paste the
+# ini's from the root into it" -- describe archives that no longer exist. Every
+# one of the four now ships its INIs already under `ini/ProgressTracker`, so
+# there is nothing to move. See report 2.
+[[mods]]
+id = "Progress Tracker - Quest Completionist's Companion"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["ProgressTracker.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53328/1000039146"
+download_handler = "nexus"
+file_name = "Progress Tracker-53328-1-6-3-1724436363.zip"
+
+[[mods]]
+id = "Quest INIs for Progress Tracker"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53886/1000041900"
+download_handler = "nexus"
+file_name = "Progress Tracker INIs-53886-1-0-4-1747340458.zip"
+
+# Guide 3: "optional MO2 file" -- already packaged for MO2, hence the name.
+[[mods]]
+id = "Progress Tracker Ini Mod Compendium"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53942/1000039489"
+download_handler = "nexus"
+file_name = "Ini Mod Compendium MO2-53942-1-1-1727300580.rar"
+
+[[mods]]
+id = "Progress Tracker - Even more Quest INIs"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54885/1000041140"
+download_handler = "nexus"
+file_name = "Progress Tracker - Even more INIs-54885-1-1741976691.zip"
+
+# Guide 5: a BAIN wizard package. The guide's four option answers resolve to
+# both subpackages; the remaining answers drive INI tweaks the wizard writes,
+# which mudcrab has no wizard engine for.
+[[mods]]
+id = "Configuration Items Begone"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["CIBFilterPatch.esp", "CIBLppSupport.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53354/1000036097"
+download_handler = "nexus"
+file_name = "CIB_BAIN_WIZARDv-53354-0-3-1694429943.7z"
+layout = "bain"
+bain_subpackages = ["00_CIB_FILTER_PATCH", "01_LPP_SUPPORT"]
+
+# Guide 6: "main file + optional file, install separately".
+[[mods]]
+id = "Oblivion Content Restoration Project"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Oblivion Content Restoration Project.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45909/1000014694"
+download_handler = "nexus"
+file_name = "Oblivion Content Restoration Project-45909-1-3.7z"
+
+[[mods]]
+id = "Oblivion Content Restoration Project - Knights"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Oblivion Content Restoration Project -- Knights.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45909/1000014695"
+download_handler = "nexus"
+file_name = "Oblivion Content Restoration Project -- Knights-45909-1-0.7z"
+
+# Guide 7: one folder out of the Dispensation collection.
+[[mods]]
+id = "Oblivion Content Restoration Project Patches"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = [
+  "DispMiscPatch_OCRP - Original Brown Leather Armor Restored.esp",
+  "DispMiscPatch_OCRP_VGR_Patch.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "custom-data-folder"
+data_folder = "Oblivion Content Restoration Project Patches"
+
+# Guide 8 [QAC]: hosted on the Internet Archive, not Nexus.
+[[mods]]
+id = "The Lost Spires"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Lost Spires.esp"]
+
+[[mods.archives]]
+path = "manual:thelostspiresv14.zip"
+
+[[mods]]
+id = "The Lost Spires - Cleaned Up Scribe Store Ruins"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Lost Spires - Cleaned Up Scribe.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50146/1000040323"
+download_handler = "nexus"
+file_name = "The Lost Spires - Cleaned Up Scribe Store-50146-1-1-1735968579.zip"
+
+# Guide 10: "LS - Assorted Fixes".
+[[mods]]
+id = "The Lost Spires - Tweaks and Enhancements"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Lost Spires - Assorted Fixes.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51037/1000027717"
+download_handler = "nexus"
+file_name = "LS - Assorted Fixes-51037-1-0-1620655097.7z"
+
+[[mods]]
+id = "The Lost Spires - NPC AI Addon"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Lost Spires - NPC AI Addon.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52833/1000034145"
+download_handler = "nexus"
+file_name = "The Lost Spires - NPC AI Addon-52833-3-1-1679651454.7z"
+
+# Guide 12: textures only.
+[[mods]]
+id = "Lost Spires Archaeology Guild Robe fix"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49343/1000021986"
+download_handler = "nexus"
+file_name = "LS Archaeology Guild Robe fix-49343-1-0-1557278667.7z"
+
+# Guide 13: "Aellis Bashed Delayers v3129C". The plugin's own name says it is
+# for merging, and Part 36's Prebash is where it goes.
+[[mods]]
+id = "Bash-able Quest Delayers"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Bashed Delayers - MERGE ONLY.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/25946/88141"
+download_handler = "nexus"
+file_name = "Aellis Bashed Delayers v3129C-25946-3-1-29-C.7z"
+
+# Guide 14: "main file only".
+[[mods]]
+id = "The Ayleid Steps"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Ayleid Steps.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/16316/1000036700"
+download_handler = "nexus"
+file_name = "The Ayleid Steps-16316-3-8-4-1698602854.7z"
+
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - The Ayleid Steps"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Ayleid Steps - Voiced Addon.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52772/1000035348"
+download_handler = "nexus"
+file_name = "The Ayleid Steps - Voiced Addon BSA-52772-1-2-1688995650.7z"
+
+[[mods]]
+id = "The Ayleid Steps - The Guardian's Atlas"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Ayleid Steps - The Guardian's Atlas.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51923/1000030896"
+download_handler = "nexus"
+file_name = "The Ayleid Steps - The Guardian's Atlas.esp-51923-1-1650275152.7z"
+
+[[mods]]
+id = "The Ayleid Steps - Compatibility Patches"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["The Ayleid Steps - Patches.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47142/1000038320"
+download_handler = "nexus"
+file_name = "The Ayleid Steps - Compatibility Patches-47142-1-5-1-1714673704.rar"
+
+# Guide 18: "Once installed delete the Sound > Voice folder."
+[[mods]]
+id = "BrotherhoodRenewed"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["BrotherhoodRenewed.esp"]
+
+[[mods.archives]]
+path = "manual:BrotherhoodRenewed.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["sound/voice"]
+
+# Guide 19a: BAIN, "00 Core Files (Required)" + "01 Cobl Version". The Cobl
+# build replaces the core plugin, which is what listing it second means.
+[[mods]]
+id = "Better Dark Brotherhood Sanctuary"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Better Dark Brotherhood Sanctuary.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/22135/1000015621"
+download_handler = "nexus"
+file_name = "Better Dark Brotherhood Sanctuary-22135-3-41-000.7z"
+layout = "bain"
+bain_subpackages = ["00 Core Files (Required)", "01 Cobl Version"]
+
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - Better Dark Brotherhood"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52772/1000035495"
+download_handler = "nexus"
+file_name = "Better Dark Brotherhood Sanctuary - Voiced Addon-52772-1-0-1690121647.7z"
+
+# Guide 20: "main file".
+[[mods]]
+id = "Thievery in the Imperial City - Tweaks and Fixes"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["thievery.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52785/1000033941"
+download_handler = "nexus"
+file_name = "Thievery in the Imperial City - Tweaks and Fixes-52785-2-0-1678424898.7z"
+
+# Guide 21: "Once installed delete the Bounty Quests OOO Patch.esp".
+#
+# The Oracle keeps that plugin instead, as a mod of its own. Ours follows the
+# guide and deletes it, so the Oracle has a mod we do not; see report 1.
+[[mods]]
+id = "Bounty Quests Fixed and Polished"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Bounty Quests.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48330/1000037053"
+download_handler = "nexus"
+file_name = "Bounty Quests Version 3.0 Installation Files-48330-3-0-1701382589.7z"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["Bounty Quests OOO Patch.esp"]
+
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - Bounty Quests"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52772/1000034112"
+download_handler = "nexus"
+file_name = "Bounty Quests Fixed and Polished - Voiced Addon BSA-52772-1-0-1679400749.7z"
+
+[[mods]]
+id = "No More Wild Goose Chases - Re-Patched and UOP Fixes Applied"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["No More Wild Goose Chases.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49958/1000029150"
+download_handler = "nexus"
+file_name = "No More Wild Goose Chases - Re-Patched and UOP Fixes Applied-49958-1-1-1632222396.7z"
+
+[[mods]]
+id = "Sinderion's Serendipity - Nirnroot Quest Reward"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["lSinderion's Serendipity.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50129/1000024925"
+download_handler = "nexus"
+file_name = "Sinderion's Serendipidy-50129-1-2-1591046256.7z"
+
+# Guide 25: BAIN, three subpackages.
+[[mods]]
+id = "SM DLC Plugin Refurbish"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = [
+  "SM Plugin Refurbish Lite.esp",
+  "SM Plugin Refurbish Lite OBSE.esp",
+  "SM Plugin Refurbish Lite Knights Infamy.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/11474/1000033964"
+download_handler = "nexus"
+file_name = "SM DLC Plugin Refurbish-11474-2-1-2-1678633322.zip"
+layout = "bain"
+bain_subpackages = [
+  "00 Full Lite Plugin",
+  "01 OBSE Level Plugin",
+  "02 Compatability Plugins",
+]
+
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - SM DLC REfurbish"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52772/1000033902"
+download_handler = "nexus"
+file_name = "SM DLC Plugin Refurbish - Voiced Addon BSA-52772-1-1-1677981985.7z"
+
+# Guide 27: "Once installed delete DaedricRequirementsEASY.esp."
+[[mods]]
+id = "Fame Based Daedric Quest Requirements"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["DaedricRequirements.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/42614/1000024481"
+download_handler = "nexus"
+file_name = "Fame Based Daedric Quest Requirements-42614-1-2-1586820634.zip"
+
+[[mods.actions]]
+action = "file_prune"
+paths = ["DaedricRequirementsEASY.esp"]
+
+[[mods]]
+id = "Shivering Isles - New Dukes"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Shivering Isles - New Dukes.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50047/1000028502"
+download_handler = "nexus"
+file_name = "Shivering Isles - New Dukes-50047-0-4-3-1627300513.zip"
+
+# Guide 29 [MI]: "right click the HackdirtTheDeepOnes3.3 > Data folder and
+# select Set as \ directory". The archive on this machine is 3.5, so the folder
+# is named for that; 3.3 is not here. Post-guide by nine months.
+[[mods]]
+id = "Hackdirt The Deep Ones"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["HackdirtTheDeepOnes.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/36224/1000043699"
+download_handler = "nexus"
+file_name = "Hackdirt The Deep Ones 3.5-36224-3-5-1766515330.7z"
+layout = "custom-data-folder"
+data_folder = "HackdirtTheDeepOnes3.5/Data"
+
+[[mods]]
+id = "The Well of Minlorada"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["TheWellOfMinlorada.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/38816/92921"
+download_handler = "nexus"
+file_name = "The Well of Minlorada v1_2-38816-1-2.rar"
+
+[[mods]]
+id = "AI Voice Addon for The Well of Minlorada"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53401/1000036268"
+download_handler = "nexus"
+file_name = "AI Voice Addon for The Well of Minlorada (11Labs)-53401-1-1-1695577318.rar"
+
+# Guide 32-33: AFK_Weye, and the combine/repack the guide spells out over five
+# bullets -- unpack the mod's own BSA, overlay mod 33's voices, repack, delete
+# the loose folders, disable mod 33.
+#
+# Modelled the same way Part 25's villages are: one mod, two archives, then
+# `extract_bsa` and `pack_bsa`. mudcrab folds directory names to lowercase on
+# the way in, so mod 33's `Sound/Voice/AFK_Weye.esp/` and the BSA's
+# `sound/voice/afk_weye.esp/` land on the same path and genuinely overlay.
+#
+# **They do not in the Oracle.** Both spellings are present there as separate
+# directories -- 367 files under one, 7892 under the other -- because BAE wrote
+# lowercase and the copy kept its own casing, which on a case-sensitive
+# filesystem is not a replace. The repack was not done either; there is no BSA.
+# So ours differs from the Oracle here on purpose. See report 1.
+[[mods]]
+id = "AFK_Weye"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["AFK_Weye.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/22828/87365"
+download_handler = "nexus"
+file_name = "AFK_Weye Version 2_32-22828-2-32.rar"
+layout = "bain"
+bain_subpackages = ["00 Core", "01 COBL"]
+
+# Guide 33's archive, overlaid second so its voices win.
+[[mods.archives]]
+path = "nexus:oblivion/54851/1000042684"
+download_handler = "nexus"
+file_name = "AFK Weye Voices (ElevenLabs)-54851-1-5-1757231332.7z"
+
+[[mods.actions]]
+action = "extract_bsa"
+archive = "AFK_Weye.bsa"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "AFK_Weye.bsa"
+prune_packed = true
+
+[[mods]]
+id = "AFK_Weye Manor VWD"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/49322/1000021895"
+download_handler = "nexus"
+file_name = "AFK_Weye manor VWD low-49322-1-0-1556234402.7z"
+
+# Guide 35: "Select just 'AFK_Weye - Reworked Posts Patch' & name the mod
+# Miscellaneous Patch Collection by Dispensation - AFK Weye".
+[[mods]]
+id = "Miscellaneous Patch Collection by Dispensation - AFK Weye"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "custom-data-folder"
+data_folder = "AFK_Weye - Reworked Posts Patch"
+
+[[mods]]
+id = "AFK_Weye - Typo and Grammatical Patch"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["AFK_Weye - Typo and Grammatical Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52800/1000033972"
+download_handler = "nexus"
+file_name = "AFK_Weye - Typo and Grammatical Patch-52800-0-1-1678686531.7z"
+
+[[mods]]
+id = "Tales of Cyrodiil"
+section = ["28 - NEW & MODIFIED QUESTS"]
+plugins = ["Tales of Cyrodiil.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48792/1000023186"
+download_handler = "nexus"
+file_name = "Tales of Cyrodiil 1.04-48792-1-04-1572831613.zip"
+
+# Guide 38: "Once installed pack the sound folder using BSArch & name the
+# archive 'Tales of Cyrodiil.bsa' & delete the loose Sound folder."
+[[mods]]
+id = "Tales of Cyrodiil Voices (ElevenLabs)"
+section = ["28 - NEW & MODIFIED QUESTS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54825/1000040595"
+download_handler = "nexus"
+file_name = "Tales of Cyrodiil Voices (ElevenLabs)-54825-1-0-1737572556.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "Tales of Cyrodiil.bsa"
+prune_packed = true
