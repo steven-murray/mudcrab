@@ -7485,6 +7485,10 @@ path = "nexus:oblivion/54371/1000039271"
 download_handler = "nexus"
 file_name = "Anvil the city of Dibella-54371-0-9-1725300330.7z"
 
+[[mods.actions]]
+action = "qac"
+plugins = ["Anvil the city of Dibella.esp"]
+
 # Guide 15 [MI] [QAC]: "Right-click Data & set as Data Directory, then deselect
 # every esp except Anvil_MorningGlory_Mixed." Four colour variants ship.
 [[mods]]
@@ -7503,6 +7507,10 @@ exclude = [
   "Anvil_MorningGlory_Orange.esp",
   "Anvil_MorningGlory_Purple.esp",
 ]
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Anvil_MorningGlory_Mixed.esp"]
 
 [[mods]]
 id = "Falling Rubbish Bravil - Project Ambience"
