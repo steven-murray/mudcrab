@@ -6,7 +6,7 @@ guide's row asks. Nothing here fails; each one succeeds and leaves the instance
 slightly short of the guide, which is exactly why it needs writing down rather
 than trusting to a diff that has other things to say.
 
-Kept current as sections are built. Last updated after Part 31.
+Kept current as sections are built. Last updated after Part 32.
 
 ---
 
@@ -115,27 +115,36 @@ has to be sane, not correct.
 Not mudcrab gaps — things in `MOFAM-03.25` that a re-check on 2026-08-21 found
 still outstanding after Steven's fixing pass.
 
-### C1. `AKF Weye.bsa` is misnamed and will not load
+### C1. `AFK Weye.bsa` is still misnamed and will not load
 
-The AFK Weye repack landed — 246 MB, built 22:26 — under the name
-**`AKF Weye.bsa`**. The `F` and `K` are transposed.
+The transposed `AKF` is fixed — the file is now **`AFK Weye.bsa`**, 246,570,540
+bytes. But the separator is a **space**, and the plugin is `AFK_Weye.esp`, with
+an **underscore**.
 
-Oblivion loads `<plugin stem>.bsa` for an active plugin. The plugin is
-`AFK_Weye.esp`, so the engine looks for `AFK_Weye.bsa` and finds nothing;
-`AKF Weye.bsa` is referenced by nothing in the profile. **The whole repack is
-inert** — every mesh, texture and voice line in it is invisible to the game.
+Oblivion loads any BSA whose filename *starts with* an active plugin's stem.
+That rule was checked against this very instance rather than assumed: of the 237
+plugin stems in the profile, 13 BSAs have no exactly-matching stem, and 12 of
+them load because of the prefix rule —
 
-Renaming it to `AFK_Weye.bsa` is the entire fix.
+```
+Bounty Quests - Voiced Addon.bsa              <- Bounty Quests.esp
+DLCShiveringIsles - Faces.bsa                 <- DLCShiveringIsles.esp
+Enhanced Grabbing - Assets.bsa                <- Enhanced Grabbing.esp
+Maskar's Oblivion Overhaul - Meshes.bsa       <- Maskar's Oblivion Overhaul.esp
+MergedLOD - LODs.bsa                          <- MergedLOD.esm
+SM Plugin Refurbish Lite - Voiced Addon.bsa   <- SM Plugin Refurbish Lite.esp
+The Ayleid Steps2.bsa                         <- The Ayleid Steps.esp
+...and five more
+```
 
-### C2. Urasek's repack did not change its contents
+`AFK Weye.bsa` is the **only** BSA in the whole instance that begins with no
+plugin stem. `AFK_Weye` is not a prefix of `AFK Weye`.
 
-`Urasek.bsa` was rebuilt (22:00) but holds the same payload as before:
-63,083,533 bytes, which is the base mod's bytes for all 608 files the VA
-archive overlaps. Ours is 58,223,187 — the VA bytes, per the guide's
-"Replace All".
-
-Same file count, same paths, so the rebuild worked; the overlay order or the
-prompt answer is what did not.
+Renaming it to `AFK_Weye.bsa` is the entire fix. Anything starting `AFK_Weye`
+works — `AFK_Weye - Voices.bsa` would too — but the underscore is not optional.
+The loose folders are gone now, so unlike before the assets are not reaching the
+game by the loose path either: the mod currently contributes its plugin and
+nothing else.
 
 ### C3. Nine of Ultimate Leveling's fifteen edits are still unapplied
 
@@ -174,3 +183,6 @@ to 10 against the archive's 25.
 - ~~`migTrainingQ.bDisplaySkillNumbers`~~ — now 1, per the guide.
 - ~~Ultimate Leveling's `ini_xp_kill_companion` / `_pet` / `_follower`~~ — back
   to the archive's 50/50/50, matching ours.
+- ~~Urasek's repack kept the base mod's bytes~~ — repacked correctly on the
+  second pass. `mudcrab inspect` now reports 58,223,187 bytes of payload on both
+  sides, so the "Replace All" overlay took.
