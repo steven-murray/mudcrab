@@ -130,20 +130,49 @@ file) or copy the file in by hand.
 
 ## B. Deferred by choice, not by capability
 
-### B1. QAC — the whole list
+### B1. ~~QAC~~ — run, with nine plugins still unexplained
 
-30 rows in the guide carry `[QAC]` (Quick Auto Clean). The action exists and
-works; it is **commented out list-wide** to keep rebuilds fast, with a
-`TODO: uncomment this at the end!` at the top of `mofam.full.toml` and four
-`TODO(qac)` markers on specific rows.
+The pass has run list-wide: 26 mods, 36 plugins. **27 come out byte-identical
+to the Oracle's cleaned copies.** It is unattended — see
+`src/config/tools/xedit.rs` for how, and why it drives real xEdit rather than
+reimplementing "identical to master".
 
-**Effect if left**: every `[QAC]` mod's plugin keeps its ITMs and UDRs. This is
-the single largest source of "content differs" against the Oracle — Parts 26a
-and 26b alone account for 13 of them, each verified byte-identical to what its
-archive ships.
+Nine still differ, and they differ in **both directions**, so this is not one
+cause:
 
-**Fix**: uncomment before the final build. Budget the time; it is a plugin-load
-per marked row.
+| plugin | ours | Oracle |
+|---|---|---|
+| `DLCFrostcrag.esp` | 182563 | 129320 |
+| `Harvest [Flora] - DLCFrostcrag.esp` | 1120 | 800 |
+| `ImpeREAL City … Merged.esp` | 694227 | 655698 |
+| `SkingradDeuglified.esp` | 171647 | 171484 |
+| `EVE_StockEquipmentReplacer for OOO.esp` | 60545 | 60832 |
+| `All Natural - Real Lights.esp` | 2196163 | 2196260 |
+| `The Imperial Water.esp` | 20905 | 22343 |
+| `Nobody Goes into the Mountains but Hunters.esp` | 597139 | 724881 |
+| `The Lost Spires.esp` | 2820420 | 3043886 |
+
+**What is known about the largest of them.** `DLCFrostcrag.esp` holds 157
+records the Oracle's copy does not, and the Oracle's holds none ours lacks —
+a strict subset. Only **2** of the 157 are byte-identical to `Oblivion.esm`,
+so they are not ITMs. By type they are 134 REFR, 10 CELL, 5 LAND, 4 PGRD,
+which is the shape of a **cell or worldspace group deletion**, not of anything
+QuickAutoClean does. Its companion `Harvest [Flora] - DLCFrostcrag.esp` is the
+row that already carries a hand deletion in A2 ("remove the Worldspace
+group"), so a manual xEdit step on the Oracle side is the leading candidate —
+but that is a hypothesis, not a finding.
+
+`The Lost Spires` is the other big one: ours removed 87 records the Oracle
+kept and **443 records differ in content**, which is UDR undeletion, not ITM
+removal.
+
+**Effect if left**: the merges are close but not exact — TACE 8536 records
+against the Oracle's 8533, Prebash 4506 against 4505. Both were rebuilt on the
+cleaned sources.
+
+**Next step**: take the nine one at a time. The instrument is
+`mudcrab diff --only "<mod>"`, which now reports records unique to each side
+and records whose contents differ.
 
 ### B2. ~~LOOT / load order~~ — settled at Part 37
 
