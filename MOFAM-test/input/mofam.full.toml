@@ -445,6 +445,31 @@ plugins = [
 	"Cobl Glue - Bravil Barrel Fix.esp",
 	"PekCOBLBookJackets.esp",
 	"Cobl for DLC Homes.esp",
+	# Part 33. The four weightless/respawning plugins are Prebash merge sources
+	# and the two Improved Guild patches are Late Loaders ones; all six are hidden
+	# in the Oracle and active here until Part 36.
+	"SMO.esp",
+	"AutoHaggle.esp",
+	"za_bankmod.esp",
+	# Declared by both Crime has witnesses and its Responsibility Tweak: the tweak
+	# ships a plugin of the same name, so it replaces rather than adds.
+	"kuerteeCrimeHasWitnesses.esp",
+	"Reznod_Mannequin.esp",
+	"Enhanced Grabbing.esp",
+	"Take or Equip.esp",
+	"Convenient Open Spells.esp",
+	"AoG - Greed Arena.esp",
+	"Camping.esp",
+	"Note to Self.esp",
+	"QuestsMakeFriends.esp",
+	"WeightlessAmmoConsumablesPotions.esp",
+	"weightlessstones.esp",
+	"aesrespawningamberstumpsandmadnessoredeposits.esp",
+	"aesrespawninggoldandsilverveins.esp",
+	"Improved FG Patch.esp",
+	"Improved MG Patch.esp",
+	"SneakVignette.esp",
+	"DrowningVisuals.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -9080,3 +9105,343 @@ path = "nexus:oblivion/52047/1000031575"
 download_handler = "nexus"
 file_name = "Legacy of the Champion - Hobbit Home-52047-0-09b-1655329286.7z"
 include = ["Textures/Custom/3bears/porridge.dds", "Textures/Custom/3bears/porridge_n.dds"]
+
+# ---------------------------------------------------------------------------
+# Part 33 - GAMEPLAY & IMMERSIVE EXTRAS
+# ---------------------------------------------------------------------------
+
+# Guide 1: "Once installed delete the sound folder." That is 3234 of the
+# archive's 3238 files. The Oracle kept every one of them; the guide is followed
+# here and the difference is reported -- see the Part 33 note.
+[[mods]]
+id = "SupreMe Overhaul"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["SMO.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51073/1000029854"
+download_handler = "nexus"
+file_name = "SMO-51073-1-6-2-1640189859.zip"
+exclude = ["Sound/**"]
+
+# Guide 1 (companion): the ConScribe log settings from the guide's own mod page,
+# which switch on four of SupreMe Overhaul's systems. The archive is a packaged
+# MO2 mod folder, so its own meta.ini is dropped -- mudcrab writes that file.
+[[mods]]
+id = "MOFAM - ConsCribe Logs LINK Settings"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041297"
+download_handler = "nexus"
+file_name = "Consribe Logs MOFAM LINK Settings-52949-03-25-1743347504.zip"
+layout = "custom-data-folder"
+data_folder = "Consribe Logs MOFAM LINK Settings"
+exclude = ["**/meta.ini"]
+
+[[mods]]
+id = "AutoHaggle"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["AutoHaggle.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52532/1000038723"
+download_handler = "nexus"
+file_name = "AutoHaggle-52532-1-1-1-1719447110.rar"
+
+# Guide 3 + 4, as one mod.
+#
+# Row 3 is the "unusual" install: the download is a zip holding a 2006
+# self-extracting installer, and the guide has the user open the mod folder and
+# run the .exe by hand. Nothing needs running -- `inner_archive` names the
+# installer and its contents are laid out as the mod, with the container's
+# readme kept beside them. The row's optional "delete the .exe" is not optional
+# here: a container is never staged.
+#
+# Row 4 then copies the ElevenLabs voices over the base mod's, repacks
+# textures/meshes/sound into za_bankmod.bsa, deletes the loose folders and
+# disables the voices mod. That is this list's combine-and-repack shape, so the
+# voices are a second archive on this mod rather than a mod of their own: layer
+# order expresses "replace when prompted" and no disabled-mod state is needed.
+#
+# The BSA name matches the plugin stem, so the engine loads it.
+[[mods]]
+id = "Bank of Cyrodiil"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["za_bankmod.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/3172/2593"
+download_handler = "nexus"
+file_name = "Bank of Cyrodiil-3172.zip"
+inner_archive = "Bank of Cyrodiil 1-11.exe"
+
+# Guide 4: "Copy the Sound folder from mod 4 to mod 3, replacing when prompted."
+# 538 files against the base mod's 31, re-recorded.
+[[mods.archives]]
+path = "nexus:oblivion/54289/1000039031"
+download_handler = "nexus"
+file_name = "Bank of Cyrodiil Voices (ElevenLabs)-54289-1-0-1722766547.7z"
+
+[[mods.actions]]
+action = "pack_bsa"
+output = "za_bankmod.bsa"
+prune_packed = true
+
+# Guide 5: the ini edit, then "delete the omod conversion data folder". The
+# Oracle applied the edit and kept the folder; the guide is followed here.
+[[mods]]
+id = "Crime has witnesses"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["kuerteeCrimeHasWitnesses.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/22894/45765"
+download_handler = "nexus"
+file_name = "Crime has witnesses 0p63-22894.zip"
+exclude = ["omod conversion data/**"]
+
+[[mods.actions]]
+action = "ini_set"
+file = "ini/kuerteeCrimeHasWitnesses.ini"
+format = "set-to"
+key = "kCWWQuest.showWitnesses"
+value = 1
+
+# Guide 6: a replacement plugin of the same name, overriding row 5's by mod
+# order.
+[[mods]]
+id = "Crime Has Witnesses - Responsibility Tweak"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/33682/65549"
+download_handler = "nexus"
+file_name = "Crime Has Witness Responsibility Tweak-33682.rar"
+
+[[mods]]
+id = "Reznod Mannequins"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Reznod_Mannequin.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/2055/1527"
+download_handler = "nexus"
+file_name = "Reznod Mannequins-2055.zip"
+
+# Guide 8: ships its own two BSAs, both named to load off `Enhanced Grabbing.esp`.
+[[mods]]
+id = "Put it in its Place - Enhanced Grabbing"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Enhanced Grabbing.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/19847/58809"
+download_handler = "nexus"
+file_name = "PiiiP - Enhanced Grabbing v05-19847.7z"
+
+[[mods]]
+id = "Take or Equip"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Take or Equip.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52733/1000037736"
+download_handler = "nexus"
+file_name = "Take or Equip-52733-1-6-4-1707870346.zip"
+
+[[mods]]
+id = "Convenient Open Spells"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Convenient Open Spells.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53163/1000035390"
+download_handler = "nexus"
+file_name = "Convenient Open Spells-53163-1-0-1689385362.zip"
+
+# Guide 11a [QAC]: the two ini edits. The row names the file `GreedArena.ini`;
+# the archive ships `AoG - Greed Arena.ini` and there is no other. TODO(qac)
+[[mods]]
+id = "Greed Arena (AoG)"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["AoG - Greed Arena.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48277/1000018931"
+download_handler = "nexus"
+file_name = "Greed Arena (AoG)-48277-9.7z"
+
+[[mods.actions]]
+action = "ini_set"
+file = "AoG - Greed Arena.ini"
+format = "set-to"
+key = "aogArn.arena24"
+value = 1
+
+[[mods.actions]]
+action = "ini_set"
+file = "AoG - Greed Arena.ini"
+format = "set-to"
+key = "aogArn.corpseLoot"
+value = 1
+
+# Guide 11b: absent from the Oracle. The archive is on disk and the row is
+# unambiguous, so it is installed; see the Part 33 note.
+[[mods]]
+id = "Voiced Addons Collection for Mods (ElevenLabs) - Greed Arena"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52772/1000035494"
+download_handler = "nexus"
+file_name = "Greed Arena (AoG) - Voiced Addon Loose-52772-1-0-1690121540.7z"
+
+# Guide 12: also absent from the Oracle, same reasoning as 11b.
+[[mods]]
+id = "Camping"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Camping.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/37197/1000004483"
+download_handler = "nexus"
+file_name = "Camping 2_3-37197-.7z"
+exclude = ["omod conversion data/**"]
+
+[[mods]]
+id = "Note To Self"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Note to Self.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/37909/77810"
+download_handler = "nexus"
+file_name = "Note To Self-37909-1-0-0.zip"
+
+# Guide 14 [MI]: a bare esp, which MO2 flags as missing data and mudcrab simply
+# stages.
+[[mods]]
+id = "Quests make friends"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["QuestsMakeFriends.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51792/1000039773"
+download_handler = "nexus"
+file_name = "Quests make friends-51792-1-1-1730288420.7z"
+
+# Guide 15-17. All four plugins are Prebash merge sources, hidden in the Oracle
+# and active here until Part 36.
+[[mods]]
+id = "Weightless Arrows-Potions-Other Consumables"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["WeightlessAmmoConsumablesPotions.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47916/1000017347"
+download_handler = "nexus"
+file_name = "Weightless Arrows-Potions-Other Consumables-47916-1.7z"
+
+[[mods]]
+id = "Weightless Varla and Welkynd stones"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["weightlessstones.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51520/1000029488"
+download_handler = "nexus"
+file_name = "WeightlessStones-51520-1-0-1636108664.7z"
+
+[[mods]]
+id = "Respawning Hollowed Amber Stumps and Madness Ore Deposits"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["aesrespawningamberstumpsandmadnessoredeposits.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48056/1000017737"
+download_handler = "nexus"
+file_name = "Respawning Hollowed Amber Stumps and Madness Ore Deposits-48056-1-1.zip"
+
+# Guide 17: "main file + optional, install separately".
+[[mods]]
+id = "Respawning Hollowed Amber Stumps and Madness Ore Deposits - Gold and Silver"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["aesrespawninggoldandsilverveins.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48056/1000017736"
+download_handler = "nexus"
+file_name = "Respawning Gold and Silver Veins-48056-1-1.zip"
+
+# Guide 18: three of the Base Object Swapper integrations, installed separately.
+# Each archive is a single ini inside a `BaseObjectSwapper/` folder, which is
+# where the OBSE plugin reads its rules from -- so `simple` keeps the folder
+# rather than letting wrapper detection strip it. The Oracle's three copies sit
+# at the mod root instead; see the Part 33 note.
+[[mods]]
+id = "Base Object Swapper Integrations - COBL Food"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53877/1000037968"
+download_handler = "nexus"
+file_name = "Cobl - Food-53877-1-0-0-1709894957.7z"
+layout = "simple"
+
+[[mods]]
+id = "Base Object Swapper Integrations - OCRAFT Stations"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53877/1000037972"
+download_handler = "nexus"
+file_name = "OCRAFT - Stations-53877-1-0-0-1709895026.7z"
+layout = "simple"
+
+[[mods]]
+id = "Base Object Swapper Integrations - OOO Treasure"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53877/1000037967"
+download_handler = "nexus"
+file_name = "OOO - Treasure-53877-1-0-0-1709894942.7z"
+layout = "simple"
+
+# Guide 19: five of AsteriaSennall's fixes bundled by the guide author. Both
+# plugins are Late Loaders merge sources, hidden in the Oracle and active here
+# until Part 36. The archive is a packaged MO2 mod folder; its meta.ini is
+# dropped, as with the ConScribe settings above.
+[[mods]]
+id = "AsteriaSennall's MOFAM Fixes"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["Improved FG Patch.esp", "Improved MG Patch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000041299"
+download_handler = "nexus"
+file_name = "AsteriaSennall's MOFAM Fixes-52949-03-25-1743349970.zip"
+layout = "custom-data-folder"
+data_folder = "AsteriaSennall's MOFAM Fixes"
+exclude = ["**/meta.ini"]
+
+[[mods]]
+id = "Sneak Vignette"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["SneakVignette.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54862/1000040999"
+download_handler = "nexus"
+file_name = "Sneak Vignette-54862-1-1-1740789968.zip"
+
+[[mods]]
+id = "Drowning Visuals"
+section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
+plugins = ["DrowningVisuals.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/54926/1000041021"
+download_handler = "nexus"
+file_name = "Drowning Visuals-54926-1-0-1740869444.zip"
