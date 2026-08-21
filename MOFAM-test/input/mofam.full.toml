@@ -348,12 +348,11 @@ files = [
 	"%GAME_DIR%/OriginalESPs/Knights.esp",
 ]
 
-# Commenting this out for now to save time on re-builds
-# TODO: uncomment this at the end!
-# [[mods.actions]]
-# action = "qac"
-# # Glob patterns are resolved relative to this mod's staged data folder.
-# plugins = ["DLC*.esp", "Knights.esp"]
+# Part 1's whole point: these are the vanilla DLC plugins, cleaned. Glob
+# patterns resolve against this mod's staged folder.
+[[mods.actions]]
+action = "qac"
+plugins = ["DLC*.esp", "Knights.esp"]
 
 # ------------------------------
 # Part 2 - OBSE Plugins
@@ -1291,6 +1290,10 @@ section = ["UI & UX IMPROVEMENTS"]
 [[mods.archives]]
 path = "nexus:oblivion/48892/1000020672"
 
+[[mods.actions]]
+action = "qac"
+plugins = ["Marking the Landmarks.esp"]
+
 [[mods]]
 id = "Map Marker Overhaul"
 section = ["UI & UX IMPROVEMENTS"]
@@ -1468,6 +1471,10 @@ section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/5392/1000012637"
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Cliff_BetterLetters.esp"]
 
 [[mods]]
 id = "Better Scroll Background"
@@ -2476,9 +2483,9 @@ bain_subpackages = [
   "15 Equipment Replacer Lowerbody - Normal",
 ]
 
-# [[mods.actions]]
-# action = "qac"
-# plugins = ["EVE_StockEquipmentReplacer for OOO.esp"]
+[[mods.actions]]
+action = "qac"
+plugins = ["EVE_StockEquipmentReplacer for OOO.esp"]
 
 [[mods]]
 id = "Seamless - HGEC Female"
@@ -3135,8 +3142,11 @@ paths = ["NoMushroomStalks"]
 # a different thing -- scripted record deletion, which mudcrab cannot do yet and
 # which Parts 26a #6 and 26b #12 also need. Both plugins are Part 36 merge
 # sources, so nothing downstream depends on them until that merge is built.
-# TODO(qac): Harvest [Flora] - DLCFrostcrag.esp, Harvest [Flora] - Shivering Isles.esp
 # TODO(xedit): remove the Worldspace group from Harvest [Flora] - DLCFrostcrag.esp
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Harvest [Flora] - DLCFrostcrag.esp", "Harvest [Flora] - Shivering Isles.esp"]
 
 [[mods]]
 id = "Improved Flora Harvest Fix"
@@ -3247,7 +3257,10 @@ action = "file_move"
 from = "All Natural - SI.esp"
 to = "optional/All Natural - SI.esp"
 
-# TODO(qac): All Natural - Real Lights.esp -- guide row 1 marks it [QAC].
+
+[[mods.actions]]
+action = "qac"
+plugins = ["All Natural - Real Lights.esp"]
 
 [[mods]]
 id = "Weather - All Natural Real Lights - Candelabra pathgrid fix"
@@ -3301,9 +3314,10 @@ section = ["12 - WEATHER & LIGHTING"]
 path = "nexus:oblivion/51592/1000029858"
 download_handler = "nexus"
 file_name = "drifting mist lleyawiin missing house fix-51592-v1-1-1640253028.7z"
-# TODO(qac): drifting mist.esp -- guide row 5 marks it [QAC]. Uncleaned here,
-# which is the 110797 vs 108624 byte difference the diff reports.
-# oracle version 1.1.0.0
+
+[[mods.actions]]
+action = "qac"
+plugins = ["drifting mist.esp"]
 
 [[mods]]
 id = "Atmospheres 2021 - Additional Weather Effects"
@@ -3441,9 +3455,10 @@ section = ["12 - WEATHER & LIGHTING"]
 path = "nexus:oblivion/36566/91853"
 download_handler = "nexus"
 file_name = "Better Rainbows V1_2-36566-1-2.7z"
-# TODO(qac): Better Rainbows.esp -- guide row 16 marks it [QAC]. Uncleaned
-# here, which is the 7317 vs 7216 byte difference the diff reports.
-# oracle version 1.2.0.0
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Better Rainbows.esp"]
 
 [[mods]]
 id = "Lights of Oblivion - Road Lanterns"
@@ -4745,14 +4760,16 @@ path = "nexus:oblivion/45275/1000007251"
 download_handler = "nexus"
 file_name = "Ducks and Swans for Cyrodiil-45275-1-0.7z"
 
-# [[mods.actions]]
-# action = "qac"
-
 # Guide 17: "This mod requires installing twice. For each separate install,
 # right click the Data folder in each of the 'ducks' and 'swans' folders & set
 # as \ directory, calling the installs 'Diverse Ducks and Swans - Ducks' &
 # 'Diverse Ducks and Swans - Swans' respectively." One archive, two mods, two
 # data folders -- and the guide names both mods, so the ids are the guide's.
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Ducks and Swans.esp"]
+
 [[mods]]
 id = "Diverse Ducks and Swans - Ducks"
 section = ["19 - CREATURE & ANIMAL RETEXTURES"]
@@ -6213,8 +6230,9 @@ download_handler = "nexus"
 file_name = "Local Guards Features 1.1-45517-1-1.7z"
 data_folder = "Local Guards Features/Data"
 
-# [[mods.actions]]
-# action = "qac"
+[[mods.actions]]
+action = "qac"
+plugins = ["tbskGuardsFeatures.esp"]
 
 [[mods]]
 id = "Local Guards Features Unofficial Patch"
@@ -6615,6 +6633,11 @@ file_name = "ImpeREAL City - Unique Districts - All The Districts - Merged-19589
 # Guide 7 [MI] [QAC]: "right click Files & select Set as \ Directory, and
 # disable The Imperial Water - BETTER CITIES.esp plugin" -- both halves happen
 # in the installer, so the Better Cities plugin never lands.
+
+[[mods.actions]]
+action = "qac"
+plugins = ["ImpeREAL City Unique Districts - All the Districts - Merged.esp"]
+
 [[mods]]
 id = "The Imperial Waters"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -6627,6 +6650,10 @@ file_name = "The Imperial Waters 1-2-25804-1-2.7z"
 layout = "custom-data-folder"
 data_folder = "Files"
 exclude = ["The Imperial Water - BETTER CITIES.esp"]
+
+[[mods.actions]]
+action = "qac"
+plugins = ["The Imperial Water.esp"]
 
 [[mods]]
 id = "Ice's Waterfront Tunnel"
@@ -6911,6 +6938,10 @@ path = "nexus:oblivion/49092/1000021128"
 download_handler = "nexus"
 file_name = "Nobody Goes into the Mountains but Hunters-49092-1-0-1547350502.7z"
 
+[[mods.actions]]
+action = "qac"
+plugins = ["Nobody Goes into the Mountains but Hunters.esp"]
+
 [[mods]]
 id = "Nobody Goes into the Mountains but Hunters - UL compat"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -7066,6 +7097,11 @@ download_handler = "nexus"
 file_name = "Glowing Wonders-43331-v1-0.zip"
 
 # Guide 47a: "Reworked Post - Carved Letters".
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Glowing Wonders.esp"]
+
 [[mods]]
 id = "Reworked Posts"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -7190,6 +7226,10 @@ path = "nexus:oblivion/53797/1000037693"
 download_handler = "nexus"
 file_name = "Cheydinhal Cemetery Overhaul-53797-1-0-1707591500.rar"
 
+[[mods.actions]]
+action = "qac"
+plugins = ["Cheydinhal Cemetery Overhaul.esp"]
+
 [[mods]]
 id = "Gogan's Family Cemetery"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -7199,6 +7239,10 @@ plugins = ["Gogan's Family Cemetery.esp"]
 path = "nexus:oblivion/53768/1000037603"
 download_handler = "nexus"
 file_name = "Gogan's Family Cemetery-53768-1-0-1707020747.zip"
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Gogan's Family Cemetery.esp"]
 
 [[mods]]
 id = "Better Odiil Farm"
@@ -7211,6 +7255,11 @@ download_handler = "nexus"
 file_name = "Better Odiil Farm-52638-1-0-1672902481.rar"
 
 # Guide 53: "Once installed delete SI Unmarked Locations without markers.esp".
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Better Odiil Farm.esp"]
+
 [[mods]]
 id = "SI Unmarked Locations"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -7385,6 +7434,10 @@ path = "nexus:oblivion/54050/1000038447"
 download_handler = "nexus"
 file_name = "Cheydinhal Peach Tree Island-54050-1-0-1716730360.7z"
 
+[[mods.actions]]
+action = "qac"
+plugins = ["Cheydinhal Peach Tree Island.esp"]
+
 [[mods]]
 id = "Cheydinhal Garden"
 section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
@@ -7407,6 +7460,11 @@ file_name = "Chorrol Castle Courtyard-54179-1-0-1722334208.7z"
 
 # Guide 8 [MI]: "Right click 01 Classic Bark & select Set as Data Directory."
 # Four bark variants ship; the guide takes the first.
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Chorrol Castle Courtyard.esp"]
+
 [[mods]]
 id = "Chorrol Great Oak Replacer"
 section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
@@ -7431,6 +7489,11 @@ file_name = "Chorrol Park-53900-0-5-1711277661.7z"
 
 # Guide 10: a BAIN package, "select: 00 Core, 01 Vanilla". The other two 01
 # options are Better Cities and Open Cities builds of the same plugin.
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Chorrol Park.esp"]
+
 [[mods]]
 id = "Chorrol Lower Class Houses"
 section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
@@ -7464,6 +7527,10 @@ plugins = ["SkingradDeuglified.esp"]
 path = "nexus:oblivion/52456/1000032767"
 download_handler = "nexus"
 file_name = "MOO Compatibility-52456-v1-0-1668149861.zip"
+
+[[mods.actions]]
+action = "qac"
+plugins = ["SkingradDeuglified.esp"]
 
 [[mods]]
 id = "Gardens of Cyrodiil - Castle Courtyards - Skingrad"
@@ -7565,6 +7632,11 @@ file_name = "Gardens of Cyrodill-Knights of the Thorn Lodge-54522-1-1-1737301278
 # ── Part 27 - NEW & MODIFIED NPCs ───────────────────────────────────────────
 
 # Guide 1: one file out of a collection, "More Mythic Dawn Agents - Cleaned".
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Gardens of Cyrodill-Knights of the Thorn Lodge.esp"]
+
 [[mods]]
 id = "Collection of Cleaned - Updated - Fixed - UOP Compatible Mods - More Mythic Dawn Agents"
 section = ["27 - NEW & MODIFIED NPCS"]
@@ -7809,6 +7881,10 @@ plugins = ["The Lost Spires.esp"]
 
 [[mods.archives]]
 path = "manual:thelostspiresv14.zip"
+
+[[mods.actions]]
+action = "qac"
+plugins = ["The Lost Spires.esp"]
 
 [[mods]]
 id = "The Lost Spires - Cleaned Up Scribe Store Ruins"
@@ -9105,7 +9181,7 @@ download_handler = "nexus"
 file_name = "Convenient Open Spells-53163-1-0-1689385362.zip"
 
 # Guide 11a [QAC]: the two ini edits. The row names the file `GreedArena.ini`;
-# the archive ships `AoG - Greed Arena.ini` and there is no other. TODO(qac)
+# the archive ships `AoG - Greed Arena.ini` and there is no other.
 [[mods]]
 id = "Greed Arena (AoG)"
 section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
@@ -9132,6 +9208,11 @@ value = 1
 
 # Guide 11b: absent from the Oracle. The archive is on disk and the row is
 # unambiguous, so it is installed; see the Part 33 note.
+
+[[mods.actions]]
+action = "qac"
+plugins = ["AoG - Greed Arena.esp"]
+
 [[mods]]
 id = "Voiced Addons Collection for Mods (ElevenLabs) - Greed Arena"
 section = ["33 - GAMEPLAY & IMMERSIVE EXTRAS"]
