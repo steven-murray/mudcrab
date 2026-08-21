@@ -15,7 +15,9 @@ use std::path::{Path, PathBuf};
 
 pub async fn run(args: MergeArgs) -> anyhow::Result<()> {
     let source = config::loader::load_modlist(&args.input)?;
-    config::validator::validate(&source)?;
+    for warning in config::validator::validate(&source)? {
+        tracing::warn!("{warning}");
+    }
 
     let load_order: Vec<PluginName> = source.plugins.iter().map(PluginName::new).collect();
 

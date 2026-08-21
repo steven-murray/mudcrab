@@ -265,5 +265,5 @@ fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
 
 fn reload_and_validate(path: &Path) -> anyhow::Result<()> {
     let reloaded = config::loader::load_modlist(path)?;
-    config::validator::validate(&reloaded)
+    config::validator::validate(&reloaded).map(|_| ())
 }
