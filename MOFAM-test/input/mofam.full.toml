@@ -378,6 +378,13 @@ plugins = [
 	"DispMiscPatch_AFK_Weye - Reworked Posts Patch.esp",
 	"AFK_Weye - Typo and Grammatical Patch.esp",
 	"Tales of Cyrodiil.esp",
+	# Part 29. All four of these are Prebash merge sources bar NIARA, hidden in
+	# the Oracle and active here until Part 36.
+	"FasterHorses.esp",
+	"MehrunesDagonWalk.esp",
+	"Wolf Animations Restored.esp",
+	"Wolf Animations Restored - MOO Patch.esp",
+	"NIARA.esp",
 	"Glowing Wonders.esp",
 	"Reworked Posts.esp",
 	"xxReworkedReedstand.esp",
@@ -8265,3 +8272,136 @@ file_name = "Tales of Cyrodiil Voices (ElevenLabs)-54825-1-0-1737572556.7z"
 action = "pack_bsa"
 output = "Tales of Cyrodiil.bsa"
 prune_packed = true
+
+# ── Part 29 - ANIMATIONS ────────────────────────────────────────────────────
+
+[[mods]]
+id = "Smoother Horse Animations"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45146/1000006922"
+download_handler = "nexus"
+file_name = "smoother horses-45146-.zip"
+
+[[mods]]
+id = "Faster Horses"
+section = ["29 - ANIMATIONS"]
+plugins = ["FasterHorses.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/20265/32070"
+download_handler = "nexus"
+file_name = "Faster Horses-20265.zip"
+
+[[mods]]
+id = "Faster Horse Dismount"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/50226/1000025161"
+download_handler = "nexus"
+file_name = "Faster Horse Dismount-50226-1-0-1593457870.7z"
+
+# Guide 4 [MI]: "right click & select Core and select Set as \ Directory". The
+# archive also ships a Variations folder the guide does not take.
+[[mods]]
+id = "Combat Stance Reanimation"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/43695/1000012821"
+download_handler = "nexus"
+file_name = "Combat Stance Reanimation v3.0-43695-3-0.rar"
+layout = "custom-data-folder"
+data_folder = "Core"
+
+# Guide 5: "main file only... right click the 'Normal' folder and select Set as
+# \ directory". Feminine and Optional are the alternatives.
+[[mods]]
+id = "Stylish Jump - Animation Replacer"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/20459/32546"
+download_handler = "nexus"
+file_name = "Stylish_Jump_1_0-20459.zip"
+layout = "custom-data-folder"
+data_folder = "Stylish Jump 1.0/Normal"
+
+[[mods]]
+id = "Lich - Skeleton Hand-To-Hand Animations"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48606/1000019778"
+download_handler = "nexus"
+file_name = "Lich - Skeleton handtohand Animations-48606-Final.rar"
+
+# Guide 7: "Once installed delete MehrunesDagonWalk.esp" -- the mergeable build
+# in row 8 replaces it.
+#
+# The archive's root also holds **six unrelated mod archives** the author
+# packaged by mistake: Nirnroot retexture, Oblivion Races Unlocked, Painters
+# Touch, two Paladin Mod files and Pet your animals. Extracting the archive
+# faithfully puts all six in the mod folder, which is what happened the first
+# time this row ran.
+#
+# `include` takes only what the mod actually is. That also satisfies the
+# guide's delete instruction, by never unpacking the plugin in the first place.
+[[mods]]
+id = "Mehrunes Dagon Walking Animation"
+section = ["29 - ANIMATIONS"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52126/1000031702"
+download_handler = "nexus"
+file_name = "Mehrunes Dagon Walking Animation-52126-1-1-1656778512.zip"
+include = ["meshes/**"]
+
+# Guide 8: the mergeable build of row 7's plugin, from a collection.
+[[mods]]
+id = "Wrye Bash Collection of Mergeable Mods - Mehrunes Dagon Walking Animation"
+section = ["29 - ANIMATIONS"]
+plugins = ["MehrunesDagonWalk.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52823/1000034039"
+download_handler = "nexus"
+file_name = "Mehrunes Dagon Walking Animation - Mergeable-52823-1-1-1679149190.7z"
+
+# Guide 9 [MI]: "Drag Wolf Animations Restored - MOO Patch.esp into 00 Core,
+# right click 00 Core & select Set as \ Directory". Two archive entries over
+# one file, the same shape as Part 26a's Legion Forester Outposts.
+[[mods]]
+id = "Unique Wolf Animations Restored"
+section = ["29 - ANIMATIONS"]
+plugins = [
+  "Wolf Animations Restored.esp",
+  "Wolf Animations Restored - MOO Patch.esp",
+]
+
+[[mods.archives]]
+path = "nexus:oblivion/53042/1000034956"
+download_handler = "nexus"
+file_name = "Unique Wolf Animations Restored-53042-1-0-1686340792.7z"
+layout = "custom-data-folder"
+data_folder = "Unique Wolf Animations Restored/00 Core"
+
+[[mods.archives]]
+path = "nexus:oblivion/53042/1000034956"
+download_handler = "nexus"
+file_name = "Unique Wolf Animations Restored-53042-1-0-1686340792.7z"
+layout = "custom-data-folder"
+data_folder = "Unique Wolf Animations Restored/01 Patches"
+include = ["Wolf Animations Restored - MOO Patch.esp"]
+
+[[mods]]
+id = "NPC Idle Animation Restoration and Additions (NIARA)"
+section = ["29 - ANIMATIONS"]
+plugins = ["NIARA.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/53184/1000035417"
+download_handler = "nexus"
+file_name = "NPC Idle Animation Restoration and Additions-53184-1-0-1689599135.7z"
