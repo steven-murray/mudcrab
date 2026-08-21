@@ -500,3 +500,42 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
         "check must not write the locally resolvable archive into the cache"
     );
 }
+
+/// The cache is keyed by a derived name -- mod id, archive index, file id --
+/// which says nothing about content. Replace the archive in a search path and
+/// the derived name does not change, so a naive cache hit keeps serving the old
+/// bytes. A MOFAM archive was repaired in place and the next install still
+/// unpacked the broken copy, silently.
+#[test]
+fn a_replaced_source_archive_supersedes_the_cached_copy() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let search = dir.path().join("downloads");
+    let cache = dir.path().join("cache");
+    std::fs::create_dir_all(&search).unwrap();
+    std::fs::create_dir_all(&cache).unwrap();
+
+    // The stale cache entry, under its derived name, and the sidecar adoption
+    // would have written.
+    std::fs::write(cache.join("mod_0_123.zip"), vec![b'x'; 4096]).unwrap();
+    std::fs::write(cache.join("mod_0_123.zip.orig-name"), "real.zip").unwrap();
+
+    // The archive as it now stands in the search path: same name, new content.
+    std::fs::write(search.join("real.zip"), b"fixed").unwrap();
+
+    assert!(
+        mudcrab::config::download::cache_entry_is_stale_for_test(
+            &cache.join("mod_0_123.zip"),
+            Some("real.zip"),
+            std::slice::from_ref(&search),
+        ),
+        "a cache entry that no longer matches its source is stale"
+    );
+
+    // And one that does match is not, so a normal run still short-circuits.
+    std::fs::write(cache.join("same_0_1.zip"), b"fixed").unwrap();
+    assert!(!mudcrab::config::download::cache_entry_is_stale_for_test(
+        &cache.join("same_0_1.zip"),
+        Some("real.zip"),
+        &[search],
+    ));
+}
