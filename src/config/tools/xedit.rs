@@ -1,15 +1,36 @@
 //! xEdit (TES4Edit) orchestration: QuickAutoClean.
 //!
 //! xEdit is a Windows GUI tool, so on Linux it runs through the configured
-//! Wine/Proton prefix. It has no headless mode, so completion is detected by
-//! watching the output plugin stabilise and then waiting for the user to close
-//! the window.
+//! Wine/Proton prefix. `-autoexit` is accepted but **not honoured in Quick
+//! Clean mode** in 4.1.5f: the window sits on its summary until someone closes
+//! it, so waiting for the process to exit is waiting for a human.
+//!
+//! What makes this unattended instead is that xEdit says when it is done and
+//! saves before it shuts down. Its log ends the job with `Quick Clean mode
+//! finished`, and the cleaned plugin is already on disk by then, written beside
+//! the original as `<plugin>.save.<timestamp>` and only *renamed* over it at
+//! shutdown. So mudcrab watches the log for that line, takes the newest save
+//! file, and closes xEdit itself.
+//!
+//! This is not reimplemented natively, and deliberately. QuickAutoClean removes
+//! records that are identical to their master, but "identical" is xEdit's
+//! judgement, not a byte comparison: it knows which fields are unordered sets
+//! and which bytes are unused padding, per record type. Two records from this
+//! very list make the point -- a CELL whose `XCLR` region list is the same three
+//! FormIDs in a different order, and a LAND whose `BTXT`/`ATXT` entries differ
+//! only in their unused byte. Both are identical to xEdit and neither is
+//! identical to a memcmp. Matching that would mean reimplementing xEdit's whole
+//! field schema, where erring loose silently deletes real edits.
 
 use crate::config::install::InstallSettings;
 use crate::config::schema::QacAction;
 use crate::config::tools::ToolsConfig;
 use crate::util::fs::link_or_copy;
 use std::path::{Path, PathBuf};
+
+/// How long one plugin may take. Generous: cleaning loads every master, and
+/// Oblivion.esm alone is 265 MB through a Wine prefix.
+const QAC_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(900);
 
 /// Quick Auto Clean action.
 ///
@@ -164,73 +185,95 @@ pub(crate) fn apply_qac_action(
                 owner = owner_label,
                 plugin = plugin_name,
                 exe = %qac_exe.display(),
-                "qac: waiting for xEdit; once the window says it is finished, close it manually"
+                "qac: cleaning"
             );
+
+            // xEdit appends to one log across runs, so remember where this run
+            // starts. `-autoexit` is passed because later builds may honour it
+            // in this mode; 4.1.5f does not, and nothing depends on it.
+            let log_path = xedit_log_path(&qac_exe);
+            let log_offset = log_path
+                .as_deref()
+                .and_then(|path| std::fs::metadata(path).ok())
+                .map(|meta| meta.len())
+                .unwrap_or(0);
 
             let mut child = settings
                 .tools
                 .windows_tool_command(&qac_exe)?
-                .args(["-TES4", "-QAC", "-autoload", "-save", &data_arg, &plugin_name])
+                .args([
+                    "-TES4",
+                    "-QAC",
+                    "-autoload",
+                    "-autoexit",
+                    "-save",
+                    &data_arg,
+                    &plugin_name,
+                ])
                 .spawn()
                 .map_err(|err| anyhow::anyhow!("qac: failed to launch xEdit: {err}"))?;
 
-            let initial_metadata = std::fs::metadata(&temp_plugin).ok();
-            let mut previous_len = initial_metadata.as_ref().map(|m| m.len());
-            let mut previous_modified = initial_metadata
-                .as_ref()
-                .and_then(|m| m.modified().ok());
-            let mut saw_output_change = false;
-            let mut stable_checks = 0u32;
-            let mut prompted_manual_close = false;
+            // Wait for xEdit to say it is finished, then close it. Polling the
+            // log from the offset it had at launch, so a previous run's
+            // completion line cannot be mistaken for this one's.
             let start = std::time::Instant::now();
-
+            let mut finished = false;
             loop {
                 if let Some(status) = child
                     .try_wait()
                     .map_err(|err| anyhow::anyhow!("qac: failed to poll xEdit: {err}"))?
                 {
-                    if !status.success() {
-                        anyhow::bail!(
-                            "qac: xEdit exited with status {}",
-                            status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".to_string())
-                        );
-                    }
+                    // Closed on its own, or someone closed it. Either way the
+                    // work is over; the save file below is the evidence.
+                    let _ = status;
+                    finished = true;
                     break;
                 }
 
-                let current_metadata = std::fs::metadata(&temp_plugin).ok();
-                let current_len = current_metadata.as_ref().map(|m| m.len());
-                let current_modified = current_metadata
-                    .as_ref()
-                    .and_then(|m| m.modified().ok());
-
-                let changed = current_len != previous_len || current_modified != previous_modified;
-                if changed {
-                    saw_output_change = true;
-                    stable_checks = 0;
-                } else if saw_output_change {
-                    stable_checks += 1;
-                }
-
-                previous_len = current_len;
-                previous_modified = current_modified;
-
-                if saw_output_change && stable_checks >= 6 && !prompted_manual_close {
-                    tracing::info!(
+                if log_says_finished(log_path.as_deref(), log_offset) {
+                    tracing::debug!(
                         owner = owner_label,
                         plugin = plugin_name,
-                        "qac: finished writing output; if the xEdit window says it is done, it is now safe to close it"
+                        "qac: xEdit reported Quick Clean finished; closing it"
                     );
-                    prompted_manual_close = true;
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    finished = true;
+                    break;
                 }
 
-                if start.elapsed() > std::time::Duration::from_secs(600) {
-                    anyhow::bail!(
-                        "qac: timed out waiting for xEdit to close; if the window shows cleaning is finished, close it manually and rerun install"
-                    );
+                if start.elapsed() > QAC_TIMEOUT {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    break;
                 }
 
-                std::thread::sleep(std::time::Duration::from_millis(500));
+                std::thread::sleep(std::time::Duration::from_millis(250));
+            }
+
+            if !finished {
+                anyhow::bail!(
+                    "qac: xEdit never reported finishing within {} seconds cleaning \
+                     {plugin_name}. Its log is {}; if a dialog is waiting for an answer, run \
+                     the same command by hand to see it.",
+                    QAC_TIMEOUT.as_secs(),
+                    log_path
+                        .as_deref()
+                        .map(|path| path.display().to_string())
+                        .unwrap_or_else(|| "not where it was expected".to_string()),
+                );
+            }
+
+            // xEdit renames the save over the original only at shutdown, which
+            // it may not have reached. Prefer the newest save file, and fall
+            // back to the plugin itself for the case where it did.
+            if let Some(save) = newest_save_file(&temp_data, &plugin_name)? {
+                std::fs::rename(&save, &temp_plugin).map_err(|err| {
+                    anyhow::anyhow!(
+                        "qac: failed to move {} over the cleaned plugin: {err}",
+                        save.display()
+                    )
+                })?;
             }
 
             // Copy the cleaned plugin back to the staging directory.
@@ -252,3 +295,142 @@ pub(crate) fn apply_qac_action(
     Ok(())
 }
 
+
+/// Where xEdit writes the log for this run.
+///
+/// Beside the executable, named for it. Returns `None` rather than guessing if
+/// the path cannot be built; the caller degrades to the timeout.
+fn xedit_log_path(qac_exe: &Path) -> Option<PathBuf> {
+    let dir = qac_exe.parent()?;
+    let candidates = [
+        qac_exe
+            .file_stem()
+            .map(|stem| format!("{}_log.txt", stem.to_string_lossy())),
+        Some("TES4Edit_log.txt".to_string()),
+    ];
+    candidates
+        .into_iter()
+        .flatten()
+        .map(|name| dir.join(name))
+        .find(|path| path.is_file())
+}
+
+/// Has xEdit logged the end of the job since this run started?
+fn log_says_finished(log_path: Option<&Path>, from: u64) -> bool {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let Some(path) = log_path else { return false };
+    let Ok(mut file) = std::fs::File::open(path) else {
+        return false;
+    };
+    if file.seek(SeekFrom::Start(from)).is_err() {
+        return false;
+    }
+    let mut tail = String::new();
+    // Lossy on purpose: the log is not always valid UTF-8, and the marker is
+    // plain ASCII either way.
+    let mut bytes = Vec::new();
+    if file.read_to_end(&mut bytes).is_err() {
+        return false;
+    }
+    tail.push_str(&String::from_utf8_lossy(&bytes));
+    tail.contains("Quick Clean mode finished")
+}
+
+/// The most recent `<plugin>.save.<timestamp>` xEdit wrote, if any.
+///
+/// Quick Clean saves between passes, so there can be several; the last one is
+/// the fully cleaned plugin.
+fn newest_save_file(data_dir: &Path, plugin_name: &str) -> anyhow::Result<Option<PathBuf>> {
+    let prefix = format!("{plugin_name}.save.");
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+
+    for entry in std::fs::read_dir(data_dir)
+        .map_err(|err| anyhow::anyhow!("qac: failed to read {}: {err}", data_dir.display()))?
+    {
+        let entry = entry?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        let modified = entry.metadata().and_then(|meta| meta.modified())?;
+        if best.as_ref().is_none_or(|(best, _)| modified >= *best) {
+            best = Some((modified, entry.path()));
+        }
+    }
+
+    Ok(best.map(|(_, path)| path))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn the_finish_marker_is_only_read_from_this_run() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let log = dir.path().join("TES4Edit_log.txt");
+        std::fs::write(&log, "[00:00] Quick Clean mode finished.\n").expect("previous run");
+        let offset = std::fs::metadata(&log).expect("metadata").len();
+
+        // A previous run's marker sits below the offset and must not count.
+        assert!(!log_says_finished(Some(&log), offset));
+
+        let mut file = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&log)
+            .expect("append");
+        writeln!(file, "[00:00] Start: Applying Filter").expect("write");
+        assert!(!log_says_finished(Some(&log), offset));
+
+        writeln!(file, "[00:00] Quick Clean mode finished.").expect("write");
+        assert!(log_says_finished(Some(&log), offset));
+    }
+
+    #[test]
+    fn a_missing_log_is_not_a_finished_one() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        assert!(!log_says_finished(None, 0));
+        assert!(!log_says_finished(Some(&dir.path().join("absent.txt")), 0));
+    }
+
+    /// Quick Clean saves between passes, so the last save is the cleaned one.
+    #[test]
+    fn the_newest_save_file_wins() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let data = dir.path();
+        for (name, contents) in [
+            ("Thing.esp", &b"original"[..]),
+            ("Thing.esp.save.2026_01_01_00_00_01", &b"pass one"[..]),
+            ("Thing.esp.save.2026_01_01_00_00_02", &b"pass two"[..]),
+            // A different plugin's save must not be picked up.
+            ("Other.esp.save.2026_01_01_00_00_09", &b"not ours"[..]),
+        ] {
+            std::fs::write(data.join(name), contents).expect("fixture");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+
+        let found = newest_save_file(data, "Thing.esp")
+            .expect("scan should succeed")
+            .expect("a save file should be found");
+        assert_eq!(
+            std::fs::read(&found).expect("read"),
+            b"pass two",
+            "the last pass is the cleaned plugin"
+        );
+    }
+
+    /// xEdit reached shutdown and renamed the save over the original itself.
+    #[test]
+    fn no_save_file_means_xedit_already_renamed_it() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        std::fs::write(dir.path().join("Thing.esp"), b"cleaned").expect("fixture");
+        assert!(
+            newest_save_file(dir.path(), "Thing.esp")
+                .expect("scan should succeed")
+                .is_none()
+        );
+    }
+}
