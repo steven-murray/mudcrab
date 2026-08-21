@@ -477,6 +477,136 @@ fn install_descends_a_wrapper_folder_holding_a_plugin() {
     assert!(!mods_dir.join("wrapped").join("SomeMod [updated]").exists());
 }
 
+/// Bank of Cyrodiil's shape: a zip holding an installer plus a readme.
+///
+/// The container's readme stays at the mod root, the inner archive's contents
+/// are laid out as if they had been the mod's own archive, and the container
+/// itself is never written.
+#[test]
+fn install_unpacks_an_archive_nested_inside_another() {
+    let dir = tempdir().expect("temp dir should be created");
+    let inner = dir.path().join("installer.zip");
+    let archive = dir.path().join("outer.zip");
+    let modlist = dir.path().join("modlist.toml");
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    let cache = dir.path().join("cache");
+    let mods_dir = dir.path().join("mods");
+    let game_dir = dir.path().join("game");
+    std::fs::create_dir_all(&game_dir).expect("game dir should be created");
+
+    make_zip_with_files(
+        &inner,
+        &[("bank.esp", b"plugin"), ("meshes/bank.nif", b"mesh")],
+    );
+    let inner_bytes = std::fs::read(&inner).expect("inner archive should be readable");
+    make_zip_with_files(
+        &archive,
+        &[("installer.zip", &inner_bytes), ("readme.txt", b"read me")],
+    );
+
+    let source = format!(
+        "name = \"Nested Test\"\nplugins = [\"bank.esp\"]\n\n[[mods]]\nid = \"bank\"\ndependencies = []\nplugins = [\"bank.esp\"]\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninner_archive = \"installer.zip\"\n",
+        archive.display()
+    );
+    std::fs::write(&modlist, source).expect("fixture modlist should be written");
+
+    run_pipeline(&game_dir, &modlist, &compiled, &plan, &cache, &mods_dir);
+
+    assert!(mods_dir.join("bank").join("bank.esp").exists());
+    assert!(mods_dir.join("bank").join("meshes/bank.nif").exists());
+    // The container's own files come along; the container does not.
+    assert!(mods_dir.join("bank").join("readme.txt").exists());
+    assert!(!mods_dir.join("bank").join("installer.zip").exists());
+}
+
+/// Naming an entry that is not there is a typo, and typos should say so rather
+/// than installing a mod that is quietly missing all of its content.
+#[test]
+fn install_rejects_an_inner_archive_the_container_does_not_hold() {
+    let dir = tempdir().expect("temp dir should be created");
+    let archive = dir.path().join("outer.zip");
+    let modlist = dir.path().join("modlist.toml");
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    let cache = dir.path().join("cache");
+    let mods_dir = dir.path().join("mods");
+    let game_dir = dir.path().join("game");
+    std::fs::create_dir_all(&game_dir).expect("game dir should be created");
+
+    make_zip_with_files(&archive, &[("readme.txt", b"read me")]);
+
+    let source = format!(
+        "name = \"Nested Test\"\n\n[[mods]]\nid = \"bank\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninner_archive = \"missing.zip\"\n",
+        archive.display()
+    );
+    std::fs::write(&modlist, source).expect("fixture modlist should be written");
+
+    for stage in [
+        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
+        vec!["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()],
+    ] {
+        Command::cargo_bin("mudcrab")
+            .expect("binary should build")
+            .env("GAME_DIR", &game_dir)
+            .args(&stage)
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .env("GAME_DIR", &game_dir)
+        .arg("install")
+        .arg(&plan)
+        .arg("--cache")
+        .arg(&cache)
+        .arg("--mods-dir")
+        .arg(&mods_dir)
+        .arg("--game-dir")
+        .arg(&game_dir)
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("inner_archive 'missing.zip' is not in"));
+}
+
+fn run_pipeline(
+    game_dir: &std::path::Path,
+    modlist: &std::path::Path,
+    compiled: &std::path::Path,
+    plan: &std::path::Path,
+    cache: &std::path::Path,
+    mods_dir: &std::path::Path,
+) {
+    for stage in [
+        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
+        vec!["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()],
+    ] {
+        Command::cargo_bin("mudcrab")
+            .expect("binary should build")
+            .env("GAME_DIR", game_dir)
+            .args(&stage)
+            .assert()
+            .success();
+    }
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .env("GAME_DIR", game_dir)
+        .arg("install")
+        .arg(plan)
+        .arg("--cache")
+        .arg(cache)
+        .arg("--mods-dir")
+        .arg(mods_dir)
+        .arg("--game-dir")
+        .arg(game_dir)
+        .assert()
+        .success();
+}
+
 fn make_zip_with_files(path: &std::path::Path, entries: &[(&str, &[u8])]) {
     let zip_file = std::fs::File::create(path).expect("zip fixture should be created");
     let mut zip = zip::ZipWriter::new(zip_file);

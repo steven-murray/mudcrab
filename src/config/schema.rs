@@ -547,6 +547,17 @@ pub struct ArchiveSpec {
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
+    /// The mod's content is inside *this* entry, which is itself an archive.
+    ///
+    /// Some mods ship a container: a zip holding a self-extracting installer, or
+    /// an archive holding an archive. The named entry is unpacked and its
+    /// contents become the mod, with `layout`, `data_folder`, `include` and
+    /// `exclude` all applying to the inner archive -- that is where the game
+    /// content is. Everything else in the outer archive (readmes, screenshots)
+    /// is staged at the mod root as it stands, and the container entry itself is
+    /// dropped, since it is packaging rather than content.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inner_archive: Option<String>,
     #[serde(default)]
     pub bain_subpackages: Vec<String>,
     #[serde(default)]
@@ -646,6 +657,9 @@ pub struct CompiledArchive {
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
     pub target_subdir: Option<String>,
+    /// The archive inside this archive; see `ArchiveSpec::inner_archive`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inner_archive: Option<String>,
     #[serde(default)]
     pub bain_subpackages: Vec<String>,
     #[serde(default)]

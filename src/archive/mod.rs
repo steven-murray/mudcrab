@@ -491,12 +491,14 @@ pub fn list_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         || name.ends_with(".7z")
         || probe_magic(source, &[0x52, 0x61, 0x72, 0x21])
         || probe_magic(source, &[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C])
+        || is_self_extracting(source)
     {
         return list_system_archive_paths(source);
     }
 
     anyhow::bail!(
-        "unsupported archive format for {} (supports .zip, .tar, .tar.gz, .tgz, .rar, .7z)",
+        "unsupported archive format for {} (supports .zip, .tar, .tar.gz, .tgz, .rar, .7z, \
+         and self-extracting .exe installers)",
         source.display()
     )
 }
@@ -675,6 +677,7 @@ impl ArchiveExtractor for SystemArchiveExtractor {
             || name.ends_with(".7z")
             || probe_magic(source, &[0x52, 0x61, 0x72, 0x21]) // Rar!
             || probe_magic(source, &[0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C]) // 7z
+            || is_self_extracting(source)
     }
 
     fn extract(
@@ -689,6 +692,37 @@ impl ArchiveExtractor for SystemArchiveExtractor {
         let _ = std::fs::remove_dir_all(&stage);
         result
     }
+}
+
+/// A self-extracting installer: a Windows executable with an archive stapled on.
+///
+/// Standard for mods old enough to predate the mod managers -- Bank of Cyrodiil
+/// (2006) is distributed as a zip holding one, and expects the user to run it.
+/// Nothing has to be run: both `bsdtar` and `7z` open these directly, scanning
+/// past the executable for the archive signature. Recognising the file is the
+/// whole of the support needed.
+///
+/// The `MZ` check is what keeps this cheap. It is the DOS header every PE
+/// carries, so a single 2-byte read rejects everything that is not a Windows
+/// executable before any subprocess starts; only a real `.exe` costs a `7z l`.
+/// Asking 7z rather than trusting the extension is deliberate -- most `.exe`
+/// files are not archives, and claiming them here would turn "this is not an
+/// installer" into an extraction failure much further down.
+fn is_self_extracting(source: &Path) -> bool {
+    if !probe_magic(source, &[0x4D, 0x5A]) {
+        return false;
+    }
+    let Some(src) = source.to_str() else {
+        return false;
+    };
+
+    Command::new("7z")
+        .args(["l", "-slt", src])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
 }
 
 fn probe_magic(source: &Path, magic: &[u8]) -> bool {
@@ -871,6 +905,56 @@ Attributes = A
             drop_directory_entries(listed),
             ["textures/architecture/imperialcity/poster.dds"]
         );
+    }
+
+    /// A self-extracting installer is a Windows executable with an archive
+    /// after it, which is what this fixture is: an `MZ` header, some filler,
+    /// then a real 7z stream. `Bank of Cyrodiil 1-11.exe` (2006) is the shape
+    /// this stands in for.
+    #[test]
+    fn a_self_extracting_installer_is_recognised_as_an_archive() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let inner = dir.path().join("inner.7z");
+        let payload = dir.path().join("a.txt");
+        std::fs::write(&payload, b"hi").expect("payload");
+        let made = Command::new("7z")
+            .args([
+                "a",
+                "-t7z",
+                inner.to_str().unwrap(),
+                payload.to_str().unwrap(),
+            ])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
+        if !made.map(|status| status.success()).unwrap_or(false) {
+            eprintln!("skipping: no usable 7z on this machine");
+            return;
+        }
+
+        let mut bytes = b"MZ".to_vec();
+        bytes.extend(std::iter::repeat_n(0u8, 512));
+        bytes.extend(std::fs::read(&inner).expect("inner archive"));
+        let sfx = dir.path().join("installer.exe");
+        std::fs::write(&sfx, &bytes).expect("sfx fixture");
+
+        assert!(is_self_extracting(&sfx));
+        assert!(SystemArchiveExtractor.can_handle(&sfx));
+        assert_eq!(list_archive_paths(&sfx).expect("listable"), ["a.txt"]);
+    }
+
+    /// Most `.exe` files are not archives, and claiming them here would turn a
+    /// wrong `inner_archive` into a confusing extraction failure much later.
+    #[test]
+    fn an_executable_that_is_not_an_archive_is_not_claimed() {
+        let dir = tempfile::tempdir().expect("temp dir");
+        let plain = dir.path().join("plain.exe");
+        let mut bytes = b"MZ".to_vec();
+        bytes.extend((0u16..1024).map(|value| value as u8));
+        std::fs::write(&plain, &bytes).expect("fixture");
+
+        assert!(!is_self_extracting(&plain));
+        assert!(!SystemArchiveExtractor.can_handle(&plain));
     }
 
     #[test]
