@@ -470,6 +470,16 @@ plugins = [
 	"Improved MG Patch.esp",
 	"SneakVignette.esp",
 	"DrowningVisuals.esp",
+	# Part 34. Filter patches: each names masters it does not require, so MO2
+	# reports missing masters for all seven and the guide says to ignore that.
+	"Ragdolls for Oblivion - Filter Patch for Mods.esp",
+	"OCOv2 - Filter Patch for Mods.esp",
+	"BasicHarvestFilterPatch.esp",
+	"MOBSification of MODS.esp",
+	"DispMiscPatch_OCRAFT - Filter Patch for Mods.esp",
+	"Cava Obscura - Filter Patch For Mods.esp",
+	# Two spaces before the dash, as the archive spells it.
+	"Unique Landscapes Separate  - OOO Adaptation.esp",
 ]
 
 # post-install-actions = ["loot-sort"]
@@ -9445,3 +9455,101 @@ plugins = ["DrowningVisuals.esp"]
 path = "nexus:oblivion/54926/1000041021"
 download_handler = "nexus"
 file_name = "Drowning Visuals-54926-1-0-1740869444.zip"
+
+# ---------------------------------------------------------------------------
+# Part 34 - FINAL FILTER PATCHES
+# ---------------------------------------------------------------------------
+#
+# Filter patches name masters they do not require. MO2 reports each as missing
+# masters and the guide says to ignore that: the Bashed Patch consumes only the
+# masters actually in the load order. mudcrab does not check masters at install
+# time, so nothing here needs an override.
+
+[[mods]]
+id = "Ragdolls for Oblivion - Filter Patch for Mods"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["Ragdolls for Oblivion - Filter Patch for Mods.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52804/1000035427"
+download_handler = "nexus"
+file_name = "Ragdolls for Oblivion - Filter Patch for Mods-52804-1-3-1689675976.7z"
+
+[[mods]]
+id = "OCOv2 - Filter Patch for Mods"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["OCOv2 - Filter Patch for Mods.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51379/1000036054"
+download_handler = "nexus"
+file_name = "OCOv2 - Filter Patch for Mods-51379-2-0-2-1694188374.7z"
+
+# Guide 3: "right click BasicHarvest_FilterPatch_V1.4 > 00_CoreFilterPatch, and
+# select Set as \ directory". Same archive as Part 11's Basic harvest, a
+# different folder out of it -- which is why this is a second mod rather than a
+# second subpackage on the first.
+[[mods]]
+id = "Basic harvest - Filter Patch"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["BasicHarvestFilterPatch.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/51833/1000032472"
+download_handler = "nexus"
+file_name = "BasicHarvest_FilterPatch_v1.4-51833-1-4-1665008548.7z"
+layout = "custom-data-folder"
+data_folder = "BasicHarvest_FilterPatch_V1.4/00_CoreFilterPatch"
+
+[[mods]]
+id = "MOBSification of MODS - Weapon Balancing"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["MOBSification of MODS.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/45522/1000011540"
+download_handler = "nexus"
+file_name = "MOBSification of MODS 1.02-45522-1-02.7z"
+
+# Guide 5: the OCRAFT Patches folder of the collection, less two of its three
+# plugins. The row asks for the mod to be named "Miscellaneous Patch Collection
+# by Dispensation - Filter Patches"; the Oracle abbreviated it.
+[[mods]]
+id = "Miscellaneous Patch Collection by Dispensation - Filter Patches"
+oracle_name = "Misc Patch Collection by Dispensation - Filter Patches"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["DispMiscPatch_OCRAFT - Filter Patch for Mods.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/52874/1000036033"
+download_handler = "nexus"
+file_name = "Miscellaneous Patch Collection by Dispensation-52874-1-2-2-1693934341.7z"
+layout = "bain"
+bain_subpackages = ["OCRAFT Patches"]
+exclude = [
+  "**/DispMiscPatch_OCRAFT - Better Camps Patch.esp",
+  "**/DispMiscPatch_RadiantAI NPCs Alive Cyrodiil - OCRAFT Int Patch.esp",
+]
+
+[[mods]]
+id = "Cava Obscura - Updated Filter Patch for Mods"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["Cava Obscura - Filter Patch For Mods.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/35099/1000017088"
+download_handler = "nexus"
+file_name = "Updated Filter Patch for Mods-35099-1-4-1.7z"
+
+# Guide 7: "Using the BAIN installer, select just 01 Separate UL".
+[[mods]]
+id = "Unique Landscapes - OOO Adaptation"
+section = ["34 - FINAL FILTER PATCHES"]
+plugins = ["Unique Landscapes Separate  - OOO Adaptation.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/48463/1000041540"
+download_handler = "nexus"
+file_name = "Unique Landscapes - OOO Adaptation-48463-2-12-1745572029.rar"
+layout = "bain"
+bain_subpackages = ["01 Separate UL"]
