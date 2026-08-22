@@ -18,6 +18,7 @@ pub mod file_move;
 pub mod file_prune;
 pub mod ini_append_block;
 pub mod ini_set;
+pub mod ini_tweak;
 pub mod pack_bsa;
 pub mod qac;
 
@@ -55,6 +56,7 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     match action {
         ModAction::IniSet(spec) => ini_set::apply(spec, cx),
         ModAction::IniAppendBlock(spec) => ini_append_block::apply(spec, cx),
+        ModAction::IniTweak(spec) => ini_tweak::apply(spec, cx),
         ModAction::Qac(spec) => qac::apply(spec, cx),
         ModAction::PackBsa(spec) => pack_bsa::apply(spec, cx),
         ModAction::CreateDummyPlugin(spec) => create_dummy_plugin::apply(spec, cx),
@@ -173,6 +175,27 @@ mod tests {
         };
         assert_eq!(spec.file, "ini/x.ini");
         assert_eq!(spec.block, "set x to 1");
+    }
+
+    #[test]
+    fn ini_tweak_names_an_ini_not_a_path() {
+        let ModAction::IniTweak(spec) = parse(
+            "action=\"ini_tweak\"\nfile=\"Mod.ini\"\nkey=\"A.b\"\nvalue=0\nformat=\"set-to\"",
+        )
+        .unwrap() else {
+            panic!("expected ini_tweak");
+        };
+        assert_eq!(spec.file, "Mod.ini");
+        assert_eq!(spec.value.0, "0");
+        assert_eq!(spec.format, IniSetFormat::SetTo);
+
+        // The fragment's location is the action's business, not the modlist's.
+        // A path here means somebody guessed at the folder name.
+        assert!(
+            parse("action=\"ini_tweak\"\nfile=\"INI Tweaks/Mod.ini\"\nkey=\"A.b\"\nvalue=0")
+                .is_ok(),
+            "a path parses; it is rejected at apply time, where the owner is known"
+        );
     }
 
     #[test]

@@ -7879,6 +7879,19 @@ file_name = "CIB_BAIN_WIZARDv-53354-0-3-1694429943.7z"
 layout = "bain"
 bain_subpackages = ["00_CIB_FILTER_PATCH", "01_LPP_SUPPORT"]
 
+# Guide 5 option 3, "Select 'Don't add torch hotkey item'". The package ships a
+# BAIN wizard; selecting its two subpackages covers everything the wizard
+# *installs*, but three of its questions call EditINI, which writes a Wrye Bash
+# tweak fragment instead. Only this one fires here: the guide leaves the Maskar
+# question unselected, and the Basic Primary Needs / Basic Personal Hygiene
+# branches are gated on mods this list does not install.
+[[mods.actions]]
+action = "ini_tweak"
+file = "Oscuro's_Oblivion_Overhaul.ini"
+key = "OOOOptions.bHK"
+value = 0
+format = "set-to"
+
 # Guide 6: "main file + optional file, install separately".
 [[mods]]
 id = "Oblivion Content Restoration Project"
