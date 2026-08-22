@@ -152,19 +152,12 @@ cause:
 | `Nobody Goes into the Mountains but Hunters.esp` | 597139 | 724881 |
 | `The Lost Spires.esp` | 2820420 | 3043886 |
 
-**What is known about the largest of them.** `DLCFrostcrag.esp` holds 157
-records the Oracle's copy does not, and the Oracle's holds none ours lacks —
-a strict subset. Only **2** of the 157 are byte-identical to `Oblivion.esm`,
-so they are not ITMs. By type they are 134 REFR, 10 CELL, 5 LAND, 4 PGRD,
-which is the shape of a **cell or worldspace group deletion**, not of anything
-QuickAutoClean does. Its companion `Harvest [Flora] - DLCFrostcrag.esp` is the
-row that already carries a hand deletion in A2 ("remove the Worldspace
-group"), so a manual xEdit step on the Oracle side is the leading candidate —
-but that is a hypothesis, not a finding.
+**The two Frostcrag entries are settled — see C2 below.** Both come from the
+same hand step, applied to one file too many. Neither is a QAC difference.
 
-`The Lost Spires` is the other big one: ours removed 87 records the Oracle
-kept and **443 records differ in content**, which is UDR undeletion, not ITM
-removal.
+Of the seven that remain, `The Lost Spires` is the informative one: ours
+removed 87 records the Oracle kept and **443 records differ in content**, which
+is UDR undeletion rather than ITM removal.
 
 **Effect if left**: the merges are close but not exact — TACE 8536 records
 against the Oracle's 8533, Prebash 4506 against 4505. Both were rebuilt on the
@@ -185,7 +178,47 @@ entry for entry. No GUI, no interim.
 Not mudcrab gaps — things in `MOFAM-03.25` still outstanding as of 2026-08-22.
 Most of what was here has been fixed; see section D.
 
-### C1. Nine of Ultimate Leveling's fifteen edits are still unapplied
+### C1. `DLCFrostcrag.esp` has had its Worldspace group deleted, and should not have
+
+Guide Part 11 row 23 says:
+
+> Open **Harvest [Flora] - DLCFrostcrag.esp** in xEdit & remove the **Worldspace** group.
+
+On the Oracle that removal has been applied to **two** files. Top-level groups:
+
+| file | groups |
+|---|---|
+| `Harvest [Flora] - DLCFrostcrag.esp` (Oracle) | `FLOR` — correct, the row asks for this |
+| `Harvest [Flora] - DLCFrostcrag.esp` (ours) | `FLOR`, `WRLD` — **we are missing the step**, see A2 |
+| `DLCFrostcrag.esp` (Oracle) | no `WRLD` group at all |
+| `DLCFrostcrag.esp` (ours) | `WRLD` present |
+
+Nothing in the guide asks for the DLC master itself to be touched, and the
+consequences are not cosmetic. Against the vanilla file (1316 records), our QAC
+removes 70 and the Oracle's copy is short by 227. The extra 157 are:
+
+- 4 WRLD — `Tamriel`, `SkingradWorld`, `ICTheArcaneUniversity`, and Bethesda's
+  leftover `TestGragtown`
+- their child CELLs, including `FrostcragSpireExterior`
+- 134 REFR, 5 LAND, 4 PGRD
+
+**71 of the removed records are DLCFrostcrag's own**, not overrides — QAC never
+removes those, because a plugin's own records have no master to be identical
+to. They are object placements: they position 24 distinct base objects, and 9 of
+those base objects are still defined in the file with nothing left to place
+them.
+
+So the Oracle's Frostcrag Spire has its interiors (the `CELL` group survives)
+and no exterior placement. **Worth checking in game** — travel to Frostcrag
+Spire and see whether the building is there — before assuming this note is
+right about the consequence. The file difference itself is not in doubt.
+
+`DLCFrostcrag.esp` is also a master for `Harvest [Flora] - DLCFrostcrag.esp`,
+`DLCFrostcrag - OOO Adaptation.esp` and `Bruma Frostcrag Spire LOD.esp`, so
+anything overriding those 71 records now points at a record its master no longer
+defines.
+
+### C2. Nine of Ultimate Leveling's fifteen edits are still unapplied
 
 Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 1000, `ini_xp_level_mult` 400). Nine still hold the archive's defaults:
@@ -205,7 +238,7 @@ Guide row 1 lists fifteen `set` edits. Two are now correct (`ini_xp_level_base`
 Plus `ini_xp_kill_other`, which the guide does not mention and the Oracle sets
 to 10 against the archive's 25.
 
-### C2. Cosmetic, listed so they are not re-investigated
+### C3. Cosmetic, listed so they are not re-investigated
 
 - `MigTraining.ini` line 65 (`fTrainerAdvancedMult`) has one tab in the Oracle
   where the archive has two. No instruction touches that line; the file has been
