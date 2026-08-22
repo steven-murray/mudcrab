@@ -3,8 +3,6 @@
 //! MO2 is the first concrete export target, not the internal abstraction --
 //! the install pipeline itself stays launcher-agnostic.
 
-pub(crate) mod load_order;
-
 use super::install::InstallSettings;
 use crate::config::download;
 use crate::config::install::is_plugin_file;
@@ -183,44 +181,21 @@ pub(crate) fn export_mo2_instance(
 
     let profile_dir = mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
     write_text_file(&profile_dir.join("modlist.txt"), &render_mo2_modlist(plan, scope))?;
-    // Oblivion's plugins.txt says which plugins are active, not what order they
-    // load in. `load_order` puts the order where the game and MO2 actually keep
-    // it; without that the list here is a description of an order nothing has.
+    // Both files, and they are not the same file twice. Oblivion has no
+    // load-order file: the order *is* the plugins' modification times, oldest
+    // first, and `plugins.txt` records only which plugins are active. The order
+    // lives in `loadorder.txt`, which MO2 reads when it opens the profile and
+    // then applies by stamping the plugin files -- so writing `plugins.txt`
+    // alone describes an order nothing has, and MO2 fills the gap by rewriting
+    // `loadorder.txt` from whatever timestamps extraction happened to leave.
+    //
+    // MO2 reads this at profile load, so it has to be restarted for a new order
+    // to take. Part 37 of the guide says the same thing about pasting its own
+    // `loadorder.txt` in: "close & restart MO2 to have the plugins in order".
     let plugins = scoped_plugins(plan, settings, scope)?;
-    apply_load_order(&plugins, settings)?;
     write_text_file(&profile_dir.join("plugins.txt"), &render_plugin_list(&plugins))?;
     write_text_file(&profile_dir.join("loadorder.txt"), &render_plugin_list(&plugins))?;
     write_text_file(&profile_dir.join("archives.txt"), &render_archive_list(plan, settings, scope)?)?;
-    Ok(())
-}
-
-/// Stamp the plugin files so the game loads them in the declared order.
-///
-/// A declared plugin with no file is reported and skipped, not dropped from the
-/// profile. `Bashed Patch, 0.esp` is the normal case -- the list pre-declares
-/// it and Wrye Bash writes it later -- and in a staging install with no
-/// `--game-dir` the base masters are simply not visible from here, so absence
-/// is not evidence. MO2 ignores a name with no file behind it, and the order
-/// the profile does describe is now backed by the timestamps, so a rewrite
-/// reproduces it rather than replacing it.
-fn apply_load_order(plugins: &[String], settings: &InstallSettings) -> anyhow::Result<()> {
-    let plan =
-        load_order::plan_load_order(plugins, &settings.mods_dir, settings.game_dir.as_deref())?;
-    let stamped = load_order::stamp_plugin_order(&plan)?;
-
-    tracing::info!(
-        stamped,
-        plugins = plan.present.len(),
-        "mo2 export: applied the load order to the plugin files"
-    );
-    if !plan.missing.is_empty() {
-        tracing::info!(
-            count = plan.missing.len(),
-            plugins = ?plan.missing,
-            "mo2 export: no file to stamp for these plugins, so they hold no position yet"
-        );
-    }
-
     Ok(())
 }
 
