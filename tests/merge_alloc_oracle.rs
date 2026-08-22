@@ -6,7 +6,7 @@
 //! extracted from the same install, so this runs without the game present.
 //!
 //! Regenerate the fixtures from a real install with the snippet in
-//! `MOFAM-test/notes/merge-recon.md`.
+//! `docs/design/merge-engine.md`.
 
 use mudcrab::merge::alloc::allocate;
 use mudcrab::plugin::PluginName;

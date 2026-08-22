@@ -290,7 +290,7 @@ pub struct FilePruneAction {
     /// The guide's "Winning File conflicts -> Overwritten mods" and "Losing
     /// file conflicts -> Providing Mod" rows, said once instead of as a list
     /// of paths read off somebody's finished install. See
-    /// `notes/conflict-resolution-design.md` for why the *direction* has to be
+    /// `docs/design/conflict-resolution.md` for why the *direction* has to be
     /// declared rather than derived from mod priority.
     #[serde(default)]
     pub conflicts_with: Vec<String>,

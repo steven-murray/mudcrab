@@ -3,7 +3,7 @@
 //! The algorithm below reproduces zEdit/zMerge's `map.json` **exactly** for all
 //! six MOFAM merges, including the two that actually renumber (Unique Forts,
 //! 2004 remaps; TACE, 1170). It was derived by measurement, not from
-//! documentation -- see `MOFAM-test/notes/merge-recon.md`.
+//! documentation -- see `docs/design/merge-engine.md`.
 
 use crate::plugin::PluginName;
 use indexmap::IndexMap;

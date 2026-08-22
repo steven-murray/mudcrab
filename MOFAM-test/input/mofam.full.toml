@@ -2626,7 +2626,8 @@ file_name = "OOO Enhanced - Resources-47187-5-3b-1742488154.7z"
 # Both spellings are listed because archive-side globs are case-*sensitive*
 # while staged-tree ones are not. That asymmetry is a known deferred item and
 # this is another instance of it: one pattern looks like it covers the case and
-# silently catches 4 of 14. See notes/ooo-enhanced-thumbs-db.txt.
+# silently catches 4 of 14 -- this mod ships ten lower-case `thumbs.db` and
+# four capitalised `Thumbs.db`.
 exclude = ["**/thumbs.db", "**/Thumbs.db"]
 
 [[mods.actions]]
@@ -3591,7 +3592,7 @@ file_name = "Improved glow maps for Oblivion Realm-53411-1-2-1697805206.7z"
 #
 # The Oracle did NOT apply this -- its own oblivion.ini still has
 # bUseRefractionShader=1. `diff` compares mod folders, not INIs, so this
-# disagreement is invisible to it. Guide followed; see the overnight reports.
+# disagreement is invisible to it. Guide followed.
 [[mods.actions]]
 action = "ini_set"
 scope = "game"
@@ -4205,7 +4206,7 @@ path = "nexus:oblivion/25122/43241"
 download_handler = "nexus"
 file_name = "Mage Guild Sign-25122.rar"
 # Guide 27. NOT IN THE ORACLE -- it installed only row 28's mergeable variant,
-# so this mod is "extra in ours". Guide followed; see the overnight reports.
+# so this mod is "extra in ours". Guide followed.
 #
 # Guide: "Once installed move MageGuild_simbol.esp to the optional folder."
 

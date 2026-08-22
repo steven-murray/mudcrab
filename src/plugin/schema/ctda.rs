@@ -9,7 +9,7 @@
 //! Every classification below was confirmed empirically: for each function,
 //! comparing the parameter in a merge's source plugin against the same
 //! parameter in zMerge's output shows whether zMerge rewrote it. See
-//! `MOFAM-test/notes/merge-recon.md`.
+//! `docs/design/merge-engine.md`.
 //!
 //! An unlisted function index is an error. The table is filled demand-driven
 //! from what `plugin-audit` actually finds, because guessing which parameters

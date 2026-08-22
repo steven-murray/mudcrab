@@ -1,34 +1,68 @@
-# MOFAM Real-World Test Workspace
+# MOFAM: the case study mudcrab was built against
 
-Goal: drive mudcrab feature development toward automated install support for MOFAM on Nexus:
-https://www.nexusmods.com/oblivion/mods/52949
+[MOFAM](https://www.nexusmods.com/oblivion/mods/52949) is a 40-part, ~700-mod
+Oblivion guide. This workspace holds the whole of it expressed as a single
+mudcrab modlist, and it exists because a declarative installer is easy to
+believe in on a ten-mod example and hard to believe in on a real one.
 
-This folder tracks a practical translation pipeline from human instructions to machine-installable TOML.
+Almost every feature mudcrab has was added because a MOFAM row needed it.
 
-## Current Status
+## What is here
 
-- Source capture is complete: [input/mofam-source.md](input/mofam-source.md) holds the
-  full manually-transcribed page (~158 KB, 40 Parts), since automated web extraction of
-  the Nexus description page was blocked by anti-bot/ad redirects in the fetch tool.
-- Translation to TOML is in progress: Parts 1, 2, 3, 4, and 6 are fully translated in
-  [input/mofam.full.toml](input/mofam.full.toml) and have been installed end-to-end
-  (see [output/mo2-instance](output/mo2-instance) and the install logs under `output/`).
-  The remaining Parts are not yet translated.
-- Known hole: Part 5 (LOD) was skipped, not deferred ahead — it sits *behind*
-  the current frontier and is the next section to be built.
+| | |
+| --- | --- |
+| `input/mofam.full.toml` | The modlist. ~700 mods, six merges, a fixed 242-plugin load order. |
+| `input/mofam-source.md` | The guide, transcribed. The authoring input. |
+| `input/mofam.merges.toml` | The merges alone, for building and inspecting them standalone. |
+| `input/mofam.minimal*.toml` | Small lists of behaviourally interesting rows, for fast iteration. |
+| `loadorder.txt` | The guide's published load order, used to verify ours. |
+| `scripts/run-full.sh` | The whole pipeline against the real list; takes `--section` / `--only`. |
+| `notes/open-items.md` | What is still outstanding in this particular build. |
 
-## Workflow
+`output/` is generated and gitignored.
 
-1. Put captured source instructions in [input/mofam-source.md](input/mofam-source.md).
-2. Condense and normalize into [notes/mofam-condensed.md](notes/mofam-condensed.md).
-3. Translate into full TOML draft in [input/mofam.full.toml](input/mofam.full.toml).
-4. Keep a fast-path test TOML in [input/mofam.minimal.toml](input/mofam.minimal.toml) with only behaviorally interesting entries.
-5. Iterate mudcrab against minimal TOML first, then promote patterns to full TOML.
+## What it established
 
-## Quick Run (Minimal)
+The list installs end to end and the result has been played. Verification was
+per-section against a hand-built reference instance of the same guide (an
+"Oracle"), with every difference explained rather than accepted — that discipline
+is what found most of the bugs worth finding.
+
+Against that reference, of 737 mods compared:
+
+- **559 byte-for-byte identical.**
+- **86** differ only in how a merged-away plugin is retired: mudcrab renames it
+  `.mohidden`; the reference unticks it instead. All 86 are inactive on both
+  sides, so the effective load order is the same.
+- **41** differ in content, and they fall into a few systematic groups — the six
+  merges (mudcrab and zMerge allocate FormIDs differently and retain different
+  masters, while producing the same record set and reference graph), the repacked
+  BSAs (same payload, different internal ordering), the independently-built
+  Bashed Patch, and a handful of hand edits made on the reference side.
+- The rest are mods the reference has and this list does not, or the reverse.
+
+The load order matches the guide's own published `loadorder.txt` entry for
+entry, with one deliberate omission (`Swearing Rats.esp`, which the guide says
+may be skipped).
+
+## Running it
+
+Needs the archives. Most resolve from a local MO2 downloads folder via
+`--archive-search-path`; anything genuinely missing needs `NEXUS_API_KEY`.
 
 ```bash
-./MOFAM-test/scripts/run-minimal.sh
+./MOFAM-test/scripts/run-full.sh --section "12 - WEATHER & LIGHTING"
 ```
 
-Artifacts are written under [MOFAM-test/output](output).
+The last stage is `mudcrab diff` against the reference instance, which is the
+point of the exercise. Paths to the game, the instances and the downloads folder
+are set at the top of the script.
+
+## A caveat about reproducibility
+
+This list pins Nexus **file ids**, which the guide does not — it usually says
+"the top file on the page". Those ids were recovered from the reference
+instance's `meta.ini` files. That makes the list reproducible in a way the guide
+is not, but it also means the pinning came from one person's install rather than
+from the guide text. `diff` flags any archive that postdates the guide, so drift
+is visible; see [known-issues.md](../docs/known-issues.md#nexus-pinning).

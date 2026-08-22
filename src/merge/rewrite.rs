@@ -108,7 +108,7 @@ impl<'a> Remapper<'a> {
         // Counted rather than logged at the point of use: a per-reference
         // warning would print hundreds of times for one plugin. The merge
         // reports the total once.
-        // See MOFAM-test/notes/zmerge-non-canonical-refs.md.
+        // See docs/design/merge-engine.md.
         if mod_index >= own_index {
             if mod_index > own_index {
                 self.non_canonical.set(self.non_canonical.get() + 1);
