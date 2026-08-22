@@ -220,11 +220,48 @@ effective load order. See C1 for the consequence on the Oracle's Prebash.
 OOO Patches 1759, TACE 8533, Prebash 4505, Late Loaders 4361, NPC 2278 — and
 the renumbering counts (2004 and 1170) match too.
 
-### B2. ~~LOOT / load order~~ — settled at Part 37
+### B2. ~~LOOT / load order~~ — settled, and the earlier version of this note was wrong
 
-`loot-sort` was never needed. The load order is the modlist's `plugins` array,
-and Part 37 made that array identical to the guide's published `loadorder.txt`,
-entry for entry. No GUI, no interim.
+The load order is the modlist's `plugins` array, and Part 37 made that array
+identical to the guide's published `loadorder.txt`, entry for entry. `loot-sort`
+was never needed.
+
+What the earlier note missed is that **writing `plugins.txt` does not apply a
+load order.** Oblivion has no load-order file: the order *is* the plugin files'
+modification times, oldest first, and `plugins.txt` records only which plugins
+are active. Steven caught it by looking at MO2 and seeing
+`YourMotherWasAHamster.esp` at the bottom of the list.
+
+The failure was worse than "the order is ignored". MO2 read the real order off
+the timestamps, found it disagreed with a stale `loadorder.txt`, and rewrote
+`loadorder.txt` to match the files — so what the profile displayed was the order
+the archives happened to be extracted in, and mudcrab's order was actively
+overwritten. Checking it is one line: the order MO2 showed was byte-for-byte the
+mtime order.
+
+`src/config/mo2/load_order.rs` now puts the order in both places that hold it,
+from one list, so there is nothing for MO2 to reconcile:
+
+- `loadorder.txt`, which MO2 reads and displays.
+- the plugin files' mtimes, which the game reads. One minute apart from
+  2000-01-01, far enough apart that no filesystem's timestamp granularity can
+  tie two neighbours.
+
+Three details that are not arbitrary:
+
+- **Every copy of a name is stamped**, not the one MO2 would pick. Two mods can
+  ship a plugin of the same name — see B1 — and stamping both means the result
+  does not depend on this code agreeing with MO2 about mod priority.
+- **Hidden plugins are skipped.** A `.mohidden` merge source is not in the load
+  order, and its mtime is part of the merge's input hash: stamping one would
+  rebuild every merge on the next run.
+- **Mod roots only, not a recursive walk.** MO2 exposes a mod's root as `Data`,
+  so a plugin under `optional/` is not in the load order.
+
+`Bashed Patch, 0.esp` is reported as having no file to stamp, which is correct
+until Wrye Bash writes it. It stays in the profile: MO2 ignores a name with
+nothing behind it, and a staging install with no `--game-dir` cannot see the
+base masters either, so absence is not evidence of anything.
 
 ## C. Open on the Oracle side
 
