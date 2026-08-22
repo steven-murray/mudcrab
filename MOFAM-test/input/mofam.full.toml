@@ -6619,10 +6619,11 @@ path = "nexus:oblivion/54287/1000039026"
 download_handler = "nexus"
 file_name = "IFG Eng - Town Guard Shields Preview Patch-54287-1-1-1722632246.rar"
 
-# Guide 6 [QAC]: "All The Districts - Merged". The guide also asks for two
-# records to be deleted in xEdit afterwards -- a Light and the Tamriel
-# worldspace override, to drop the Waterfront district. mudcrab has no scripted
-# record deletion yet, so that step is NOT applied here; see report 4.
+# Guide 6 [QAC]: "All The Districts - Merged", then two records deleted in
+# xEdit: a Light and the Tamriel worldspace override. "This removes the
+# Waterfront aspect from the merge, given it's excess on performance" -- so it
+# is a content decision, not tidying, and skipping it would leave the Waterfront
+# district in.
 [[mods]]
 id = "ImpeREAL City - Unique Districts"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -6640,6 +6641,16 @@ file_name = "ImpeREAL City - Unique Districts - All The Districts - Merged-19589
 [[mods.actions]]
 action = "qac"
 plugins = ["ImpeREAL City Unique Districts - All the Districts - Merged.esp"]
+
+# Deleting the Tamriel override takes its whole child tree with it: 13 cells and
+# 542 references, 591 entries in all.
+[[mods.actions]]
+action = "delete_records"
+plugin = "ImpeREAL City Unique Districts - All the Districts - Merged.esp"
+form_ids = [
+  "xx010F43",  # Light > CityStreetlightWaterfrontDistrict01
+  "0000003C",  # Worldspace > Tamriel
+]
 
 [[mods]]
 id = "The Imperial Waters"
@@ -7517,10 +7528,8 @@ path = "nexus:oblivion/46462/1000011703"
 download_handler = "nexus"
 file_name = "Falling Leaves Chorrol - Project Ambience-46462-0-1.rar"
 
-# Guide 12 [QAC]: the MOO Compatibility main file. The guide then asks for
-# three wild edits to be removed in xEdit -- a cell block, a reference and a
-# sub-block override. mudcrab has no scripted record deletion, so that step is
-# NOT applied; the same gap as Part 26a row 6.
+# Guide 12 [QAC]: the MOO Compatibility main file, then "a few wild edits need
+# removing" in xEdit.
 [[mods]]
 id = "People Live Here - Skingrad Enhancement Mod"
 section = ["26b - TOWN & CITY EXTRAS (TACE) MERGE"]
@@ -7534,6 +7543,19 @@ file_name = "MOO Compatibility-52456-v1-0-1668149861.zip"
 [[mods.actions]]
 action = "qac"
 plugins = ["SkingradDeuglified.esp"]
+
+# Guide 12's three deletions. The first is written as "Worldspace > 0001C31D >
+# Delete Block -11, 2"; that block holds one sub-block holding one cell, so
+# naming the cell is the same edit from the bottom up -- the two groups left
+# holding nothing collapse with it. The other two are named outright.
+[[mods.actions]]
+action = "delete_records"
+plugin = "SkingradDeuglified.esp"
+form_ids = [
+  "xx0010AB",  # the only cell in Block -11, 2
+  "xx002136",  # Block -1, 0 > Sub-Block -2, 0 > 0000A7E9
+  "xx0020EE",  # Block -1, -1 > Sub-Block -3, -1
+]
 
 [[mods]]
 id = "Gardens of Cyrodiil - Castle Courtyards - Skingrad"

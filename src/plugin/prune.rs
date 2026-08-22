@@ -100,10 +100,18 @@ fn remove_record(entries: &mut Vec<Entry>, form_id: FormId) -> bool {
         return true;
     }
 
-    for entry in entries {
-        if let Entry::Group(group) = entry
+    // Deeper in. A group left holding nothing goes too: removing the only cell
+    // in an exterior block empties its sub-block, which empties the block, and
+    // xEdit does not leave those behind. Part 26b row 12 is exactly that -- it
+    // says "delete Block -11, 2", and deleting the one cell inside it is the
+    // same edit expressed from the bottom up.
+    for index in 0..entries.len() {
+        if let Entry::Group(group) = &mut entries[index]
             && remove_record(&mut group.entries, form_id)
         {
+            if group.entries.is_empty() {
+                entries.remove(index);
+            }
             return true;
         }
     }
@@ -205,6 +213,57 @@ mod tests {
         assert_eq!(report.form_ids, vec![FormId(0x0100_0001)]);
         let left: Vec<u32> = plugin.records().map(|record| record.form_id.0).collect();
         assert_eq!(left, vec![0x0100_0003], "the cell, its group and its ref all go");
+    }
+
+    /// Part 26b row 12's shape: the guide says "delete Block -11, 2", and the
+    /// block holds one sub-block holding one cell. Deleting the cell has to
+    /// take the two groups that are then holding nothing.
+    #[test]
+    fn emptied_parent_groups_collapse() {
+        let mut plugin = plugin(vec![group(
+            GroupType::TopLevel(*b"WRLD"),
+            vec![
+                record(b"WRLD", 0x0001_C31D),
+                group(
+                    GroupType::WorldChildren(FormId(0x0001_C31D)),
+                    vec![
+                        group(
+                            GroupType::ExteriorBlock { y: 2, x: -11 },
+                            vec![group(
+                                GroupType::ExteriorSubBlock { y: 10, x: -44 },
+                                vec![record(b"CELL", 0x0100_10AB)],
+                            )],
+                        ),
+                        // A sibling block, which must survive untouched.
+                        group(
+                            GroupType::ExteriorBlock { y: 0, x: -1 },
+                            vec![record(b"CELL", 0x0100_2222)],
+                        ),
+                    ],
+                ),
+            ],
+        )]);
+
+        plugin.prune(&PruneRequest {
+            form_ids: vec![FormId(0x0100_10AB)],
+            ..Default::default()
+        });
+
+        let Entry::Group(top) = &plugin.entries[0] else {
+            panic!("top-level group should survive")
+        };
+        let Entry::Group(children) = &top.entries[1] else {
+            panic!("world children should survive")
+        };
+        assert_eq!(
+            children.entries.len(),
+            1,
+            "the emptied block should be gone and the sibling kept"
+        );
+        let Entry::Group(kept) = &children.entries[0] else {
+            panic!("sibling block should survive")
+        };
+        assert_eq!(kept.group_type, GroupType::ExteriorBlock { y: 0, x: -1 });
     }
 
     #[test]

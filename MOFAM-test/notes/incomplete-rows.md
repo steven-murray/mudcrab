@@ -47,24 +47,22 @@ the whole block, not a key.
 Target file, as installed: `ini/MigFEA - Custom Trainers.ini`.
 Our copy is 1788 bytes; a correct one is 2181.
 
-### A2. Scripted record deletion — Parts 11, 26a, 26b
+### A2. ~~Scripted record deletion~~ — done, all three rows
 
-Three rows ask for records to be deleted in xEdit after install.
+`delete_records` does what those rows asked xEdit to do by hand. All three are
+encoded and verified:
 
-| row | mod | what to delete |
+| row | what it removes | result |
 |---|---|---|
-| 26a #6 | ImpeREAL City - Unique Districts | `Light > xx010F43 CityStreetlightWaterfrontDistrict01`, and `Worldspace > 0000003C Tamriel` |
-| 26b #12 | People Live Here - Skingrad | `Worldspace > 0001C31D > Block -11, 2`; `0001C31D > Block -1,0 > Sub-Block -2,0 > 0000A7E9 > xx002136`; `0001C31D > Block -1,-1 > Sub-Block -3,-1 > xx0020EE` |
-| 11 #23 | Harvest [Flora] - DLCFrostcrag | the Worldspace group (see `TODO(xedit)` in the modlist) |
+| 11 #23 | the `WRLD` group from `Harvest [Flora] - DLCFrostcrag.esp` | **byte-identical** to the Oracle |
+| 26a #6 | `xx010F43` (a Light) and `0000003C` (Tamriel), 593 entries | same records, same contents |
+| 26b #12 | three wild edits, 5 entries | **byte-identical** to the Oracle |
 
-**Effect if left**: 26a #6 leaves the Waterfront district in the ImpeREAL merge,
-which the guide removes for performance. 26b #12 leaves three wild edits that
-can fight other mods over the same cells.
-
-**Fix**: mudcrab already has a full TES4 reader/writer and a reference-rewriting
-engine — deleting a record by FormID and re-deriving the GRUPs is well within
-what the merge code already does. This is the largest missing feature in the
-list and the one most worth building.
+Two details worth keeping. Removing a record takes the group holding its
+children — a CELL and the GRUP of its references are separate entries, so
+deleting the record alone leaves children parented to nothing. And a group left
+holding nothing collapses, which is why 26b row 12's "delete Block -11, 2" can
+be written as the one cell inside it: the sub-block and block go with it.
 
 ### A3. The Bashed Patch itself — Part 38 row 1
 
@@ -130,42 +128,42 @@ file) or copy the file in by hand.
 
 ## B. Deferred by choice, not by capability
 
-### B1. ~~QAC~~ — run, with nine plugins still unexplained
+### B1. ~~QAC~~ — run, and all nine differences explained
 
-The pass has run list-wide: 26 mods, 36 plugins. **27 come out byte-identical
-to the Oracle's cleaned copies.** It is unattended — see
-`src/config/tools/xedit.rs` for how, and why it drives real xEdit rather than
-reimplementing "identical to master".
+26 mods, 27 plugins. **21 are byte-identical to the Oracle's copies.** The pass
+is unattended; `src/config/tools/xedit.rs` says how, and why it drives real
+xEdit rather than reimplementing "identical to master".
 
-Nine still differ, and they differ in **both directions**, so this is not one
-cause:
+The six that differ are not QAC failures. Every one is now accounted for:
 
-| plugin | ours | Oracle |
-|---|---|---|
-| `DLCFrostcrag.esp` | 182563 | 129320 |
-| `Harvest [Flora] - DLCFrostcrag.esp` | 1120 | 800 |
-| `ImpeREAL City … Merged.esp` | 694227 | 655698 |
-| `SkingradDeuglified.esp` | 171647 | 171484 |
-| `EVE_StockEquipmentReplacer for OOO.esp` | 60545 | 60832 |
-| `All Natural - Real Lights.esp` | 2196163 | 2196260 |
-| `The Imperial Water.esp` | 20905 | 22343 |
-| `Nobody Goes into the Mountains but Hunters.esp` | 597139 | 724881 |
-| `The Lost Spires.esp` | 2820420 | 3043886 |
+| plugin | what it is |
+|---|---|
+| `EVE_StockEquipmentReplacer for OOO.esp` | Oracle never cleaned it — 1 ITM |
+| `All Natural - Real Lights.esp` | Oracle never cleaned it — 1 ITM |
+| `The Imperial Water.esp` | Oracle never cleaned it — 19 ITM |
+| `Nobody Goes into the Mountains but Hunters.esp` | Oracle never cleaned it — 17 ITM |
+| `The Lost Spires.esp` | Oracle never cleaned it — **159 ITM, 433 UDR** |
+| `ImpeREAL City … Merged.esp` | same size, same 8845 records, same contents — record **order** only |
 
-**The two Frostcrag entries are settled — see C2 below.** Both come from the
-same hand step, applied to one file too many. Neither is a QAC difference.
+**"Never cleaned" is measured, not inferred.** For all five, the Oracle's copy
+is byte-for-byte the plugin as it comes out of the mod's archive. The dirt
+counts are xEdit's own, from its log when we cleaned ours. All five carry
+`[QAC]` in the guide, so this build follows the guide and the Oracle skipped
+those five rows.
 
-Of the seven that remain, `The Lost Spires` is the informative one: ours
-removed 87 records the Oracle kept and **443 records differ in content**, which
-is UDR undeletion rather than ITM removal.
+`The Lost Spires`' 433 UDRs are the "443 records differ" that looked mysterious
+earlier — undeleted references, not ITM removal.
 
-**Effect if left**: the merges are close but not exact — TACE 8536 records
-against the Oracle's 8533, Prebash 4506 against 4505. Both were rebuilt on the
-cleaned sources.
+**ImpeREAL City** is the one cosmetic case. Its groups are FormID-sorted in the
+Oracle and in archive order here: a full xEdit load-and-save sorts records
+within a group, QuickAutoClean does not, and the Oracle's copy went through a
+manual xEdit session for its row-6 deletions while ours is edited by mudcrab.
+Record order inside a group carries no meaning — the engine indexes by FormID —
+so this sits with the BSA payload-ordering difference as a known non-issue.
 
-**Next step**: take the nine one at a time. The instrument is
-`mudcrab diff --only "<mod>"`, which now reports records unique to each side
-and records whose contents differ.
+**Every merge now matches the Oracle's record count exactly**: Unique Forts
+7912, OOO Patches 1759, TACE 8533, Prebash 4505, Late Loaders 4361, NPC 2278 —
+and the renumbering counts (2004 and 1170) match too.
 
 ### B2. ~~LOOT / load order~~ — settled at Part 37
 
