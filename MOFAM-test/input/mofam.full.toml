@@ -3133,20 +3133,23 @@ file_name = "Harvest Flora v3_0_1-2037.zip"
 action = "file_prune"
 paths = ["NoMushroomStalks"]
 
-# Guide 23, remaining steps -- deferred, as every QAC so far has been:
-#   - Run Harvest [Flora] - DLCFrostcrag.esp through QAC
-#   - Run Harvest [Flora] - Shivering Isles.esp through QAC
-#   - Open Harvest [Flora] - DLCFrostcrag.esp in xEdit & remove the Worldspace group
-#
-# The QACs join the batch run at the end of the build. The Worldspace removal is
-# a different thing -- scripted record deletion, which mudcrab cannot do yet and
-# which Parts 26a #6 and 26b #12 also need. Both plugins are Part 36 merge
-# sources, so nothing downstream depends on them until that merge is built.
-# TODO(xedit): remove the Worldspace group from Harvest [Flora] - DLCFrostcrag.esp
-
 [[mods.actions]]
 action = "qac"
 plugins = ["Harvest [Flora] - DLCFrostcrag.esp", "Harvest [Flora] - Shivering Isles.esp"]
+
+# Guide 23: "Open Harvest [Flora] - DLCFrostcrag.esp in xEdit & remove the
+# Worldspace group."
+#
+# After the QAC above on purpose: QAC rewrites the whole plugin, so a deletion
+# made first would be made against a file about to be replaced. Harmless in this
+# case, since QAC removes nothing from this one, but not something to rely on.
+#
+# The group holds one WRLD (Tamriel) and the cell beneath it. What is left is
+# the three FLOR records that are the point of the patch.
+[[mods.actions]]
+action = "delete_records"
+plugin = "Harvest [Flora] - DLCFrostcrag.esp"
+groups = ["WRLD"]
 
 [[mods]]
 id = "Improved Flora Harvest Fix"
