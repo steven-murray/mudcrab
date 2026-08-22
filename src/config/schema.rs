@@ -129,6 +129,7 @@ pub enum ModAction {
     FileHide(FileHideAction),
     FileMove(FileMoveAction),
     ExtractBsa(ExtractBsaAction),
+    DeleteRecords(DeleteRecordsAction),
 }
 
 impl ModAction {
@@ -150,7 +151,8 @@ impl ModAction {
             | ModAction::FilePrune(_)
             | ModAction::FileHide(_)
             | ModAction::FileMove(_)
-            | ModAction::ExtractBsa(_) => false,
+            | ModAction::ExtractBsa(_)
+            | ModAction::DeleteRecords(_) => false,
         }
     }
 
@@ -165,6 +167,7 @@ impl ModAction {
             ModAction::FileHide(_) => "file_hide",
             ModAction::FileMove(_) => "file_move",
             ModAction::ExtractBsa(_) => "extract_bsa",
+            ModAction::DeleteRecords(_) => "delete_records",
         }
     }
 }
@@ -330,6 +333,30 @@ pub struct IniSetAction {
     pub format: IniSetFormat,
     #[serde(default)]
     pub scope: IniScope,
+}
+
+/// Delete records or whole groups from a plugin.
+///
+/// Several guide rows say "open this in xEdit and remove that", which is
+/// otherwise the one kind of step that cannot be reproduced without a GUI.
+///
+/// Nothing here is a glob: a record is named by its FormID and a group by its
+/// signature, and asking for one that is not there is an error rather than a
+/// quiet no-op.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DeleteRecordsAction {
+    /// The plugin to edit, named exactly, relative to the mod's staged folder.
+    pub plugin: String,
+    /// Whole top-level groups to remove, by record signature: `WRLD`, `CELL`.
+    /// Removing a group takes everything inside it.
+    #[serde(default)]
+    pub groups: Vec<String>,
+    /// Records to remove, as eight hex digits. A leading `xx` stands for the
+    /// plugin's own mod index, which is how xEdit displays it and how the guide
+    /// writes it -- `xx010F43`. Whatever children the record carries go too.
+    #[serde(default)]
+    pub form_ids: Vec<String>,
 }
 
 /// Quick Auto Clean: run xEdit's QAC over the named plugins.
