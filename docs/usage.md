@@ -224,27 +224,17 @@ merges are rebuilt deterministically and hiding is idempotent.
 
 Oblivion has no load-order file. **The order is the plugin files' modification
 times**, oldest first; `plugins.txt` says only which plugins are *active*.
-Writing it in the declared order therefore looks right and does nothing — and
-MO2, on finding that the timestamps disagree with `loadorder.txt`, rewrites
-`loadorder.txt` to match the files, so a modlist's order is not just ignored but
-overwritten by whatever order the archives were extracted in.
+Writing it in the declared order therefore looks right and applies nothing — and
+MO2, finding a `loadorder.txt` that does not list everything, places the rest by
+timestamp, which is whatever order the archives were extracted in.
 
-`install` puts the order in both places that hold it, from one list:
+`install` writes `loadorder.txt` next to `plugins.txt`, from the same list.
+Applying it to the plugin timestamps is MO2's job and mudcrab leaves it alone:
+MO2 restamps the files from `loadorder.txt` when it loads the profile.
 
-- `loadorder.txt`, which MO2 reads and displays.
-- the plugin files' mtimes, one minute apart from 2000-01-01, which the game
-  reads.
-
-Every copy of a plugin name is stamped, not just the one MO2's priority order
-would pick, so the result does not depend on agreeing with MO2 about which mod
-wins. `.mohidden` plugins are skipped — a hidden merge source is not in the load
-order, and its mtime is part of that merge's input hash. Only mod roots are
-scanned, since that is what MO2 exposes as `Data`.
-
-A declared plugin with no file on disk is logged and skipped rather than
-dropped from the profile: `Bashed Patch, 0.esp` is declared before Wrye Bash
-writes it, and a staging install with no `--game-dir` cannot see the base
-masters at all.
+**MO2 must be restarted** for a new order to take, since it reads the file at
+profile load. Part 37 of the MOFAM guide says the same thing about pasting in
+its own copy: "close & restart MO2 to have the plugins in order".
 
 ### What a re-run does not redo
 

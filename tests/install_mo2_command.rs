@@ -106,20 +106,11 @@ fn install_exports_modorganizer2_instance_structure() {
     assert_eq!(plugins, "Core.esm\n");
 
     // Oblivion's plugins.txt says what is active, not what order it loads in.
-    // loadorder.txt is where MO2 keeps the order, and the plugin's own mtime is
-    // where the game keeps it -- so the export has to write both.
+    // loadorder.txt is where the order lives, and MO2 applies it to the plugin
+    // files, so the export has to write it too.
     let loadorder = std::fs::read_to_string(profile_dir.join("loadorder.txt"))
         .expect("loadorder.txt should exist");
     assert_eq!(loadorder, plugins);
-
-    let stamped = std::fs::metadata(instance_dir.join("mods").join("core").join("Core.esm"))
-        .expect("the plugin should be staged")
-        .modified()
-        .expect("mtime")
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("after the epoch")
-        .as_secs();
-    assert_eq!(stamped, 946_684_800, "first in the load order gets the base stamp");
 
     let archives = std::fs::read_to_string(profile_dir.join("archives.txt"))
         .expect("archives.txt should exist");

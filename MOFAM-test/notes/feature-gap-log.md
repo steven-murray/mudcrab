@@ -18,7 +18,7 @@ Track required mudcrab capabilities discovered while translating MOFAM.
 | GAP-011 | Actions | `ini_append_block` | Multi-line raw block append (not a single key/value `ini_set`) | **done** — `src/config/actions/ini_append_block.rs`, Part 30 row 7 byte-identical |
 | GAP-012 | Actions | Move plugin to `optional/` | MO2 optional-plugins convention | open |
 | GAP-013 | Layout | MO2 "Ignore Missing Data" flag | Mods that reference files MO2 would otherwise flag as missing | open |
-| GAP-014 | MO2 export | Apply the load order | **done** — `src/config/mo2/load_order.rs` writes `loadorder.txt` *and* stamps the plugin mtimes, which is where Oblivion actually keeps the order |
+| GAP-014 | MO2 export | Write `loadorder.txt` | **done** — the order lives there, not in `plugins.txt`; MO2 reads it at profile load and applies it to the plugin timestamps itself |
 | GAP-015 | Actions | xEdit scripted record deletion | Cases needing an xEdit script to delete records, not just merge/rewrite them | open |
 
 ### GAP-007 note

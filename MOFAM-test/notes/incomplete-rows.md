@@ -232,36 +232,34 @@ modification times, oldest first, and `plugins.txt` records only which plugins
 are active. Steven caught it by looking at MO2 and seeing
 `YourMotherWasAHamster.esp` at the bottom of the list.
 
-The failure was worse than "the order is ignored". MO2 read the real order off
-the timestamps, found it disagreed with a stale `loadorder.txt`, and rewrote
-`loadorder.txt` to match the files — so what the profile displayed was the order
-the archives happened to be extracted in, and mudcrab's order was actively
-overwritten. Checking it is one line: the order MO2 showed was byte-for-byte the
-mtime order.
+The failure was worse than "the order is ignored". MO2 held a stale
+`loadorder.txt` listing 94 of 242 plugins, and placed the rest by timestamp — so
+what the profile displayed was largely the order the archives happened to be
+extracted in. The install now writes `loadorder.txt` alongside `plugins.txt`,
+from the same list.
 
-`src/config/mo2/load_order.rs` now puts the order in both places that hold it,
-from one list, so there is nothing for MO2 to reconcile:
+**MO2 stamps the plugin files; mudcrab must not.** The first fix had mudcrab
+write the timestamps as well, on the reasoning that the game reads mtimes and
+something has to put them there. Steven's read was that MO2 must already do it
+when it builds the VFS, which the Oracle settles: its 329 plugins carry mtimes
+one day apart from 2000-01-01, in `loadorder.txt` order. That is MO2's own
+stamping, and mudcrab reproducing it would be emulating the tool that is
+already in the loop — while writing to every plugin file on every install, and
+needing a special case to keep `.mohidden` merge sources out of it. The
+stamping came back out.
 
-- `loadorder.txt`, which MO2 reads and displays.
-- the plugin files' mtimes, which the game reads. One minute apart from
-  2000-01-01, far enough apart that no filesystem's timestamp granularity can
-  tie two neighbours.
+**MO2 must be restarted** for a new `loadorder.txt` to take: it reads the file
+when the profile opens. The guide says the same about pasting in its own copy —
+*"close & restart MO2 to have the plugins in order"* — and adds *"DOUBLE CHECK
+the Load Order is correct"*.
 
-Three details that are not arbitrary:
-
-- **Every copy of a name is stamped**, not the one MO2 would pick. Two mods can
-  ship a plugin of the same name — see B1 — and stamping both means the result
-  does not depend on this code agreeing with MO2 about mod priority.
-- **Hidden plugins are skipped.** A `.mohidden` merge source is not in the load
-  order, and its mtime is part of the merge's input hash: stamping one would
-  rebuild every merge on the next run.
-- **Mod roots only, not a recursive walk.** MO2 exposes a mod's root as `Data`,
-  so a plugin under `optional/` is not in the load order.
-
-`Bashed Patch, 0.esp` is reported as having no file to stamp, which is correct
-until Wrye Bash writes it. It stays in the profile: MO2 ignores a name with
-nothing behind it, and a staging install with no `--game-dir` cannot see the
-base masters either, so absence is not evidence of anything.
+One artefact of how the stamping works is worth knowing before a rebuild. In the
+Oracle, `Bashed Patch, 0.esp` is the **single** plugin out of sequence: Wrye Bash
+wrote it after MO2 last saved the order, so it kept its own timestamp and sits
+seven positions early, ahead of `NPC Merge.esp`, `Late Loaders Merged.esp` and
+four others it is declared to load after. Whether that reaches the game depends
+on whether MO2 restamps at launch or only when the list changes — unverified
+here, and worth a look after building the patch.
 
 ## C. Open on the Oracle side
 
