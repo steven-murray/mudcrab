@@ -128,42 +128,67 @@ file) or copy the file in by hand.
 
 ## B. Deferred by choice, not by capability
 
-### B1. ~~QAC~~ — run, and all nine differences explained
+### B1. ~~QAC~~ — run, and every difference explained
 
-26 mods, 27 plugins. **21 are byte-identical to the Oracle's copies.** The pass
+26 mods, 27 plugins. **25 are byte-identical to the Oracle's copies.** The pass
 is unattended; `src/config/tools/xedit.rs` says how, and why it drives real
 xEdit rather than reimplementing "identical to master".
 
-The six that differ are not QAC failures. Every one is now accounted for:
+Five plugins were originally uncleaned on the Oracle side — measured, not
+inferred: each copy was byte-for-byte the plugin as it comes out of the mod's
+archive. The dirt counts below are xEdit's own, from its log when we cleaned
+ours. All five carry `[QAC]` in the guide, so this build followed the guide and
+flagged the gap; the Oracle has since been cleaned to match.
 
-| plugin | what it is |
+| plugin | dirt xEdit found |
 |---|---|
-| `EVE_StockEquipmentReplacer for OOO.esp` | Oracle never cleaned it — 1 ITM |
-| `All Natural - Real Lights.esp` | Oracle never cleaned it — 1 ITM |
-| `The Imperial Water.esp` | Oracle never cleaned it — 19 ITM |
-| `Nobody Goes into the Mountains but Hunters.esp` | Oracle never cleaned it — 17 ITM |
-| `The Lost Spires.esp` | Oracle never cleaned it — **159 ITM, 433 UDR** |
-| `ImpeREAL City … Merged.esp` | same size, same 8845 records, same contents — record **order** only |
-
-**"Never cleaned" is measured, not inferred.** For all five, the Oracle's copy
-is byte-for-byte the plugin as it comes out of the mod's archive. The dirt
-counts are xEdit's own, from its log when we cleaned ours. All five carry
-`[QAC]` in the guide, so this build follows the guide and the Oracle skipped
-those five rows.
+| `All Natural - Real Lights.esp` | 1 ITM |
+| `The Imperial Water.esp` | 19 ITM |
+| `Nobody Goes into the Mountains but Hunters.esp` | 17 ITM |
+| `The Lost Spires.esp` | **159 ITM, 433 UDR** |
+| `EVE_StockEquipmentReplacer for OOO.esp` | 1 ITM — see below |
 
 `The Lost Spires`' 433 UDRs are the "443 records differ" that looked mysterious
 earlier — undeleted references, not ITM removal.
 
-**ImpeREAL City** is the one cosmetic case. Its groups are FormID-sorted in the
-Oracle and in archive order here: a full xEdit load-and-save sorts records
-within a group, QuickAutoClean does not, and the Oracle's copy went through a
-manual xEdit session for its row-6 deletions while ours is edited by mudcrab.
-Record order inside a group carries no meaning — the engine indexes by FormID —
-so this sits with the BSA payload-ordering difference as a known non-issue.
+**Two plugins still differ, and neither is a defect.**
 
-**Every merge now matches the Oracle's record count exactly**: Unique Forts
-7912, OOO Patches 1759, TACE 8533, Prebash 4505, Late Loaders 4361, NPC 2278 —
-and the renumbering counts (2004 and 1170) match too.
+**`Nobody Goes into the Mountains but Hunters.esp` taught the general rule.**
+Two mods ship a plugin of that name — guide row 31 (main file) and row 32 (UL
+Compilation Compatible) — and only row 32 carries `[QAC]`. That marker is
+load-bearing: row 32 installs later, so its copy is the one the VFS resolves.
+Hanging the action off row 31 cleans a file the game never reads and leaves the
+one it does read dirty. **A `qac` action belongs on the mod that wins the path,
+which is not always the mod that declares the plugin** — the action is now on
+the UL-compat mod, which declares no plugins at all, and both mods are
+byte-identical to the Oracle.
+
+**`EVE_StockEquipmentReplacer for OOO.esp` is the same shape, unresolved in the
+guide itself.** Row 7 (EVE HGEC) carries `[QAC]`; row 8 (Seamless - HGEC
+Female) ships its own copy of the same plugin and installs after it, so row 8
+wins the path and the guide's `[QAC]` lands on a file the game never loads. We
+follow the guide and clean row 7's copy; the Oracle leaves it raw. **The plugin
+the VFS actually resolves — Seamless' copy — is byte-identical on both sides
+and uncleaned on both**, so the 1 ITM is live in the Oracle and here alike. The
+only difference is an inert file.
+
+**`ImpeREAL City … Merged.esp` is cosmetic.** Same size, same 8845 records,
+same contents; its groups are FormID-sorted in the Oracle and in archive order
+here. A full xEdit load-and-save sorts records within a group, QuickAutoClean
+does not, and the Oracle's copy went through a manual xEdit session for its
+row-6 deletions while ours is edited by mudcrab. Record order inside a group
+carries no meaning — the engine indexes by FormID — so this sits with the BSA
+payload-ordering difference as a known non-issue.
+
+One further diff line on the QAC'd set is not about cleaning at all: `Harvest
+Flora`'s three DLC plugins are `.mohidden` here and plain files in the Oracle.
+Both sides leave them out of `plugins.txt` — they are Prebash merge sources.
+Hiding is how mudcrab retires every merge source; the Oracle unticks instead.
+Same effective load order.
+
+**Every merge matches the Oracle's record count exactly**: Unique Forts 7912,
+OOO Patches 1759, TACE 8533, Prebash 4505, Late Loaders 4361, NPC 2278 — and
+the renumbering counts (2004 and 1170) match too.
 
 ### B2. ~~LOOT / load order~~ — settled at Part 37
 

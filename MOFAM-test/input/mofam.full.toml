@@ -6942,6 +6942,11 @@ file_name = "LFO OCO New Eyes Addon-51512-Latest-1685989930.7z"
 # Guide 31-32: "main file only", then the UL-compatible build [QAC]. Both ship
 # a plugin of the same name; the compatible one installs second and wins the
 # path, which is why the load order names it once.
+#
+# The [QAC] marker sits on row 32, and that is load-bearing: the row-32 copy is
+# the one the VFS resolves, so cleaning row 31 would clean a file the game never
+# reads and leave the one it does read dirty. The action therefore hangs off the
+# UL-compat mod, even though the plugin is declared by its neighbour.
 [[mods]]
 id = "Nobody Goes into the Mountains but Hunters"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -6952,10 +6957,6 @@ path = "nexus:oblivion/49092/1000021128"
 download_handler = "nexus"
 file_name = "Nobody Goes into the Mountains but Hunters-49092-1-0-1547350502.7z"
 
-[[mods.actions]]
-action = "qac"
-plugins = ["Nobody Goes into the Mountains but Hunters.esp"]
-
 [[mods]]
 id = "Nobody Goes into the Mountains but Hunters - UL compat"
 section = ["26a - NEW & MODIFIED LOCATIONS"]
@@ -6964,6 +6965,10 @@ section = ["26a - NEW & MODIFIED LOCATIONS"]
 path = "nexus:oblivion/49092/1000021204"
 download_handler = "nexus"
 file_name = "Nobody Goes into the Mountains but Hunters - UL Compilation Compatible-49092-1-0-1548549782.7z"
+
+[[mods.actions]]
+action = "qac"
+plugins = ["Nobody Goes into the Mountains but Hunters.esp"]
 
 # Guide 33: "Main files Better Dungeons + Better Dungeons BSA, install
 # separately" -- so two mods, one holding the plugin and one the archive.
