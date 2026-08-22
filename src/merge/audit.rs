@@ -2,7 +2,7 @@
 //!
 //! M0's recon established three scoping decisions -- no script bytecode
 //! patching, no asset copying, no BSA handling -- by measuring the real
-//! corpus rather than assuming (`MOFAM-test/notes/merge-recon.md`). Each held
+//! corpus rather than assuming (`docs/design/merge-engine.md`). Each held
 //! for all six MOFAM merges.
 //!
 //! These detectors exist so those decisions are **self-invalidating rather
@@ -26,7 +26,7 @@ pub enum AuditError {
          {form_id} at byte offset {offset}, and this merge renumbers that FormID.\n\
          mudcrab renumbers SCRO entries in place and does not patch bytecode, because \
          Oblivion scripts reference forms by 16-bit index into the record's SCRO list \
-         (MOFAM-test/notes/merge-recon.md section 2 -- zero occurrences across the whole \
+         (docs/design/merge-engine.md section 2 -- zero occurrences across the whole \
          752-mod corpus). This plugin is the counter-example that assumption needed.\n\
          Merging it would leave the script pointing at the wrong form."
     )]
@@ -41,7 +41,7 @@ pub enum AuditError {
         "{plugin}: {kind} at {}\n\
          These assets are looked up by plugin name or FormID, so merging the plugin \
          away breaks the lookup and mudcrab does not rewrite them \
-         (MOFAM-test/notes/merge-recon.md section 3 -- no merged MOFAM plugin has any).\n\
+         (docs/design/merge-engine.md section 3 -- no merged MOFAM plugin has any).\n\
          Either exclude this plugin from the merge, or handle the assets by hand.",
         .path.display()
     )]
@@ -219,7 +219,7 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(err.contains("voice data"), "{err}");
-        assert!(err.contains("merge-recon.md"), "the error must cite its evidence: {err}");
+        assert!(err.contains("merge-engine.md"), "the error must cite its evidence: {err}");
     }
 
     #[test]

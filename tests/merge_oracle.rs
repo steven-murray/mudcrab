@@ -19,7 +19,7 @@
 //! file and report a spurious difference. The fixture pins ORC to **v180**
 //! even though merges.json names v194: the definition was updated when the ORC
 //! upgrade began, but the installed Prebash merge was built from v180 and never
-//! rebuilt. See MOFAM-test/notes/zmerge-non-canonical-refs.md.
+//! rebuilt. See docs/design/merge-engine.md.
 
 use mudcrab::merge::{self, MergeRequest, MergeSource};
 use mudcrab::plugin::{FormId, MasterTable, Origin, Plugin, PluginName, Record};
@@ -422,7 +422,7 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
     // still resolve -- readers clamp an out-of-range index to "own record", so
     // `canonicalize` above does too, and the graphs match exactly. But we
     // should emit the form the spec describes, and this keeps us to it.
-    // See MOFAM-test/notes/zmerge-non-canonical-refs.md.
+    // See docs/design/merge-engine.md.
     let our_own_index = ours.masters.own_mod_index();
     let mut ours_non_canonical = Vec::new();
     for record in ours.records() {

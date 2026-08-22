@@ -500,7 +500,7 @@ fn packing_stores_a_repeated_payload_once() {
 
 /// All 18 archives Bethesda shipped set bits 8-10, and `0x703` is the plain
 /// uncompressed shape among them. mudcrab wrote `0x003`, which not one of the
-/// 74 archives in `MOFAM-test/notes/bsa-header-flags.csv` does.
+/// 74 archives in `docs/design/bsa-header-flags.csv` does.
 #[test]
 fn a_packed_archive_declares_the_flags_every_real_one_does() {
     let source = tempfile::tempdir().unwrap();

@@ -1,493 +1,98 @@
 # mudcrab
 
-The rust-based platform-independent declarative modlist creator, compiler, manager and 
-installer. 
+A declarative modlist compiler and installer for TES4: Oblivion, written in Rust
+and independent of platform.
 
 **I've seen mudcrabs more fearsome than you!**
 
-## What Is `mudcrab`?
+## What mudcrab is
 
-Mudcrab aims to make it easy to create, share, manage and install modlists for games
-like TES Oblivion and Skyrim. 
+You write a modlist as a TOML file: where each mod comes from, how to unpack it,
+what to do to it afterwards, and what order it all loads in. mudcrab compiles
+that, downloads the archives, installs them, applies the edits, builds the
+merges, and writes a ready-to-use Mod Organizer 2 instance.
 
-## Usage (Current MVP)
+It is **not** a mod manager and does not replace MO2. It is closer to
+Wabbajack — a way to install someone else's curated list — with one difference
+that drives the whole design.
 
-Detailed command reference is also available in `docs/usage.md`.
+**A Wabbajack install is data with no relationships in it.** The files are
+there, but nothing records why a mod was included, what it was patched against,
+or which other mods a change would disturb. So the two things people most often
+want to do afterwards are the two hardest: change a setting you did not choose,
+and add a mod that needs patches from a dozen rows you would now have to
+reinstall by hand.
 
-The CLI currently supports MVP implementations for all four pipeline stages:
+A mudcrab modlist is the list *and* the reasoning, in one file you can read,
+diff and send to someone. Because it is declarative and compiled rather than
+executed top to bottom, the relationships are visible to the tool as well as to
+you.
 
-1. `compile` (source TOML -> compiled JSON)
-2. `query` (compiled JSON -> personalized plan JSON)
-3. `download` (personalized plan -> cached archives)
-4. `install` (personalized plan + cache -> staged mod archive layout)
+### Does it work?
 
-The `export` command is scaffolded but not implemented yet.
+Yes, on a hard case. mudcrab reproduces
+[MOFAM](https://www.nexusmods.com/oblivion/mods/52949) — a 40-part, ~700-mod
+Oblivion guide with six plugin merges, BSA repacking, xEdit cleaning, FOMOD and
+BAIN installers and a fixed 242-plugin load order — from a single TOML file, on
+Linux, with no GUI tool involved except the final Wrye Bash step. It was
+verified mod-by-mod against a hand-built reference instance and then played.
+See [MOFAM-test](MOFAM-test/) for that case study.
 
-### Command Overview
+It is **not yet packaged for other people to use**. See
+[docs/roadmap.md](docs/roadmap.md) for what stands between here and that, and
+[docs/known-issues.md](docs/known-issues.md) for what will bite you meanwhile.
 
-Print help:
+## Documentation
 
-```bash
-cargo run -- --help
-```
+| | |
+| --- | --- |
+| [docs/usage.md](docs/usage.md) | Command reference, and what each action does |
+| [docs/modlist-format.md](docs/modlist-format.md) | The TOML format |
+| [docs/mo2-output-structure.md](docs/mo2-output-structure.md) | What gets written into an MO2 instance |
+| [docs/known-issues.md](docs/known-issues.md) | Limitations, and what to do about them |
+| [docs/roadmap.md](docs/roadmap.md) | What is planned before a release |
 
-Compile a source modlist:
-
-```bash
-cargo run -- compile path/to/modlist.toml --output build/compiled.json
-```
-
-Resolve inputs into a personalized plan (headless mode):
-
-```bash
-cargo run -- query build/compiled.json --output build/plan.json --headless
-```
-
-Download required archives into a cache directory:
-
-```bash
-cargo run -- download build/plan.json --cache .mudcrab-cache --retry 3
-```
-
-Validate source modlist without writing compiled output:
-
-```bash
-cargo run -- validate path/to/modlist.toml
-```
-
-Add a mod to a source modlist in place, keeping its comments and formatting
-byte-for-byte (see `docs/usage.md` for the full flag list):
+## The pipeline
 
 ```bash
-cargo run -- add path/to/modlist.toml \
-  --from-oracle /path/to/mo2/mods --mod "Blockhead" --section "OBSE PLUGINS"
+mudcrab compile  modlist.toml   --output build/compiled.json
+mudcrab query    build/compiled.json --output build/plan.json --headless
+mudcrab download build/plan.json --cache .mudcrab-cache
+mudcrab install  build/plan.json --cache .mudcrab-cache --mo2-instance-dir ~/mo2/MyList
 ```
 
-### End-to-End Example
+1. **compile** — validate the source list and resolve what can be resolved.
+2. **query** — ask the user any questions the list declares, producing a plan
+   specific to their answers.
+3. **download** — fetch (or find locally) every archive the plan needs.
+4. **install** — unpack, apply actions, build merges, write the MO2 instance.
 
-```bash
-cargo run -- compile tests/fixtures/modlists/simple.toml --output build/compiled.json
-cargo run -- query build/compiled.json --output build/plan.json --headless
-cargo run -- download build/plan.json --cache .mudcrab-cache
-```
-
-### Input and Output Files
-
-1. Source modlist (`.toml`): author-facing input.
-2. Compiled modlist (`compiled.json`): validated machine-friendly intermediate format.
-3. Personalized plan (`plan.json`): selected mods and resolved input responses.
-4. Cache directory: downloaded archives for later install stage.
-5. Mods directory: staged archive layout and an `install_manifest.json` summary.
-
-### NexusMods Support (Early)
-
-Nexus is supported early in development through two source patterns:
-
-1. Direct URL containing `nexusmods.com` (downloaded via HTTP handler).
-2. API descriptor format: `nexus:<game>/<mod_id>/<file_id>`.
-
-For API descriptor sources, set:
-
-```bash
-export NEXUS_API_KEY="your-api-key"
-```
-
-Optional override for API base URL (useful for local testing/mocking):
-
-```bash
-export NEXUS_API_BASE="https://api.nexusmods.com/v1"
-```
-
-### Current Modlist TOML Shape
-
-At minimum:
-
-```toml
-name = "Example Modlist"
-
-[[mods]]
-id = "core"
-dependencies = []
-
-[[mods.archives]]
-path = "https://example.com/mod.zip"
-download_handler = "http"
-```
-
-Conditional inclusion example:
-
-```toml
-name = "Conditional Example"
-
-[inputs.use_hd_textures]
-type = "bool"
-query = "Install HD textures?"
-
-[[mods]]
-id = "base"
-dependencies = []
-
-[[mods]]
-id = "hd_pack"
-dependencies = ["base"]
-if = "use_hd_textures"
-```
-
-### Notes and Limitations
-
-1. Query supports basic expressions: `flag`, `!flag`, `key == value`, `key != value`.
-2. Download `--parallel` is accepted but currently processed sequentially.
-3. Install unpacks `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar` archives into per-mod directories.
-4. `.7z` and `.rar` extraction shells out to the system `bsdtar` (tried first) and `7z` (fallback) binaries -- see Requirements below.
+Authoring commands sit alongside it: `inspect` an archive to see its layout and
+installer options, `add` a mod to a list without disturbing its comments,
+`identify` an archive by hash, `conflicts` to see what two mods both provide,
+`diff` to compare a built instance against a reference, `check` and `validate`.
+`mudcrab --help` lists them all.
 
 ## Requirements
 
-`mudcrab` needs the following external tools available on `PATH` at install time:
-
-1. `bsdtar` -- used first to list/extract `.7z` and `.rar` archives (via libarchive).
-2. `7z` -- used as a fallback for `.7z` and `.rar` archives when `bsdtar` can't handle them.
-
-`.zip`, `.tar`, `.tar.gz`, and `.tgz` are handled with pure-Rust decoders and need no external tools.
+- `bsdtar` and `7z` on `PATH`, for `.7z` and `.rar`. Everything else is decoded
+  in-process.
+- For `qac`: xEdit, configured via `tools.toml` (`mudcrab setup-tools` writes a
+  template). It runs headlessly, under Proton or Wine on Linux.
+- For Nexus sources: `NEXUS_API_KEY` in the environment.
 
 ## Development
 
-There is no CI pipeline yet, so these checks are enforced by convention rather than automation. Before sending a change, run:
-
-```
+```bash
 cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-Both must pass. The project does not use blanket `#[allow]` attributes to silence lints -- fix the lint or, if it's genuinely a false positive, suppress it narrowly at the site with a comment explaining why.
-
-## Wishlist
-
-These are features we want, but are intentionally deferred for later milestones.
-
-1. True concurrent downloads with bounded parallelism honoring `--parallel`.
-2. Download resume and stronger integrity verification (checksums/signatures).
-3. Full Nexus workflow polish (expanded metadata support and richer auth UX).
-4. Export phase implementation (Markdown/HTML output from compiled plans).
-5. Composable/includable sub-modlists (see below).
-6. A `custom` mod type for arbitrary user-supplied build steps.
-
-`mudcrab` is **not** a mod manager. It doesn't replace Mod Organizer 2. 
-It's **more** like Wabbajack -- an automatic way to install an entire cohesive
-set of mods that is possibly curated by someone else.
-However, unlike Wabbajack, it uses a declarative approach, i.e. where the mods
-to be installed, and any custom actions that need to be applied to those mods, are
-statically **declared** in both a human-friendly and computer-friendly way.
-This avoids the biggest drawback of Wabbajack mods: the difficulty of applying 
-modifications to the list once it is installed. This drawback has two main 
-common problems:
-
-1. You want to make a small modification to the list post-install (like, changing
-   the resolution at which the game is played) but it's hard to find where that setting
-   is set (you didn't create the modlist after all!) and you're unsure what other
-   settings you might break in doing so.
-2. Related to (1) but a bit different in practice, you may want to make a bigger change.
-   For example, you want to add in a new mod. But that mod requires several patches
-   with other mods in the list. So installing that mod means going back through the 
-   entire list and re-installing any mod that might include patches to check the 
-   relevant tick-box in its FOMOD procedure. Problem is, on the surface you don't even
-   know which mods might need to be patched. You can find out, but then you might as 
-   well have installed the list yourself manually!
-
-These problematic outcomes stem from two properties of a Wabbajack install:
-
-1. The data just "is". You install it, it exists, but there are no encoded relationships
-   between any of the installed mods. So if I change a mod, there's no way to tell if
-   this affects another mod. 
-2. The wabbajack author's *intent* is not made clear. While the author *can* add notes
-   to each mod to enlighten the user a little bit, often this is not done, and even if 
-   it is, it is to a minimal degree. Without knowing *why* a certain mod was included
-   or altered, it's hard to make judgments about how to add your own changes other than
-   by asking the author. 
-
-`mudcrab` tries to get around these problems by providing:
-
-1. A definite, human-readable (and machine-interpretable) text-based "language" for 
-   defining a full mod-list: including the ability to specify:
-    
-    * Local or remote file locations for downloading mod archives (including from 
-      the nexus)
-    * The ability to specify the name of the mod as it will appear in the final
-      modlist (with sensible defaults, for example when the mod is simply a single 
-      archive on the Nexus, just using the name of the Mod as defined there).
-    * The ability to specify the archive format and how to unpack it.
-    * The ability to specify (with glob-style syntax) files to include or exclude
-      from the archive.
-    * The ability to specify custom (or built-in) actions on the mod (e.g. applying
-      xEdit's Quick Auto Clean) after install.
-    * Conditionals: the ability to install mods or perform actions based on the result
-      of other data (e.g. only install Mod B if also installing Mod A).
-    * Ability to query the user for information and use that information in conditionals.
-      For example, a modlist install could ask the user if they want to use Mod A or
-      Mod B, and then use that info throughout the rest of the entire list. 
-2. A staged set of actions to go from author-defined list to installed set of mods:
-
-    1. Compile: take an author-defined list and verify that it is valid, verify that
-       the mods exist, and fill in any missing information to obtain a detailed
-       machine-readable modlist format.
-    2. Query: ask the user for any required inputs and proceed to create a unique
-       modlist based on that info.
-    3. Download: proceed to download all the required mod archives in the unique modlist.
-    4. Install: Unpack each archive, and apply each custom action, to arrive at a fully
-       installed set of mods.
-
-3. A set of command-line-friendly tools to help manage each step. Being command-line
-   friendly helps with compatibility on different platforms, but also helps with
-   automation by other tools. The command-line tools can help with things like:
-
-   * Adding mods to the list as an author. While the author can always directly edit
-     the modlist with a text editor, using the command-line tools can make this process
-     faster/easier.
-   * Ability to export the modlist into different formats, including markdown or 
-     HTML, so you can *at the same time* provide an easy manual guide to users that
-     prefer to do it themselves the old way. 
-
-
-Some Features Include:
-
-
-1. Since the modlist format is declarative and compiled, the logic need not be ordered.
-   That is, you can conditionally include Mod B depending on if Mod A is included, even
-   if Mod A is installed after Mod B (and therefore takes precedence in terms of file
-   loading).
-2. It is intended to be composable: if a node in the modlist tree refers to an external
-   file that has the format of a modlist, that modlist would be included at that point
-   in the tree, letting you publish small, re-useable modlists that other lists can
-   point to. **Not implemented yet** -- there is currently no include/composition
-   handling in the modlist schema; every modlist today is a single flat file.
-3. The ability to specify modding tools that must be installed alongside the mods
-   (either simply for the benefit of the end-user, or as dependencies for the custom
-   actions applied to the mods).
-4. The ability to "install" the modlist to different formats (e.g. directly to the 
-   Game install folder, or in Mod Organizer 2 format, or other mod manager formats).
-
-
-## The Mod-List Format
-
-The modlist format is TOML with the following allowed fields:
-
-* `name`: the name of modlist
-* `inputs`: a table where each table entry has a key corresponding to a variable name
-  that is able to be used throughout the rest of the modlist, and values that specify
-  how the input data is to be captured:
-  * `type`: either `bool`, `choice` or `text`
-  * `query`: a string specifying the question to put to the user
-  * `choices`: (if the type is `choice`) specifying the possible choices.
-* `ini`: an optional table of game-scope `Oblivion.ini` edits to apply independently
-   of any specific mod. Values must be scalar TOML values. Keys containing spaces must
-   be quoted.
-* `mods`: an ordered array of mod entries. Each entry has an `id` (unique; also the
-   mod's directory name) and an optional `section`, a list naming its MO2 separator
-   path from outermost to innermost. Every level of the path becomes a separator.
-* `plugins`: an ordered list of plugins. Each entry should be an exact filename. 
-* `post-install-actions`: optional ordered list of install-wide actions to run after
-   extraction and MO2 export. Currently supports `"loot-sort"`.
-
-Example with nested sections:
-
-```toml
-name = "Nested Sections Example"
-
-[[mods]]
-id = "base"
-section = ["foundation"]
-dependencies = []
-
-[[mods]]
-id = "combat"
-section = ["gameplay"]
-dependencies = ["base"]
-
-[[mods]]
-id = "magic"
-section = ["gameplay"]
-dependencies = ["base"]
-```
-
-Example top-level ini edits:
-
-```toml
-[ini]
-"bFull Screen" = 0
-"iSize W" = 1920
-"iSize H" = 1080
-```
-
-Example top-level post-install actions:
-
-```toml
-post-install-actions = ["loot-sort"]
-```
-
-### Archive Layouts
-
-`mudcrab` supports a few common archive layouts.
-
-For a normal archive where the mod data is already at the archive root, no layout field is required.
-
-For archives where the real data lives under a known subdirectory, use `data_folder` and optionally `target_subdir`.
-
-For BAIN-style archives, use `layout = "bain"` and list the top-level package directories you want to install in `bain_subpackages`. The contents of each selected package are merged into the mod root in the order listed.
-
-Example:
-
-```toml
-[[mods]]
-id = "DLC Lore Books"
-section = ["example"]
-
-[[mods.archives]]
-path = "nexus:oblivion/46715/1000012857"
-layout = "bain"
-bain_subpackages = ["00 Merged"]
-```
-
-If a BAIN archive contains:
-
-- `00 Option1/plugin1.esp`
-- `01 Option2/plugin2.esp`
-- `01 Option2/Textures/...`
-
-then selecting both `00 Option1` and `01 Option2` produces a mod root containing `plugin1.esp`, `plugin2.esp`, and `Textures/...` directly, without preserving the `00 ...` and `01 ...` folder names.
-
-Each entry in `mods` has the following format:
-
-```toml
-[[mods]]
-id = "modname"
-if = "<conditional>"  # only install this mod if conditional is true
-
-[[mods.archives]]
-path = "nexus:oblivion/<mod_id>/<file_id>"
-download_handler = "nexus"
-layout = "fomod"  # or omit for a plain archive, or "custom-data-folder"/"bain"
-include = ["Textures/*"]
-exclude = ["Meshes/*"]
-
-[[mods.archives.fomod_selections]]
-step = "Textures"
-group = "Resolution"
-options = ["2K"]
-
-[[mods.archives.fomod_selections]]
-step = "Options"
-group = "Style"
-options = ["Orange Styling"]
-
-[[mods.archives]]
-download_handler = "nexus"
-layout = "custom-data-folder"
-data_folder = "."  # e.g. if layout='custom-data-folder' and the data/ folder is the root
-include = ["Meshes/arg*"]
-```
-
-Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/per-mod
-via the `actions` machinery in `src/config/actions/` -- see `MOFAM-test/input/mofam.full.toml`
-for real examples.
-
-### Actions
-
-`actions` is an **ordered** list; each entry runs in the order it is declared. The
-`action` key selects which one, and the rest of the table carries its parameters. An
-unrecognised name is a parse error naming the supported values, not a silent skip.
-
-| `action` | What it does |
-| --- | --- |
-| `ini_set` | Set a key in an INI file (`scope = "mod"` or `"game"`). |
-| `qac` | Run xEdit's Quick Auto Clean over the named plugins. |
-| `pack_bsa` | Pack the mod's staged files into a BSA. |
-| `create_dummy_plugin` | Write an empty `.esp` so Oblivion loads a BSA of the same name. |
-| `file_prune` | Delete staged files matching globs. |
-
-The last three exist to be composed, in this order, for mods that ship loose assets
-the guide wants archived:
-
-```toml
-[[mods]]
-id = "Example Mod"
-
-actions = [
-  { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
-  { action = "create_dummy_plugin", output = "Example Mod.esp" },
-  { action = "file_prune", paths = ["meshes/**", "textures/**", "sound/**"] },
-]
-```
-
-`file_prune` is a separate action rather than a `pack_bsa` option because it has to run
-*after* the archive is written -- the loose files must still exist to be packed. Ordering
-is the only mechanism involved.
-
-Oblivion loads `Foo.bsa` only when a plugin named `Foo.esp` is active, which is what
-`create_dummy_plugin` is for: a mod distributed as a bare archive needs an empty plugin
-beside it. The plugin is built through mudcrab's own plugin writer, so it is a real TES4
-file rather than a blob of hand-written bytes.
-
-Paths in all three are relative to the mod's staged data folder and may not escape it.
-A BSA cannot store a file outside a folder, so anything at the top level of the staged
-mod (a readme, a plugin) is left loose and logged rather than packed.
-
-Packing and unpacking are native -- see `src/bsa/` -- so no BSArch.exe under Wine.
-
-Along with standard archive-based mods, a mod can be **built** rather than extracted.
-Two `type` values do this today:
-
-- `"build-from-files"` assembles a mod's contents from local files and layers instead
-  of a downloaded archive (see `BuildLayer` in `src/config/schema.rs`).
-- `"merge"` produces a single merged plugin from several other mods' `.esp` files --
-  a headless, native replacement for zEdit's zMerge, so a modlist requiring merges can
-  be installed without driving a GUI tool.
-
-### Merges
-
-```toml
-[[mods]]
-id      = "Unique Forts Merged"
-section = ["36 - zMERGED PLUGINS"]
-type    = "merge"
-
-  [mods.merge]
-  output       = "Unique Forts Merged.esp"
-  method       = "clobber"   # the default; last source wins on conflicts
-  hide_sources = true        # the default
-  sources = [
-    { mod = "Better Fort Aurus",       plugin = "Unique Forts Fort Aurus.esp" },
-    { mod = "Better Fort Doublecross", plugin = "Unique Forts Fort Doublecross.esp" },
-    # ...
-  ]
-```
-
-`sources` is **ordered**: the order defines both clobber precedence and FormID
-allocation, so reordering changes the output. Each source names a **mod id**, not a
-data-folder path -- the path is resolved at install time, so it survives renames.
-There is no `load_order` field; the load order comes from the modlist's own `plugins`.
-
-`hide_sources` renames each source plugin to `<name>.esp.mohidden`, which drops it from
-MO2's virtual filesystem while leaving its mod **enabled** so its meshes, textures and
-BSAs keep loading -- the same mechanism as MO2's "Merge Plugins Hide" plugin. Undo it
-with `mudcrab unhide-merges`.
-
-Because sources are hidden, the modlist's `plugins` list must contain the merge's
-`output` and must **not** contain any source plugin. `mudcrab validate` enforces that,
-along with: every source mod exists, no plugin is merged twice, and a merge mod
-declares no archives of its own.
-
-For fully custom actions (**not yet available**):
-
-```toml
-[[mods]]
-id = "modname"
-dependencies = [
-    "mod A",
-    "mod B",
-]
-type = "custom"
-
-actions = [
-    "my-custom-script --mod A",
-    "my-other-script --args etc"
-]
-```
+Both must pass. There is no CI yet, so this is convention rather than
+automation — [roadmap Phase E](docs/roadmap.md#phase-e--publishing-mechanics).
+
+The codebase is heavily commented, deliberately: most of what mudcrab does is
+work around some undocumented behaviour of a twenty-year-old file format or of
+MO2, and the comment explaining why a line is the way it is tends to be the most
+valuable thing in the file. Keep that up. No blanket `#[allow]` — fix the lint,
+or suppress it narrowly with a reason.

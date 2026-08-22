@@ -119,7 +119,7 @@ fn a_script_embedding_a_renumbered_form_id_is_refused() {
     assert!(err.contains("compiled script bytecode"), "{err}");
     assert!(err.contains("byte offset 4"), "the offset locates it: {err}");
     assert!(
-        err.contains("merge-recon.md"),
+        err.contains("merge-engine.md"),
         "the refusal must cite the evidence it overturns: {err}"
     );
 }

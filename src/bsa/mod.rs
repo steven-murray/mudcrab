@@ -73,7 +73,7 @@ pub const FLAG_COMPRESSED: u32 = 0x0000_0004;
 ///
 /// Not documented anywhere reliable, and the engine's loader reads only the
 /// name and compression bits above. The case for writing them is the corpus,
-/// tallied in `MOFAM-test/notes/bsa-header-flags.csv`: of 74 real archives,
+/// tallied in `docs/design/bsa-header-flags.csv`: of 74 real archives,
 /// **all 74** set bits 9 and 10, and **all 18 of Bethesda's own** set bit 8 as
 /// well, making `0x703` the plain uncompressed shape. Five mod-author archives
 /// clear bit 8 and are otherwise unremarkable, so it is not load-bearing --
