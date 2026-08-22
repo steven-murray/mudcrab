@@ -273,6 +273,35 @@ profile's copy, never the original `Oblivion.ini`. `format` is `"standard"`
 (`key = value`) or `"set-to"` (`set key to value`). `value` accepts any TOML
 scalar; booleans become `1`/`0`.
 
+### ini_append_block
+
+```toml
+[[mods.actions]]
+action = "ini_append_block"
+file = "ini/Mod - Custom Trainers.ini"
+block = """
+
+set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 02D025);Uurwen
+set migFeaQ.customLevl to 65
+SetStage migFeaQ 1
+"""
+```
+
+The guide's "paste the following into `<file>`" rows. `ini_set` cannot express
+them: the same key is set several times and what runs between the settings is
+part of the meaning, so order and repetition are the content rather than a list
+of key/value pairs.
+
+The block is appended verbatim to the end of the file, with line endings
+rewritten to whatever that file already uses, and is idempotent — a second
+install finds the block already present and appends nothing. Leading blank
+lines are kept, which is how the gap before the pasted lines is spelled. One
+trailing newline is dropped, since a TOML multi-line string always carries one
+nobody typed; a file that ended without a final newline still ends without one.
+
+The file must already exist. Appending to a file the mod does not ship means
+the path is wrong, and a file created this way would never be read.
+
 ### qac
 
 ```toml

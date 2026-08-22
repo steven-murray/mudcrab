@@ -122,6 +122,7 @@ pub enum InputType {
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum ModAction {
     IniSet(IniSetAction),
+    IniAppendBlock(IniAppendBlockAction),
     Qac(QacAction),
     PackBsa(PackBsaAction),
     CreateDummyPlugin(CreateDummyPluginAction),
@@ -145,7 +146,8 @@ impl ModAction {
         match self {
             ModAction::IniSet(spec) => spec.scope == IniScope::Game,
             // The rest write only into the staged folder.
-            ModAction::Qac(_)
+            ModAction::IniAppendBlock(_)
+            | ModAction::Qac(_)
             | ModAction::PackBsa(_)
             | ModAction::CreateDummyPlugin(_)
             | ModAction::FilePrune(_)
@@ -160,6 +162,7 @@ impl ModAction {
     pub fn name(&self) -> &'static str {
         match self {
             ModAction::IniSet(_) => "ini_set",
+            ModAction::IniAppendBlock(_) => "ini_append_block",
             ModAction::Qac(_) => "qac",
             ModAction::PackBsa(_) => "pack_bsa",
             ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
@@ -170,6 +173,39 @@ impl ModAction {
             ModAction::DeleteRecords(_) => "delete_records",
         }
     }
+}
+
+/// Append a verbatim block of lines to the end of an INI file.
+///
+/// The guide's "paste the following into `<file>`" rows, which `ini_set` cannot
+/// express. Part 30 row 7 is the shape: the same two keys are set three times
+/// each and a `SetStage` between them is what commits each triple, so order and
+/// repetition *are* the content. Treating it as key/value edits would collapse
+/// nine lines into two.
+///
+/// The block is appended exactly as written, with two adjustments that make a
+/// TOML multi-line string land as a person would expect:
+///
+/// - Line endings are rewritten to whatever the target file already uses. These
+///   are Windows-authored INIs read by an OBSE script, and half of them are
+///   CRLF; a block pasted in with bare LFs would be a second convention inside
+///   one file.
+/// - One trailing line ending is dropped, because a TOML multi-line string puts
+///   one there that nobody typed. The file's own final-newline state is then
+///   restored, so a file that ended without a newline still ends without one.
+///
+/// Leading blank lines in the block are content and are kept, which is how the
+/// gap between the mod's own lines and the pasted ones is spelled.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IniAppendBlockAction {
+    /// Path relative to the mod's staged data folder, resolved
+    /// case-insensitively. The file must exist: appending to a file the mod
+    /// does not ship means the path is wrong, and a created one would never be
+    /// read.
+    pub file: String,
+    /// The lines to append, verbatim.
+    pub block: String,
 }
 
 /// Pack the mod's staged files into a BSA.

@@ -15,7 +15,7 @@ Track required mudcrab capabilities discovered while translating MOFAM.
 | GAP-007 | Actions | Post-install ordered file prune | Part 4 "delete X after install" notes | open — narrowed, see note below |
 | GAP-009 | Actions | Section-aware `ini_set` | `apply_ini_set` in `src/config/actions/ini_set.rs` matches keys anywhere in the file and appends missing keys at EOF; a key destined for `[Grass]` or `[LIMITER]` lands in the wrong section | open — live correctness bug |
 | GAP-010 | Actions | INI scope `game-root` | INI edits that must target the game install root rather than `mod`/`game` (MO2 profile) scope | open |
-| GAP-011 | Actions | `ini_append_block` | Multi-line raw block append (not a single key/value `ini_set`) | open |
+| GAP-011 | Actions | `ini_append_block` | Multi-line raw block append (not a single key/value `ini_set`) | **done** — `src/config/actions/ini_append_block.rs`, Part 30 row 7 byte-identical |
 | GAP-012 | Actions | Move plugin to `optional/` | MO2 optional-plugins convention | open |
 | GAP-013 | Layout | MO2 "Ignore Missing Data" flag | Mods that reference files MO2 would otherwise flag as missing | open |
 | GAP-014 | Actions | Explicit `loadorder.txt` post-install action | Direct load-order file write, distinct from LOOT sorting | open |

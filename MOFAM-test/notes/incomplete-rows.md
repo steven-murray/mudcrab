@@ -15,37 +15,37 @@ list is now built end to end, so this is the finish-line checklist.
 
 These need a feature before they can be automated, or a hand pass at the end.
 
-### A1. `ini_append_block` — Part 30 row 7 (FEA - Fundament Enchanting Addons)
+### A1. ~~`ini_append_block`~~ — done, Part 30 row 7
 
-The guide asks for nine lines to be pasted into `Custom Trainers.ini`:
+The guide asks for nine lines to be pasted into `MigFEA - Custom Trainers.ini`,
+registering Uurwen, Calindil and Contumeliorus Florius as custom enchanting
+trainers. `ini_set` could not express it: the same two keys are set three times
+each and the `SetStage` between them is what commits each triple, so order and
+repetition are the content rather than a list of key/value pairs.
 
-```
-set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 02D025)   ;Uurwen
-set migFeaQ.customLevl to 65
-SetStage migFeaQ 1
-set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 015EA9)   ;Calindil
-set migFeaQ.customLevl to 40
-SetStage migFeaQ 1
-set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 0222B7)   ;Contumeliorus Florius
-set migFeaQ.customLevl to 65
-SetStage migFeaQ 1
-```
+`ini_append_block` takes the raw block and appends it verbatim. The file is now
+**byte-identical to the Oracle** at 2181 bytes, up from 1788.
 
-`ini_set` cannot express this. It is not three key/value edits — the same two
-keys are set three times each, and `SetStage` between them is what commits each
-triple. Order and repetition are the content, so an append is the only correct
-shape.
+Three details decided it, and all three are about landing a TOML string in a
+Windows INI without it looking pasted by a machine:
 
-**Effect if left**: the three custom enchanting trainers (Uurwen, Calindil,
-Contumeliorus Florius) are never registered. The mod works; those three NPCs
-just do not offer the service.
+- **Line endings come from the target file.** This one is CRLF throughout; a
+  block appended with bare LFs would put two conventions in one file.
+- **Leading blank lines are content.** The gap between the mod's own entries and
+  the pasted ones is part of the paste, and the Oracle has two blank lines
+  there. TOML eats the newline immediately after the opening delimiter, so the
+  modlist carries two visually-blank lines and a comment saying why.
+- **One trailing newline is dropped, then the file's shape restored.** A
+  multi-line TOML string always ends with a newline nobody typed. This file
+  ended mid-line before the append and still does.
 
-**Fix**: an `ini_append_block` action taking a raw multi-line string, appended
-verbatim if not already present. Idempotence is the only hard part — match on
-the whole block, not a key.
+The append is idempotent — it matches the whole block, not a key, since these
+lines individually recur throughout the file. Nothing in the pipeline re-applies
+an action to an already-staged folder today, so that guard is insurance rather
+than something the build relies on.
 
-Target file, as installed: `ini/MigFEA - Custom Trainers.ini`.
-Our copy is 1788 bytes; a correct one is 2181.
+The block itself is checked against the guide's transcription line for line, not
+copied off the Oracle.
 
 ### A2. ~~Scripted record deletion~~ — done, all three rows
 

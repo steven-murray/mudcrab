@@ -8615,6 +8615,30 @@ file_name = "FEA 2_1_3-41553-2-1-3.zip"
 layout = "bain"
 bain_subpackages = ["00 Core"]
 
+[[mods.actions]]
+# Guide 7: "Once installed, paste the following into Custom Trainers.ini".
+# Nine lines, not three key/value edits -- the same two keys are set three
+# times each and the SetStage between them is what commits each triple.
+#
+# The two blank lines below the ''' are content: TOML eats the newline
+# immediately after the delimiter, so the block starts with the gap that
+# separates the paste from the mod's own entries, exactly as in the Oracle.
+action = "ini_append_block"
+file = "ini/MigFEA - Custom Trainers.ini"
+block = '''
+
+
+set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 02D025);Uurwen
+set migFeaQ.customLevl to 65
+SetStage migFeaQ 1
+set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 015EA9);Calindil
+set migFeaQ.customLevl to 40
+SetStage migFeaQ 1
+set migFeaQ.customTrain to (GetFormFromMod "Oblivion.esm" 0222B7);Contumeliorus Florius
+set migFeaQ.customLevl to 65
+SetStage migFeaQ 1
+'''
+
 [[mods]]
 id = "PSO - Pickpocket Skill Overhaul"
 section = ["30 - SKILLS & LEVELLING"]
