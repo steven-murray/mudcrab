@@ -16,6 +16,7 @@ pub mod extract_bsa;
 pub mod file_hide;
 pub mod file_move;
 pub mod file_prune;
+pub mod ini_append_block;
 pub mod ini_set;
 pub mod pack_bsa;
 pub mod qac;
@@ -53,6 +54,7 @@ pub fn apply_all(actions: &[ModAction], cx: &ActionCx<'_>) -> anyhow::Result<()>
 fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     match action {
         ModAction::IniSet(spec) => ini_set::apply(spec, cx),
+        ModAction::IniAppendBlock(spec) => ini_append_block::apply(spec, cx),
         ModAction::Qac(spec) => qac::apply(spec, cx),
         ModAction::PackBsa(spec) => pack_bsa::apply(spec, cx),
         ModAction::CreateDummyPlugin(spec) => create_dummy_plugin::apply(spec, cx),
@@ -156,6 +158,21 @@ mod tests {
         };
         assert_eq!(spec.scope, IniScope::Game);
         assert_eq!(spec.format, IniSetFormat::SetTo);
+    }
+
+    #[test]
+    fn ini_append_block_requires_both_a_file_and_a_block() {
+        let err = parse("action=\"ini_append_block\"\nfile=\"ini/x.ini\"").unwrap_err();
+        assert!(err.to_string().contains("block"), "{err}");
+
+        let ModAction::IniAppendBlock(spec) =
+            parse("action=\"ini_append_block\"\nfile=\"ini/x.ini\"\nblock=\"set x to 1\"")
+                .unwrap()
+        else {
+            panic!("expected ini_append_block");
+        };
+        assert_eq!(spec.file, "ini/x.ini");
+        assert_eq!(spec.block, "set x to 1");
     }
 
     #[test]
