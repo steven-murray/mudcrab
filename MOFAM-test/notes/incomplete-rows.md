@@ -130,7 +130,8 @@ file) or copy the file in by hand.
 
 ### B1. ~~QAC~~ — run, and every difference explained
 
-26 mods, 27 plugins. **25 are byte-identical to the Oracle's copies.** The pass
+26 mods, 27 plugins. **26 are byte-identical to the Oracle's copies**, and the
+only one that is not differs in record order alone. The pass
 is unattended; `src/config/tools/xedit.rs` says how, and why it drives real
 xEdit rather than reimplementing "identical to master".
 
@@ -146,12 +147,12 @@ flagged the gap; the Oracle has since been cleaned to match.
 | `The Imperial Water.esp` | 19 ITM |
 | `Nobody Goes into the Mountains but Hunters.esp` | 17 ITM |
 | `The Lost Spires.esp` | **159 ITM, 433 UDR** |
-| `EVE_StockEquipmentReplacer for OOO.esp` | 1 ITM — see below |
+| `EVE_StockEquipmentReplacer for OOO.esp` | 1 ITM — but in a copy that is now deleted; see below |
 
 `The Lost Spires`' 433 UDRs are the "443 records differ" that looked mysterious
 earlier — undeleted references, not ITM removal.
 
-**Two plugins still differ, and neither is a defect.**
+**Two of them took a second pass to get right, and one plugin still differs.**
 
 **`Nobody Goes into the Mountains but Hunters.esp` taught the general rule.**
 Two mods ship a plugin of that name — guide row 31 (main file) and row 32 (UL
@@ -163,14 +164,22 @@ which is not always the mod that declares the plugin** — the action is now on
 the UL-compat mod, which declares no plugins at all, and both mods are
 byte-identical to the Oracle.
 
-**`EVE_StockEquipmentReplacer for OOO.esp` is the same shape, unresolved in the
-guide itself.** Row 7 (EVE HGEC) carries `[QAC]`; row 8 (Seamless - HGEC
-Female) ships its own copy of the same plugin and installs after it, so row 8
-wins the path and the guide's `[QAC]` lands on a file the game never loads. We
-follow the guide and clean row 7's copy; the Oracle leaves it raw. **The plugin
-the VFS actually resolves — Seamless' copy — is byte-identical on both sides
-and uncleaned on both**, so the 1 ITM is live in the Oracle and here alike. The
-only difference is an inert file.
+**`EVE_StockEquipmentReplacer for OOO.esp` was the same shape, unresolved in
+the guide itself — and is now settled.** Row 7 (EVE HGEC) carries `[QAC]`; row 8
+(Seamless - HGEC Female) ships its own copy of the same plugin and installs
+after it, so row 8 wins the path and the guide's `[QAC]` would have landed on a
+file the game never loads. The resolution, Steven's call and mirrored on both
+sides: **delete** row 7's copy and clean row 8's.
+
+Deleting rather than hiding or shadowing is deliberate. Merge Plugins Hide walks
+mod folders rather than the VFS, so a second file of the same name is a hazard
+to it whether or not the game ever sees it — and in a declarative list there is
+nothing to be gained by keeping a file no tool should find.
+
+xEdit's verdict on row 8's copy: **0 UDR, 0 ITM**, and a LOOT masterlist `clean`
+entry at CRC `0xE35796B1`. It was already clean, so the 1 ITM reported earlier
+lived only in row 7's copy — which no longer exists on either side. The dirt is
+gone rather than left live.
 
 **`ImpeREAL City … Merged.esp` is cosmetic.** Same size, same 8845 records,
 same contents; its groups are FormID-sorted in the Oracle and in archive order
@@ -181,10 +190,11 @@ carries no meaning — the engine indexes by FormID — so this sits with the BS
 payload-ordering difference as a known non-issue.
 
 One further diff line on the QAC'd set is not about cleaning at all: `Harvest
-Flora`'s three DLC plugins are `.mohidden` here and plain files in the Oracle.
-Both sides leave them out of `plugins.txt` — they are Prebash merge sources.
-Hiding is how mudcrab retires every merge source; the Oracle unticks instead.
-Same effective load order.
+Flora`'s three DLC plugins are `.mohidden` here and plain files in the Oracle,
+because Steven unhid them there to re-clean them. Both sides leave them out of
+`plugins.txt`, and the four plugins are byte-identical across instances. Hiding
+is how mudcrab retires every merge source; the Oracle unticks instead. Same
+effective load order. See C1 for the consequence on the Oracle's Prebash.
 
 **Every merge matches the Oracle's record count exactly**: Unique Forts 7912,
 OOO Patches 1759, TACE 8533, Prebash 4505, Late Loaders 4361, NPC 2278 — and
@@ -201,45 +211,26 @@ entry for entry. No GUI, no interim.
 Not mudcrab gaps — things in `MOFAM-03.25` still outstanding as of 2026-08-22.
 Most of what was here has been fixed; see section D.
 
-### C1. `DLCFrostcrag.esp` has had its Worldspace group deleted, and should not have
+### C1. The Oracle's merges are now built from stale sources
 
-Guide Part 11 row 23 says:
+Steven unhid `Harvest Flora`'s three DLC plugins to re-clean them. Those three
+are Prebash Merge sources — the only merge any of this round's cleaning touches;
+none of the other re-cleaned plugins feeds a merge. So **the Oracle's
+`Prebash Merge.esp` predates its own inputs**, and the zMerge GUI issue means it
+cannot be rebuilt there.
 
-> Open **Harvest [Flora] - DLCFrostcrag.esp** in xEdit & remove the **Worldspace** group.
+This costs no verification that was ever available. The Oracle was never a byte
+reference for merge *output*: zMerge and mudcrab allocate FormIDs differently
+and zMerge retains masters mudcrab drops, so every merge has always differed at
+the record level while matching exactly on count. Those counts are unchanged —
+Prebash is 4505 on both sides, and every source plugin is byte-identical across
+instances.
 
-On the Oracle that removal has been applied to **two** files. Top-level groups:
-
-| file | groups |
-|---|---|
-| `Harvest [Flora] - DLCFrostcrag.esp` (Oracle) | `FLOR` — correct, the row asks for this |
-| `Harvest [Flora] - DLCFrostcrag.esp` (ours) | `FLOR`, `WRLD` — **we are missing the step**, see A2 |
-| `DLCFrostcrag.esp` (Oracle) | no `WRLD` group at all |
-| `DLCFrostcrag.esp` (ours) | `WRLD` present |
-
-Nothing in the guide asks for the DLC master itself to be touched, and the
-consequences are not cosmetic. Against the vanilla file (1316 records), our QAC
-removes 70 and the Oracle's copy is short by 227. The extra 157 are:
-
-- 4 WRLD — `Tamriel`, `SkingradWorld`, `ICTheArcaneUniversity`, and Bethesda's
-  leftover `TestGragtown`
-- their child CELLs, including `FrostcragSpireExterior`
-- 134 REFR, 5 LAND, 4 PGRD
-
-**71 of the removed records are DLCFrostcrag's own**, not overrides — QAC never
-removes those, because a plugin's own records have no master to be identical
-to. They are object placements: they position 24 distinct base objects, and 9 of
-those base objects are still defined in the file with nothing left to place
-them.
-
-So the Oracle's Frostcrag Spire has its interiors (the `CELL` group survives)
-and no exterior placement. **Worth checking in game** — travel to Frostcrag
-Spire and see whether the building is there — before assuming this note is
-right about the consequence. The file difference itself is not in doubt.
-
-`DLCFrostcrag.esp` is also a master for `Harvest [Flora] - DLCFrostcrag.esp`,
-`DLCFrostcrag - OOO Adaptation.esp` and `Bruma Frostcrag Spire LOD.esp`, so
-anything overriding those 71 records now points at a record its master no longer
-defines.
+What it does mean: **the Oracle instance itself should not be played on that
+merge**, and a future Oracle-side comparison of `Prebash Merge.esp` proves
+nothing. mudcrab rebuilds a merge whenever a source changes — the last full run
+reported all six `skipped: inputs unchanged since the last build`, so this
+build's merges are current.
 
 ### C2. Nine of Ultimate Leveling's fifteen edits are still unapplied
 
@@ -295,3 +286,8 @@ to 10 against the archive's 25.
 - ~~SupreMe Overhaul kept its sound folder~~ — deleted by Steven, per the guide.
 - ~~Camping and the Greed Arena voiced addon were not installed~~ — installed by
   Steven.
+- ~~`DLCFrostcrag.esp` had its Worldspace group deleted when only
+  `Harvest [Flora] - DLCFrostcrag.esp` should have~~ — re-cleaned by Steven. The
+  DLC master is byte-identical on both sides again, so the 71 own records that
+  had gone missing (the exterior placements for Frostcrag Spire, plus the LOD
+  and OOO-adaptation overrides that pointed at them) are back.

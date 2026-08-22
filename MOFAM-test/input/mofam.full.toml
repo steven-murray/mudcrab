@@ -2483,9 +2483,16 @@ bain_subpackages = [
   "15 Equipment Replacer Lowerbody - Normal",
 ]
 
+# The guide's [QAC] marker is on this row, but the plugin it names is not the
+# one the game loads: guide 8 (Seamless - HGEC Female) ships its own copy of
+# `EVE_StockEquipmentReplacer for OOO.esp` and installs after this, so Seamless
+# wins the path and this copy is dead weight. The clean therefore moves to
+# Seamless, and this copy is deleted rather than left to be shadowed --
+# Merge Plugins Hide walks mod folders rather than the VFS, so a second file of
+# the same name is a hazard to it whether or not the game ever sees it.
 [[mods.actions]]
-action = "qac"
-plugins = ["EVE_StockEquipmentReplacer for OOO.esp"]
+action = "file_prune"
+paths = ["EVE_StockEquipmentReplacer for OOO.esp"]
 
 [[mods]]
 id = "Seamless - HGEC Female"
@@ -2502,6 +2509,12 @@ bain_subpackages = [
   "15 Equipment Replacer Lowerbody - Normal",
 ]
 # oracle version 1.1.0.0a
+
+# Guide 7's [QAC], applied to the copy that actually reaches the game. See the
+# note on the EVE HGEC row above.
+[[mods.actions]]
+action = "qac"
+plugins = ["EVE_StockEquipmentReplacer for OOO.esp"]
 
 # Guide 9: move the optional Crucible edits plugin into `optional/`, MO2's
 # convention for a plugin kept but left out of the load order.
