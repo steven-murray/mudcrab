@@ -401,7 +401,12 @@ fn dominant_alignment(lines: &[String], format: IniSetFormat) -> bool {
     padded > tight
 }
 
-fn render_ini_assignment(key: &str, value: &str, format: IniSetFormat, spaced: bool) -> String {
+pub(crate) fn render_ini_assignment(
+    key: &str,
+    value: &str,
+    format: IniSetFormat,
+    spaced: bool,
+) -> String {
     match format {
         // `set X to Y` is a script command; its spacing is not optional.
         IniSetFormat::SetTo => format!("set {key} to {value}"),

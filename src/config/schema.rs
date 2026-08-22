@@ -123,6 +123,7 @@ pub enum InputType {
 pub enum ModAction {
     IniSet(IniSetAction),
     IniAppendBlock(IniAppendBlockAction),
+    IniTweak(IniTweakAction),
     Qac(QacAction),
     PackBsa(PackBsaAction),
     CreateDummyPlugin(CreateDummyPluginAction),
@@ -147,6 +148,7 @@ impl ModAction {
             ModAction::IniSet(spec) => spec.scope == IniScope::Game,
             // The rest write only into the staged folder.
             ModAction::IniAppendBlock(_)
+            | ModAction::IniTweak(_)
             | ModAction::Qac(_)
             | ModAction::PackBsa(_)
             | ModAction::CreateDummyPlugin(_)
@@ -163,6 +165,7 @@ impl ModAction {
         match self {
             ModAction::IniSet(_) => "ini_set",
             ModAction::IniAppendBlock(_) => "ini_append_block",
+            ModAction::IniTweak(_) => "ini_tweak",
             ModAction::Qac(_) => "qac",
             ModAction::PackBsa(_) => "pack_bsa",
             ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
@@ -206,6 +209,31 @@ pub struct IniAppendBlockAction {
     pub file: String,
     /// The lines to append, verbatim.
     pub block: String,
+}
+
+/// Declare a Wrye Bash INI Tweak: `INI Tweaks/<file>`, holding one setting.
+///
+/// This is a BAIN wizard's `EditINI(file, section, key, value)`, which does not
+/// edit the named INI at all. It writes a *fragment* into the package's
+/// `INI Tweaks/` folder, and Wrye Bash's INI Tweaks tab applies it later, on
+/// request. Part 28 row 5 (Configuration Items Begone) is the only row in the
+/// list whose wizard produces one, and it is the only part of that wizard's
+/// output that selecting subpackages does not already cover.
+///
+/// The file is created with the header MO2's wizard writes, because that is
+/// what this artefact looks like everywhere else it exists; a second tweak
+/// naming the same file adds its line to it rather than starting a new one.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IniTweakAction {
+    /// The INI the tweak is *for*, named as the game names it -- not a path.
+    /// `Oscuro's_Oblivion_Overhaul.ini` becomes
+    /// `ini tweaks/Oscuro's_Oblivion_Overhaul.ini` in the staged mod.
+    pub file: String,
+    pub key: String,
+    pub value: IniValue,
+    #[serde(default)]
+    pub format: IniSetFormat,
 }
 
 /// Pack the mod's staged files into a BSA.

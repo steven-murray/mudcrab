@@ -302,6 +302,24 @@ nobody typed; a file that ended without a final newline still ends without one.
 The file must already exist. Appending to a file the mod does not ship means
 the path is wrong, and a file created this way would never be read.
 
+### ini_tweak
+
+```toml
+{ action = "ini_tweak", file = "Oscuro's_Oblivion_Overhaul.ini", key = "OOOOptions.bHK", value = 0, format = "set-to" }
+```
+
+A BAIN wizard's `EditINI`, which despite the name does not edit the INI it
+names. It writes a *fragment* into the package's `INI Tweaks/` folder, and Wrye
+Bash's INI Tweaks tab applies it later, on request. Use this for a wizard
+question whose answer produces a tweak; use `ini_set` to change a value in the
+mod's own INI directly.
+
+`file` names the INI the tweak is for, not a path — the fragment lands at
+`ini tweaks/<file>` in the staged mod, and giving a path is an error. `key`,
+`value` and `format` are as `ini_set`. A second `ini_tweak` naming the same
+file adds its setting to the existing fragment, which is what a wizard calling
+`EditINI` twice produces.
+
 ### qac
 
 ```toml
