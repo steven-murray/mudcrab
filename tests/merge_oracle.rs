@@ -375,7 +375,7 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
                 .or_default() += 1;
         }
         let mut rows: Vec<(String, usize)> = counts.into_iter().collect();
-        rows.sort_by(|a, b| b.1.cmp(&a.1));
+        rows.sort_by_key(|(_, count)| std::cmp::Reverse(*count));
         rows
     };
 
