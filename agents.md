@@ -9,6 +9,11 @@ cargo clippy --all-targets -- -D warnings
 
 Both must pass before any change lands. No blanket `#[allow]`.
 
+CI runs these on the **current stable**, which can be ahead of the toolchain on
+any given machine — a new clippy lint will fail there while passing locally.
+That is the check doing its job, not CI being wrong; fix the lint. `rustup
+update` locally closes the gap.
+
 ## Comments
 
 The codebase is heavily commented on purpose. Most of what mudcrab does is work

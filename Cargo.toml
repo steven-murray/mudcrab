@@ -7,7 +7,7 @@ edition = "2024"
 rust-version = "1.88"
 description = "A declarative modlist compiler and installer for TES4: Oblivion, including a headless replacement for zEdit's zMerge"
 license = "MIT OR Apache-2.0"
-# repository = "..."   # set this before publishing to crates.io
+repository = "https://github.com/steven-murray/mudcrab"
 readme = "readme.md"
 keywords = ["oblivion", "modding", "modlist", "bethesda", "mod-organizer"]
 categories = ["command-line-utilities", "game-development"]
@@ -32,6 +32,11 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zip = "2.2"
+
+[profile.release]
+# The audience downloads a binary rather than building one; debug symbols are
+# 2.5 MB of a 12.8 MB file and help nobody who is not building from source.
+strip = true
 
 [dev-dependencies]
 assert_cmd = "2.0"

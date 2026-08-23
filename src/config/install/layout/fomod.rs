@@ -357,19 +357,31 @@ pub(crate) fn read_xml_text(path: &Path) -> anyhow::Result<String> {
 /// depending on which tool authored it.
 pub(crate) fn decode_xml(bytes: &[u8], label: &str) -> anyhow::Result<String> {
     if bytes.starts_with(&[0xFF, 0xFE]) {
-        let mut values = Vec::new();
-        for chunk in bytes[2..].chunks_exact(2) {
-            values.push(u16::from_le_bytes([chunk[0], chunk[1]]));
-        }
+        // `as_chunks` rather than `chunks_exact`: a const chunk size gives
+        // fixed-size arrays, so the pair goes straight to `from_le_bytes`
+        // without indexing. A trailing odd byte is dropped either way -- it
+        // cannot be half of a UTF-16 code unit.
+        let values: Vec<u16> = bytes[2..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| u16::from_le_bytes(*pair))
+            .collect();
         return String::from_utf16(&values)
             .map_err(|err| anyhow::anyhow!("failed to decode UTF-16LE XML {label}: {err}"));
     }
 
     if bytes.starts_with(&[0xFE, 0xFF]) {
-        let mut values = Vec::new();
-        for chunk in bytes[2..].chunks_exact(2) {
-            values.push(u16::from_be_bytes([chunk[0], chunk[1]]));
-        }
+        // `as_chunks` rather than `chunks_exact`: a const chunk size gives
+        // fixed-size arrays, so the pair goes straight to `from_be_bytes`
+        // without indexing. A trailing odd byte is dropped either way -- it
+        // cannot be half of a UTF-16 code unit.
+        let values: Vec<u16> = bytes[2..]
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|pair| u16::from_be_bytes(*pair))
+            .collect();
         return String::from_utf16(&values)
             .map_err(|err| anyhow::anyhow!("failed to decode UTF-16BE XML {label}: {err}"));
     }
