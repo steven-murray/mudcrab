@@ -47,12 +47,38 @@ The third is cheap and helps immediately; it does not preclude the others.
 search. Porting `inspect` onto the planner is the fix — the planner exists so
 that one piece of code answers this.
 
-### A4. Tolerate out-of-range mod indices in merge sources
+### A4. ~~Tolerate out-of-range mod indices in merge sources~~ — already done
 
-`merge::rewrite` errors on a reference whose mod index exceeds the plugin's
-master list. Every real reader treats that as "my own record", and zMerge emits
-them routinely, so mudcrab cannot currently merge a zMerge output. Clamp with a
-warning rather than refuse.
+Recorded here as open from a stale note; `merge::rewrite` has clamped them with
+a counted warning since commit `7ed2b6d`, and the merge report prints the total.
+
+### A4b. Close the TES4 schema gap — **the blocker for sharing the merge engine**
+
+`src/plugin/schema/tes4.rs` describes 436 (record, field) pairs, derived from
+the 171 source plugins of the six MOFAM merges. That is a corpus, not the
+format. `plugin-audit` over the whole 431-plugin instance reports **125 gaps**,
+including whole record types — `CLAS`, `GMST`, `CSTY`, `EYES`, `HAIR`, `LVSP`,
+`REGN`, `ANIO`, `WATR`, `ROAD` — and many CTDA condition functions.
+
+The consequence is concrete: merging plugins outside the MOFAM corpus hard-errors
+on the first unknown field. `Feldscar.esp` fails on `LIGH/MODL`, which is a model
+path and could not be more ordinary. The failure is loud and safe — mudcrab
+refuses rather than guessing whether a field holds a FormID — but a stranger's
+first merge will very likely hit it.
+
+The work is mechanical and the tooling is already there:
+
+1. `cargo run --bin plugin-audit -- <mods dir>` produces the worklist.
+2. For each pair, xEdit's `Core/wbDefinitionsTES4.pas` is the source of truth:
+   `wbFormIDCk`/`wbFormID` means it holds a FormID, `wbInteger`/`wbFloat` means
+   it does not. That file is not in an xEdit release — it is in the xEdit
+   repository.
+3. `tests/fixtures/plugin/subrecord_matrix.txt` asserts coverage, so widen it as
+   the table grows.
+
+Guessing is the one thing that must not happen: marking a FormID-bearing field
+as inert would silently corrupt a merge, which is exactly the failure mode the
+hard error exists to prevent.
 
 ### A5. Honour `--parallel`, or remove it
 

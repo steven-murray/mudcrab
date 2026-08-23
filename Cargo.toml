@@ -2,6 +2,16 @@
 name = "mudcrab"
 version = "0.1.0"
 edition = "2024"
+# 1.88 is where let-chains stabilised, which this crate uses in ten places.
+# Not yet verified by CI against that toolchain.
+rust-version = "1.88"
+description = "A declarative modlist compiler and installer for TES4: Oblivion, including a headless replacement for zEdit's zMerge"
+license = "MIT OR Apache-2.0"
+# repository = "..."   # set this before publishing to crates.io
+readme = "readme.md"
+keywords = ["oblivion", "modding", "modlist", "bethesda", "mod-organizer"]
+categories = ["command-line-utilities", "game-development"]
+exclude = ["MOFAM-test/", "docs/design/bsa-header-flags.csv"]
 
 [dependencies]
 anyhow = "1.0"
