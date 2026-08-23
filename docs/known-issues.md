@@ -56,12 +56,11 @@ is the usual case. Restart MO2 after building one.
 
 ## Merges
 
-**Merging a plugin outside the tested corpus may hard-error on an unknown
-field.** The TES4 field table describes 436 (record, field) pairs, taken from the
-171 source plugins of the six MOFAM merges. Across a whole 431-plugin instance
-there are **125 pairs it does not describe**, including whole record types
-(`CLAS`, `GMST`, `CSTY`, `EYES`, `HAIR`, `REGN`, `WATR`) and many CTDA condition
-functions.
+**A plugin using Oblivion Magic Extender cannot be merged.** OBME adds fields to
+ALCH, ENCH, INGR, SPEL and MGEF whose parameters are FormIDs or not depending on
+a byte in a neighbouring subrecord, which mudcrab's per-field table cannot
+express. It refuses rather than guessing. Every other field the format uses is
+covered: an audit of 431 plugins and 758,464 records leaves only these.
 
 > The error names the field and where to add it. This is deliberate: mudcrab
 > cannot tell whether an unknown field holds a FormID, and guessing wrong would

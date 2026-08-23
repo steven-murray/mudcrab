@@ -16,9 +16,32 @@ pub async fn run(args: NewMergeArgs) -> anyhow::Result<()> {
 
     let sources = scaffold::resolve_sources(&args.mods_dir, &requested)?;
 
-    let load_order_path = match &args.load_order {
-        Some(path) => path.clone(),
-        None => {
+    let load_order_path = match (&args.load_order, &args.mo2_profile) {
+        (Some(path), _) => path.clone(),
+        (None, Some(profile)) => {
+            let path = scaffold::profile_load_order(&args.mods_dir, profile);
+            if !path.is_file() {
+                let known = scaffold::discover_load_orders(&args.mods_dir);
+                anyhow::bail!(
+                    "profile {profile} has no loadorder.txt at {}.{}",
+                    path.display(),
+                    if known.is_empty() {
+                        String::new()
+                    } else {
+                        format!(
+                            "\nProfiles that do: {}",
+                            known
+                                .iter()
+                                .filter_map(|p| p.parent()?.file_name()?.to_str())
+                                .collect::<Vec<_>>()
+                                .join(", ")
+                        )
+                    }
+                );
+            }
+            path
+        }
+        (None, None) => {
             let found = scaffold::discover_load_orders(&args.mods_dir);
             match found.len() {
                 1 => found.into_iter().next().expect("length checked"),
@@ -28,10 +51,10 @@ pub async fn run(args: NewMergeArgs) -> anyhow::Result<()> {
                     args.mods_dir.display()
                 ),
                 _ => anyhow::bail!(
-                    "several profiles have a loadorder.txt; pass --load-order to choose one:\n  {}",
+                    "this instance has several profiles; choose one with --mo2-profile <NAME>:\n  {}",
                     found
                         .iter()
-                        .map(|p| p.display().to_string())
+                        .filter_map(|p| p.parent()?.file_name()?.to_str())
                         .collect::<Vec<_>>()
                         .join("\n  ")
                 ),

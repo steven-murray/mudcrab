@@ -127,6 +127,16 @@ pub fn resolve_sources(mods_dir: &Path, requested: &[String]) -> anyhow::Result<
     Ok(out)
 }
 
+/// Where a named MO2 profile keeps its load order, given the `mods/` directory.
+pub fn profile_load_order(mods_dir: &Path, profile: &str) -> PathBuf {
+    mods_dir
+        .parent()
+        .unwrap_or(mods_dir)
+        .join("profiles")
+        .join(profile)
+        .join("loadorder.txt")
+}
+
 /// Profile load-order files under an MO2 instance, given its `mods/` directory.
 pub fn discover_load_orders(mods_dir: &Path) -> Vec<PathBuf> {
     let Some(instance) = mods_dir.parent() else {

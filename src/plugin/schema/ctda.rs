@@ -6,14 +6,21 @@
 //! `GetRandomPercent` takes nothing, `GetQuestVariable` takes a QUST FormID
 //! *and* a plain variable index.
 //!
-//! Every classification below was confirmed empirically: for each function,
-//! comparing the parameter in a merge's source plugin against the same
-//! parameter in zMerge's output shows whether zMerge rewrote it. See
-//! `docs/design/merge-engine.md`.
+//! The table is transcribed from xEdit's own `wbCTDAFunctions`, whose entries
+//! carry a `ParamType` per parameter. Everything from `ptObjectReference`
+//! onward in its `TCTDAFunctionParamType` enum names a record type and is a
+//! FormID; everything before it (`ptInteger`, `ptActorValue`, `ptQuestStage`,
+//! `ptVariableName`, ...) is not. All 192 functions are listed, so an unlisted
+//! index means a plugin using a function TES4 does not define.
 //!
-//! An unlisted function index is an error. The table is filled demand-driven
-//! from what `plugin-audit` actually finds, because guessing which parameters
-//! are FormIDs is exactly how a merge corrupts a plugin.
+//! It was previously derived empirically -- comparing each parameter against
+//! zMerge's output to see whether zMerge rewrote it -- and **that method was
+//! wrong for seven functions**: `GetScriptVariable`, `GetIsClass`, `GetIsRace`,
+//! `GetFactionRank`, `GetDisposition`, `GetDeadCount` and `GetInCellParam` all
+//! take a FormID that the MOFAM merges happened never to renumber, because the
+//! records they pointed at were vanilla and so kept their ids. "Observed
+//! unchanged" was true and meant nothing. A corpus can only show which fields
+//! *did* change, never which ones *can*.
 
 use super::SchemaError;
 use crate::plugin::formid::FormId;
@@ -38,44 +45,198 @@ use ParamKind::{FormId as F, Value as V};
 /// Confirmed-FormID entries are marked; the rest were observed unchanged
 /// across all six merges *and* carry values inconsistent with a FormID.
 static FUNCTIONS: &[(u32, ParamKind, ParamKind)] = &[
-    (1, F, V),   // GetDistance(ObjectRef)                  -- rewritten in corpus
-    (14, V, V),  // GetActorValue(ActorValue)
-    (46, V, V),  // GetDead -- takes no parameters
-    (47, F, V),  // GetItemCount(InventoryObject)           -- rewritten in corpus
-    (48, V, V),  // GetGold
-    (50, V, V),  // GetSleeping
-    (53, V, V),  // GetScriptVariable
-    (56, F, V),  // GetQuestRunning(Quest)                  -- rewritten in corpus
-    (58, F, V),  // GetStage(Quest)                         -- rewritten in corpus
-    (59, F, V),  // GetStageDone(Quest)                     -- rewritten in corpus
-    (67, F, V),  // GetInCell(Cell)                         -- rewritten in corpus
-    (68, V, V),  // GetIsClass(Class)
-    (69, V, V),  // GetIsRace(Race)
-    (70, V, V),  // GetIsSex
-    (71, F, V),  // GetInFaction(Faction)                   -- rewritten in corpus
-    (72, F, V),  // GetIsID(Object)                         -- rewritten in corpus
-    (73, V, V),  // GetFactionRank
-    (74, F, V),  // GetGlobalValue(Global)                  -- rewritten in corpus
-    (76, V, V),  // GetDisposition
-    (77, V, V),  // GetRandomPercent
-    (79, F, V),  // GetQuestVariable(Quest, variable index) -- rewritten in corpus
-    (80, V, V),  // GetLevel
-    (84, V, V),  // GetDeadCount
+    (1, F, V), // GetDistance (ObjectReference)
+    (5, V, V), // GetLocked
+    (6, V, V), // GetPos (Axis)
+    (8, V, V), // GetAngle (Axis)
+    (10, V, V), // GetStartingPos (Axis)
+    (11, V, V), // GetStartingAngle (Axis)
+    (12, V, V), // GetSecondsPassed
+    (14, V, V), // GetActorValue (ActorValue)
+    (18, V, V), // GetCurrentTime
+    (24, V, V), // GetScale
+    (27, F, V), // GetLineOfSight (ObjectReference)
+    (32, F, V), // GetInSameCell (ObjectReference)
+    (35, V, V), // GetDisabled
+    (36, V, V), // MenuMode (Integer)
+    (39, V, V), // GetDisease
+    (40, V, V), // GetVampire
+    (41, V, V), // GetClothingValue
+    (42, F, V), // SameFaction (Actor)
+    (43, F, V), // SameRace (Actor)
+    (44, F, V), // SameSex (Actor)
+    (45, F, V), // GetDetected (Actor)
+    (46, V, V), // GetDead
+    (47, F, V), // GetItemCount (InventoryObject)
+    (48, V, V), // GetGold
+    (49, V, V), // GetSleeping
+    (50, V, V), // GetTalkedToPC
+    (53, F, V), // GetScriptVariable (ObjectReference, VariableName)
+    (56, F, V), // GetQuestRunning (Quest)
+    (58, F, V), // GetStage (Quest)
+    (59, F, V), // GetStageDone (Quest, QuestStage)
+    (60, F, F), // GetFactionRankDifference (Faction, Actor)
+    (61, V, V), // GetAlarmed
+    (62, V, V), // IsRaining
+    (63, V, V), // GetAttacked
+    (64, V, V), // GetIsCreature
+    (65, V, V), // GetLockLevel
+    (66, F, V), // GetShouldAttack (Actor)
+    (67, F, V), // GetInCell (Cell)
+    (68, F, V), // GetIsClass (Class)
+    (69, F, V), // GetIsRace (Race)
+    (70, V, V), // GetIsSex (Sex)
+    (71, F, V), // GetInFaction (Faction)
+    (72, F, V), // GetIsID (ReferencableObject)
+    (73, F, V), // GetFactionRank (Faction)
+    (74, F, V), // GetGlobalValue (Global)
+    (75, V, V), // IsSnowing
+    (76, F, V), // GetDisposition (Actor)
+    (77, V, V), // GetRandomPercent
+    (79, F, V), // GetQuestVariable (Quest, VariableName)
+    (80, V, V), // GetLevel
+    (81, V, V), // GetArmorRating
+    (84, F, V), // GetDeadCount (ActorBase)
+    (91, V, V), // GetIsAlerted
+    (98, V, V), // GetPlayerControlsDisabled
+    (99, F, V), // GetHeadingAngle (ObjectReference)
     (101, V, V), // IsWeaponOut
+    (102, V, V), // IsTorchOut
+    (103, V, V), // IsShieldOut
+    (104, V, V), // IsYielding
+    (106, V, V), // IsFacingUp
     (107, V, V), // GetKnockedState
+    (108, V, V), // GetWeaponAnimType
+    (109, V, V), // GetWeaponSkillType
     (110, V, V), // GetCurrentAIPackage
+    (111, V, V), // IsWaiting
+    (112, V, V), // IsIdlePlaying
+    (116, V, V), // GetCrimeGold
+    (122, F, V), // GetCrime (Actor, CrimeType)
     (125, V, V), // IsGuard
-    (131, V, V), // GetPCInFaction
-    (141, V, V), // IsInMyOwnedCell
-    (143, V, V), // GetCurrentWeatherPercent
-    (145, V, V), // IsContinuingPackagePCNear
-    (146, V, V), // CanHaveFlames
-    (185, V, V), // IsSneaking
-    (230, V, V), // GetTimeDead
-    (251, V, V), // IsLeftUp
-    (254, V, V), // IsEssential -- takes no parameters
-    (286, V, V), // GetPersuasionNumber
-    (365, V, V), // OBSE/extended -- observed with both parameters always zero
+    (127, V, V), // CanPayCrimeGold
+    (128, V, V), // GetFatiguePercentage
+    (129, F, V), // GetPCIsClass (Class)
+    (130, F, V), // GetPCIsRace (Race)
+    (131, V, V), // GetPCIsSex (Sex)
+    (132, F, V), // GetPCInFaction (Faction)
+    (133, V, V), // SameFactionAsPC
+    (134, V, V), // SameRaceAsPC
+    (135, V, V), // SameSexAsPC
+    (136, F, V), // GetIsReference (ObjectReference)
+    (141, V, V), // IsTalking
+    (142, V, V), // GetWalkSpeed
+    (143, V, V), // GetCurrentAIProcedure
+    (144, V, V), // GetTrespassWarningLevel
+    (145, V, V), // IsTrespassing
+    (146, V, V), // IsInMyOwnedCell
+    (147, V, V), // GetWindSpeed
+    (148, V, V), // GetCurrentWeatherPercent
+    (149, F, V), // GetIsCurrentWeather (Weather)
+    (150, V, V), // IsContinuingPackagePCNear
+    (153, V, V), // CanHaveFlames
+    (154, V, V), // HasFlames
+    (157, V, V), // GetOpenState
+    (159, V, V), // GetSitting
+    (160, V, V), // GetFurnitureMarkerID
+    (161, F, V), // GetIsCurrentPackage (Package)
+    (162, F, V), // IsCurrentFurnitureRef (ObjectReference)
+    (163, F, V), // IsCurrentFurnitureObj (Furniture)
+    (170, V, V), // GetDayOfWeek
+    (171, V, V), // IsPlayerInJail
+    (172, F, V), // GetTalkedToPCParam (Actor)
+    (175, V, V), // IsPCSleeping
+    (176, V, V), // IsPCAMurderer
+    (180, F, V), // GetDetectionLevel (Actor)
+    (182, F, V), // GetEquipped (InventoryObject)
+    (185, V, V), // IsSwimming
+    (190, V, V), // GetAmountSoldStolen
+    (193, F, V), // GetPCExpelled (Faction)
+    (195, F, V), // GetPCFactionMurder (Faction)
+    (197, F, V), // GetPCFactionSteal (Faction)
+    (199, F, V), // GetPCFactionAttack (Faction)
+    (201, F, V), // GetPCFactionSubmitAuthority (Faction)
+    (203, V, V), // GetDestroyed
+    (214, F, V), // HasMagicEffect (MagicEffect)
+    (215, V, V), // GetDoorDefaultOpen
+    (223, F, V), // IsSpellTarget (MagicItem)
+    (224, F, V), // GetIsPlayerBirthsign (Birthsign)
+    (225, V, V), // GetPersuasionNumber
+    (227, V, V), // HasVampireFed
+    (228, F, V), // GetIsClassDefault (Class)
+    (229, V, V), // GetClassDefaultMatch
+    (230, F, F), // GetInCellParam (Cell, ObjectReference)
+    (237, V, V), // GetIsGhost
+    (242, V, V), // GetUnconscious
+    (244, V, V), // GetRestrained
+    (246, F, V), // GetIsUsedItem (ReferencableObject)
+    (247, V, V), // GetIsUsedItemType (FormType)
+    (249, V, V), // GetPCFame
+    (251, V, V), // GetPCInfamy
+    (254, V, V), // GetIsPlayableRace
+    (255, V, V), // GetOffersServicesNow
+    (258, V, V), // GetUsedItemLevel
+    (259, V, V), // GetUsedItemActivate
+    (264, V, V), // GetBarterGold
+    (265, V, V), // IsTimePassing
+    (266, V, V), // IsPleasant
+    (267, V, V), // IsCloudy
+    (274, V, V), // GetArmorRatingUpperBody
+    (277, V, V), // GetBaseActorValue (ActorValue)
+    (278, F, V), // IsOwner (OwnerOpt)
+    (280, F, F), // IsCellOwner (Cell, OwnerOpt)
+    (282, V, V), // IsHorseStolen
+    (285, V, V), // IsLeftUp
+    (286, V, V), // IsSneaking
+    (287, V, V), // IsRunning
+    (288, F, V), // GetFriendHit (Actor)
+    (289, V, V), // IsInCombat
+    (300, V, V), // IsInInterior
+    (305, V, V), // GetInvestmentGold
+    (306, V, V), // IsActorUsingATorch
+    (309, V, V), // IsXBox
+    (310, F, V), // GetInWorldspace (WorldSpace)
+    (312, V, V), // GetPCMiscStat (Integer)
+    (313, V, V), // IsActorEvil
+    (314, V, V), // IsActorAVictim
+    (315, V, V), // GetTotalPersuasionNumber
+    (318, V, V), // GetIdleDoneOnce
+    (320, V, V), // GetNoRumors
+    (323, V, V), // WhichServiceMenu
+    (327, V, V), // IsRidingHorse
+    (329, V, V), // IsTurnArrest
+    (332, V, V), // IsInDangerousWater
+    (338, V, V), // GetIgnoreFriendlyHits
+    (339, V, V), // IsPlayersLastRiddenHorse
+    (353, V, V), // IsActor
+    (354, V, V), // IsEssential
+    (358, V, V), // IsPlayerMovingIntoNewSpace
+    (361, V, V), // GetTimeDead
+    (362, V, V), // GetPlayerHasLastRiddenHorse
+    (365, V, V), // GetPlayerInSEWorld
+    (1107, V, V), // IsAmmo, (Integer)
+    (1884, F, V), // GetPCTrainingSessionsUsed (Package)
+    (2213, F, V), // GetPackageOffersServices (Package)
+    (2214, F, V), // GetPackageMustReachLocation (Package)
+    (2215, F, V), // GetPackageMustComplete (Package)
+    (2216, F, V), // GetPackageLockDoorsAtStart (Package)
+    (2217, F, V), // GetPackageLockDoorsAtEnd (Package)
+    (2218, F, V), // GetPackageLockDoorsAtLocation (Package)
+    (2219, F, V), // GetPackageUnlockDoorsAtStart (Package)
+    (2220, F, V), // GetPackageUnlockDoorsAtEnd (Package)
+    (2221, F, V), // GetPackageUnlockDoorsAtLocation (Package)
+    (2222, F, V), // GetPackageContinueIfPCNear (Package)
+    (2223, F, V), // GetPackageOncePerDay (Package)
+    (2224, F, V), // GetPackageSkipFalloutBehavior (Package)
+    (2225, F, V), // GetPackageAlwaysRun (Package)
+    (2226, F, V), // GetPackageAlwaysSneak (Package)
+    (2227, F, V), // GetPackageAllowSwimming (Package)
+    (2228, F, V), // GetPackageAllowFalls (Package)
+    (2229, F, V), // GetPackageArmorUnequipped (Package)
+    (2230, F, V), // GetPackageWeaponsUnequipped (Package)
+    (2231, F, V), // GetPackageDefensiveCombat (Package)
+    (2232, F, V), // GetPackageUseHorse (Package)
+    (2233, F, V), // GetPackageNoIdleAnims (Package)
 ];
 
 fn lookup(function: u32) -> Option<(ParamKind, ParamKind)> {

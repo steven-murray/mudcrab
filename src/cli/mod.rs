@@ -179,15 +179,20 @@ pub struct NewMergeArgs {
     /// pick a side when two mods ship the same filename.
     #[arg(long = "plugin")]
     pub plugin: Vec<String>,
-    /// Read plugin names from a file, one per line; `#` comments allowed.
-    /// Combines with `--plugin`.
-    #[arg(long)]
+    /// Read plugin names from a text file, one per line, in merge order;
+    /// blank lines and `#` comments are skipped. Combines with `--plugin`.
+    #[arg(long = "plugins", alias = "plugins-from", value_name = "FILE")]
     pub plugins_from: Option<PathBuf>,
     /// Filename of the merged plugin. Defaults to `<name>.esp`.
     #[arg(long)]
     pub output_plugin: Option<String>,
-    /// The load order to build against, as a `loadorder.txt` or `plugins.txt`.
-    /// Found automatically when the instance has exactly one profile.
+    /// The MO2 profile whose load order to build against, by name. The usual
+    /// way to choose when an instance has several.
+    #[arg(long)]
+    pub mo2_profile: Option<String>,
+    /// The load order to build against, as a path to a `loadorder.txt` or
+    /// `plugins.txt`. Overrides `--mo2-profile`. Found automatically when the
+    /// instance has exactly one profile.
     #[arg(long)]
     pub load_order: Option<PathBuf>,
     /// Where to write the modlist. Printed to stdout if omitted.

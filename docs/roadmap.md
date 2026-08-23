@@ -52,33 +52,39 @@ that one piece of code answers this.
 Recorded here as open from a stale note; `merge::rewrite` has clamped them with
 a counted warning since commit `7ed2b6d`, and the merge report prints the total.
 
-### A4b. Close the TES4 schema gap — **the blocker for sharing the merge engine**
+### A4b. ~~Close the TES4 schema gap~~ — done, except for OBME
 
-`src/plugin/schema/tes4.rs` describes 436 (record, field) pairs, derived from
-the 171 source plugins of the six MOFAM merges. That is a corpus, not the
-format. `plugin-audit` over the whole 431-plugin instance reports **125 gaps**,
-including whole record types — `CLAS`, `GMST`, `CSTY`, `EYES`, `HAIR`, `LVSP`,
-`REGN`, `ANIO`, `WATR`, `ROAD` — and many CTDA condition functions.
+`plugin-audit` over the 431-plugin instance reported **125 gaps**. Working each
+one against xEdit's `wbDefinitionsTES4.pas` brought that to **17**, all of them
+Oblivion Magic Extender fields.
 
-The consequence is concrete: merging plugins outside the MOFAM corpus hard-errors
-on the first unknown field. `Feldscar.esp` fails on `LIGH/MODL`, which is a model
-path and could not be more ordinary. The failure is loud and safe — mudcrab
-refuses rather than guessing whether a field holds a FormID — but a stranger's
-first merge will very likely hit it.
+Those 17 stay refused on purpose. `EFIX`'s parameter is a union whose type is
+decided by a byte in the *`EFME` subrecord of the same record*, so a per-field
+table cannot answer it — and marking the harmless OBME fields `Opaque` would let
+such a plugin reach the point where `EFIT` is read as inert bytes and its FormID
+silently not renumbered. The header of `src/plugin/schema/tes4.rs` says so, at
+length, because it looks like an easy win.
 
-The work is mechanical and the tooling is already there:
+**Remaining work**: a field kind with access to its sibling subrecords, which
+would close OBME and let `EFIT` be handled correctly too. Until then a clearer
+refusal ("this plugin uses OBME") would be worth more than the current
+per-field error.
 
-1. `cargo run --bin plugin-audit -- <mods dir>` produces the worklist.
-2. For each pair, xEdit's `Core/wbDefinitionsTES4.pas` is the source of truth:
-   `wbFormIDCk`/`wbFormID` means it holds a FormID, `wbInteger`/`wbFloat` means
-   it does not. That file is not in an xEdit release — it is in the xEdit
-   repository.
-3. `tests/fixtures/plugin/subrecord_matrix.txt` asserts coverage, so widen it as
-   the table grows.
+### A4c. The CTDA table was wrong in seven places — fixed
 
-Guessing is the one thing that must not happen: marking a FormID-bearing field
-as inert would silently corrupt a merge, which is exactly the failure mode the
-hard error exists to prevent.
+Condition parameters were classified empirically, by checking whether zMerge
+rewrote them. Against xEdit's own `wbCTDAFunctions`, seven disagreed:
+`GetScriptVariable`, `GetIsClass`, `GetIsRace`, `GetFactionRank`,
+`GetDisposition`, `GetDeadCount` and `GetInCellParam` all take a FormID that
+mudcrab treated as a plain integer.
+
+They slipped through because the records those conditions pointed at were
+vanilla, so their ids never changed during a merge. "Observed unchanged" was
+true and meant nothing — a corpus shows which fields *did* change, never which
+ones *can*. All 192 functions now come from xEdit's table.
+
+All six MOFAM merges rebuild **byte-identical** with the correction, so nothing
+already built was affected. The next list would not have been so lucky.
 
 ### A5. Honour `--parallel`, or remove it
 
