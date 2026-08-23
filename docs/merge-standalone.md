@@ -98,10 +98,11 @@ type = "merge"
 
 ## Limits
 
-**It may refuse to merge your plugins.** The TES4 field table was built from the
-171 source plugins of one modlist, and it does not yet cover the whole format —
-across a full 431-plugin instance there are 125 (record, field) pairs it does not
-describe. When it meets one it stops with a message naming the field.
+**It refuses plugins that use Oblivion Magic Extender.** OBME's fields carry
+parameters that are FormIDs or not depending on a byte elsewhere in the record,
+which mudcrab's field table cannot express, so it stops rather than guess. The
+rest of the format is covered — an audit of 431 plugins and 758,464 records
+leaves only OBME.
 
 That refusal is deliberate. mudcrab cannot tell whether an unknown field holds a
 FormID, and guessing wrong would silently corrupt the merge instead of failing.

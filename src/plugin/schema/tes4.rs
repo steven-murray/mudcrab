@@ -12,6 +12,24 @@
 //! Note how the same field signature means different things in different
 //! records -- `DOOR/ANAM` is a sound FormID, `WEAP/ANAM` is a u16 enchantment
 //! point count. That is why the key is the pair, never the field alone.
+//!
+//! # The OBME fields are missing on purpose
+//!
+//! `OBME`, `EFME`, `EFIX`, `EFXX`, `EDDX` and `ESCE` -- Oblivion Magic
+//! Extender's additions to ALCH, ENCH, INGR, SPEL and MGEF -- are deliberately
+//! absent, and **must not be added as `Opaque` to quieten the error**.
+//!
+//! Five of the six hold no FormIDs and would be safe. `EFIX` is not: xEdit
+//! defines its Param #2 as a union whose type is decided by a byte in the
+//! *`EFME` subrecord of the same record*, and it can be a FormID. `EFIT` has
+//! the same shape -- already in this table as `Opaque`, which is correct for
+//! vanilla TES4 and wrong once OBME is present.
+//!
+//! So a per-field table cannot answer this, and marking the harmless five
+//! `Opaque` would let an OBME plugin through to the point where `EFIT` is read
+//! as inert bytes and its FormID silently not renumbered. The refusal on the
+//! other five is what keeps that from happening. Resolving it properly needs a
+//! field kind with access to its sibling subrecords.
 
 use super::{CustomKind, FieldKind};
 
@@ -57,6 +75,17 @@ const MAGIC_EFFECT_DATA: FieldKind = Struct {
     sizes: &[64],
     form_id_offsets: &[8, 24, 32, 36, 40, 44, 48, 52],
 };
+/// `REGN/RDWT` and `CLMT/WLST`: repeating {weather FormID, chance}.
+const WEATHER_CHANCE: FieldKind = FieldKind::StructArray { stride: 8, form_id_offsets: &[0] };
+/// `REGN/RDGS`: repeating {grass FormID, unused}.
+const GRASS_ENTRY: FieldKind = FieldKind::StructArray { stride: 8, form_id_offsets: &[0] };
+/// `REGN/RDSD`: repeating {sound FormID, flags, chance}.
+const REGION_SOUND: FieldKind = FieldKind::StructArray { stride: 12, form_id_offsets: &[0] };
+/// `REGN/RDOT`: repeating region object; the FormID leads each 52-byte entry.
+const REGION_OBJECT: FieldKind = FieldKind::StructArray { stride: 52, form_id_offsets: &[0] };
+/// `WATR/GNAM`: daytime, nighttime and underwater water FormIDs.
+const RELATED_WATERS: FieldKind = FieldKind::Struct { sizes: &[12], form_id_offsets: &[0, 4, 8] };
+
 /// Fixed-size structs containing no FormIDs.
 const PLAIN_8: FieldKind = Struct {
     sizes: &[8],
@@ -117,6 +146,12 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"AMMO", *b"MODB", Opaque),
     (*b"AMMO", *b"MODL", ZString),
     (*b"AMMO", *b"MODT", Opaque),
+    // ---- ANIO ----
+    (*b"ANIO", *b"DATA", FormId), // IDLE animation
+    (*b"ANIO", *b"EDID", ZString),
+    (*b"ANIO", *b"MODB", Opaque),
+    (*b"ANIO", *b"MODL", ZString),
+    (*b"ANIO", *b"MODT", Opaque),
     // ---- APPA ----
     (*b"APPA", *b"DATA", Opaque), // type, value, weight, quality
     (*b"APPA", *b"EDID", ZString),
@@ -158,6 +193,12 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"BOOK", *b"MODL", ZString),
     (*b"BOOK", *b"MODT", Opaque),
     (*b"BOOK", *b"SCRI", FormId),
+    // ---- BSGN ----
+    (*b"BSGN", *b"DESC", ZString),
+    (*b"BSGN", *b"EDID", ZString),
+    (*b"BSGN", *b"FULL", ZString),
+    (*b"BSGN", *b"ICON", ZString),
+    (*b"BSGN", *b"SPLO", FormId), // SPEL or LVSP
     // ---- CELL ----
     (*b"CELL", *b"DATA", Opaque), // u8 flags
     (*b"CELL", *b"EDID", ZString),
@@ -172,7 +213,23 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"CELL", *b"XGLB", FormId), // global
     (*b"CELL", *b"XOWN", FormId),
     (*b"CELL", *b"XRNK", Opaque), // i32 faction rank
+    // ---- CLAS ----
+    (*b"CLAS", *b"DATA", Opaque), // skills, flags, services -- enums, no FormIDs
+    (*b"CLAS", *b"DESC", ZString),
+    (*b"CLAS", *b"EDID", ZString),
+    (*b"CLAS", *b"FULL", ZString),
+    (*b"CLAS", *b"ICON", ZString),
+    // ---- CLMT ----
+    (*b"CLMT", *b"EDID", ZString),
+    (*b"CLMT", *b"FNAM", ZString), // sun texture
+    (*b"CLMT", *b"GNAM", ZString), // sun glare texture
+    (*b"CLMT", *b"MODB", Opaque),
+    (*b"CLMT", *b"MODL", ZString),
+    (*b"CLMT", *b"MODT", Opaque),
+    (*b"CLMT", *b"TNAM", Opaque), // sunrise/sunset/volatility timings
+    (*b"CLMT", *b"WLST", WEATHER_CHANCE),
     // ---- CLOT ----
+    (*b"CLOT", *b"ANAM", Opaque), // u16 enchantment points -- NOT a FormID, as WEAP/ANAM
     (*b"CLOT", *b"BMDT", Opaque), // u32 biped flags
     (*b"CLOT", *b"DATA", Opaque), // value, weight
     (*b"CLOT", *b"EDID", ZString),
@@ -233,11 +290,16 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"CREA", *b"TNAM", Opaque), // f32 turning speed -- NOT a FormID
     (*b"CREA", *b"WNAM", Opaque), // f32 foot weight -- NOT a FormID
     (*b"CREA", *b"ZNAM", FormId), // combat style
+    // ---- CSTY ----
+    (*b"CSTY", *b"CSAD", Opaque), // advanced combat floats
+    (*b"CSTY", *b"CSTD", Opaque), // combat style struct
+    (*b"CSTY", *b"EDID", ZString),
     // ---- DIAL ----
     (*b"DIAL", *b"DATA", Opaque), // u8 dialogue type
     (*b"DIAL", *b"EDID", ZString),
     (*b"DIAL", *b"FULL", ZString),
     (*b"DIAL", *b"QSTI", FormId), // quest -- one per subrecord
+    (*b"DIAL", *b"QSTR", FormIdArray), // quests
     // ---- DOOR ----
     (*b"DOOR", *b"ANAM", FormId), // loop sound -- NOT the same as WEAP/ANAM
     (*b"DOOR", *b"BNAM", FormId), // close sound
@@ -261,12 +323,19 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"ENCH", *b"EFIT", Opaque),
     (*b"ENCH", *b"ENIT", Opaque),
     (*b"ENCH", *b"FULL", ZString),
+    (*b"ENCH", *b"SCIT", SCRIPT_EFFECT),
+    // ---- EYES ----
+    (*b"EYES", *b"DATA", Opaque), // u8 flags
+    (*b"EYES", *b"EDID", ZString),
+    (*b"EYES", *b"FULL", ZString),
+    (*b"EYES", *b"ICON", ZString),
     // ---- FACT ----
     (*b"FACT", *b"CNAM", Opaque), // f32 crime gold multiplier
     (*b"FACT", *b"DATA", Opaque),
     (*b"FACT", *b"EDID", ZString),
     (*b"FACT", *b"FNAM", ZString), // female rank name
     (*b"FACT", *b"FULL", ZString),
+    (*b"FACT", *b"INAM", ZString), // insignia texture -- NOT the CREA/NPC_ death item
     (*b"FACT", *b"MNAM", ZString), // male rank name
     (*b"FACT", *b"RNAM", Opaque), // i32 rank number
     (*b"FACT", *b"XNAM", FORM_ID_THEN_8), // faction + i32 modifier
@@ -275,6 +344,7 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"FLOR", *b"FULL", ZString),
     (*b"FLOR", *b"MODB", Opaque),
     (*b"FLOR", *b"MODL", ZString),
+    (*b"FLOR", *b"MODT", Opaque), // texture hashes
     (*b"FLOR", *b"PFIG", FormId), // ingredient produced
     (*b"FLOR", *b"PFPC", Opaque), // four u8 seasonal production counts
     (*b"FLOR", *b"SCRI", FormId),
@@ -284,16 +354,29 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"FURN", *b"MNAM", Opaque), // u32 active marker flags
     (*b"FURN", *b"MODB", Opaque),
     (*b"FURN", *b"MODL", ZString),
+    (*b"FURN", *b"MODT", Opaque), // texture hashes
+    (*b"FURN", *b"SCRI", FormId),
     // ---- GLOB ----
     (*b"GLOB", *b"EDID", ZString),
     (*b"GLOB", *b"FLTV", Opaque), // f32 value
     (*b"GLOB", *b"FNAM", Opaque), // u8 type char
+    // ---- GMST ----
+    (*b"GMST", *b"DATA", Opaque), // string, int or float by EDID prefix
+    (*b"GMST", *b"EDID", ZString),
     // ---- GRAS ----
     (*b"GRAS", *b"DATA", Opaque), // density, slope, water, colour range
     (*b"GRAS", *b"EDID", ZString),
     (*b"GRAS", *b"MODB", Opaque),
     (*b"GRAS", *b"MODL", ZString),
     (*b"GRAS", *b"MODT", Opaque),
+    // ---- HAIR ----
+    (*b"HAIR", *b"DATA", Opaque), // u8 flags
+    (*b"HAIR", *b"EDID", ZString),
+    (*b"HAIR", *b"FULL", ZString),
+    (*b"HAIR", *b"ICON", ZString),
+    (*b"HAIR", *b"MODB", Opaque),
+    (*b"HAIR", *b"MODL", ZString),
+    (*b"HAIR", *b"MODT", Opaque),
     // ---- IDLE ----
     (*b"IDLE", *b"ANAM", Opaque), // u8 animation group section
     (*b"IDLE", *b"CTDA", CONDITION),
@@ -352,6 +435,13 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"LIGH", *b"DATA", Opaque), // time, radius, colour, flags, falloff, FOV, value, weight
     (*b"LIGH", *b"EDID", ZString),
     (*b"LIGH", *b"FNAM", Opaque), // f32 fade value
+    (*b"LIGH", *b"FULL", ZString),
+    (*b"LIGH", *b"ICON", ZString),
+    (*b"LIGH", *b"MODB", Opaque), // f32 bound radius
+    (*b"LIGH", *b"MODL", ZString), // model filename
+    (*b"LIGH", *b"MODT", Opaque), // texture hashes
+    (*b"LIGH", *b"SCRI", FormId),
+    (*b"LIGH", *b"SNAM", FormId), // SOUN
     // ---- LSCR ----
     (*b"LSCR", *b"DESC", ZString),
     (*b"LSCR", *b"EDID", ZString),
@@ -368,12 +458,18 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"LVLC", *b"LVLD", Opaque), // u8 chance none
     (*b"LVLC", *b"LVLF", Opaque), // u8 flags
     (*b"LVLC", *b"LVLO", LEVELLED_ENTRY),
+    (*b"LVLC", *b"SCRI", FormId),
     (*b"LVLC", *b"TNAM", FormId), // template creature
     // ---- LVLI ----
     (*b"LVLI", *b"EDID", ZString),
     (*b"LVLI", *b"LVLD", Opaque), // u8 chance none
     (*b"LVLI", *b"LVLF", Opaque), // u8 flags
     (*b"LVLI", *b"LVLO", LEVELLED_ENTRY),
+    // ---- LVSP ----
+    (*b"LVSP", *b"EDID", ZString),
+    (*b"LVSP", *b"LVLD", Opaque), // u8 chance none
+    (*b"LVSP", *b"LVLF", Opaque), // u8 flags
+    (*b"LVSP", *b"LVLO", LEVELLED_ENTRY),
     // ---- MGEF ----
     (*b"MGEF", *b"DATA", MAGIC_EFFECT_DATA),
     (*b"MGEF", *b"DESC", ZString),
@@ -496,10 +592,31 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"REFR", *b"XMRK", Opaque), // zero-length map marker flag
     (*b"REFR", *b"XOWN", FormId),
     (*b"REFR", *b"XRNK", Opaque), // i32 faction rank
+    (*b"REFR", *b"XRTM", FormId), // REFR
     (*b"REFR", *b"XSCL", Opaque), // f32 scale -- NOT a FormID
     (*b"REFR", *b"XSED", Opaque), // SpeedTree seed
     (*b"REFR", *b"XTEL", FORM_ID_THEN_28), // destination door + 24B transform
     (*b"REFR", *b"XTRG", FormId), // target reference
+    // ---- REGN ----
+    (*b"REGN", *b"EDID", ZString),
+    (*b"REGN", *b"ICON", ZString),
+    (*b"REGN", *b"RCLR", Opaque), // map colour
+    (*b"REGN", *b"RDAT", Opaque), // data-type header
+    (*b"REGN", *b"RDGS", GRASS_ENTRY),
+    (*b"REGN", *b"RDMD", Opaque), // u32 music type
+    (*b"REGN", *b"RDMP", ZString), // map name
+    (*b"REGN", *b"RDOT", REGION_OBJECT),
+    (*b"REGN", *b"RDSD", REGION_SOUND),
+    (*b"REGN", *b"RDWT", WEATHER_CHANCE),
+    (*b"REGN", *b"RPLD", Opaque), // point list floats
+    (*b"REGN", *b"RPLI", Opaque), // u32 edge falloff
+    (*b"REGN", *b"WNAM", FormId), // WRLD
+    // ---- ROAD ----
+    (*b"ROAD", *b"PGRP", Opaque), // point positions
+    (*b"ROAD", *b"PGRR", Opaque), // connections
+    // ---- SBSP ----
+    (*b"SBSP", *b"DNAM", Opaque), // x/y/z floats
+    (*b"SBSP", *b"EDID", ZString),
     // ---- SCPT ----
     (*b"SCPT", *b"EDID", ZString),
     (*b"SCPT", *b"SCDA", Opaque), // see QUST/SCDA
@@ -519,6 +636,16 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"SGST", *b"MODB", Opaque),
     (*b"SGST", *b"MODL", ZString),
     (*b"SGST", *b"MODT", Opaque),
+    // ---- SKIL ----
+    (*b"SKIL", *b"ANAM", ZString),
+    (*b"SKIL", *b"DATA", Opaque), // action, attribute, specialization
+    (*b"SKIL", *b"DESC", ZString),
+    (*b"SKIL", *b"EDID", ZString),
+    (*b"SKIL", *b"ENAM", ZString),
+    (*b"SKIL", *b"ICON", ZString),
+    (*b"SKIL", *b"INDX", Opaque), // s32 skill index
+    (*b"SKIL", *b"JNAM", ZString),
+    (*b"SKIL", *b"MNAM", ZString),
     // ---- SLGM ----
     (*b"SLGM", *b"DATA", Opaque), // value, weight
     (*b"SLGM", *b"EDID", ZString),
@@ -563,6 +690,15 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"TREE", *b"MODL", ZString),
     (*b"TREE", *b"MODT", Opaque),
     (*b"TREE", *b"SNAM", Opaque), // SpeedTree seeds -- u32 array, NOT FormIDs
+    // ---- WATR ----
+    (*b"WATR", *b"ANAM", Opaque), // u8 opacity
+    (*b"WATR", *b"DATA", Opaque), // water properties
+    (*b"WATR", *b"EDID", ZString),
+    (*b"WATR", *b"FNAM", Opaque), // u8 flags
+    (*b"WATR", *b"GNAM", RELATED_WATERS),
+    (*b"WATR", *b"MNAM", ZString), // material id
+    (*b"WATR", *b"SNAM", FormId), // SOUN
+    (*b"WATR", *b"TNAM", ZString), // texture
     // ---- WEAP ----
     (*b"WEAP", *b"ANAM", Opaque), // u16 enchantment points -- NOT DOOR/ANAM
     (*b"WEAP", *b"DATA", Opaque),
@@ -593,7 +729,10 @@ static FIELDS: &[([u8; 4], [u8; 4], FieldKind)] = &[
     (*b"WTHR", *b"EDID", ZString),
     (*b"WTHR", *b"FNAM", Opaque), // fog distances
     (*b"WTHR", *b"HNAM", Opaque), // HDR parameters
+    (*b"WTHR", *b"MODB", Opaque), // f32 bound radius
+    (*b"WTHR", *b"MODL", ZString),
     (*b"WTHR", *b"NAM0", Opaque), // 160-byte colour table
+    (*b"WTHR", *b"SNAM", FORM_ID_THEN_8), // sound + type, repeating
 ];
 
 pub fn lookup(record: [u8; 4], field: [u8; 4]) -> Option<FieldKind> {

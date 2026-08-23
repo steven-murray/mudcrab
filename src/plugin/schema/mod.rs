@@ -38,6 +38,13 @@ pub enum FieldKind {
         sizes: &'static [usize],
         form_id_offsets: &'static [usize],
     },
+    /// A repeating struct: the payload is N of them back to back, with the
+    /// FormIDs at the same offsets within each. A payload that is not a whole
+    /// multiple of `stride` is an error, not a truncated last element.
+    StructArray {
+        stride: usize,
+        form_id_offsets: &'static [usize],
+    },
     /// One FormID followed by an opaque, variable-length payload.
     FormIdPrefix,
     /// Needs bespoke logic; see [`CustomKind`].
@@ -228,6 +235,26 @@ pub fn form_id_offsets(
             form_id_offsets
                 .iter()
                 .copied()
+                .filter(|offset| offset + 4 <= data.len())
+                .collect()
+        }
+
+        FieldKind::StructArray {
+            stride,
+            form_id_offsets,
+        } => {
+            if stride == 0 || !data.len().is_multiple_of(stride) {
+                return Err(SchemaError::FieldSizeMismatch {
+                    record: record_sig,
+                    field: field_sig,
+                    form_id,
+                    expected: &[],
+                    actual: data.len(),
+                });
+            }
+            (0..data.len())
+                .step_by(stride)
+                .flat_map(|base| form_id_offsets.iter().map(move |offset| base + offset))
                 .filter(|offset| offset + 4 <= data.len())
                 .collect()
         }
