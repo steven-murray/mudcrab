@@ -31,22 +31,28 @@ jobs:
       # The audience is modders, not Rust developers: ship something they can
       # download and run. The licences travel with it -- a binary handed over
       # without them grants nobody anything.
+      # Unpacking should produce one named directory rather than scattering
+      # four files into whatever the user was standing in. The standalone merge
+      # guide travels with it: it is the page that warns about the OBME refusal
+      # before someone meets it.
       - name: Package (unix)
         if: matrix.archive == 'tar.gz'
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/mudcrab dist/
-          cp LICENSE-MIT LICENSE-APACHE readme.md dist/
-          tar -C dist -czf mudcrab-${{ matrix.target }}.tar.gz .
+          name=mudcrab-${{ matrix.target }}
+          mkdir -p "$name"
+          cp target/${{ matrix.target }}/release/mudcrab "$name/"
+          cp LICENSE-MIT LICENSE-APACHE readme.md "$name/"
+          cp docs/merge-standalone.md "$name/"
+          tar -czf "$name.tar.gz" "$name"
       - name: Package (windows)
         if: matrix.archive == 'zip'
         run: |
-          mkdir dist
-          copy target\${{ matrix.target }}\release\mudcrab.exe dist\
-          copy LICENSE-MIT dist\
-          copy LICENSE-APACHE dist\
-          copy readme.md dist\
-          Compress-Archive -Path dist\* -DestinationPath mudcrab-${{ matrix.target }}.zip
+          $name = "mudcrab-${{ matrix.target }}"
+          New-Item -ItemType Directory -Path $name | Out-Null
+          Copy-Item "target\${{ matrix.target }}\release\mudcrab.exe" $name
+          Copy-Item LICENSE-MIT, LICENSE-APACHE, readme.md $name
+          Copy-Item docs\merge-standalone.md $name
+          Compress-Archive -Path $name -DestinationPath "$name.zip"
 
       - uses: softprops/action-gh-release@v2
         with:
