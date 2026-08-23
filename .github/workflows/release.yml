@@ -4,6 +4,11 @@ on:
   push:
     tags: ["v*"]
 
+# Creating a release and uploading to it is a write; the default token is
+# read-only on repositories configured that way.
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -46,3 +51,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: mudcrab-${{ matrix.target }}.*
+          # A tag with a suffix -- v0.2.0-beta.1 -- is a pre-release; a plain
+          # version is not.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
