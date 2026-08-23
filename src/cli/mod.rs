@@ -47,6 +47,8 @@ pub enum Command {
     UnhideMerges(UnhideMergesArgs),
     /// Build merged plugins from an already-installed mods directory.
     Merge(MergeArgs),
+    /// Write a merge modlist from a bare list of plugin names.
+    NewMerge(NewMergeArgs),
 }
 
 /// Add one `[[mods]]` block to a source modlist.
@@ -156,6 +158,44 @@ pub struct MergeArgs {
     /// Build only the merge with this mod id.
     #[arg(long)]
     pub only: Option<String>,
+}
+
+/// Scaffold a merge-only modlist by reading an installed instance.
+///
+/// The merge engine needs to know which mod folder each plugin lives in and
+/// what the load order is. Both are already on disk, so this reads them rather
+/// than asking someone to transcribe them.
+#[derive(Debug, Args)]
+pub struct NewMergeArgs {
+    /// Directory holding the installed mod folders, e.g. an MO2 instance's mods/.
+    #[arg(long)]
+    pub mods_dir: PathBuf,
+    /// Name for the merge. Also the mod id, and the plugin name unless
+    /// `--output-plugin` says otherwise.
+    #[arg(long)]
+    pub name: String,
+    /// A plugin to merge, in the order they should be merged: the order decides
+    /// clobber precedence, so later wins. Repeatable. Write `<mod>/<plugin>` to
+    /// pick a side when two mods ship the same filename.
+    #[arg(long = "plugin")]
+    pub plugin: Vec<String>,
+    /// Read plugin names from a file, one per line; `#` comments allowed.
+    /// Combines with `--plugin`.
+    #[arg(long)]
+    pub plugins_from: Option<PathBuf>,
+    /// Filename of the merged plugin. Defaults to `<name>.esp`.
+    #[arg(long)]
+    pub output_plugin: Option<String>,
+    /// The load order to build against, as a `loadorder.txt` or `plugins.txt`.
+    /// Found automatically when the instance has exactly one profile.
+    #[arg(long)]
+    pub load_order: Option<PathBuf>,
+    /// Where to write the modlist. Printed to stdout if omitted.
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
+    /// Overwrite `--output` if it already exists.
+    #[arg(long)]
+    pub force: bool,
 }
 
 #[derive(Debug, Args)]

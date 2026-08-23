@@ -56,12 +56,17 @@ is the usual case. Restart MO2 after building one.
 
 ## Merges
 
-**A source plugin whose reference uses an out-of-range mod index is rejected.**
-`merge::rewrite` treats it as a dangling reference and errors. Real tools —
-zMerge among them — emit such indices routinely, and every reader resolves them
-as "my own record", so the refusal is stricter than the de facto format. The
-practical consequence is that **mudcrab cannot currently merge a zMerge output
-as a source**. Nothing in a normal list triggers it.
+**Merging a plugin outside the tested corpus may hard-error on an unknown
+field.** The TES4 field table describes 436 (record, field) pairs, taken from the
+171 source plugins of the six MOFAM merges. Across a whole 431-plugin instance
+there are **125 pairs it does not describe**, including whole record types
+(`CLAS`, `GMST`, `CSTY`, `EYES`, `HAIR`, `REGN`, `WATR`) and many CTDA condition
+functions.
+
+> The error names the field and where to add it. This is deliberate: mudcrab
+> cannot tell whether an unknown field holds a FormID, and guessing wrong would
+> silently corrupt the merge. Run `cargo run --bin plugin-audit -- <mods dir>`
+> to see the whole worklist for your own setup.
 
 **Merge output is not byte-identical to zMerge's**, and is not meant to be. Both
 produce the same record set and the same reference graph; the FormIDs allocated

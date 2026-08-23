@@ -46,6 +46,7 @@ It is **not yet packaged for other people to use**. See
 
 | | |
 | --- | --- |
+| [docs/merge-standalone.md](docs/merge-standalone.md) | Using the merge engine on its own, as a zMerge replacement |
 | [docs/usage.md](docs/usage.md) | Command reference, and what each action does |
 | [docs/modlist-format.md](docs/modlist-format.md) | The TOML format |
 | [docs/mo2-output-structure.md](docs/mo2-output-structure.md) | What gets written into an MO2 instance |
@@ -72,6 +73,11 @@ installer options, `add` a mod to a list without disturbing its comments,
 `identify` an archive by hash, `conflicts` to see what two mods both provide,
 `diff` to compare a built instance against a reference, `check` and `validate`.
 `mudcrab --help` lists them all.
+
+## Licence
+
+MIT or Apache-2.0, at your option. See [LICENSE-MIT](LICENSE-MIT) and
+[LICENSE-APACHE](LICENSE-APACHE).
 
 ## Requirements
 

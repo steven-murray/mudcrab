@@ -11,6 +11,7 @@ pub mod install;
 pub mod mo2;
 pub mod loader;
 pub mod query;
+pub mod scaffold;
 pub mod schema;
 pub mod tools;
 pub mod validator;
