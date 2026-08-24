@@ -42,6 +42,21 @@ It is **not yet packaged for other people to use**. See
 [docs/roadmap.md](docs/roadmap.md) for what stands between here and that, and
 [docs/known-issues.md](docs/known-issues.md) for what will bite you meanwhile.
 
+## Getting it
+
+Prebuilt binaries for Linux and Windows are attached to each
+[release](https://github.com/steven-murray/mudcrab/releases). Unpack and run —
+there is nothing to install.
+
+The Linux build needs glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35
+and later), plus `liblzma.so.5` and `libbz2.so.1.0`, which almost every distro
+already has.
+
+If you only want the merge engine, that is all you need: `merge` and
+`new-merge` read plugin files and write one, with no configuration, no external
+tools and no API key. See
+[docs/merge-standalone.md](docs/merge-standalone.md).
+
 ## Documentation
 
 | | |
