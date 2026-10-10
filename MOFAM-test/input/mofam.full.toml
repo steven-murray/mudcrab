@@ -3722,17 +3722,6 @@ download_handler = "nexus"
 file_name = "ORC Main Ini-52949-11-24-1730638333.zip"
 # oracle version 11.24.0.0
 
-# TEMP: DynamicHUD=0 made no difference, so the next candidate is ORC's
-# ambient-occlusion pass -- the one post-process the guide leaves enabled, and
-# the ORC.log confirms it loads. An AO pass compositing over the UI darkens it
-# after it draws, which is the reported symptom.
-[[mods.actions]]
-action = "ini_set"
-scope = "mod"
-file = "OBSE/Plugins/ORC.ini"
-section = "Effects"
-key = "AmbientOcclusion"
-value = 0
 
 [[mods]]
 id = "Vanilla Remastered 1K Whiteflame fix"
