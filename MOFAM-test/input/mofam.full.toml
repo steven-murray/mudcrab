@@ -644,12 +644,17 @@ file = "OBSE/Plugins/Oblivion_Display_Tweaks.ini"
 key = "iMaxFPSTolerance"
 value = "120"
 
+# DEVIATION from the guide, which wants windowed (0). This machine has a
+# 3840x2400 panel, and a window -- borderless or not -- will not span it;
+# fullscreen does. Oblivion Display Tweaks sets no resolution of its own, so the
+# size comes from iSize W/H above, and `bBorderless` makes no difference either
+# way here.
 [[mods.actions]]
 action = "ini_set"
 scope = "game"
 file = "Oblivion.ini"
 key = "bFull Screen"
-value = "0"
+value = "1"
 
 [[mods]]
 id = "Oblivion Priority"
