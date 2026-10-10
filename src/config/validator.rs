@@ -95,6 +95,21 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         }
     }
 
+    // An inactive plugin still has a load-order slot, so it must be declared in
+    // `plugins` -- otherwise the order lives in two places and they can disagree.
+    for plugin in &modlist.inactive_plugins {
+        if !modlist
+            .plugins
+            .iter()
+            .any(|entry| entry.eq_ignore_ascii_case(plugin))
+        {
+            anyhow::bail!(
+                "inactive-plugins names {plugin}, which is not in the global plugins load \
+                 order. An inactive plugin is still ordered; add it to `plugins` too."
+            );
+        }
+    }
+
     let mut seen_plugins = HashSet::new();
     for plugin in &modlist.plugins {
         if !is_plugin_filename(plugin) {

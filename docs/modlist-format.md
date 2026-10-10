@@ -20,6 +20,11 @@ A modlist is a single TOML file. This is the reference for what it may contain;
    mod's directory name) and an optional `section`, a list naming its MO2 separator
    path from outermost to innermost. Every level of the path becomes a separator.
 * `plugins`: an ordered list of plugins. Each entry should be an exact filename. 
+* `inactive-plugins`: a subset of `plugins` that is installed and ordered but
+   **not active**. They keep their slot in `loadorder.txt` and are left out of
+   `plugins.txt`. This is for plugins another tool has absorbed — Wrye Bash
+   unticks whatever it merges into the Bashed Patch — so that reinstalling the
+   list does not re-activate them and force the patch to be rebuilt. 
 * `post-install-actions`: optional ordered list of install-wide actions to run after
    extraction and MO2 export. Currently supports `"loot-sort"`.
 

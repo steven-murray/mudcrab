@@ -47,6 +47,7 @@ pub fn build_plan(compiled: &CompiledModlist, headless: bool) -> anyhow::Result<
         mo2_modlist_entries: compiled.mo2_modlist_entries.clone(),
         mods,
         plugins: compiled.plugins.clone(),
+        inactive_plugins: compiled.inactive_plugins.clone(),
     })
 }
 
