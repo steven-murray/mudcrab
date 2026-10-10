@@ -4,7 +4,9 @@ use super::ActionCx;
 use crate::config::install::InstallSettings;
 use crate::config::mo2::mo2_profile_dir;
 use crate::config::schema::{IniScope, IniSetAction, IniSetFormat};
-use crate::util::fs::{normalize_relative_path, resolve_existing_path_case_insensitive};
+use crate::util::fs::{
+    case_variant_siblings, normalize_relative_path, resolve_existing_path_case_insensitive,
+};
 use std::path::{Path, PathBuf};
 
 pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
@@ -38,6 +40,31 @@ pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<
             ini_path.display()
         )
     })?;
+
+    // Two names differing only by case are two files on Linux, and editing
+    // whichever the directory happens to list first is a coin toss. MO2 writes
+    // `oblivion.ini`; BethINI writes `Oblivion.ini`. When both existed, every
+    // game-scoped edit landed in the one the game never opens, and nothing
+    // said so -- eighteen settings silently inert for weeks.
+    let variants = case_variant_siblings(&ini_path);
+    if !variants.is_empty() {
+        anyhow::bail!(
+            "{}: {} has {} other name{} differing only by case:\n  {}\n\
+             These are separate files, and which one an edit reaches is down to \
+             directory order -- so one of them is being read by the game while the \
+             other is being written. Delete or merge the duplicates, leaving the \
+             name the game actually opens (MO2 uses all-lowercase).",
+            cx.owner,
+            ini_path.display(),
+            variants.len(),
+            if variants.len() == 1 { "" } else { "s" },
+            variants
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>()
+                .join("\n  ")
+        );
+    }
 
     if cx.settings.dry_run {
         tracing::info!(

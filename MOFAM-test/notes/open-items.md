@@ -42,6 +42,15 @@ dies.
   file-for-file identical to the reference instance, and AWLS gained a file by
   the same fix. Steven's "fonts messed up" report is what led here.
 
+- **Two `Oblivion.ini` files in one profile, differing only by case.** MO2 reads
+  and writes `oblivion.ini`; BethINI created `Oblivion.ini` on 2026-08-22.
+  mudcrab's `ini_set` resolves case-insensitively and picked the capital one, so
+  **all eighteen game-scoped settings have been landing in a file the game never
+  opens** -- wrong fonts, `bUseRefractionShader=1` where the guide says 0, grass
+  at 3000 instead of 8000, and the game running 3840x2400 instead of 2560x1600.
+  `ini_set` now refuses when a case twin exists rather than guessing. The
+  duplicate still has to be removed by hand in the instance.
+
 ### What the compass is not
 
 Ruled out by inspection, so as not to be re-checked: every texture DarNified's

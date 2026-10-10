@@ -280,6 +280,36 @@ pub fn link_or_copy(source: &Path, destination: &Path) -> anyhow::Result<()> {
 /// that never overlay, and the game sees whichever one it happens to look in.
 /// Part 9's OOO voice files hit exactly this, twice.
 ///
+/// Every entry in `path`'s directory whose name differs from it only by case.
+///
+/// On a case-insensitive filesystem there can be at most one, so this is
+/// always empty there. On Linux there can be several, and then any
+/// case-insensitive resolution is a coin toss between files with different
+/// contents -- which is exactly the situation this exists to refuse.
+pub fn case_variant_siblings(path: &Path) -> Vec<PathBuf> {
+    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
+        return Vec::new();
+    };
+    let Some(parent) = path.parent() else {
+        return Vec::new();
+    };
+    let Ok(entries) = std::fs::read_dir(parent) else {
+        return Vec::new();
+    };
+    let mut found: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|candidate| {
+            candidate
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|other| other != name && other.eq_ignore_ascii_case(name))
+        })
+        .collect();
+    found.sort();
+    found
+}
+
 /// Staging everything into lowercase directories makes the overlay behave the
 /// way the mod authors assumed it would. File names are left as they are: they
 /// are what BSA packing and the Oracle comparison both key on, and nothing
@@ -418,6 +448,29 @@ fn copy_tree_recursive(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// MO2 writes `oblivion.ini`, BethINI writes `Oblivion.ini`. On Linux those
+    /// are two files, and a case-insensitive lookup picks whichever the
+    /// directory lists first -- so the guard has to see the other one.
+    #[test]
+    fn case_variant_siblings_finds_the_other_spelling() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("oblivion.ini"), b"a").unwrap();
+        std::fs::write(dir.path().join("Oblivion.ini"), b"b").unwrap();
+        std::fs::write(dir.path().join("unrelated.ini"), b"c").unwrap();
+
+        let found = case_variant_siblings(&dir.path().join("Oblivion.ini"));
+
+        assert_eq!(found, vec![dir.path().join("oblivion.ini")]);
+    }
+
+    #[test]
+    fn a_file_with_no_case_twin_has_no_siblings() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("Oblivion.ini"), b"a").unwrap();
+
+        assert!(case_variant_siblings(&dir.path().join("Oblivion.ini")).is_empty());
+    }
 
     #[test]
     fn lowercase_dir_components_leaves_the_file_name_alone() {
