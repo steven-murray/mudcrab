@@ -3,6 +3,27 @@
 Everything else about the MOFAM list is done: it installs, the load order
 matches the guide's published one, and it has been played.
 
+## In-game problems found by playing
+
+Four were reported. One is closed:
+
+- **~~Missing meshes (OOO's Fine Wood Desk and others)~~** — the modlist pinned
+  **OOO BSA v1.7** (Dec 2025) where the guide meant **v1.5.15**, the newest file
+  on the page in March 2025. v1.7 drops **1009 files** relative to v1.5.15,
+  among them 138 `meshes\harvest` and 124 `meshes\armor`, so this was costing
+  far more than the one desk. Now pinned to file id `1000038495`.
+
+  `diff` **did** flag the row POST-GUIDE. The flag was read as version drift and
+  waved through, which is the failure mode that warning exists to prevent: a
+  newer file is not only newer, it can be *smaller*. Comparing a referenced
+  asset path against what the install actually provides would have caught it
+  outright — see roadmap Phase F.
+
+Still open: the black compass, water not rendering, and dying when a gargoyle
+dies. None is explained by the OOO version: the 1009 dropped files include
+**no** compass or HUD texture, and OOO's plugins are byte-identical between
+instances.
+
 ## Deliberately different from the reference instance
 
 - **`Ultimate Leveling`, `ini_xp_kill_other`** — 25 here (the archive's default),

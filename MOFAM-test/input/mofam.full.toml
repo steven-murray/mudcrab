@@ -2389,10 +2389,15 @@ file_name = "MOBS 2.0a patch for MOO-47473-1-1.7z"
 id = "OOO - Oscuro's Oblivion Overhaul - Updated"
 section = ["9 - OVERHAULS OSCURO"]
 
+# v1.5.15, the newest file on the page in March 2025 -- NOT the current top
+# file. v1.7 (Dec 2025) drops meshes this list still references: its archive has
+# no `harvest/containers/XMSharvestUpperDesk01HiFi.nif`, so OOO's Fine Wood Desk
+# renders as nothing. `diff` flagged the row POST-GUIDE and the flag was read as
+# version drift rather than a missing asset.
 [[mods.archives]]
-path = "nexus:oblivion/46199/1000043752"
+path = "nexus:oblivion/46199/1000038495"
 download_handler = "nexus"
-file_name = "OOO BSA-46199-1-7-1767121182.7z"
+file_name = "OOO BSA-46199-1-5-15-1717285415.7z"
 
 # The voice files, guide row 3. They are pasted into this mod and repacked, so
 # they are a second layer of this mod rather than a mod of their own -- which is
