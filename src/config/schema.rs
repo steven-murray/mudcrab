@@ -19,6 +19,17 @@ pub struct SourceModlist {
     pub mods: Vec<ModEntry>,
     #[serde(default)]
     pub plugins: Vec<String>,
+    /// Plugins that are installed and ordered but **not active**.
+    ///
+    /// They keep their slot in `loadorder.txt` and are left out of
+    /// `plugins.txt`. This is what a tool that absorbs plugins into an output
+    /// of its own leaves behind: Wrye Bash merges the mergeable ones into the
+    /// Bashed Patch and unticks them, and without somewhere to say so, every
+    /// install re-ticks them and the patch has to be built again to undo it.
+    ///
+    /// Must be a subset of `plugins`, so the order stays in one place.
+    #[serde(default, rename = "inactive-plugins")]
+    pub inactive_plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
     pub post_install_actions: Vec<PostInstallAction>,
 }
@@ -710,6 +721,8 @@ pub struct CompiledModlist {
     pub actions: Vec<ModAction>,
     pub plugins: Vec<String>,
     #[serde(default)]
+    pub inactive_plugins: Vec<String>,
+    #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
@@ -795,6 +808,8 @@ pub struct PersonalizedPlan {
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<PersonalizedMod>,
     pub plugins: Vec<String>,
+    #[serde(default)]
+    pub inactive_plugins: Vec<String>,
 }
 
 impl PersonalizedPlan {

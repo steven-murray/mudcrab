@@ -193,7 +193,29 @@ pub(crate) fn export_mo2_instance(
     // to take. Part 37 of the guide says the same thing about pasting its own
     // `loadorder.txt` in: "close & restart MO2 to have the plugins in order".
     let plugins = scoped_plugins(plan, settings, scope)?;
-    write_text_file(&profile_dir.join("plugins.txt"), &render_plugin_list(&plugins))?;
+    // `loadorder.txt` holds every plugin and its order; `plugins.txt` holds only
+    // the active ones. The two lists differ exactly by the plugins something
+    // else has absorbed -- Wrye Bash unticks what it merges into the Bashed
+    // Patch -- and writing them identically re-ticks those on every install,
+    // which means rebuilding the patch just to undo it.
+    let inactive: HashSet<String> = plan
+        .inactive_plugins
+        .iter()
+        .map(|name| name.trim().to_ascii_lowercase())
+        .collect();
+    let active: Vec<String> = plugins
+        .iter()
+        .filter(|name| !inactive.contains(&name.trim().to_ascii_lowercase()))
+        .cloned()
+        .collect();
+    if !inactive.is_empty() {
+        tracing::info!(
+            inactive = plugins.len() - active.len(),
+            active = active.len(),
+            "mo2 export: leaving declared-inactive plugins out of plugins.txt"
+        );
+    }
+    write_text_file(&profile_dir.join("plugins.txt"), &render_plugin_list(&active))?;
     write_text_file(&profile_dir.join("loadorder.txt"), &render_plugin_list(&plugins))?;
     write_text_file(&profile_dir.join("archives.txt"), &render_archive_list(plan, settings, scope)?)?;
     Ok(())

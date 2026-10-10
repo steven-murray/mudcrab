@@ -79,6 +79,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         inputs: source.inputs,
         actions,
         plugins: source.plugins,
+        inactive_plugins: source.inactive_plugins,
         post_install_actions: source.post_install_actions,
         mo2_modlist_entries,
         mods,

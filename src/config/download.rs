@@ -945,6 +945,7 @@ mod tests {
                 actions: vec![],
             }],
             plugins: vec![],
+            inactive_plugins: vec![],
         };
 
         download_all(&plan, &settings)
@@ -1019,6 +1020,7 @@ mod tests {
                 actions: vec![],
             }],
             plugins: vec![],
+            inactive_plugins: vec![],
         };
 
         let err = download_all(&plan, &settings)

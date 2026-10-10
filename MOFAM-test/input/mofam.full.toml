@@ -300,6 +300,30 @@ plugins = [
 	"Conflict Resolution.esp",
 ]
 
+# Plugins Wrye Bash merges into the Bashed Patch and unticks. They keep their
+# load-order slot and stay out of plugins.txt, so a reinstall no longer
+# re-activates them -- which is what used to force a patch rebuild after every
+# install, for no reason but to undo that.
+#
+# Read off the reference instance, where the patch is built; they are the
+# "Activate Non-Mergeable" leftovers -- filter patches and MERGE ONLY plugins.
+# Rebuild the patch when its *inputs* change, not when the list reinstalls.
+inactive-plugins = [
+  "EVE_KnightsoftheNine.esp",
+  "EVE_StockEquipmentReplacer for OOO.esp",
+  "OCOv2 - Filter Patch for Mods.esp",
+  "MOBSification of MODS.esp",
+  "Ragdolls for Oblivion - Filter Patch for Mods.esp",
+  "BasicHarvestFilterPatch.esp",
+  "Cobl Filter Late MERGE ONLY.esp",
+  "Cobl - Buffet Plate and Hibernation Potion Disabler.esp",
+  "Bashed Delayers - MERGE ONLY.esp",
+  "CIBFilterPatch.esp",
+  "DispMiscPatch_OCRAFT - Filter Patch for Mods.esp",
+  "Unique Landscapes Separate  - OOO Adaptation.esp",
+  "Cava Obscura - Filter Patch For Mods.esp",
+]
+
 # post-install-actions = ["loot-sort"]
 #
 # Disabled deliberately. LOOT opens a GUI that needs a human to approve its
@@ -315,6 +339,10 @@ plugins = [
 # Turn it back on for a play-test, with someone at the keyboard.
 
 [ini]
+# Skip the logo videos. Not a guide instruction -- it is pure test-loop time,
+# and an empty value is how Oblivion is told there is nothing to play.
+SIntroSequence = ""
+SMainMenuMovieIntro = ""
 "iSize W" = 2560
 "iSize H" = 1600
 "bSaveOnInteriorExteriorSwitch" = 0
@@ -322,6 +350,7 @@ plugins = [
 "bSaveOnTravel" = 0
 "bSaveOnWait" = 0
 "bAllowScriptedAutosave" = 0
+
 
 [inputs]
 
@@ -3692,6 +3721,18 @@ path = "nexus:oblivion/52949/1000039828"
 download_handler = "nexus"
 file_name = "ORC Main Ini-52949-11-24-1730638333.zip"
 # oracle version 11.24.0.0
+
+# TEMP: DynamicHUD=0 made no difference, so the next candidate is ORC's
+# ambient-occlusion pass -- the one post-process the guide leaves enabled, and
+# the ORC.log confirms it loads. An AO pass compositing over the UI darkens it
+# after it draws, which is the reported symptom.
+[[mods.actions]]
+action = "ini_set"
+scope = "mod"
+file = "OBSE/Plugins/ORC.ini"
+section = "Effects"
+key = "AmbientOcclusion"
+value = 0
 
 [[mods]]
 id = "Vanilla Remastered 1K Whiteflame fix"
