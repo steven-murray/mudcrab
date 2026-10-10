@@ -33,6 +33,15 @@ Four were reported. One is closed:
 Still open: the black compass, water not rendering, and dying when a gargoyle
 dies.
 
+- **~~DarNified UI was missing two menus~~** — `menus/main/stats_menu.xml` and
+  `menus/prefabs/darn/stats_config.xml`. Not a selection error: the FOMOD
+  answers already matched the guide exactly (all Components, Normal, Default
+  Kingthings, no Custom Options). The files install through
+  `conditionalFileInstalls`, gated on `Oblivion XP.esp` being absent, and
+  **mudcrab never read that block at all**. Fixed; DarNified UI is now
+  file-for-file identical to the reference instance, and AWLS gained a file by
+  the same fix. Steven's "fonts messed up" report is what led here.
+
 ### What the compass is not
 
 Ruled out by inspection, so as not to be re-checked: every texture DarNified's
