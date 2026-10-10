@@ -1,7 +1,8 @@
 pub mod add;
+mod bsa;
+pub mod check;
 pub mod compile;
 pub mod conflicts;
-pub mod check;
 pub mod diff;
 pub mod download;
 pub mod export;
@@ -23,8 +24,9 @@ pub fn require_game_dir(explicit: Option<PathBuf>) -> anyhow::Result<PathBuf> {
         return Ok(path);
     }
 
-    let value = std::env::var("GAME_DIR")
-        .map_err(|_| anyhow::anyhow!("GAME_DIR must be defined (or pass --game-dir where supported)"))?;
+    let value = std::env::var("GAME_DIR").map_err(|_| {
+        anyhow::anyhow!("GAME_DIR must be defined (or pass --game-dir where supported)")
+    })?;
 
     let trimmed = value.trim();
     if trimmed.is_empty() {
@@ -52,5 +54,6 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::UnhideMerges(args) => unhide_merges::run(args).await,
         Command::Merge(args) => merge::run(args).await,
         Command::NewMerge(args) => new_merge::run(args).await,
+        Command::Bsa(command) => bsa::run(command),
     }
 }

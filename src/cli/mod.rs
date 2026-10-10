@@ -49,6 +49,9 @@ pub enum Command {
     Merge(MergeArgs),
     /// Write a merge modlist from a bare list of plugin names.
     NewMerge(NewMergeArgs),
+    /// List or extract the files inside a BSA archive.
+    #[command(subcommand)]
+    Bsa(BsaCommand),
 }
 
 /// Add one `[[mods]]` block to a source modlist.
@@ -513,4 +516,34 @@ pub struct SetupToolsArgs {
     /// Overwrite an existing tools.toml file.
     #[arg(long)]
     pub force: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum BsaCommand {
+    /// Print the path of every file in the archive, one per line.
+    List(BsaListArgs),
+    /// Write the archive's files below a directory.
+    Extract(BsaExtractArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct BsaListArgs {
+    /// The archive to read.
+    pub archive: PathBuf,
+    /// Only files whose path contains this text, ignoring case. Either
+    /// slash direction matches.
+    #[arg(long)]
+    pub filter: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct BsaExtractArgs {
+    /// The archive to read.
+    pub archive: PathBuf,
+    /// Directory to extract into. Created if missing.
+    pub destination: PathBuf,
+    /// Only files whose path contains this text, ignoring case. Either
+    /// slash direction matches.
+    #[arg(long)]
+    pub filter: Option<String>,
 }
