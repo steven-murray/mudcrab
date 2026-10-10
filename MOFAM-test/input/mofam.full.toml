@@ -1122,12 +1122,19 @@ download_handler = "nexus"
 file_name = "Merged LOD-52949-03-25-1743347429.zip"
 # oracle version 3.25.0.0
 
+# The archive ships `menus/hud/...` at its root with no `textures/` level, so
+# installed literally it drops 2195 .dds files into `Data/Menus/` -- the XML
+# menu directory -- where nothing reads them. Menu XML resolves `<filename>`
+# under `Data/Textures/Menus/`, which is where vanilla keeps
+# `menus/hud/hud_compass_face.dds` and where DarNified puts its own
+# `menus/darn/`. `target_subdir` supplies the missing root.
 [[mods]]
 id = "T4UT - Menus Repolished"
 section = ["UI & UX IMPROVEMENTS"]
 
 [[mods.archives]]
 path = "nexus:oblivion/54904/1000041088"
+target_subdir = "textures"
 
 [[mods]]
 id = "LINK Plus Plus"
