@@ -38,6 +38,13 @@ impl FomodInstallEntry {
             Self::File { priority, .. } | Self::Folder { priority, .. } => *priority,
         }
     }
+
+    #[cfg(test)]
+    fn source(&self) -> &str {
+        match self {
+            Self::File { source, .. } | Self::Folder { source, .. } => source,
+        }
+    }
 }
 
 /// Plan a FOMOD straight from an archive, reading its config on the way.
@@ -184,11 +191,11 @@ fn collect_selected_entries(
         collect_fomod_entries(required, &mut entries)?;
     }
 
-    let Some(steps) = find_child_element(root, "installSteps") else {
-        return Ok(entries);
-    };
+    // Not an early return: `conditionalFileInstalls` below is independent of
+    // the steps, and a FOMOD may have one without the other.
+    let steps = find_child_element(root, "installSteps");
 
-    for step in child_elements(steps, "installStep") {
+    for step in steps.into_iter().flat_map(|steps| child_elements(steps, "installStep")) {
         if let Some(visible) = find_child_element(step, "visible")
             && let Some(deps) = find_child_element(visible, "dependencies")
             && !fomod_dependencies_match(deps, active_plugins, &flags)?
@@ -239,6 +246,29 @@ fn collect_selected_entries(
                     if let Some(files) = find_child_element(plugin, "files") {
                         collect_fomod_entries(files, &mut entries)?;
                     }
+                }
+            }
+        }
+    }
+
+    // `conditionalFileInstalls` runs last, once every step has set its flags.
+    // It is how a FOMOD says "install this unless mod X is there", and it is
+    // not optional decoration: DarNified UI ships its stats menu this way,
+    // conditioned on `Oblivion XP.esp` being absent. Skipping the block drops
+    // those files with no error at all, which is how two of its menus went
+    // missing from a build that otherwise matched the guide's answers exactly.
+    if let Some(conditional) = find_child_element(root, "conditionalFileInstalls") {
+        for patterns in child_elements(conditional, "patterns") {
+            for pattern in child_elements(patterns, "pattern") {
+                let matched = match find_child_element(pattern, "dependencies") {
+                    Some(deps) => fomod_dependencies_match(deps, active_plugins, &flags)?,
+                    // A pattern with no dependencies is unconditional.
+                    None => true,
+                };
+                if matched
+                    && let Some(files) = find_child_element(pattern, "files")
+                {
+                    collect_fomod_entries(files, &mut entries)?;
                 }
             }
         }
@@ -685,6 +715,48 @@ pub(crate) fn normalize_fomod_path_allow_empty(value: &str) -> anyhow::Result<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// DarNified UI installs its stats menu through `conditionalFileInstalls`,
+    /// gated on `Oblivion XP.esp` being absent. The block was ignored outright,
+    /// so those files vanished from a build whose answers were otherwise exactly
+    /// the guide's -- and nothing reported it.
+    #[test]
+    fn conditional_file_installs_are_applied() {
+        let xml = r#"<config>
+          <requiredInstallFiles><file source="always.xml" destination="always.xml"/></requiredInstallFiles>
+          <conditionalFileInstalls><patterns>
+            <pattern>
+              <dependencies operator="Or">
+                <fileDependency file="Oblivion XP.esp" state="Inactive"/>
+                <fileDependency file="Oblivion XP.esp" state="Missing"/>
+              </dependencies>
+              <files><file source="stats_menu.xml" destination="stats_menu.xml"/></files>
+            </pattern>
+            <pattern>
+              <dependencies><fileDependency file="Oblivion XP.esp" state="Active"/></dependencies>
+              <files><file source="xp_stats.xml" destination="xp_stats.xml"/></files>
+            </pattern>
+          </patterns></conditionalFileInstalls>
+        </config>"#;
+        let doc = roxmltree::Document::parse(xml).expect("fixture parses");
+        let archive = CompiledArchive::default();
+
+        let without_xp =
+            collect_selected_entries(doc.root_element(), &archive, &HashSet::new()).unwrap();
+        let sources: Vec<&str> = without_xp.iter().map(|entry| entry.source()).collect();
+        assert_eq!(sources, vec!["always.xml", "stats_menu.xml"]);
+
+        // And the other way: the same block must *exclude* a file whose
+        // condition fails, or it stops being a condition.
+        let with_xp = collect_selected_entries(
+            doc.root_element(),
+            &archive,
+            &HashSet::from(["oblivion xp.esp".to_string()]),
+        )
+        .unwrap();
+        let sources: Vec<&str> = with_xp.iter().map(|entry| entry.source()).collect();
+        assert_eq!(sources, vec!["always.xml", "xp_stats.xml"]);
+    }
 
     fn paths(entries: &[&str]) -> Vec<String> {
         entries.iter().map(ToString::to_string).collect()

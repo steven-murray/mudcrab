@@ -745,7 +745,7 @@ pub struct CompiledMod {
     pub actions: Vec<ModAction>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CompiledArchive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
