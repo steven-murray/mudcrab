@@ -16,7 +16,8 @@
 
 {% endif %}
 {% if mod.merge %}
-{{ sym.symbols.merge }} Merges {{ mod.merge.sources | map(attribute="plugin") | join(", ") }} into {{ mod.merge.output }}.
+{{ sym.symbols.merge }} Merge these plugins into {{ mod.merge.output }}:
+[code]{% for source in mod.merge.sources %}{{ source.plugin }}{{ "\n" if not loop.last }}{% endfor %}[/code]
 
 {% endif %}
 {% if options.steps %}

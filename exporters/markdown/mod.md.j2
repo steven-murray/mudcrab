@@ -16,7 +16,13 @@
 
 {% endif %}
 {% if mod.merge %}
-{{ sym.symbols.merge }} Merges {{ mod.merge.sources | map(attribute="plugin") | map("tojson") | join(", ") | replace('"', "`") }} into `{{ mod.merge.output }}`.
+{{ sym.symbols.merge }} Merge these plugins into `{{ mod.merge.output }}`:
+
+```
+{% for source in mod.merge.sources %}
+{{ source.plugin }}
+{% endfor %}
+```
 
 {% endif %}
 {% if options.steps %}

@@ -248,12 +248,25 @@ pub fn archive_instructions(
             .unwrap_or_else(|| glob_words(&archive.include));
         push("include", format!("Install only {what}."));
     }
-    if !archive.exclude.is_empty() {
+    // An archive that is a packaged MO2 mod folder ships MO2's own
+    // `meta.ini`; leaving it out is install mechanics (mudcrab writes that
+    // file), not something a person installing through MO2 ever does.
+    let exclude: Vec<String> = archive
+        .exclude
+        .iter()
+        .filter(|p| {
+            !p.rsplit('/')
+                .next()
+                .is_some_and(|name| name.eq_ignore_ascii_case("meta.ini"))
+        })
+        .cloned()
+        .collect();
+    if !exclude.is_empty() {
         let what = content
             .as_deref()
-            .and_then(|c| matching(c, &archive.exclude, false))
+            .and_then(|c| matching(c, &exclude, false))
             .map(|files| code_list(&files))
-            .unwrap_or_else(|| glob_words(&archive.exclude));
+            .unwrap_or_else(|| glob_words(&exclude));
         push("exclude", format!("Leave out {what}."));
     }
     if !archive.game_root_files.is_empty() {
@@ -658,6 +671,14 @@ mod tests {
             texts(&oco, Some(&listing)),
             ["Leave out `Oblivion_Character_Overhaul.esp`."]
         );
+    }
+
+    #[test]
+    fn meta_ini_is_not_a_readers_concern() {
+        let packaged = archive(|a| a.exclude = vec!["**/meta.ini".into()]);
+        assert!(texts(&packaged, None).is_empty());
+        let both = archive(|a| a.exclude = vec!["**/meta.ini".into(), "*.txt".into()]);
+        assert_eq!(texts(&both, None), ["Leave out every `.txt` file."]);
     }
 
     #[test]
