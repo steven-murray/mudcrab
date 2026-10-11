@@ -67,6 +67,8 @@ fn add(path: &Path) -> Command {
             c
         })
         .expect("binary should build");
+    // --nexus looks the file's name up when a key is set; tests stay offline.
+    command.env_remove("NEXUS_API_KEY");
     command.arg("add").arg(path);
     command
 }
@@ -505,4 +507,90 @@ fn requires_a_source() {
         .assert()
         .failure()
         .stderr(predicates::str::contains("give a source"));
+}
+
+#[test]
+fn a_new_plugin_needs_a_place_in_the_load_order() {
+    let (_dir, path) = fixture();
+    let original = std::fs::read_to_string(&path).unwrap();
+    add(&path)
+        .args(["--nexus", "7/8", "--id", "Delta", "--section", "CORE"])
+        .args(["--plugin", "Delta.esp"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("--load-after"));
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), original);
+
+    add(&path)
+        .args(["--nexus", "7/8", "--id", "Delta", "--section", "CORE"])
+        .args(["--plugin", "Delta.esp", "--load-after", "Oblivion.esm"])
+        .assert()
+        .success();
+    let source = load_modlist(&path).unwrap();
+    assert_eq!(source.plugins, ["Oblivion.esm", "Delta.esp", "Core.esp"]);
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("\t\"Delta.esp\",\n\t# Core.esp must load here"),
+        "the comment stays with Core.esp: {text}"
+    );
+
+    add(&path)
+        .args(["--nexus", "9/10", "--id", "Epsilon", "--section", "UI"])
+        .args(["--plugin", "Epsilon.esp", "--load-last"])
+        .assert()
+        .success();
+    assert_eq!(
+        load_modlist(&path)
+            .unwrap()
+            .plugins
+            .last()
+            .map(String::as_str),
+        Some("Epsilon.esp")
+    );
+}
+
+#[test]
+fn an_archive_writes_its_own_entry() {
+    let (dir, path) = fixture();
+    let archive = dir.path().join("Delta-77-1-0.zip");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    for name in ["Delta Data/Delta.esp", "Delta Data/textures/a.dds"] {
+        zip.start_file(name, options).unwrap();
+        std::io::Write::write_all(&mut zip, b"x").unwrap();
+    }
+    zip.finish().unwrap();
+
+    // With no `.meta` the source has to be given.
+    add(&path)
+        .arg("--archive")
+        .arg(&archive)
+        .args(["--id", "Delta", "--section", "CORE"])
+        .assert()
+        .failure()
+        .stderr(predicates::str::contains("--nexus"));
+
+    std::fs::write(
+        dir.path().join("Delta-77-1-0.zip.meta"),
+        "[General]\ngameName=Oblivion\nmodID=77\nfileID=99\n",
+    )
+    .unwrap();
+    add(&path)
+        .arg("--archive")
+        .arg(&archive)
+        .args(["--id", "Delta", "--section", "CORE"])
+        .args(["--plugin", "Delta.esp", "--load-last"])
+        .assert()
+        .success();
+    let source = load_modlist(&path).unwrap();
+    let delta = source.mods.iter().find(|m| m.id == "Delta").unwrap();
+    let archive = &delta.archives[0];
+    assert_eq!(archive.path.as_deref(), Some("nexus:oblivion/77/99"));
+    assert_eq!(archive.file_name.as_deref(), Some("Delta-77-1-0.zip"));
+    assert_eq!(delta.plugins, ["Delta.esp"]);
+    assert!(
+        !std::fs::read_to_string(&path)
+            .unwrap()
+            .contains("# no layout")
+    );
 }

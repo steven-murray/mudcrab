@@ -25,32 +25,32 @@ use std::path::PathBuf;
 
 /// The game folder: `--game-dir`, else `GAME_DIR`, else the folder the MO2
 /// instance being installed into was set up with -- so an MO2 install needs
-/// neither.
-pub fn require_game_dir(
+/// neither. An install into a plain mods directory can do without one: what
+/// needs it (game INI edits, LOOT) says so when it runs.
+pub fn resolve_game_dir(
     explicit: Option<PathBuf>,
     mo2_instance: Option<&std::path::Path>,
-) -> anyhow::Result<PathBuf> {
+) -> anyhow::Result<Option<PathBuf>> {
     if let Some(path) = explicit {
-        return Ok(path);
+        return Ok(Some(path));
     }
     if let Ok(value) = std::env::var("GAME_DIR") {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             anyhow::bail!("GAME_DIR is defined but empty");
         }
-        return Ok(PathBuf::from(trimmed));
+        return Ok(Some(PathBuf::from(trimmed)));
     }
-    if let Some(path) = mo2_instance.and_then(crate::config::mo2::instance_game_path) {
-        return Ok(path);
+    let Some(instance) = mo2_instance else {
+        return Ok(None);
+    };
+    match crate::config::mo2::instance_game_path(instance) {
+        Some(path) => Ok(Some(path)),
+        None => anyhow::bail!(
+            "no game folder: pass --game-dir or set GAME_DIR (the MO2 instance's \
+             ModOrganizer.ini names none this can read)"
+        ),
     }
-    anyhow::bail!(
-        "no game folder: pass --game-dir or set GAME_DIR{}",
-        if mo2_instance.is_some() {
-            " (the MO2 instance's ModOrganizer.ini names none this can read)"
-        } else {
-            ""
-        }
-    )
 }
 
 /// The downloads folder: `--downloads`, else `downloads_dir` in tools.toml,

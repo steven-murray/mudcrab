@@ -159,7 +159,11 @@ pub fn inspect_archive(source: &Path, include_files: bool) -> anyhow::Result<Ins
         .cloned()
         .collect();
 
-    let toml_snippet = render_toml_snippet(&file_name, &layout, fomod.as_ref());
+    // A download MO2 (or mudcrab) made has a `.meta` naming its Nexus ids, so
+    // the snippet can say where it came from instead of leaving a blank.
+    let source_path = crate::config::archive_store::meta_source(source);
+    let toml_snippet =
+        render_toml_snippet(&file_name, source_path.as_deref(), &layout, fomod.as_ref());
 
     Ok(InspectReport {
         archive: source.display().to_string(),
@@ -509,13 +513,17 @@ fn toml_string(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
-fn render_toml_snippet(
+pub(crate) fn render_toml_snippet(
     file_name: &str,
+    source_path: Option<&str>,
     layout: &LayoutGuess,
     fomod: Option<&FomodReport>,
 ) -> String {
     let mut out = String::from("[[mods.archives]]\n");
-    out.push_str("path = \"nexus:oblivion/<mod id>/<file id>\"\n");
+    out.push_str(&format!(
+        "path = {}\n",
+        toml_string(source_path.unwrap_or("nexus:oblivion/<mod id>/<file id>"))
+    ));
     out.push_str(&format!("file_name = {}\n", toml_string(file_name)));
 
     match layout {
@@ -666,7 +674,7 @@ pub fn render_text(report: &InspectReport) -> String {
 
     if !report.plugins.is_empty() {
         out.push_str(&format!(
-            "\nplugins ({}) -- these go in the modlist's `plugins` load order by hand:\n",
+            "\nplugins ({}) -- `add` places them with --plugin and --load-after or --load-last:\n",
             report.plugins.len()
         ));
         for plugin in &report.plugins {
@@ -794,11 +802,36 @@ mod tests {
     }
 
     #[test]
+    fn the_snippet_takes_its_source_from_the_archives_meta() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive = dir.path().join("Mod-123-1-0.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        zip.start_file("Mod.esp", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        std::io::Write::write_all(&mut zip, b"TES4").unwrap();
+        zip.finish().unwrap();
+        std::fs::write(
+            dir.path().join("Mod-123-1-0.zip.meta"),
+            "[General]\ngameName=Oblivion\nmodID=123\nfileID=456\n",
+        )
+        .unwrap();
+
+        let report = inspect_archive(&archive, false).unwrap();
+        assert!(
+            report
+                .toml_snippet
+                .contains("path = \"nexus:oblivion/123/456\""),
+            "{}",
+            report.toml_snippet
+        );
+    }
+
+    #[test]
     fn toml_snippet_quotes_names_containing_quotes_and_backslashes() {
         let layout = LayoutGuess::CustomDataFolder {
             data_folder: "Odd\"Name\\Here".to_string(),
         };
-        let snippet = render_toml_snippet("Mod-1-0.7z", &layout, None);
+        let snippet = render_toml_snippet("Mod-1-0.7z", None, &layout, None);
         assert!(
             snippet.contains(r#"data_folder = "Odd\"Name\\Here""#),
             "{snippet}"

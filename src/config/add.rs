@@ -24,9 +24,9 @@ pub struct NewMod {
     pub section: Vec<String>,
     /// The mod's `if`, when it is optional.
     pub condition: Option<String>,
-    /// Plugins the mod ships. `add` never touches the load order: each still
-    /// has to be placed in `plugins` (or consumed by a merge), which `validate`
-    /// insists on.
+    /// Plugins the mod ships. Each also has to be in the top-level `plugins`
+    /// load order (or consumed by a merge), which `validate` insists on; `add`
+    /// puts it there only where told to (`place_plugins`).
     pub plugins: Vec<String>,
     /// Archive descriptor, e.g. `nexus:oblivion/43752/1000029844`.
     pub path: Option<String>,
@@ -42,6 +42,9 @@ pub struct NewMod {
     /// A Nexus mod id known without a file id, so the descriptor cannot be
     /// built yet. Recorded in the TODO so the lookup has somewhere to start.
     pub known_mod_id: Option<u64>,
+    /// A complete `[[mods.archives]]` block, written as is in place of one
+    /// built from `path` and `file_name`: what `inspect` makes of an archive.
+    pub archive_block: Option<String>,
 }
 
 /// Where a rendered block will be spliced in.
@@ -136,7 +139,10 @@ pub fn render_block(new_mod: &NewMod) -> String {
         lines.push(format!("plugins = [{joined}]"));
     }
 
-    if new_mod.path.is_some() || new_mod.file_name.is_some() {
+    if let Some(block) = &new_mod.archive_block {
+        lines.push(String::new());
+        lines.push(block.trim_end().to_string());
+    } else if new_mod.path.is_some() || new_mod.file_name.is_some() {
         lines.push(String::new());
         lines.push("[[mods.archives]]".to_string());
         if let Some(path) = &new_mod.path {
@@ -694,6 +700,126 @@ pub struct OracleMeta {
 /// Not a general INI parser: MO2 writes values containing `=`, quotes, escaped
 /// Qt variants and whole BBCode mod descriptions, so this reads only the four
 /// keys it understands and ignores the rest rather than trying to model them.
+/// Where `add` puts a new mod's plugins in the top-level `plugins` load order.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LoadPosition {
+    /// Straight after this plugin, which must already be in the list.
+    After(String),
+    /// At the end.
+    Last,
+}
+
+/// Insert `plugins` into the top-level `plugins` array, in the order given, at
+/// `position`; a plugin already listed is left where it is. Line-based like
+/// the rest of `add`: nothing outside the lines it inserts changes, except a
+/// comma added to the entry it follows. With no `plugins` array yet, one is
+/// started before the file's first table.
+pub fn place_plugins(
+    text: &str,
+    plugins: &[String],
+    position: &LoadPosition,
+) -> anyhow::Result<String> {
+    let kinds = classify_lines(text);
+    let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let first_table = kinds
+        .iter()
+        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
+        .unwrap_or(lines.len());
+    let indent = if lines.iter().any(|line| line.starts_with('\t')) {
+        "\t"
+    } else {
+        "    "
+    };
+    let quoted = |line: &str| -> Option<String> {
+        let line = strip_trailing_comment(line).trim();
+        let rest = line.strip_prefix('"')?;
+        Some(rest[..rest.find('"')?].to_string())
+    };
+
+    let start = (0..first_table).find(|&i| {
+        matches!(kinds[i], LineKind::Other)
+            && lines[i]
+                .trim_start()
+                .strip_prefix("plugins")
+                .is_some_and(|rest| rest.trim_start().starts_with('='))
+    });
+    let Some(start) = start else {
+        if let LoadPosition::After(after) = position {
+            anyhow::bail!("--load-after {after}: the list has no `plugins` load order yet");
+        }
+        let mut block = vec!["plugins = [".to_string()];
+        block.extend(
+            plugins
+                .iter()
+                .map(|p| format!("{indent}{},", toml_string(p))),
+        );
+        block.push("]".to_string());
+        block.push(String::new());
+        lines.splice(first_table..first_table, block);
+        return Ok(lines.join("\n"));
+    };
+    if strip_trailing_comment(&lines[start])
+        .trim_end()
+        .ends_with(']')
+    {
+        anyhow::bail!(
+            "the top-level `plugins` array is written on one line; put one plugin per line \
+             so entries can be added without rewriting it"
+        );
+    }
+    let end = (start + 1..lines.len())
+        .find(|&i| lines[i].trim_start().starts_with(']'))
+        .ok_or_else(|| anyhow::anyhow!("the top-level `plugins` array is not closed"))?;
+    let entries: Vec<(usize, String)> = (start + 1..end)
+        .filter_map(|i| quoted(&lines[i]).map(|name| (i, name)))
+        .collect();
+    let listed = |name: &str| entries.iter().any(|(_, e)| e.eq_ignore_ascii_case(name));
+    let new: Vec<&String> = plugins.iter().filter(|p| !listed(p)).collect();
+    if new.is_empty() {
+        return Ok(text.to_string());
+    }
+
+    // The line to insert after, and the indentation entries use.
+    let anchor = match position {
+        LoadPosition::After(after) => entries
+            .iter()
+            .find(|(_, e)| e.eq_ignore_ascii_case(after))
+            .map(|(i, _)| *i)
+            .ok_or_else(|| {
+                anyhow::anyhow!("--load-after {after}: not in the `plugins` load order")
+            })?,
+        LoadPosition::Last => entries.last().map_or(start, |(i, _)| *i),
+    };
+    let entry_indent = entries
+        .first()
+        .map(|(i, _)| {
+            let line = &lines[*i];
+            line[..line.len() - line.trim_start().len()].to_string()
+        })
+        .unwrap_or_else(|| indent.to_string());
+    // The entry followed needs its comma, if it was the last and had none.
+    if anchor != start {
+        let line = &lines[anchor];
+        let body = strip_trailing_comment(line).trim_end();
+        if !body.ends_with(',') {
+            let at = body.len();
+            lines[anchor] = format!("{},{}", &line[..at], &line[at..]);
+        }
+    }
+    // A CRLF file's lines keep their `\r`; new ones get it too.
+    let carriage = if lines[anchor].ends_with('\r') {
+        "\r"
+    } else {
+        ""
+    };
+    let block: Vec<String> = new
+        .iter()
+        .map(|p| format!("{entry_indent}{},{carriage}", toml_string(p)))
+        .collect();
+    lines.splice(anchor + 1..anchor + 1, block);
+    Ok(lines.join("\n"))
+}
+
 pub fn parse_meta_ini(text: &str) -> OracleMeta {
     let mut meta = OracleMeta::default();
     let mut section = String::new();
@@ -1129,6 +1255,69 @@ mod tests {
         let err = plan_insertion_at(text, &mods, &new_mod, &before_mod("nope"))
             .expect_err("should refuse rather than fall back to the section default");
         assert!(err.to_string().contains("no mod with that id"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod place_tests {
+    use super::*;
+
+    fn names(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    const LIST: &str = "name = \"x\"\nplugins = [\n\t\"Oblivion.esm\",\n\t# fixes\n\t\"A.esp\", # after the esm\n\t\"B.esp\"\n]\n\n[[mods]]\nid = \"m\"\nplugins = [\"B.esp\"]\n";
+
+    #[test]
+    fn a_plugin_goes_after_the_one_named_keeping_its_comment() {
+        let out = place_plugins(
+            LIST,
+            &names(&["New.esp"]),
+            &LoadPosition::After("a.esp".into()),
+        )
+        .unwrap();
+        assert!(
+            out.contains("\t\"A.esp\", # after the esm\n\t\"New.esp\",\n\t\"B.esp\"\n]"),
+            "{out}"
+        );
+    }
+
+    #[test]
+    fn last_adds_the_missing_comma_and_ignores_mod_level_plugins() {
+        let out = place_plugins(LIST, &names(&["N1.esp", "N2.esp"]), &LoadPosition::Last).unwrap();
+        assert!(
+            out.contains("\t\"B.esp\",\n\t\"N1.esp\",\n\t\"N2.esp\",\n]"),
+            "{out}"
+        );
+        assert!(out.ends_with("plugins = [\"B.esp\"]\n"), "{out}");
+    }
+
+    #[test]
+    fn listed_plugins_stay_put_and_unknown_anchors_are_refused() {
+        assert_eq!(
+            place_plugins(LIST, &names(&["b.esp"]), &LoadPosition::Last).unwrap(),
+            LIST
+        );
+        assert!(
+            place_plugins(
+                LIST,
+                &names(&["N.esp"]),
+                &LoadPosition::After("Z.esp".into())
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn a_list_without_a_load_order_gets_one_before_its_first_table() {
+        let text = "name = \"x\"\n\n[[mods]]\nid = \"m\"\n";
+        let out = place_plugins(text, &names(&["M.esp"]), &LoadPosition::Last).unwrap();
+        assert_eq!(
+            out,
+            "name = \"x\"\n\nplugins = [\n    \"M.esp\",\n]\n\n[[mods]]\nid = \"m\"\n"
+        );
+        let parsed: toml::Table = toml::from_str(&out).unwrap();
+        assert_eq!(parsed["plugins"].as_array().unwrap().len(), 1);
     }
 }
 

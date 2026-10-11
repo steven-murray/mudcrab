@@ -108,12 +108,19 @@ pub struct AddArgs {
     pub input: PathBuf,
     /// Read the mod's details from `<DIR>/<--mod>/meta.ini`, as written by
     /// Mod Organizer 2. Only ever read from.
-    #[arg(long, value_name = "ORACLE_MODS_DIR", conflicts_with = "nexus")]
+    #[arg(long, value_name = "ORACLE_MODS_DIR", conflicts_with_all = ["nexus", "archive"])]
     pub from_oracle: Option<PathBuf>,
+    /// Write the archive entry from the archive itself: its source (from the
+    /// MO2 `.meta` beside it, or --nexus / --manual), file name, layout, FOMOD
+    /// defaults and BAIN packages, as `inspect` reports them. Only ever read
+    /// from.
+    #[arg(long, value_name = "FILE")]
+    pub archive: Option<PathBuf>,
     /// Name of the mod folder inside the Oracle mods directory.
     #[arg(long = "mod", value_name = "FOLDER", requires = "from_oracle")]
     pub mod_folder: Option<String>,
     /// Nexus source as `<modid>/<fileid>`, for a mod with no Oracle folder.
+    /// With --archive, the source when the archive has no `.meta` naming it.
     #[arg(long, value_name = "MODID/FILEID")]
     pub nexus: Option<String>,
     /// Mod id, which is also the directory it installs into.
@@ -132,10 +139,23 @@ pub struct AddArgs {
     /// `mod:"Some Other Mod"`.
     #[arg(long = "if", value_name = "CONDITION")]
     pub condition: Option<String>,
-    /// A plugin the mod ships; repeat for several. Written into the entry
-    /// only: placing it in the load order is still the author's call.
+    /// A plugin the mod ships; repeat for several. Written into the entry, and
+    /// into the top-level `plugins` load order where --load-after or
+    /// --load-last says. A plugin's place in the load order matters, so
+    /// mudcrab does not pick one for you.
     #[arg(long = "plugin", value_name = "FILE")]
     pub plugins: Vec<String>,
+    /// Put the --plugin files into the load order straight after this plugin.
+    #[arg(
+        long = "load-after",
+        value_name = "PLUGIN",
+        requires = "plugins",
+        conflicts_with = "load_last"
+    )]
+    pub load_after: Option<String>,
+    /// Put the --plugin files at the end of the load order.
+    #[arg(long = "load-last", requires = "plugins")]
+    pub load_last: bool,
     /// When --section names a section the file does not have yet, start it
     /// immediately before this existing section instead of at end of file.
     /// Repeat for a nested path, as with --section.

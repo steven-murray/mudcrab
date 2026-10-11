@@ -410,6 +410,27 @@ pub fn write_meta(archive_path: &Path, archive: &ArchiveRef<'_>) -> anyhow::Resu
     Ok(())
 }
 
+/// The source an archive's `.meta` names, as a modlist writes it:
+/// `nexus:<game>/<mod>/<file>` for a Nexus download, or its URL. `None` when
+/// there is no `.meta`, or only MO2's placeholder ids.
+pub fn meta_source(archive: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(meta_path(archive)).ok()?;
+    let meta = parse_meta(&text);
+    let id = |key: &str| {
+        meta.get(key)
+            .filter(|v| !v.is_empty() && v.as_str() != "0")
+            .cloned()
+    };
+    if let (Some(mod_id), Some(file_id)) = (id("modid"), id("fileid")) {
+        let game = meta
+            .get("gamename")
+            .map(|g| g.to_ascii_lowercase())
+            .unwrap_or_else(|| "oblivion".to_string());
+        return Some(format!("nexus:{game}/{mod_id}/{file_id}"));
+    }
+    meta.get("url").filter(|url| !url.is_empty()).cloned()
+}
+
 /// Whether an archive's `.meta` says what it is: Nexus ids that are not zero,
 /// or a URL. MO2 writes `modID=3`/`fileID=0`-style placeholders for downloads
 /// it could not identify, which find nothing.

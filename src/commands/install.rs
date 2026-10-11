@@ -23,7 +23,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         }
     }
     let game_dir =
-        super::require_game_dir(args.game_dir.clone(), args.mo2_instance_dir.as_deref())?;
+        super::resolve_game_dir(args.game_dir.clone(), args.mo2_instance_dir.as_deref())?;
     let raw = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
     let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(|err| {
@@ -43,12 +43,17 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         (None, Some(instance_dir)) => instance_dir.join("mods"),
         (None, None) => anyhow::bail!("install requires either --mods-dir or --mo2-instance-dir"),
     };
+    // Staging hangs off the mods folder's parent, so a relative path must not
+    // reach it as "": that would be `/`, and extraction would fall back to the
+    // system temp dir.
+    let mods_dir = std::path::absolute(&mods_dir)
+        .map_err(|err| anyhow::anyhow!("failed to resolve {}: {err}", mods_dir.display()))?;
     let settings = config::install::InstallSettings {
         cache_dir,
         mods_dir: mods_dir.clone(),
         mo2_instance_dir: args.mo2_instance_dir.clone(),
         profile_name: args.profile_name.clone(),
-        game_dir: Some(game_dir.clone()),
+        game_dir: game_dir.clone(),
         execute_actions: !args.skip_actions,
         dry_run: args.dry_run,
         tools: {
@@ -75,7 +80,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         mods_dir = %mods_dir.display(),
         mo2_instance_dir = ?args.mo2_instance_dir.as_ref().map(|p| p.display().to_string()),
         profile_name = %args.profile_name,
-        game_dir = %game_dir.display(),
+        game_dir = ?game_dir,
         skip_actions = args.skip_actions,
         force_merges = args.force_merges,
         force = args.force,

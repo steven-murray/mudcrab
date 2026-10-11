@@ -1,13 +1,17 @@
 use crate::cli::AddArgs;
 use crate::config;
 use crate::config::add::{
-    NewMod, OracleMeta, Placement, find_plugins, parse_meta_ini, plan_insertion_at,
+    LoadPosition, NewMod, OracleMeta, Placement, find_plugins, parse_meta_ini, place_plugins,
+    plan_insertion_at,
 };
 use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
 
 pub async fn run(args: AddArgs) -> anyhow::Result<()> {
-    let (new_mod, mod_dir) = resolve(&args)?;
+    let (mut new_mod, mod_dir) = resolve(&args)?;
+    if new_mod.file_name.is_none() {
+        new_mod.file_name = nexus_file_name(new_mod.path.as_deref()).await;
+    }
 
     // The id becomes a directory name at install time, so reject here what
     // install would reject there rather than after 600 entries are written.
@@ -35,7 +39,44 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
         before_mod: args.before_mod.clone(),
         before_section: (!args.before_sections.is_empty()).then(|| args.before_sections.clone()),
     };
-    let plan = plan_insertion_at(&original, &source.mods, &new_mod, &placement)?;
+    let mut plan = plan_insertion_at(&original, &source.mods, &new_mod, &placement)?;
+
+    // Plugins the load order does not list yet go where the author said. A
+    // plugin in the wrong place fails silently in game, so with no place given
+    // this stops here, before anything is written.
+    let unplaced: Vec<String> = new_mod
+        .plugins
+        .iter()
+        .filter(|plugin| {
+            !source
+                .plugins
+                .iter()
+                .any(|listed| listed.eq_ignore_ascii_case(plugin))
+        })
+        .cloned()
+        .collect();
+    let position = match (&args.load_after, args.load_last) {
+        (Some(after), _) => Some(LoadPosition::After(after.clone())),
+        (None, true) => Some(LoadPosition::Last),
+        (None, false) => None,
+    };
+    match (&position, unplaced.is_empty()) {
+        (Some(position), false) => {
+            let placed = place_plugins(&plan.new_text, &unplaced, position)?;
+            // The load order sits above every mod, so the block moves down by
+            // however many lines went into it.
+            plan.line += placed.lines().count() - plan.new_text.lines().count();
+            plan.new_text = placed;
+        }
+        (None, false) => anyhow::bail!(
+            "{} {} not in the load order yet; say where with --load-after <plugin> or \
+             --load-last (or add {} to `plugins` yourself first)",
+            unplaced.join(", "),
+            if unplaced.len() == 1 { "is" } else { "are" },
+            if unplaced.len() == 1 { "it" } else { "them" },
+        ),
+        (_, true) => {}
+    }
 
     if new_mod.section.is_empty() {
         eprintln!(
@@ -71,6 +112,13 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
             plan.anchor
         );
         println!("{}", plan.block);
+        if let (Some(position), false) = (&position, unplaced.is_empty()) {
+            let at = match position {
+                LoadPosition::After(after) => format!("after {after}"),
+                LoadPosition::Last => "at the end".to_string(),
+            };
+            println!("\nand {} into the load order {at}", unplaced.join(", "));
+        }
         println!("\n(--dry-run: nothing written)");
         return Ok(());
     }
@@ -105,9 +153,42 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The archive's filename, from Nexus's list of the mod's files, for a
+/// `nexus:` source given without --file-name. It lets `download` save the file
+/// under its real name and later stages find one already on disk. Best effort:
+/// with no API key, or no answer, the block is written without it.
+async fn nexus_file_name(path: Option<&str>) -> Option<String> {
+    let spec = path?.strip_prefix("nexus:")?;
+    let mut parts = spec.split('/');
+    let (game, mod_id, file_id) = (parts.next()?, parts.next()?, parts.next()?);
+    let (mod_id, file_id): (u64, u64) = (mod_id.parse().ok()?, file_id.parse().ok()?);
+    let api_key = std::env::var("NEXUS_API_KEY").ok()?;
+    let api_base = std::env::var("NEXUS_API_BASE").ok();
+    let client = reqwest::Client::builder()
+        .user_agent("mudcrab")
+        .build()
+        .ok()?;
+    let files =
+        crate::config::identify::nexus_files(&client, api_base.as_deref(), &api_key, game, mod_id)
+            .await
+            .map_err(|err| eprintln!("note: could not ask Nexus for the file's name ({err})"))
+            .ok()?;
+    let name = files
+        .into_iter()
+        .find(|file| file.file_id == file_id)
+        .and_then(|file| file.file_name);
+    if name.is_none() {
+        eprintln!("note: Nexus does not list file {file_id} for mod {mod_id}");
+    }
+    name
+}
+
 /// Build the entry to insert, plus the Oracle mod folder when there is one (it
 /// is scanned afterwards for plugins).
 fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
+    if let Some(archive) = &args.archive {
+        return Ok((from_archive(archive, args)?, None));
+    }
     match (&args.from_oracle, &args.nexus) {
         (Some(oracle_dir), None) => {
             let folder = args
@@ -120,12 +201,102 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
         }
         (None, Some(nexus)) => Ok((from_nexus(nexus, args)?, None)),
         (None, None) => anyhow::bail!(
-            "give a source: --from-oracle <ORACLE_MODS_DIR> --mod <folder>, or --nexus <modid>/<fileid>"
+            "give a source: --archive <file>, --nexus <modid>/<fileid>, or \
+             --from-oracle <ORACLE_MODS_DIR> --mod <folder>"
         ),
         (Some(_), Some(_)) => {
             unreachable!("clap declares --from-oracle and --nexus as conflicting")
         }
     }
+}
+
+/// An entry written from the archive itself, as `inspect` reads it. What the
+/// archive cannot decide -- which FOMOD options, which of several BAIN
+/// packages, where its plugins load -- is reported for the author to settle.
+fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
+    use crate::config::inspect::{LayoutGuess, inspect_archive, render_toml_snippet};
+
+    let id = args
+        .id
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("--archive requires --id <mod id>"))?;
+    let report = inspect_archive(archive, false)?;
+    let source = match (&args.nexus, args.manual) {
+        (Some(spec), _) => {
+            let (mod_id, file_id) = parse_nexus_arg(spec)?;
+            format!("nexus:oblivion/{mod_id}/{file_id}")
+        }
+        (None, true) => format!("manual:{}", report.file_name),
+        (None, false) => crate::config::archive_store::meta_source(archive).ok_or_else(|| {
+            anyhow::anyhow!(
+                "{} has no MO2 `.meta` saying where it came from; give the source with \
+                 --nexus <modid>/<fileid>, or --manual for an archive fetched by hand",
+                archive.display()
+            )
+        })?,
+    };
+    // Comments in the snippet talk to someone reading `inspect`'s report; in
+    // the list they would only be noise.
+    let block = render_toml_snippet(
+        &report.file_name,
+        Some(&source),
+        &report.layout,
+        report.fomod.as_ref(),
+    )
+    .lines()
+    .filter(|line| !line.trim_start().starts_with('#'))
+    .collect::<Vec<_>>()
+    .join("\n");
+
+    match &report.layout {
+        LayoutGuess::Fomod { .. } => eprintln!(
+            "note: '{id}' has a FOMOD installer; the entry picks each group's default. \
+             `mudcrab inspect` lists the options, to change `fomod_selections`."
+        ),
+        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => eprintln!(
+            "note: '{id}' is a BAIN package and every subpackage is listed; delete from \
+             `bain_subpackages` the ones that are alternatives to each other."
+        ),
+        _ => {}
+    }
+    let unlisted: Vec<&String> = report
+        .plugins
+        .iter()
+        .filter(|path| {
+            let name = path.rsplit('/').next().unwrap_or(path);
+            !args.plugins.iter().any(|p| p.eq_ignore_ascii_case(name))
+        })
+        .collect();
+    if !unlisted.is_empty() {
+        eprintln!("note: the archive holds plugins not given with --plugin:");
+        for path in unlisted {
+            eprintln!("  {path}");
+        }
+    }
+
+    Ok(NewMod {
+        id,
+        section: args.sections.clone(),
+        condition: args.condition.clone(),
+        plugins: args.plugins.clone(),
+        archive_block: Some(block),
+        ..NewMod::default()
+    })
+}
+
+fn parse_nexus_arg(spec: &str) -> anyhow::Result<(u64, u64)> {
+    let (mod_id, file_id) = spec
+        .split_once('/')
+        .ok_or_else(|| anyhow::anyhow!("--nexus must be <modid>/<fileid>, got '{spec}'"))?;
+    let mod_id: u64 = mod_id
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("--nexus mod id must be a number, got '{mod_id}'"))?;
+    let file_id: u64 = file_id
+        .trim()
+        .parse()
+        .map_err(|_| anyhow::anyhow!("--nexus file id must be a number, got '{file_id}'"))?;
+    Ok((mod_id, file_id))
 }
 
 fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
@@ -197,17 +368,7 @@ fn nexus_ids(meta: &OracleMeta) -> NexusSource {
 }
 
 fn from_nexus(spec: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
-    let (mod_id, file_id) = spec
-        .split_once('/')
-        .ok_or_else(|| anyhow::anyhow!("--nexus must be <modid>/<fileid>, got '{spec}'"))?;
-    let mod_id: u64 = mod_id
-        .trim()
-        .parse()
-        .map_err(|_| anyhow::anyhow!("--nexus mod id must be a number, got '{mod_id}'"))?;
-    let file_id: u64 = file_id
-        .trim()
-        .parse()
-        .map_err(|_| anyhow::anyhow!("--nexus file id must be a number, got '{file_id}'"))?;
+    let (mod_id, file_id) = parse_nexus_arg(spec)?;
 
     let id = args
         .id
@@ -228,6 +389,7 @@ fn from_nexus(spec: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
         version: None,
         non_nexus: false,
         known_mod_id: None,
+        archive_block: None,
     })
 }
 
@@ -252,9 +414,9 @@ fn report_plugins(mod_id: &str, mod_dir: &Path) {
         eprintln!("  {plugin}");
     }
     eprintln!(
-        "Add them to the top-level `plugins` array yourself, at the right point in load order. \
-         mudcrab will not guess the position, and the mod block was written without a `plugins` \
-         key so the modlist still validates until you do."
+        "Place them with --plugin <file> and --load-after <plugin> (or --load-last). \
+         mudcrab will not guess the position, and without those the mod block is written \
+         with no `plugins` key so the modlist still validates."
     );
 }
 
