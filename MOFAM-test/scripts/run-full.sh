@@ -48,6 +48,9 @@ CACHE_DIR="${MOFAM_CACHE_DIR:-$MO2_DOWNLOADS}"
 SEARCH_PATHS=(
 	"$MO2_DOWNLOADS"
 	"$MO2_DIR/downloads"
+	# Tools fetched by hand, e.g. Root Builder: Nexus only gives premium
+	# accounts API download links.
+	"$HOME/Games/OblivionModdingtools"
 )
 export GAME_DIR="${GAME_DIR:-/home/steven/.local/share/Steam/steamapps/common/Oblivion}"
 

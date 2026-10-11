@@ -182,14 +182,28 @@ mod (a readme, a plugin) is left loose and logged rather than packed.
 
 Packing and unpacking are native -- see `src/bsa/` -- so no BSArch.exe under Wine.
 
-Along with standard archive-based mods, a mod can be **built** rather than extracted.
-Two `type` values do this today:
+Along with standard archive-based mods, `type` selects a few other kinds:
 
 - `"build-from-files"` assembles a mod's contents from local files and layers instead
   of a downloaded archive (see `BuildLayer` in `src/config/schema.rs`).
 - `"merge"` produces a single merged plugin from several other mods' `.esp` files --
   a headless, native replacement for zEdit's zMerge, so a modlist requiring merges can
   be installed without driving a GUI tool.
+- `"empty"` is a deliberately empty folder, for a tool's output to land in.
+- `"generated"` holds only what its actions write: `write_file` authors a file
+  (`path`, `content`), refusing to overwrite one.
+- `"mo2-plugin"` installs into the MO2 instance's `plugins/<id>` rather than
+  `mods/`, and stays out of the profile's mod list and the Oracle diff. The id
+  is the plugin's folder name. It is rebuilt on every install.
+
+### Game-root files
+
+Files that belong beside `Oblivion.exe` -- a script extender's loader, a
+`dxvk.conf` -- go in a mod's `root/` folder: `game_root_files = ["*.dll"]` on an
+archive stages matching files there, or a `generated` mod writes one with
+`write_file`. The Root Builder MO2 plugin (itself a `mo2-plugin` entry in MOFAM)
+deploys `root/` to the game folder when MO2 launches the game and restores the
+folder afterwards. mudcrab never writes the game folder.
 
 ## Merges
 

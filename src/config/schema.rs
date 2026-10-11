@@ -83,6 +83,10 @@ impl SourceModlist {
         let mut previous: Vec<String> = Vec::new();
 
         for entry in &self.mods {
+            // An MO2 plugin lives in `plugins/`, not the mod list.
+            if entry.mod_type == Some(ModType::Mo2Plugin) {
+                continue;
+            }
             for depth in 0..entry.section.len() {
                 if previous.len() > depth && previous[..=depth] == entry.section[..=depth] {
                     continue;
@@ -611,6 +615,12 @@ pub enum ModType {
     /// A mod whose whole content is written by its own actions -- `write_file`
     /// for a config file the list authors rather than downloads. No archives.
     Generated,
+    /// A Mod Organizer 2 plugin, installed into the instance's `plugins/`
+    /// folder as `plugins/<id>` rather than into `mods/`. It is not a mod as
+    /// far as MO2 is concerned, so it has no place in the profile's mod list,
+    /// and the id is the plugin's folder name. Root Builder is the case.
+    #[serde(rename = "mo2-plugin")]
+    Mo2Plugin,
 }
 
 /// How overlapping records are resolved when two sources define the same one.

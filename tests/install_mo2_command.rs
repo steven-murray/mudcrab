@@ -438,3 +438,47 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
             .exists()
     );
 }
+#[test]
+fn an_mo2_plugin_goes_into_the_instances_plugins_folder_not_the_mod_list() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let archive = dir.path().join("rb.zip");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+    zip.start_file("rootbuilder/__init__.py", options).unwrap();
+    zip.write_all(b"def createPlugins(): return []\n").unwrap();
+    zip.finish().unwrap();
+
+    let modlist = dir.path().join("modlist.toml");
+    std::fs::write(
+        &modlist,
+        format!(
+            "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\nlayout = \"custom-data-folder\"\ndata_folder = \"rootbuilder\"\n",
+            archive.display()
+        ),
+    )
+    .unwrap();
+    let compiled = dir.path().join("c.json");
+    let plan = dir.path().join("p.json");
+    let cache = dir.path().join("cache");
+    let instance = dir.path().join("instance");
+    let game = dir.path().join("game");
+    std::fs::create_dir_all(&game).unwrap();
+
+    let run = |args: &[&std::ffi::OsStr]| {
+        assert_cmd::Command::cargo_bin("mudcrab").unwrap().args(args).assert().success();
+    };
+    run(&["compile".as_ref(), modlist.as_os_str(), "--output".as_ref(), compiled.as_os_str()]);
+    run(&["query".as_ref(), compiled.as_os_str(), "--output".as_ref(), plan.as_os_str(), "--headless".as_ref()]);
+    run(&["download".as_ref(), plan.as_os_str(), "--cache".as_ref(), cache.as_os_str()]);
+    run(&[
+        "install".as_ref(), plan.as_os_str(), "--cache".as_ref(), cache.as_os_str(),
+        "--mo2-instance-dir".as_ref(), instance.as_os_str(), "--profile-name".as_ref(), "Default".as_ref(),
+        "--game-dir".as_ref(), game.as_os_str(),
+    ]);
+
+    assert!(instance.join("plugins/rootbuilder/__init__.py").exists());
+    assert!(!instance.join("mods/rootbuilder").exists());
+    let modlist_txt = std::fs::read_to_string(instance.join("profiles/Default/modlist.txt")).unwrap_or_default();
+    assert!(!modlist_txt.contains("rootbuilder"), "{modlist_txt}");
+}

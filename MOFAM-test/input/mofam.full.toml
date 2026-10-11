@@ -382,6 +382,27 @@ SMainMenuMovieIntro = ""
 
 
 # ------------------------------
+# MO2 plugins
+# ------------------------------
+
+# Not in the guide, which has the user copy game-root files by hand. Root
+# Builder deploys each mod's `root/` folder beside Oblivion.exe when MO2
+# launches the game and restores the folder when it exits; it is what puts
+# xOBSE's loader in place, and the optional dxvk.conf. Copy mode (its default,
+# `copyfiles=**`) -- link mode has a known bug with MO2 2.5.2.
+# Installed into the instance's plugins/ folder, never the mod list.
+[[mods]]
+id = "rootbuilder"
+section = ["MO2 PLUGINS"]
+type = "mo2-plugin"
+
+[[mods.archives]]
+path = "nexus:skyrimspecialedition/31720/707262"
+file_name = "Root Builder-31720-5-1-1-1767959063.zip"
+layout = "custom-data-folder"
+data_folder = "rootbuilder"
+
+# ------------------------------
 # Part 1 - CLEANED MASTERS
 # ------------------------------
 

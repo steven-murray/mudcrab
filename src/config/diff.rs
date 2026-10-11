@@ -229,6 +229,10 @@ impl PlanIndex {
         let mut aliases = HashMap::new();
 
         for mod_entry in &plan.mods {
+            // Installed into MO2's `plugins/`, so never in a mods directory.
+            if mod_entry.mod_type == Some(crate::config::schema::ModType::Mo2Plugin) {
+                continue;
+            }
             if !order.iter().any(|seen| seen == &mod_entry.section) {
                 order.push(mod_entry.section.clone());
             }
