@@ -159,7 +159,7 @@ impl Exporter {
         if as_path.join("exporter.toml").is_file() {
             Exporter::from_dir(&as_path)
         } else if let Some(name) = builtin::name(spec) {
-            Exporter::from_layers(vec![Layer::Builtin(name)])
+            Exporter::from_layers(chain(Layer::Builtin(name))?)
         } else if local.join("exporter.toml").is_file() {
             Exporter::from_dir(&local)
         } else {
@@ -173,18 +173,7 @@ impl Exporter {
     }
 
     fn from_dir(dir: &Path) -> anyhow::Result<Exporter> {
-        let mut layers = vec![Layer::Dir(dir.to_path_buf())];
-        let manifest = read_manifest(&layers[0])?;
-        if let Some(base) = &manifest.base {
-            let name = builtin::name(base).ok_or_else(|| {
-                anyhow::anyhow!(
-                    "{}: base {base:?} is not a built-in exporter",
-                    dir.display()
-                )
-            })?;
-            layers.push(Layer::Builtin(name));
-        }
-        Exporter::from_layers(layers)
+        Exporter::from_layers(chain(Layer::Dir(dir.to_path_buf()))?)
     }
 
     fn from_layers(layers: Vec<Layer>) -> anyhow::Result<Exporter> {
@@ -478,6 +467,28 @@ struct RenderState {
     warnings: Vec<String>,
 }
 
+/// `top` and every built-in it builds on, top first. Built-ins can build on
+/// each other too (`github-pages` on `markdown`).
+fn chain(top: Layer) -> anyhow::Result<Vec<Layer>> {
+    let mut layers = vec![top];
+    loop {
+        let last = layers.last().expect("never empty");
+        let Some(base) = read_manifest(last)?.base else {
+            break;
+        };
+        let name = builtin::name(&base)
+            .ok_or_else(|| anyhow::anyhow!("{last:?}: base {base:?} is not a built-in exporter"))?;
+        anyhow::ensure!(
+            !layers
+                .iter()
+                .any(|l| matches!(l, Layer::Builtin(n) if *n == name)),
+            "{last:?}: base {base:?} builds on itself"
+        );
+        layers.push(Layer::Builtin(name));
+    }
+    Ok(layers)
+}
+
 fn read_manifest(layer: &Layer) -> anyhow::Result<Manifest> {
     let raw = layer
         .read("exporter.toml")
@@ -541,4 +552,22 @@ fn write_inside(dir: &Path, relative: &str, bytes: &[u8]) -> anyhow::Result<()> 
     }
     std::fs::write(&path, bytes)
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn pages_cannot_be_written_outside_the_output() {
+        let dir = tempfile::tempdir().unwrap();
+        for bad in ["../escape.md", "/etc/passwd", "a/../../b.md"] {
+            assert!(super::write_inside(dir.path(), bad, b"x").is_err(), "{bad}");
+        }
+        super::write_inside(dir.path(), "a/b.md", b"x").unwrap();
+        assert!(dir.path().join("a/b.md").is_file());
+    }
+
+    #[test]
+    fn runs_of_blank_lines_collapse() {
+        assert_eq!(super::tidy("\n\na\n\n\n\nb  \n"), "a\n\nb\n");
+    }
 }

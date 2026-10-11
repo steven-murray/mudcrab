@@ -1,0 +1,37 @@
+{% import "macros.md.j2" as m %}
+# {{ doc.docs.title or doc.name }}
+
+{% if doc.docs.summary %}
+*{{ doc.docs.summary | markup }}*
+
+{% endif %}
+{{ m.images(doc.docs, "the guide") }}
+{% if doc.docs.body %}
+{{ doc.docs.body | markup }}
+
+{% endif %}
+{% if options.choices and doc.inputs %}
+## Choices
+
+{{ m.choices(doc.inputs) }}
+
+{% endif %}
+{% if options.contents %}
+## Contents
+
+{% for entry in doc.entries if entry.kind == "section" %}
+- [{{ entry.title }}](#{{ entry.anchor }})
+{% endfor %}
+
+{% endif %}
+{# Section headings start one level below the guide's title. #}
+{% set heading_base = 1 %}
+{% for entry in doc.entries %}
+{% include "entry.md.j2" %}
+
+{% endfor %}
+{% if options.load_order and doc.load_order %}
+## Load order
+
+{{ m.load_order(doc.load_order) }}
+{% endif %}

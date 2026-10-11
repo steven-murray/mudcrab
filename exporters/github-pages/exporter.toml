@@ -1,0 +1,29 @@
+# The guide as a Jekyll site for GitHub Pages: an index, a page per top-level
+# section, and the load order. Write it into a repository's `docs/` folder (or
+# its root) and turn on Pages. Local images are copied into `images/`.
+name = "github-pages"
+description = "A Jekyll site for GitHub Pages: an index, a page per section, the load order"
+base = "markdown"
+output = "site"
+images = "copy"
+
+[[pages]]
+template = "_config.yml.j2"
+output = "_config.yml"
+
+[[pages]]
+template = "index.md.j2"
+output = "index.md"
+
+[[pages]]
+template = "section-page.md.j2"
+output = "{{ section.anchor }}.md"
+for_each = "section"
+
+[[pages]]
+template = "load-order.md.j2"
+output = "load-order.md"
+
+[options.theme]
+default = "minima"
+help = "Jekyll theme; GitHub Pages supports minima and the jekyll-theme-* themes"

@@ -25,7 +25,7 @@ File: {% if archive.nexus %}[url={{ archive.nexus.file_url }}]{{ archive.file_na
 {% for step in mod.steps %}
 [*]{{ step.text | markup }}{{ " [i](only if " ~ step.condition.text ~ ")[/i]" if step.condition }}
 {% if step.code %}
-[code]{{ step.code }}[/code]
+[code]{{ step.code | trim }}[/code]
 {% endif %}
 {% endfor %}
 [/list]

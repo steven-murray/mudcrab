@@ -664,6 +664,11 @@ stdout. It is the contract for rendering a list with your own tools:
 editor's source (BBCode) mode. Nexus pages cannot hold files, so it links images
 by their `url`, and warns about any that only have a local `path`.
 
+`--to markdown` writes one GitHub-flavoured Markdown file. `--to github-pages`
+writes a Jekyll site into the `-o` directory -- an index, a page per top-level
+section, the load order -- with local images copied into `images/`; put it in a
+repository's `docs/` folder and turn on GitHub Pages.
+
 Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
 modlist; `--list-options` shows them) and can be customised or replaced by your
 own: see [exporters.md](exporters.md).

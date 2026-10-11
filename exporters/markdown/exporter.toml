@@ -1,0 +1,30 @@
+# The guide as one Markdown file (GitHub-flavoured): for a README, a wiki page,
+# or anywhere that renders Markdown. Images are linked by `url`.
+name = "markdown"
+description = "The guide as one GitHub-flavoured Markdown file"
+output = "file"
+markup = "markdown"
+images = "url"
+
+[[pages]]
+template = "guide.md.j2"
+
+[options.contents]
+default = true
+help = "List the top-level sections, linked, before the first one"
+
+[options.choices]
+default = true
+help = "List the questions the list asks (its inputs), with their defaults"
+
+[options.files]
+default = true
+help = "Name each mod's file(s), linked to the Nexus files tab"
+
+[options.steps]
+default = true
+help = "Write out installer choices and the changes to make after installing"
+
+[options.load_order]
+default = true
+help = "Close with the load order, folded away"

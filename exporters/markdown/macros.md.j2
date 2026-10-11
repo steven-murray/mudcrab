@@ -1,0 +1,33 @@
+{#- `#`s for a heading `level` deep; Markdown stops at six. -#}
+{% macro hashes(level) %}{{ "#" * ([level, 6] | min) }}{% endmacro %}
+
+{% macro images(docs, place) %}
+{% for image in docs.images %}
+{% set src = image | image_src(place) %}
+{% if src %}
+![{{ image.caption or "" }}]({{ src }}){{ "\n*" ~ image.caption ~ "*" if image.caption }}
+
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% else %}{{ value }}{% endif %}{% endmacro %}
+
+{% macro choices(inputs) %}
+{% for input in inputs %}
+- {{ input.query }}{{ " *(" ~ answer(input.answer) ~ ")*" if input.answer is defined else " *(default: " ~ answer(input.default) ~ ")*" if input.default is defined }}
+{% endfor %}
+{% endmacro %}
+
+{% macro load_order(plugins) %}
+<details>
+<summary>{{ plugins | length }} plugins</summary>
+
+```
+{% for plugin in plugins %}
+{{ plugin.name }}{{ "  (inactive)" if not plugin.active }}
+{% endfor %}
+```
+
+</details>
+{% endmacro %}

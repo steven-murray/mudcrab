@@ -1,0 +1,19 @@
+{% import "macros.md.j2" as m %}
+{% with title = "Load order" %}{% include "front-matter.j2" %}{% endwith %}
+{{ "{% raw %}" }}
+# Load order
+
+{% if doc.load_order %}
+{{ doc.load_order | length }} plugins, in order. {{ "Inactive ones keep their place but are not ticked." if doc.load_order | rejectattr("active") | list }}
+
+```
+{% for plugin in doc.load_order %}
+{{ plugin.name }}{{ "  (inactive)" if not plugin.active }}
+{% endfor %}
+```
+{% else %}
+This list has no plugins.
+{% endif %}
+
+[Contents](index.md)
+{{ "{% endraw %}" }}

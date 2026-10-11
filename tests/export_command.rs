@@ -361,3 +361,72 @@ fn a_template_can_extend_a_builtin_and_eject_copies_one_out() {
         "{text}"
     );
 }
+
+#[test]
+fn markdown_is_one_file_with_headings_by_depth() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let (md, _) = export_text(&list, &["--to", "markdown"]).unwrap();
+    assert!(md.starts_with("# Docs\n"), "{md}");
+    assert!(md.contains("- [1 - AUDIO](#1-audio)"), "{md}");
+    assert!(md.contains("\n## 1 - AUDIO\n"), "{md}");
+    assert!(md.contains("\n### Creatures\n"), "{md}");
+    assert!(
+        md.contains("\n#### 1. [Rats](https://www.nexusmods.com/oblivion/mods/52661)\n"),
+        "{md}"
+    );
+    assert!(
+        md.contains("![Ears](https://example.com/audio.png)"),
+        "{md}"
+    );
+    assert!(
+        md.contains("- In `ini/rats.ini`, set `rats.swear` to `1`."),
+        "{md}"
+    );
+}
+
+#[test]
+fn github_pages_writes_a_site_with_its_images() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let site = dir.path().join("site");
+
+    let err = export_text(&list, &["--to", "github-pages"]).unwrap_err();
+    assert!(err.contains("-o"), "a site needs a directory: {err}");
+
+    export_text(
+        &list,
+        &["--to", "github-pages", "-o", site.to_str().unwrap()],
+    )
+    .unwrap();
+    let read =
+        |name: &str| std::fs::read_to_string(site.join(name)).unwrap_or_else(|_| panic!("{name}"));
+
+    assert!(read("_config.yml").contains("title: \"Docs\""));
+    let index = read("index.md");
+    assert!(
+        index.starts_with("---\nlayout: default\ntitle: \"Docs\"\n---\n{% raw %}\n"),
+        "{index}"
+    );
+    assert!(
+        index.contains("1. [1 - AUDIO](1-audio.md) — Sounds."),
+        "{index}"
+    );
+    assert!(
+        index.trim_end().ends_with("{% endraw %}"),
+        "Jekyll must not read the content as Liquid"
+    );
+
+    let audio = read("1-audio.md");
+    assert!(
+        audio.contains("\n# 1 - AUDIO\n") && audio.contains("\n## Creatures\n"),
+        "{audio}"
+    );
+    // A site holds files, so the local copy is used, not the url.
+    assert!(audio.contains("![Ears](images/shots-audio.png)"), "{audio}");
+    assert_eq!(
+        std::fs::read(site.join("images/shots-audio.png")).unwrap(),
+        b"png"
+    );
+    assert!(read("load-order.md").contains("1 plugins, in order."));
+}

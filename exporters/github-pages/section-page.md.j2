@@ -1,0 +1,17 @@
+{% with title = section.title %}{% include "front-matter.j2" %}{% endwith %}
+{{ "{% raw %}" }}
+{# The page is the section, so its heading is the page's first. #}
+{% set heading_base = 0 %}
+{% include "section.md.j2" %}
+
+{% set sections = doc.entries | selectattr("kind", "equalto", "section") | list %}
+{% for other in sections %}
+{% if other.anchor == section.anchor %}
+{% set previous = sections[loop.index0 - 1] if loop.index0 > 0 %}
+{% set next = sections[loop.index0 + 1] if loop.index0 + 1 < sections | length %}
+---
+
+{{ "← [" ~ previous.title ~ "](" ~ previous.anchor ~ ".md) · " if previous }}[Contents](index.md){{ " · [" ~ next.title ~ "](" ~ next.anchor ~ ".md) →" if next }}
+{% endif %}
+{% endfor %}
+{{ "{% endraw %}" }}

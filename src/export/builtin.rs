@@ -15,6 +15,8 @@ macro_rules! exporter_files {
 /// (exporter, path inside it, contents).
 const FILES: &[(&str, &str, &str)] = exporter_files! {
     "nexus" => ["exporter.toml", "guide.j2", "entry.j2", "section.j2", "mod.j2", "macros.j2"],
+    "github-pages" => ["exporter.toml", "_config.yml.j2", "front-matter.j2", "index.md.j2", "section-page.md.j2", "load-order.md.j2"],
+    "markdown" => ["exporter.toml", "guide.md.j2", "entry.md.j2", "section.md.j2", "mod.md.j2", "macros.md.j2"],
 };
 
 /// Template exporter names, in the order they were added.

@@ -1,0 +1,6 @@
+# Written by `mudcrab export --to github-pages`.
+title: {{ (doc.docs.title or doc.name) | tojson }}
+{% if doc.docs.summary %}
+description: {{ doc.docs.summary | tojson }}
+{% endif %}
+theme: {{ options.theme }}

@@ -168,7 +168,8 @@ wiki page that drift apart.
 1. ~~Docs schema, `docs_file`, the document, `--to json`~~ -- done.
 2. ~~Template engine, exporter folders, options, `--eject`; the `nexus` (BBCode)
    exporter~~ -- done; see [exporters.md](exporters.md).
-3. `markdown` and `github-pages` exporters; image copying.
+3. ~~`markdown` and `github-pages` exporters; image copying~~ -- done. The
+   site has not been through a real Jekyll build yet.
 4. MOFAM: import the guide's prose into a docs file, export it, and compare
    against the published guide by eye.
 

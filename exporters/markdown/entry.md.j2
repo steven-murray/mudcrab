@@ -1,0 +1,5 @@
+{% if entry.kind == "section" %}
+{% with section = entry %}{% include "section.md.j2" %}{% endwith %}
+{% else %}
+{% with mod = entry %}{% include "mod.md.j2" %}{% endwith %}
+{% endif %}

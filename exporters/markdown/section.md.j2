@@ -1,0 +1,20 @@
+{% import "macros.md.j2" as m %}
+{{ m.hashes(section.depth + heading_base) }} {{ section.title }}
+
+{% if section.docs.summary %}
+*{{ section.docs.summary | markup }}*
+
+{% endif %}
+{{ m.images(section.docs, "section " ~ section.name) }}
+{% if section.docs.body %}
+{{ section.docs.body | markup }}
+
+{% endif %}
+{% set counter = namespace(n=0) %}
+{% for entry in section.entries %}
+{% if entry.kind == "mod" %}{% set counter.n = counter.n + 1 %}{% endif %}
+{% set number = counter.n %}
+{% set depth = section.depth %}
+{% include "entry.md.j2" %}
+
+{% endfor %}
