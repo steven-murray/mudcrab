@@ -1524,6 +1524,25 @@ fn describe_section(path: &[String]) -> String {
 const LIST_LIMIT: usize = 20;
 
 /// Render the report as the compact per-section text an agent can paste back.
+/// The report a person reads first: totals, one line per section that is not
+/// identical, and how many version notes there are. `render_text` has the rest.
+pub fn render_summary(report: &DiffReport) -> String {
+    let summary = &report.summary;
+    let mut out = format!(
+        "{} mod(s) compared: {} identical, {} differing, {} missing from ours, {} extra in ours\n",
+        summary.mods_compared, summary.identical, summary.differing, summary.missing, summary.extra
+    );
+    for section in &report.sections {
+        if section.identical < section.compared || section.mods.iter().any(|m| !m.is_identical()) {
+            out.push_str(&format!(
+                "  [{}] {} of {} identical\n",
+                section.name, section.identical, section.compared
+            ));
+        }
+    }
+    out
+}
+
 pub fn render_text(report: &DiffReport) -> String {
     let mut out = String::new();
     out.push_str("mudcrab diff\n");

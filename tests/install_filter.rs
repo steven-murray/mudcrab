@@ -67,7 +67,7 @@ impl Fixture {
 
     /// Run `install`, passing through whatever filter flags the test wants.
     fn install(&self, filter_args: &[&str]) {
-        let mut command = Command::cargo_bin("mudcrab").expect("binary should build");
+        let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
         command
             .arg("install")
             .arg(&self.plan)
@@ -157,7 +157,7 @@ download_handler = "local"
     let cache = root.join("cache");
     let instance = root.join("mo2-instance");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("compile")
         .arg(&modlist)
@@ -166,7 +166,7 @@ download_handler = "local"
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -178,7 +178,7 @@ download_handler = "local"
 
     // Downloading is deliberately unfiltered: every later filtered install
     // should find its archives already cached.
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("download")
         .arg(&plan)
@@ -448,7 +448,7 @@ download_handler = "local"
             "--headless",
         ],
     ] {
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .env("GAME_DIR", &game_dir)
             .args(args)
@@ -457,14 +457,14 @@ download_handler = "local"
     }
 
     // Unfiltered, a1's missing archive fails the download.
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()])
         .assert()
         .failure();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args([
@@ -479,14 +479,14 @@ download_handler = "local"
         .success();
 
     // check sees the same subset: b1 is cached, a1 was never fetched.
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["check", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()])
         .assert()
         .failure();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args([

@@ -48,14 +48,28 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
 
     let report = config::diff::diff_all(&settings)?;
 
+    // The full report always goes to the log, so the compact terminal summary
+    // never costs the detail.
+    let full = config::diff::render_text(&report);
+    tracing::info!("full diff report:\n{full}");
+
     // Straight to stdout, not through tracing: this report is the command's
     // output, and it has to survive being piped or pasted somewhere.
     match args.format {
-        DiffFormat::Text => print!("{}", config::diff::render_text(&report)),
+        DiffFormat::Text if args.details => print!("{full}"),
+        DiffFormat::Text => {
+            print!("{}", config::diff::render_summary(&report));
+            if report.has_differences() {
+                match crate::ui::log_path() {
+                    Some(path) => println!("details: --details, or the full report in {}", path.display()),
+                    None => println!("details: --details"),
+                }
+            }
+        }
         DiffFormat::Json => println!("{}", serde_json::to_string_pretty(&report)?),
     }
 
-    if report.has_differences() {
+    if report.has_differences() && args.fail_on_differences {
         // Non-zero so a section can be gated on it. The report is already on
         // stdout, so this only has to say why the exit code is what it is.
         anyhow::bail!(

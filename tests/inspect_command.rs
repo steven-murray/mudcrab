@@ -27,7 +27,7 @@ fn make_zip(path: &Path, entries: &[(&str, &[u8])]) {
 }
 
 fn inspect(archive: &Path, extra: &[&str]) -> String {
-    let assert = Command::cargo_bin("mudcrab")
+    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("inspect")
         .arg(archive)
@@ -300,7 +300,7 @@ fn json_format_carries_the_same_findings_structured() {
 #[test]
 fn inspect_refuses_a_path_that_is_not_an_archive() {
     let dir = tempdir().expect("temp dir should be created");
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("inspect")
         .arg(dir.path().join("nope.zip"))

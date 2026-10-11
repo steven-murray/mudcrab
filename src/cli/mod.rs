@@ -477,6 +477,14 @@ pub struct DiffArgs {
     /// Report format.
     #[arg(long, value_enum, default_value_t = DiffFormat::Text)]
     pub format: DiffFormat,
+    /// Print every difference, mod by mod. By default the terminal gets one
+    /// line per section and the totals; the full report always goes to the log.
+    #[arg(long)]
+    pub details: bool,
+    /// Exit non-zero when anything differs, to gate a script on a clean diff.
+    /// Differences are the report, not an error, so this is off by default.
+    #[arg(long)]
+    pub fail_on_differences: bool,
     /// Publication date of the guide the list follows, `YYYY-MM-DD`.
     ///
     /// Normally read from the modlist's `[guide]` table and carried through the

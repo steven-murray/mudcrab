@@ -81,12 +81,16 @@ fn timestamp() -> String {
 /// Keep the newest `keep` logs in `dir`; old runs are not worth a full disk.
 fn prune_logs(dir: &Path, keep: usize) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
-    let mut logs: Vec<PathBuf> = entries
+    // Oldest first by modification time: names start with the command, so
+    // sorting by name would evict every `check` log before any `install` one.
+    let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
         .flatten()
         .map(|e| e.path())
         .filter(|p| p.extension().is_some_and(|e| e == "log"))
+        .filter_map(|p| Some((p.metadata().ok()?.modified().ok()?, p)))
         .collect();
     logs.sort();
+    let logs: Vec<PathBuf> = logs.into_iter().map(|(_, p)| p).collect();
     let excess = logs.len().saturating_sub(keep);
     for old in logs.into_iter().take(excess) {
         let _ = std::fs::remove_file(old);

@@ -53,7 +53,7 @@ download_handler = "local"
         vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
         vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
     ] {
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary")
             .args(args)
             .assert()
@@ -69,7 +69,7 @@ fn a_dry_run_does_not_apply_ini_actions() {
     let ini = game_dir.join("Oblivion.ini");
     let before = std::fs::read_to_string(&ini).expect("read ini");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary")
         .args([
             "install",
@@ -103,7 +103,7 @@ fn a_dry_run_reports_uncached_archives_instead_of_aborting() {
     let dir = tempdir().expect("tempdir");
     let (plan, game_dir) = fixture(dir.path());
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary")
         .args([
             "install",

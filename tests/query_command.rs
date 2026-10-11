@@ -15,7 +15,7 @@ fn headless_plan(extra: &[&str]) -> Value {
     let compiled = dir.path().join("compiled.json");
     let query_out = dir.path().join("plan.json");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("compile")
         .arg(&fixture)
@@ -23,7 +23,7 @@ fn headless_plan(extra: &[&str]) -> Value {
         .arg(&compiled)
         .assert()
         .success();
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -59,7 +59,7 @@ fn query_headless_writes_personalized_plan() {
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
-    let mut compile_cmd = Command::cargo_bin("mudcrab").expect("binary should build");
+    let mut compile_cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
     compile_cmd
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -69,7 +69,7 @@ fn query_headless_writes_personalized_plan() {
         .assert()
         .success();
 
-    let mut query_cmd = Command::cargo_bin("mudcrab").expect("binary should build");
+    let mut query_cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
     query_cmd
         .env("GAME_DIR", &game_dir)
         .arg("query")

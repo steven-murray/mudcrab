@@ -87,13 +87,13 @@ file_name = "second.zip"
     let compiled = root.join("compiled.json");
     let plan = root.join("plan.json");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .args(["compile", modlist.to_str().unwrap()])
         .args(["--output", compiled.to_str().unwrap()])
         .assert()
         .success();
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .args(["query", compiled.to_str().unwrap()])
         .args(["--output", plan.to_str().unwrap()])
@@ -101,7 +101,7 @@ file_name = "second.zip"
         .assert()
         .success();
     // Only the first mod's archive is fetched.
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .args(["download", plan.to_str().unwrap()])
         .args(["--cache", cache.to_str().unwrap()])
@@ -110,7 +110,7 @@ file_name = "second.zip"
         .success();
 
     let install = |extra: &[&str]| {
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .env_remove("NEXUS_API_KEY")
             .args(["install", "-v", plan.to_str().unwrap()])
@@ -191,13 +191,13 @@ fn a_failed_reinstall_does_not_leave_the_mod_recorded_as_installed() {
 
         let compiled = root.join(format!("compiled{suffix}.json"));
         let plan = root.join(format!("plan{suffix}.json"));
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .args(["compile", modlist.to_str().unwrap()])
             .args(["--output", compiled.to_str().unwrap()])
             .assert()
             .success();
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .args(["query", compiled.to_str().unwrap()])
             .args(["--output", plan.to_str().unwrap()])
@@ -208,13 +208,13 @@ fn a_failed_reinstall_does_not_leave_the_mod_recorded_as_installed() {
     };
 
     let first_plan = write_plan("-a");
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .args(["download", first_plan.to_str().unwrap()])
         .args(["--cache", cache.to_str().unwrap()])
         .assert()
         .success();
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .args(["install", first_plan.to_str().unwrap()])
         .args(["--cache", cache.to_str().unwrap()])
@@ -232,7 +232,7 @@ fn a_failed_reinstall_does_not_leave_the_mod_recorded_as_installed() {
         std::fs::remove_file(&path).expect("cache entry should be removable");
     }
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .args(["install", second_plan.to_str().unwrap()])

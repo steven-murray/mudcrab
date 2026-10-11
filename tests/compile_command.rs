@@ -16,7 +16,7 @@ fn compile_writes_compiled_artifact() {
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
-    let mut cmd = Command::cargo_bin("mudcrab").expect("binary should build");
+    let mut cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
     cmd.env("GAME_DIR", &game_dir)
         .arg("compile")
         .arg(&fixture)
@@ -48,7 +48,7 @@ fn compile_flattens_nested_mod_sections() {
     )
     .expect("fixture should be written");
 
-    let mut cmd = Command::cargo_bin("mudcrab").expect("binary should build");
+    let mut cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
     cmd.env("GAME_DIR", &game_dir)
         .arg("compile")
         .arg(&modlist)

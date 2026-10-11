@@ -70,7 +70,7 @@ struct Fixture {
 impl Fixture {
     /// Run `install` and return what it logged.
     fn install(&self, extra: &[&str]) -> String {
-        let assert = Command::cargo_bin("mudcrab")
+        let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .arg("install")
             .arg("-v")
@@ -178,7 +178,7 @@ sources = [
             cache.display().to_string(),
         ],
     ] {
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .args(&args)
             .assert()

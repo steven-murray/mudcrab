@@ -67,9 +67,13 @@ impl Fixture {
     }
 
     fn diff(&self) -> Command {
-        let mut command = Command::cargo_bin("mudcrab").expect("binary should build");
+        let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
         command
             .arg("diff")
+            // The full report, and a failing exit on any difference: what
+            // these tests were written against, before both became opt-in.
+            .arg("--details")
+            .arg("--fail-on-differences")
             .arg("--mods-dir")
             .arg(self.ours())
             .arg("--oracle")

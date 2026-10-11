@@ -54,7 +54,7 @@ fn fixture() -> (TempDir, PathBuf) {
 }
 
 fn add(path: &Path) -> Command {
-    let mut command = Command::cargo_bin("mudcrab").expect("binary should build");
+    let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
     command.arg("add").arg(path);
     command
 }

@@ -4,7 +4,7 @@ use tempfile::tempdir;
 
 /// Compile then query a source modlist, leaving a personalized plan at `plan`.
 fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", game_dir)
         .args(["compile", modlist.to_str().unwrap()])
@@ -12,7 +12,7 @@ fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", game_dir)
         .args(["query", compiled.to_str().unwrap()])
@@ -78,7 +78,7 @@ download_handler = "local"
     .expect("modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    let assert = Command::cargo_bin("mudcrab")
+    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["download", plan.to_str().unwrap()])
@@ -131,7 +131,7 @@ fn download_copies_local_archives_into_cache() {
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -141,7 +141,7 @@ fn download_copies_local_archives_into_cache() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -152,7 +152,7 @@ fn download_copies_local_archives_into_cache() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")

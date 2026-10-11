@@ -69,7 +69,7 @@ impl Fixture {
     }
 
     fn install(&self) {
-        Command::cargo_bin("mudcrab")
+        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
             .expect("binary should build")
             .arg("install")
             .arg(&self.plan)
@@ -171,7 +171,7 @@ sources = [
     let cache = root.join("cache");
     let instance = root.join("mo2-instance");
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("compile")
         .arg(&modlist)
@@ -180,7 +180,7 @@ sources = [
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -190,7 +190,7 @@ sources = [
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("download")
         .arg(&plan)
@@ -312,7 +312,7 @@ fn a_declared_merge_installs_hides_its_sources_and_can_be_undone() {
     assert!(!mods_dir.join("Alpha").join("Alpha.esp").exists());
 
     // --- and it can all be undone ----------------------------------------
-    Command::cargo_bin("mudcrab")
+    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
         .expect("binary should build")
         .arg("unhide-merges")
         .arg("--mo2-instance-dir")

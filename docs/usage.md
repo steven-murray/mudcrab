@@ -568,7 +568,13 @@ validates what actually landed on disk.
 ```bash
 mudcrab diff --mods-dir <OURS> --oracle <ORACLE_MODS_DIR> [--plan <plan.json>]
              [--section <name>]... [--only <mod id>]... [--format text|json]
+             [--details] [--fail-on-differences]
 ```
+
+By default the terminal gets the totals and one line per section that is not
+identical; `--details` prints every difference, mod by mod, and the full report
+is in the run's log either way. Differences are the report, not an error, so the
+exit code is 0 unless `--fail-on-differences` is given.
 
 Example:
 
