@@ -3,16 +3,18 @@
 ## Checks
 
 ```bash
+cargo fmt
 cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-Both must pass before any change lands. No blanket `#[allow]`.
+All three must pass before any change lands (CI runs `cargo fmt --check`). No
+blanket `#[allow]`.
 
-CI runs these on the **current stable**, which can be ahead of the toolchain on
-any given machine — a new clippy lint will fail there while passing locally.
-That is the check doing its job, not CI being wrong; fix the lint. `rustup
-update` locally closes the gap.
+The toolchain is pinned in `rust-toolchain.toml`, and rustup uses it here and
+in CI alike, so a check that passes locally passes there. Moving to a newer
+Rust is a change of its own: bump the pin, run the three, commit what moves
+(a whole-tree reformat goes in `.git-blame-ignore-revs`).
 
 ## Comments
 

@@ -220,8 +220,8 @@ binaries. Left:
   attachments).
 - **A scope statement in the readme**: Oblivion and MO2 today; the design is not
   limited to either, but nothing else has been run.
-- **Pin CI's toolchain**, or keep a matching one locally: CI's newer clippy has
-  twice failed a push that passed here (`chunks_exact` with a constant size).
+- ~~**Pin CI's toolchain**~~ -- done: `rust-toolchain.toml` pins it for
+  development, CI and releases, and CI checks formatting.
 
 - **An end-to-end run by hand before a release.** Steven installs the full
   MOFAM list from scratch -- empty instance, empty cache -- driving mudcrab
