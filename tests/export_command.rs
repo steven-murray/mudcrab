@@ -118,11 +118,17 @@ fn json_is_a_tree_of_sections_with_prose_and_words() {
         "you answer yes to “Install the rats?”"
     );
     assert_eq!(
-        rats["nexus"]["mod_url"],
+        rats["pages"][0]["mod_url"],
         "https://www.nexusmods.com/oblivion/mods/52661"
     );
+    assert_eq!(rats["archives"][0]["instructions"][0]["kind"], "bain");
+    assert_eq!(rats["steps"][0]["kind"], "ini");
     assert_eq!(
-        rats["archives"][0]["instructions"][0],
+        doc["kinds"],
+        serde_json::json!(["optional", "bain", "ini", "manual"])
+    );
+    assert_eq!(
+        rats["archives"][0]["instructions"][0]["text"],
         "In the BAIN installer, select `00 Core`."
     );
     assert_eq!(
@@ -217,8 +223,9 @@ fn nexus_writes_bbcode_with_links_conditions_and_steps() {
     );
     assert!(
         bbcode.contains(
-            "1. [url=https://www.nexusmods.com/oblivion/mods/52661]Rats[/url] \
-             [i](optional: only if you answer yes to “Install the rats?”)[/i]"
+            "1. [b]Rats[/b] ❓ [url=https://www.nexusmods.com/oblivion/mods/52661]🌐[/url] \
+             [url=https://www.nexusmods.com/oblivion/mods/52661?tab=files&file_id=1000033714]⬇️[/url]\n\
+             [i]❓ Only if you answer yes to “Install the rats?”[/i]"
         ),
         "{bbcode}"
     );
@@ -227,7 +234,7 @@ fn nexus_writes_bbcode_with_links_conditions_and_steps() {
         "{bbcode}"
     );
     assert!(
-        bbcode.contains("[*]In the BAIN installer, select [font=Courier New]00 Core[/font]."),
+        bbcode.contains("[*]📋 In the BAIN installer, select [font=Courier New]00 Core[/font]."),
         "{bbcode}"
     );
     assert!(bbcode.contains("Optional, as the guide says."), "{bbcode}");
@@ -372,7 +379,11 @@ fn markdown_is_one_file_with_headings_by_depth() {
     assert!(md.contains("\n## 1 - AUDIO\n"), "{md}");
     assert!(md.contains("\n### Creatures\n"), "{md}");
     assert!(
-        md.contains("\n#### 1. [Rats](https://www.nexusmods.com/oblivion/mods/52661)\n"),
+        md.contains(
+            "\n#### 1. Rats ❓ [🌐](https://www.nexusmods.com/oblivion/mods/52661 \"Nexus mod page\") \
+             [⬇️](https://www.nexusmods.com/oblivion/mods/52661?tab=files&file_id=1000033714 \
+             \"nexus:oblivion/52661/1000033714\")\n"
+        ),
         "{md}"
     );
     assert!(
@@ -380,7 +391,7 @@ fn markdown_is_one_file_with_headings_by_depth() {
         "{md}"
     );
     assert!(
-        md.contains("- In `ini/rats.ini`, set `rats.swear` to `1`."),
+        md.contains("- ⚙️ In `ini/rats.ini`, set `rats.swear` to `1`."),
         "{md}"
     );
 }

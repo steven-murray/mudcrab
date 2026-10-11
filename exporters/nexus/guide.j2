@@ -1,4 +1,5 @@
 {% import "macros.j2" as m %}
+{% import "symbols.j2" as sym %}
 [center][size=6][b]{{ doc.docs.title or doc.name }}[/b][/size][/center]
 
 {% if doc.docs.summary %}
@@ -15,6 +16,11 @@
 [*]{{ input.query }}{{ " [i](" ~ m.answer(input.answer) ~ ")[/i]" if input.answer is defined else " [i](default: " ~ m.answer(input.default) ~ ")[/i]" if input.default is defined }}
 {% endfor %}
 [/list]
+
+{% endif %}
+{% if options.key %}
+[size=4][b]Key[/b][/size]
+{{ m.key(doc.kinds, sym, options.steps) }}
 
 {% endif %}
 {% if options.contents %}

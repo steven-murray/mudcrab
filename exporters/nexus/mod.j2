@@ -1,36 +1,46 @@
 {% import "macros.j2" as m %}
-{{ number }}. {% if mod.nexus %}[url={{ mod.nexus.mod_url }}]{{ mod.title }}[/url]{% else %}[b]{{ mod.title }}[/b]{% endif %}{% if mod.condition %} [i](optional: only if {{ mod.condition.text }})[/i]{% endif %}
+{% import "symbols.j2" as sym %}
+{% set many = mod.archives | length > 1 %}
+{{ number }}. [b]{{ mod.title }}[/b]{{ " " ~ sym.symbols.optional if mod.condition }}{{ " " ~ sym.symbols.merge if mod.merge }}{% if options.files %}{% for page in mod.pages %} [url={{ page.mod_url }}]{{ sym.symbols.page }}[/url]{% endfor %}{% for link in mod.docs.links %} [url={{ link.url }}]{{ sym.symbols.page }}[/url]{% endfor %}{% for archive in mod.archives %} {{ m.download(archive, loop.index if many, sym.symbols) }}{% endfor %}{% endif %}
 
+{% if mod.condition %}
+[i]{{ sym.symbols.optional }} Only if {{ mod.condition.text }}[/i]
+
+{% endif %}
 {% if mod.docs.summary %}
 {{ mod.docs.summary | markup }}
+
 {% endif %}
 {% if mod.docs.body %}
 {{ mod.docs.body | markup }}
-{% endif %}
-{% if options.files or options.steps %}
-{% for archive in mod.archives %}
-{% if options.files and (archive.file_name or archive.condition) %}
-File: {% if archive.nexus %}[url={{ archive.nexus.file_url }}]{{ archive.file_name or archive.nexus.file_id }}[/url]{% else %}{{ archive.file_name or archive.path }}{% endif %}{% if archive.condition %} [i](only if {{ archive.condition.text }})[/i]{% endif %}
 
 {% endif %}
-{% if options.steps and archive.instructions %}
+{% if mod.merge %}
+{{ sym.symbols.merge }} Merges {{ mod.merge.sources | map(attribute="plugin") | join(", ") }} into {{ mod.merge.output }}.
+
+{% endif %}
+{% if options.steps %}
+{% set rows = namespace(n=0) %}
+{% for archive in mod.archives %}{% set rows.n = rows.n + (archive.instructions | length) + (1 if archive.condition else 0) %}{% endfor %}
+{% set rows.n = rows.n + (mod.steps | length) %}
+{% if rows.n %}
 [list]
+{% for archive in mod.archives %}
+{% set mark = m.superscript(loop.index) if many else "" %}
+{% if archive.condition %}
+[*]{{ sym.symbols.optional }} {{ sym.symbols.download }}{{ mark }} only if {{ archive.condition.text }}
+{% endif %}
 {% for line in archive.instructions %}
-[*]{{ line | markup }}
+[*]{{ sym.symbols[line.kind] }}{{ mark }} {{ line.text | markup }}
 {% endfor %}
-[/list]
-{% endif %}
 {% endfor %}
-{% endif %}
-{% if options.steps and mod.steps %}
-[i]After installing:[/i]
-[list]
 {% for step in mod.steps %}
-[*]{{ step.text | markup }}{{ " [i](only if " ~ step.condition.text ~ ")[/i]" if step.condition }}
+[*]{{ sym.symbols[step.kind] }} {{ step.text | markup }}{{ " [i](" ~ sym.symbols.optional ~ " only if " ~ step.condition.text ~ ")[/i]" if step.condition }}
 {% if step.code %}
 [code]{{ step.code | trim }}[/code]
 {% endif %}
 {% endfor %}
 [/list]
+{% endif %}
 {% endif %}
 {{ m.images(mod.docs, "mod " ~ mod.id) }}

@@ -46,6 +46,12 @@ pub struct Document {
     pub entries: Vec<Entry>,
     pub load_order: Vec<PluginDoc>,
     pub mod_count: usize,
+    /// Every kind of thing the guide asks of its reader, in the order first
+    /// met: instruction and step kinds, plus `optional` (a mod with a
+    /// condition), `manual` (an archive to fetch by hand) and `merge`. An
+    /// exporter that marks kinds with symbols prints a key from this, listing
+    /// only what the guide uses.
+    pub kinds: Vec<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -97,9 +103,9 @@ pub struct ModDoc {
     pub anchor: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
-    /// The mod's Nexus page, from its first Nexus archive.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub nexus: Option<NexusDoc>,
+    /// The Nexus pages its archives come from, each once, in archive order.
+    /// Usually one; a mod built from several pages' files has several.
+    pub pages: Vec<NexusDoc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<ConditionDoc>,
     pub docs: Docs,
@@ -141,7 +147,7 @@ pub struct ArchiveDoc {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<ConditionDoc>,
     /// Installer choices and the like, in words; empty to install it as is.
-    pub instructions: Vec<String>,
+    pub instructions: Vec<describe::Instruction>,
     /// The archive entry as the modlist has it, for templates that want the
     /// details rather than the sentences.
     pub raw: CompiledArchive,
@@ -161,6 +167,8 @@ pub struct NexusFileDoc {
 pub struct StepDoc {
     /// The action's name in the modlist, e.g. `ini_set`.
     pub action: String,
+    /// What sort of step it is, for symbols; see [`describe::Instruction`].
+    pub kind: String,
     pub text: String,
     /// Literal text to go with it: an INI block, a file's contents.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -254,6 +262,7 @@ pub fn build_document(
         close_section(&mut open, &mut root);
     }
 
+    let kinds = kinds_used(&collect_kinds(&root));
     Ok(Document {
         document_version: DOCUMENT_VERSION,
         generator: format!("mudcrab {}", env!("CARGO_PKG_VERSION")),
@@ -278,7 +287,43 @@ pub fn build_document(
         entries: root,
         load_order: load_order(modlist, plan),
         mod_count,
+        kinds,
     })
+}
+
+fn collect_kinds(entries: &[Entry]) -> Vec<String> {
+    let mut out = Vec::new();
+    for entry in entries {
+        match entry {
+            Entry::Section(section) => out.extend(collect_kinds(&section.entries)),
+            Entry::Mod(m) => {
+                if m.condition.is_some() {
+                    out.push("optional".to_string());
+                }
+                for archive in &m.archives {
+                    if archive.source == "manual" {
+                        out.push("manual".to_string());
+                    }
+                    out.extend(archive.instructions.iter().map(|i| i.kind.to_string()));
+                }
+                if m.merge.is_some() {
+                    out.push("merge".to_string());
+                }
+                out.extend(m.steps.iter().map(|step| step.kind.clone()));
+            }
+        }
+    }
+    out
+}
+
+fn kinds_used(all: &[String]) -> Vec<String> {
+    let mut seen: Vec<String> = Vec::new();
+    for kind in all {
+        if !seen.contains(kind) {
+            seen.push(kind.clone());
+        }
+    }
+    seen
 }
 
 fn close_section(open: &mut Vec<Section>, root: &mut Vec<Entry>) {
@@ -355,6 +400,7 @@ fn mod_doc(
         let step = describe::action(&action);
         steps.push(StepDoc {
             action: action.name().to_string(),
+            kind: step.kind.to_string(),
             text: step.text,
             code: step.code,
             condition: condition
@@ -371,14 +417,19 @@ fn mod_doc(
         title: entry.docs.title.clone().unwrap_or_else(|| entry.id.clone()),
         id: entry.id.clone(),
         mod_type: entry.mod_type,
-        nexus: archive_docs
-            .iter()
-            .find_map(|a| a.nexus.as_ref())
-            .map(|n| NexusDoc {
-                game: n.game.clone(),
-                mod_id: n.mod_id.clone(),
-                mod_url: n.mod_url.clone(),
-            }),
+        pages: {
+            let mut pages: Vec<NexusDoc> = Vec::new();
+            for n in archive_docs.iter().filter_map(|a| a.nexus.as_ref()) {
+                if !pages.iter().any(|p| p.mod_url == n.mod_url) {
+                    pages.push(NexusDoc {
+                        game: n.game.clone(),
+                        mod_id: n.mod_id.clone(),
+                        mod_url: n.mod_url.clone(),
+                    });
+                }
+            }
+            pages
+        },
         condition: match planned {
             Some(_) => None,
             None => entry

@@ -17,9 +17,13 @@ help = "List the top-level sections, linked, before the first one"
 default = true
 help = "List the questions the list asks (its inputs), with their defaults"
 
+[options.key]
+default = true
+help = "Explain the symbols the guide uses, before the contents"
+
 [options.files]
 default = true
-help = "Name each mod's file(s), linked to the Nexus files tab"
+help = "Link each mod's Nexus page and the file(s) to download"
 
 [options.steps]
 default = true

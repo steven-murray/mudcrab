@@ -86,16 +86,28 @@ The document's outline:
 - `doc.entries`: the top level, each with `kind` either `"section"` or `"mod"`.
 - A section: `name` (as MO2 shows it), `title`, `path`, `depth`, `anchor`,
   `docs`, `entries`.
-- A mod: `id`, `title`, `anchor`, `nexus` (`mod_url`), `condition` (`text`, as a
-  reader would say it, and `expr`), `docs`, `plugins`, `archives`, `steps`,
-  `merge`.
+- A mod: `id`, `title`, `anchor`, `pages` (each Nexus page its archives come
+  from, with `mod_url`), `condition` (`text`, as a reader would say it, and
+  `expr`), `docs`, `plugins`, `archives`, `steps`, `merge`.
 - An archive: `file_name`, `source`, `nexus` (`file_url`, ids), `url`,
-  `condition`, `instructions` (installer choices and the like, in words), and
-  `raw` (the entry as the modlist has it).
-- A step: `action`, `text`, `code` (literal text to go with it), `condition`,
-  `raw`.
+  `condition`, `instructions` (each a `kind` and `text`: installer choices and
+  the like, in words), and `raw` (the entry as the modlist has it).
+- A step: `action`, `kind`, `text`, `code` (literal text to go with it),
+  `condition`, `raw`.
+- `doc.kinds`: every kind the guide uses, for a key.
 
-`docs` anywhere has `title`, `summary`, `body`, `footer`, `images`, `links`, and any other
+## Symbols
+
+Every instruction and step has a `kind` naming the activity -- `bain`, `fomod`,
+`ini`, `qac`, `hide`, `bsa`, ... (the full list is in
+`src/export/describe.rs`) -- plus `optional`, `manual` and `merge` for mods
+and archives. The built-in exporters mark each with a symbol (🧹 for QAC, ⚙️
+for an INI edit) and open with a key listing only the symbols the guide uses.
+The table lives in each exporter's `symbols.j2`: override that one file to
+change them.
+
+`docs` anywhere has `title`, `summary`, `body`, `footer`, `images`, `links`
+(a mod's links appear beside its title, as 🌐, in the built-in exporters), and any other
 key the author added: a custom exporter is free to use fields only its own
 lists have.
 

@@ -1,0 +1,43 @@
+{#- One symbol per kind of thing the guide asks of its reader, and what it
+    means. Override this file to change them; `doc.kinds` says which a guide
+    uses, so the key lists only those. -#}
+{% set symbols = {
+  "page": "🌐", "download": "⬇️", "manual": "✋", "optional": "❓", "merge": "🔗",
+  "inner_archive": "🪆", "bain": "📋", "fomod": "🧙", "data_folder": "📁", "subdir": "🗂️",
+  "include": "✅", "exclude": "🚫", "game_root": "🎮",
+  "ini": "⚙️", "qac": "🧹", "bsa": "📦", "plugin": "🧩", "delete": "🗑️", "hide": "🙈",
+  "move": "↪️", "extract": "📂", "records": "✂️", "texture": "🖼️", "write": "📝",
+} %}
+{#- The order the key lists them in: getting the files, installing them,
+    then what to do afterwards. -#}
+{% set order = [
+  "page", "download", "manual", "optional", "merge",
+  "inner_archive", "bain", "fomod", "data_folder", "subdir", "include", "exclude", "game_root",
+  "ini", "qac", "bsa", "plugin", "delete", "hide", "move", "extract", "records", "texture", "write",
+] %}
+{% set meanings = {
+  "page": "the mod's page, on Nexus or wherever the author hosts it",
+  "download": "the file to download (its entry on the Nexus files tab)",
+  "manual": "a file to download by hand, from wherever the author hosts it",
+  "optional": "optional: depends on an answer to one of the choices above",
+  "merge": "a plugin merged from other mods' plugins",
+  "inner_archive": "the archive holds another archive; install that",
+  "bain": "choose packages in the BAIN installer",
+  "fomod": "choose options in the FOMOD installer",
+  "data_folder": "install one folder of the archive as the mod",
+  "subdir": "install into a folder inside the mod",
+  "include": "install only some of the files",
+  "exclude": "leave some files out",
+  "game_root": "files for the game folder, deployed by Root Builder",
+  "ini": "edit an INI setting",
+  "qac": "clean a plugin with xEdit's Quick Auto Clean",
+  "bsa": "pack loose files into a BSA",
+  "plugin": "create an empty plugin to load a BSA",
+  "delete": "delete files",
+  "hide": "hide files (MO2: rename to .mohidden)",
+  "move": "move a file",
+  "extract": "extract a BSA",
+  "records": "remove records from a plugin in xEdit",
+  "texture": "convert textures",
+  "write": "create a file",
+} %}

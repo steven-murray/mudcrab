@@ -77,16 +77,36 @@ fn code_list(items: &[String]) -> String {
         .join(", ")
 }
 
+/// One thing to do, in words, with the kind of thing it is.
+///
+/// The kind is what an exporter keys its symbols on (`qac` gets a broom, say),
+/// so it names the activity rather than the action that implements it: an
+/// `ini_set` and an `ini_append_block` are both `ini`. Kinds:
+///
+/// - installing: `inner_archive`, `bain`, `fomod`, `data_folder`, `subdir`,
+///   `include`, `exclude`, `game_root`;
+/// - afterwards: `ini`, `qac`, `bsa`, `plugin`, `delete`, `hide`, `move`,
+///   `extract`, `records`, `texture`, `write`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Instruction {
+    pub kind: &'static str,
+    pub text: String,
+}
+
 /// What to do with an archive beyond "install it": installer choices, the
 /// folder to take, the files to leave out. Empty for an archive installed as
 /// it comes.
-pub fn archive_instructions(archive: &CompiledArchive) -> Vec<String> {
+pub fn archive_instructions(archive: &CompiledArchive) -> Vec<Instruction> {
     let mut out = Vec::new();
+    let mut push = |kind: &'static str, text: String| out.push(Instruction { kind, text });
     if let Some(inner) = &archive.inner_archive {
-        out.push(format!(
-            "The mod is the archive inside it, {}; install that.",
-            code(inner)
-        ));
+        push(
+            "inner_archive",
+            format!(
+                "The mod is the archive inside it, {}; install that.",
+                code(inner)
+            ),
+        );
     }
     if !archive.bain_subpackages.is_empty() {
         let names: Vec<String> = archive
@@ -94,10 +114,10 @@ pub fn archive_instructions(archive: &CompiledArchive) -> Vec<String> {
             .iter()
             .map(|s| s.name().to_string())
             .collect();
-        out.push(format!(
-            "In the BAIN installer, select {}.",
-            code_list(&names)
-        ));
+        push(
+            "bain",
+            format!("In the BAIN installer, select {}.", code_list(&names)),
+        );
     }
     for selection in &archive.fomod_selections {
         let chosen = if selection.options.is_empty() {
@@ -110,32 +130,54 @@ pub fn archive_instructions(archive: &CompiledArchive) -> Vec<String> {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        out.push(format!(
-            "In the installer's “{}” step, under “{}”, choose {chosen}.",
-            selection.step, selection.group
-        ));
+        push(
+            "fomod",
+            format!(
+                "In the installer's “{}” step, under “{}”, choose {chosen}.",
+                selection.step, selection.group
+            ),
+        );
     }
     if let Some(folder) = &archive.data_folder {
-        out.push(format!(
-            "Install the contents of {} as the mod's data folder.",
-            code(folder)
-        ));
+        push(
+            "data_folder",
+            format!(
+                "Install the contents of {} as the mod's data folder.",
+                code(folder)
+            ),
+        );
     }
     if let Some(subdir) = &archive.target_subdir {
-        out.push(format!("Install it into {} inside the mod.", code(subdir)));
+        push(
+            "subdir",
+            format!("Install it into {} inside the mod.", code(subdir)),
+        );
     }
     if !archive.include.is_empty() {
-        out.push(format!("Install only {}.", code_list(&archive.include)));
+        push(
+            "include",
+            format!("Install only {}.", code_list(&archive.include)),
+        );
     }
     if !archive.exclude.is_empty() {
-        out.push(format!("Leave out {}.", code_list(&archive.exclude)));
+        push(
+            "exclude",
+            format!("Leave out {}.", code_list(&archive.exclude)),
+        );
     }
     if !archive.game_root_files.is_empty() {
-        out.push(format!(
-            "{} go{} in the game folder, next to `Oblivion.exe` (Root Builder deploys them from the mod's `root/`).",
-            code_list(&archive.game_root_files),
-            if archive.game_root_files.len() == 1 { "es" } else { "" }
-        ));
+        push(
+            "game_root",
+            format!(
+                "{} go{} in the game folder, next to `Oblivion.exe` (Root Builder deploys them from the mod's `root/`).",
+                code_list(&archive.game_root_files),
+                if archive.game_root_files.len() == 1 {
+                    "es"
+                } else {
+                    ""
+                }
+            ),
+        );
     }
     out
 }
@@ -143,12 +185,35 @@ pub fn archive_instructions(archive: &CompiledArchive) -> Vec<String> {
 /// One step, and a block of literal text that goes with it (an INI block to
 /// append, a file's contents).
 pub struct Step {
+    pub kind: &'static str,
     pub text: String,
     pub code: Option<String>,
 }
 
+/// The kind of an action, as [`Instruction::kind`].
+pub fn action_kind(action: &ModAction) -> &'static str {
+    match action {
+        ModAction::IniSet(_) | ModAction::IniTweak(_) | ModAction::IniAppendBlock(_) => "ini",
+        ModAction::Qac(_) => "qac",
+        ModAction::PackBsa(_) => "bsa",
+        ModAction::CreateDummyPlugin(_) => "plugin",
+        ModAction::FilePrune(_) => "delete",
+        ModAction::FileHide(_) => "hide",
+        ModAction::FileMove(_) => "move",
+        ModAction::ExtractBsa(_) => "extract",
+        ModAction::DeleteRecords(_) => "records",
+        ModAction::DdsDecompress(_) => "texture",
+        ModAction::WriteFile(_) => "write",
+    }
+}
+
 pub fn action(action: &ModAction) -> Step {
-    let plain = |text: String| Step { text, code: None };
+    let kind = action_kind(action);
+    let plain = |text: String| Step {
+        kind,
+        text,
+        code: None,
+    };
     match action {
         ModAction::IniSet(set) => {
             let section = set
@@ -173,6 +238,7 @@ pub fn action(action: &ModAction) -> Step {
             code(&tweak.value.to_string())
         )),
         ModAction::IniAppendBlock(block) => Step {
+            kind,
             text: format!("Add this to the end of {}:", code(&block.file)),
             code: Some(block.block.clone()),
         },
@@ -235,6 +301,7 @@ pub fn action(action: &ModAction) -> Step {
             code_list(&dds.paths)
         )),
         ModAction::WriteFile(write) => Step {
+            kind,
             text: format!("Create {} containing:", code(&write.path)),
             code: Some(write.content.clone()),
         },

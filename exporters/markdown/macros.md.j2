@@ -31,3 +31,29 @@
 
 </details>
 {% endmacro %}
+
+{#- ¹²³ for telling a mod's archives apart. -#}
+{% macro superscript(n) %}{{ n | string | replace("0","⁰") | replace("1","¹") | replace("2","²") | replace("3","³") | replace("4","⁴") | replace("5","⁵") | replace("6","⁶") | replace("7","⁷") | replace("8","⁸") | replace("9","⁹") }}{% endmacro %}
+
+{#- An archive's download link: ⬇️ to its Nexus file, its URL, or ✋ and its
+    name when it has to be fetched by hand. `n` numbers a mod's archives. -#}
+{% macro download(archive, n, symbols) %}
+{%- set mark = superscript(n) if n else "" -%}
+{%- set name = archive.file_name or archive.path -%}
+{%- if archive.nexus -%}
+[{{ symbols.download }}{{ mark }}]({{ archive.nexus.file_url }} {{ name | tojson }})
+{%- elif archive.url -%}
+[{{ symbols.download }}{{ mark }}]({{ archive.url }} {{ name | tojson }})
+{%- elif archive.source == "manual" -%}
+{{ symbols.manual }}{{ mark }} `{{ name }}`
+{%- endif -%}
+{% endmacro %}
+
+{#- The key to the symbols this guide uses. -#}
+{% macro key(kinds, sym, steps) %}
+| | |
+|---|---|
+{% for kind in sym.order if kind in ["page", "download"] or (kind in kinds and (steps or kind in ["manual", "optional", "merge"])) %}
+| {{ sym.symbols[kind] }} | {{ sym.meanings[kind] }} |
+{% endfor %}
+{% endmacro %}
