@@ -15,6 +15,8 @@ pub struct DownloadSettings {
     /// Read-only directories that may already hold the archives, tried in order
     /// before anything goes over the network. See `link_local_archive`.
     pub archive_search_paths: Vec<PathBuf>,
+    /// How many archives to fetch at once. At least 1.
+    pub parallel: usize,
 }
 
 #[derive(Debug)]
@@ -41,6 +43,9 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     // at the first one turns finding them into one round trip each.
     let mut errors: Vec<String> = Vec::new();
 
+    // Collected first, then fetched `settings.parallel` at a time. Each job has
+    // its own destination, so concurrent jobs never write the same file.
+    let mut jobs: Vec<Job<'_>> = Vec::new();
     for mod_entry in &plan.mods {
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
             skipped += 1;
@@ -50,63 +55,75 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             if !archive.build.is_empty() {
                 for (layer_index, layer) in archive.build.iter().enumerate() {
-                    let destination = settings.cache_dir.join(build_layer_cache_file_name(
-                        &mod_entry.id,
-                        archive_index,
-                        layer_index,
-                        &layer.path,
-                    ));
                     // Build layers carry no `file_name`, so there is nothing to
                     // match a local copy against; they always take the network path.
-                    let result = download_with_retry(
-                        &client,
-                        &layer.path,
-                        None,
-                        layer.download_handler.as_deref(),
-                        &destination,
-                        settings,
-                    )
-                    .await;
-                    match result {
-                        Ok(outcome) => {
-                            downloaded += 1;
-                            log_download_outcome(&mod_entry.id, &layer.path, &outcome);
-                        }
-                        Err(err) => errors.push(format!(
-                            "mod '{}' archive {} build layer {}: {err}",
-                            mod_entry.id, archive_index, layer_index
+                    jobs.push(Job {
+                        mod_id: &mod_entry.id,
+                        label: format!("archive {archive_index} build layer {layer_index}"),
+                        path: &layer.path,
+                        file_name: None,
+                        handler: layer.download_handler.as_deref(),
+                        destination: settings.cache_dir.join(build_layer_cache_file_name(
+                            &mod_entry.id,
+                            archive_index,
+                            layer_index,
+                            &layer.path,
                         )),
-                    }
+                    });
                 }
             } else {
                 let path = archive.path.as_deref().unwrap_or_default();
-                let destination = settings
-                    .cache_dir
-                    .join(cache_file_name(&mod_entry.id, archive_index, path));
-                let result = download_with_retry(
-                    &client,
-                    path,
-                    archive.file_name.as_deref(),
-                    archive.download_handler.as_deref(),
-                    &destination,
-                    settings,
-                )
-                .await;
-                match result {
-                    Ok(outcome) => {
-                        downloaded += 1;
-                        log_download_outcome(&mod_entry.id, path, &outcome);
-                    }
-                    Err(err) => errors.push(format!(
-                        "mod '{}' archive {} ({}): {err}",
-                        mod_entry.id,
+                jobs.push(Job {
+                    mod_id: &mod_entry.id,
+                    label: format!(
+                        "archive {} ({})",
                         archive_index,
                         archive.file_name.as_deref().unwrap_or(path)
-                    )),
-                }
+                    ),
+                    path,
+                    file_name: archive.file_name.as_deref(),
+                    handler: archive.download_handler.as_deref(),
+                    destination: settings
+                        .cache_dir
+                        .join(cache_file_name(&mod_entry.id, archive_index, path)),
+                });
             }
         }
     }
+
+    use futures_util::stream::{self, StreamExt};
+    let results: Vec<_> = stream::iter(jobs)
+        .map(|job| {
+            let client = &client;
+            async move {
+                let result = download_with_retry(
+                    client,
+                    job.path,
+                    job.file_name,
+                    job.handler,
+                    &job.destination,
+                    settings,
+                )
+                .await;
+                (job, result)
+            }
+        })
+        .buffer_unordered(settings.parallel.max(1))
+        .collect()
+        .await;
+
+    for (job, result) in results {
+        match result {
+            Ok(outcome) => {
+                downloaded += 1;
+                log_download_outcome(job.mod_id, job.path, &outcome);
+            }
+            Err(err) => errors.push(format!("mod '{}' {}: {err}", job.mod_id, job.label)),
+        }
+    }
+    // Completion order is arbitrary with more than one in flight; the report
+    // should not be.
+    errors.sort();
 
     // Emitted before the bail, as in `check`: the run that fails is the run
     // whose summary is worth having, because it is the one naming dead links.
@@ -127,6 +144,17 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     }
 
     Ok(())
+}
+
+/// One archive (or build layer) to fetch.
+struct Job<'a> {
+    mod_id: &'a str,
+    /// Which archive of the mod, for error messages.
+    label: String,
+    path: &'a str,
+    file_name: Option<&'a str>,
+    handler: Option<&'a str>,
+    destination: PathBuf,
 }
 
 /// Whether a cached archive no longer matches the file it was adopted from.
@@ -908,6 +936,7 @@ mod tests {
             nexus_api_base: Some(format!("{}/v1", server.uri())),
             filter: ModFilter::default(),
             archive_search_paths: Vec::new(),
+            parallel: 4,
         };
 
         let plan = PersonalizedPlan {
@@ -983,6 +1012,7 @@ mod tests {
             nexus_api_base: None,
             filter: ModFilter::default(),
             archive_search_paths: Vec::new(),
+            parallel: 4,
         };
 
         let plan = PersonalizedPlan {

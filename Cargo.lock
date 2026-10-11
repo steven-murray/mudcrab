@@ -1126,6 +1126,7 @@ dependencies = [
  "assert_cmd",
  "clap",
  "flate2",
+ "futures-util",
  "globset",
  "indexmap",
  "md5",

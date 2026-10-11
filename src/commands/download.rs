@@ -12,10 +12,6 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    if args.parallel > 1 {
-        tracing::warn!(parallel = args.parallel, "parallel downloads are not implemented yet");
-    }
-
     let cache_dir = args
         .cache
         .clone()
@@ -27,6 +23,7 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         nexus_api_base: std::env::var("NEXUS_API_BASE").ok(),
         filter: args.filter.to_mod_filter(),
         archive_search_paths: args.archive_sources.archive_search_paths.clone(),
+        parallel: args.parallel,
     };
 
     config::download::download_all(&plan, &settings).await?;
