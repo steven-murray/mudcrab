@@ -83,6 +83,7 @@ tools and no API key. See
 
 | | |
 | --- | --- |
+| [docs/getting-started.md](docs/getting-started.md) | **Start here**: installing a modlist, from nothing to a playable game |
 | [docs/merge-standalone.md](docs/merge-standalone.md) | Using the merge engine on its own, as a zMerge replacement |
 | [docs/usage.md](docs/usage.md) | Command reference, and what each action does |
 | [docs/modlist-format.md](docs/modlist-format.md) | The TOML format |

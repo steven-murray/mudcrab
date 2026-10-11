@@ -203,8 +203,14 @@ Currently: `docs/usage.md` (command reference, good),
 
 Needed:
 
-1. **Getting started** — install mudcrab, install a published modlist, in about
-   a page. This is the document most readers will need and it does not exist.
+1. ~~**Getting started**~~ — done: [getting-started.md](getting-started.md).
+   Writing it turned up six rough edges, fixed in the commands rather than
+   documented around: `install` takes the game folder from the MO2 instance,
+   finds `Oblivion.ini` in Windows' Documents, and turns on the profile's own
+   INI files (without which MO2 ignores every INI edit); `setup-tools` writes
+   `tools.toml` where the other commands look; a free Nexus account's 403 now
+   says which page to download from by hand; and Enter takes a choice's
+   default in `query`.
 2. **Authoring guide** — writing a modlist from scratch: `inspect` an archive,
    `add` a mod, layouts, actions, sections, the compile/query/download/install
    loop. Worked example, small but real.
