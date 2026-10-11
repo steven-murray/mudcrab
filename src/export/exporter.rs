@@ -298,9 +298,12 @@ impl Exporter {
         output: Option<&Path>,
     ) -> anyhow::Result<Vec<String>> {
         let state = Arc::new(Mutex::new(RenderState::default()));
-        let env = self.environment(state.clone())?;
+        let mut env = self.environment(state.clone())?;
         let doc = Value::from_serialize(document);
         let options = Value::from_serialize(options);
+        // Also a global, so macros in imported templates -- which do not see
+        // the caller's context -- can follow options too.
+        env.add_global("options", options.clone());
         let exporter = minijinja::context! { name => self.name.clone(), markup => self.markup };
 
         let mut rendered: Vec<(Option<String>, String)> = Vec::new();

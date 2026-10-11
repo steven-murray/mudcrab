@@ -24,6 +24,12 @@ for_each = "section"
 template = "load-order.md.j2"
 output = "load-order.md"
 
+# imgur, where many guides keep their pictures, refuses images asked for by
+# some pages (a local preview, for one) but serves any request with no referrer.
+[options.image_no_referrer]
+default = true
+help = "Ask browsers not to send a referrer for images; some image hosts refuse some referrers"
+
 [options.theme]
 default = "minima"
 help = "Jekyll theme; GitHub Pages supports minima and the jekyll-theme-* themes"

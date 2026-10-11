@@ -713,6 +713,16 @@ writes a Jekyll site into the `-o` directory -- an index, a page per top-level
 section, the load order -- with local images copied into `images/`; put it in a
 repository's `docs/` folder and turn on GitHub Pages.
 
+To preview a site before publishing it, with Jekyll installed
+(`gem install --user-install jekyll minima jekyll-relative-links`):
+
+```bash
+jekyll serve -s <site> --config <site>/_config.yml,<extra>.yml
+```
+
+where `<extra>.yml` turns on what GitHub Pages enables by default:
+`plugins: [jekyll-relative-links]` (links between pages are written as `.md`).
+
 Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
 modlist; `--list-options` shows them) and can be customised or replaced by your
 own: see [exporters.md](exporters.md).

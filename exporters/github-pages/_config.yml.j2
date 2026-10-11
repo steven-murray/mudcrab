@@ -4,3 +4,7 @@ title: {{ (doc.docs.title or doc.name) | tojson }}
 description: {{ doc.docs.summary | tojson }}
 {% endif %}
 theme: {{ options.theme }}
+# Themes like minima put every page in the header unless told which; a guide
+# has dozens. The site title already links home.
+header_pages:
+  - load-order.md

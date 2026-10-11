@@ -9,6 +9,10 @@ images = "url"
 [[pages]]
 template = "guide.md.j2"
 
+[options.image_no_referrer]
+default = false
+help = "Ask browsers not to send a referrer for images (kramdown syntax: for sites, not GitHub READMEs). Image hosts such as imgur refuse some referrers"
+
 [options.contents]
 default = true
 help = "List the top-level sections, linked, before the first one"

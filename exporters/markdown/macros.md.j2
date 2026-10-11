@@ -5,7 +5,7 @@
 {% for image in docs.images %}
 {% set src = image | image_src(place) %}
 {% if src %}
-![{{ image.caption or "" }}]({{ src }}){{ "\n*" ~ image.caption ~ "*" if image.caption }}
+![{{ image.caption or "" }}]({{ src }}){{ '{: referrerpolicy="no-referrer"}' if options.image_no_referrer }}{{ "\n*" ~ image.caption ~ "*" if image.caption }}
 
 {% endif %}
 {% endfor %}

@@ -74,7 +74,7 @@ A `site` exporter's `static/` folder is copied into the output as it stands
 | Name | What |
 |---|---|
 | `doc` | The document: the same thing `--to json` writes. Run that on your modlist to see every field. |
-| `options` | Option values after defaults, `[export.<name>]` and `--opt`. |
+| `options` | Option values after defaults, `[export.<name>]` and `--opt`. Also a global, so macros in imported templates can read it. |
 | `exporter` | `name`, `markup`. |
 | `section` | The current top-level section, on a `for_each = "section"` page. |
 
