@@ -368,6 +368,63 @@ pub fn write_meta(archive_path: &Path, archive: &ArchiveRef<'_>) -> anyhow::Resu
     Ok(())
 }
 
+/// Whether an archive's `.meta` says what it is: Nexus ids that are not zero,
+/// or a URL. MO2 writes `modID=3`/`fileID=0`-style placeholders for downloads
+/// it could not identify, which find nothing.
+pub fn meta_is_informative(archive: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(meta_path(archive)) else {
+        return false;
+    };
+    let meta = parse_meta(&text);
+    let id = |key: &str| meta.get(key).is_some_and(|v| !v.is_empty() && v != "0");
+    (id("modid") && id("fileid")) || meta.get("url").is_some_and(|url| !url.is_empty())
+}
+
+/// Give an archive a `.meta` that identifies it: write one if there is none,
+/// or fill the ids into an uninformative one, keeping its other lines.
+pub fn fill_meta(archive_path: &Path, archive: &ArchiveRef<'_>) -> anyhow::Result<()> {
+    let path = meta_path(archive_path);
+    if !path.exists() {
+        return write_meta(archive_path, archive);
+    }
+    if meta_is_informative(archive_path) {
+        return Ok(());
+    }
+    let mut keys: Vec<(&str, String)> = Vec::new();
+    if let Some((game, mod_id, file_id)) = archive.nexus_ids() {
+        keys.push(("gameName", mo2_game_name(game).unwrap_or(game).to_string()));
+        keys.push(("modID", mod_id.to_string()));
+        keys.push(("fileID", file_id.to_string()));
+    } else if archive.source.starts_with("http://") || archive.source.starts_with("https://") {
+        keys.push(("url", archive.source.to_string()));
+    } else {
+        return Ok(());
+    }
+    let text = std::fs::read_to_string(&path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    let newline = if text.contains("\r\n") { "\r\n" } else { "\n" };
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
+    for (key, value) in keys {
+        let found = lines.iter().position(|line| {
+            line.split_once('=').is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+        });
+        let assignment = format!("{key}={value}");
+        match found {
+            Some(index) => lines[index] = assignment,
+            None => {
+                let at = lines
+                    .iter()
+                    .position(|line| line.trim().eq_ignore_ascii_case("[General]"))
+                    .map_or(lines.len(), |index| index + 1);
+                lines.insert(at, assignment);
+            }
+        }
+    }
+    let mut out = lines.join(newline);
+    out.push_str(newline);
+    std::fs::write(&path, out).map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
+}
+
 /// Record that something was written into `dir`, so the next lookup sees it.
 pub fn note_written(dir: &Path) {
     invalidate(dir);

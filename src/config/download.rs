@@ -576,6 +576,44 @@ fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
     scored.into_iter().take(3).map(|(_, path)| path).collect()
 }
 
+/// The real filenames of a Nexus mod's files, by file id. One request; works
+/// for any account, unlike download links.
+pub async fn nexus_file_names(
+    client: &Client,
+    api_base: Option<&str>,
+    api_key: &str,
+    game: &str,
+    mod_id: &str,
+) -> anyhow::Result<std::collections::HashMap<String, String>> {
+    #[derive(serde::Deserialize)]
+    struct Files {
+        files: Vec<File>,
+    }
+    #[derive(serde::Deserialize)]
+    struct File {
+        file_id: u64,
+        file_name: String,
+    }
+    let base = api_base.unwrap_or("https://api.nexusmods.com/v1");
+    let url = format!("{}/games/{game}/mods/{mod_id}/files.json", base.trim_end_matches('/'));
+    let files = client
+        .get(&url)
+        .header("apikey", api_key)
+        .send()
+        .await
+        .map_err(|err| anyhow::anyhow!("nexus api request failed: {err}"))?
+        .error_for_status()
+        .map_err(|err| anyhow::anyhow!("nexus api returned error for {game}/{mod_id}: {err}"))?
+        .json::<Files>()
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to parse nexus files list: {err}"))?;
+    Ok(files
+        .files
+        .into_iter()
+        .map(|file| (file.file_id.to_string(), file.file_name))
+        .collect())
+}
+
 #[derive(Debug, serde::Deserialize)]
 struct NexusDownloadLink {
     #[serde(default, alias = "URI")]

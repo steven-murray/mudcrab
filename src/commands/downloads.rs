@@ -2,14 +2,62 @@
 
 use crate::cli::{DownloadsCommand, DownloadsTidyArgs};
 use crate::config::downloads_tidy::{self, Step};
+use std::collections::HashMap;
 
-pub fn run(command: DownloadsCommand) -> anyhow::Result<()> {
+pub async fn run(command: DownloadsCommand) -> anyhow::Result<()> {
     match command {
-        DownloadsCommand::Tidy(args) => tidy(args),
+        DownloadsCommand::Tidy(args) => tidy(args).await,
     }
 }
 
-fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
+/// Real names for Nexus archives nothing on disk names, from the API's files
+/// list: one request per mod. Skipped, with a note, without an API key.
+async fn nexus_names(
+    dir: &std::path::Path,
+    plan: &crate::config::schema::PersonalizedPlan,
+) -> anyhow::Result<HashMap<String, String>> {
+    let wanted: Vec<String> = downloads_tidy::unnamed_sources(dir, plan)?
+        .into_iter()
+        .filter(|source| source.starts_with("nexus:"))
+        .collect();
+    if wanted.is_empty() {
+        return Ok(HashMap::new());
+    }
+    let Ok(key) = std::env::var("NEXUS_API_KEY") else {
+        eprintln!(
+            "note: {} archive(s) have no recorded name; set NEXUS_API_KEY to look them up",
+            wanted.len()
+        );
+        return Ok(HashMap::new());
+    };
+    let base = std::env::var("NEXUS_API_BASE").ok();
+    let client = reqwest::Client::new();
+    let mut by_mod: HashMap<(String, String), HashMap<String, String>> = HashMap::new();
+    let mut out = HashMap::new();
+    for source in wanted {
+        let Some((game, mod_id, file_id)) = crate::config::archive_store::ArchiveRef::new(&source, None).nexus_ids() else {
+            continue;
+        };
+        let key_pair = (game.to_string(), mod_id.to_string());
+        if !by_mod.contains_key(&key_pair) {
+            match crate::config::download::nexus_file_names(&client, base.as_deref(), &key, game, mod_id).await {
+                Ok(files) => {
+                    by_mod.insert(key_pair.clone(), files);
+                }
+                Err(err) => {
+                    eprintln!("note: {source}: {err}");
+                    by_mod.insert(key_pair.clone(), HashMap::new());
+                }
+            }
+        }
+        if let Some(name) = by_mod[&key_pair].get(file_id) {
+            out.insert(source.clone(), name.clone());
+        }
+    }
+    Ok(out)
+}
+
+async fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
     let plan = args
         .plan
         .as_ref()
@@ -20,7 +68,11 @@ fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
                 .map_err(|err| anyhow::anyhow!("failed to parse plan {}: {err}", path.display()))
         })
         .transpose()?;
-    let steps = downloads_tidy::plan_tidy(&args.dir, plan.as_ref())?;
+    let names = match &plan {
+        Some(plan) => nexus_names(&args.dir, plan).await?,
+        None => HashMap::new(),
+    };
+    let steps = downloads_tidy::plan_tidy(&args.dir, plan.as_ref(), &names)?;
 
     let name = |path: &std::path::Path| {
         path.file_name()

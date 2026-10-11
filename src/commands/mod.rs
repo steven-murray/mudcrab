@@ -84,6 +84,6 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::NewMerge(args) => new_merge::run(args).await,
         Command::Bsa(command) => bsa::run(command),
         Command::Dds(command) => dds::run(command),
-        Command::Downloads(command) => downloads::run(command),
+        Command::Downloads(command) => downloads::run(command).await,
     }
 }
