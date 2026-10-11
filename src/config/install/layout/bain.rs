@@ -1,7 +1,7 @@
 //! BAIN archive layout: merge selected top-level subpackages into the mod root.
 
 use crate::archive::ArchiveFilters;
-use crate::config::schema::CompiledArchive;
+use crate::config::schema::{BainSubpackage, CompiledArchive};
 use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan, Listing};
 use std::path::Path;
 
@@ -42,7 +42,7 @@ pub(crate) fn plan_bain(
 ) -> anyhow::Result<LayoutPlan> {
     let mut pairs: Vec<(String, String)> = Vec::new();
 
-    for subpackage in &archive.bain_subpackages {
+    for subpackage in archive.bain_subpackages.iter().map(BainSubpackage::name) {
         let mut matched = 0usize;
         for path in paths {
             let Some(rest) = strip_dir_prefix(path, subpackage) else {

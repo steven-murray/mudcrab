@@ -659,6 +659,7 @@ mod tests {
             mod_type: None,
             merge: None,
             archives: vec![CompiledArchive {
+                condition: None,
                 path: Some(archive_path.to_string()),
                 file_name: None,
                 download_handler: None,
@@ -1081,6 +1082,7 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
             download_handler: None,
@@ -1088,7 +1090,7 @@ mod tests {
             data_folder: None,
             target_subdir: None,
             inner_archive: None,
-            bain_subpackages: vec!["00 Option1".to_string(), "01 Option2".to_string()],
+            bain_subpackages: vec!["00 Option1".into(), "01 Option2".into()],
             fomod_selections: Vec::new(),
             build: Vec::new(),
             include: Vec::new(),
@@ -1142,6 +1144,7 @@ mod tests {
         zip.finish().expect("finish zip");
 
         let simple = CompiledArchive {
+            condition: None,
             path: Some("manual:WACv_1beta.7z".to_string()),
             file_name: None,
             download_handler: None,
@@ -1216,6 +1219,7 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
             download_handler: None,
@@ -1272,6 +1276,7 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
             download_handler: None,
@@ -1318,6 +1323,7 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
             download_handler: None,
@@ -1411,6 +1417,7 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            condition: None,
             path: Some("local-fomod.zip".to_string()),
             file_name: None,
             download_handler: None,
@@ -1421,11 +1428,13 @@ mod tests {
             bain_subpackages: Vec::new(),
             fomod_selections: vec![
                 FomodSelection {
+                    condition: None,
                     step: "Fonts".to_string(),
                     group: "Font Size".to_string(),
                     options: vec!["Large".to_string()],
                 },
                 FomodSelection {
+                    condition: None,
                     step: "Custom Options".to_string(),
                     group: "Options".to_string(),
                     options: Vec::new(),

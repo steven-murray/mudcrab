@@ -309,7 +309,39 @@ have no answer, or two). A mod listed in another's `dependencies` must be
 included whenever that one is; `query` refuses a plan where a condition left
 it out, and says which `mod:` condition would keep the two together.
 
-Conditions are resolved by `query`: the plan holds only the mods and actions
-that apply, so a changed answer changes the affected mods' definitions and
-`install` restages them. Conditions cannot yet sit on archives or FOMOD
-selections -- see Phase B of [roadmap.md](roadmap.md).
+### Conditions inside a mod
+
+`if` also sits on an archive, a FOMOD selection row and a BAIN subpackage, so
+one answer can reach every place a choice shows up:
+
+```toml
+[[mods.archives]]
+if = "res == 2k"                # only fetch and install this archive for 2K
+path = "nexus:oblivion/123/456"
+
+[[mods.archives.fomod_selections]]
+if = "res == 1k"
+step = "Textures"
+group = "Resolution"
+options = ["1K"]
+
+[[mods.archives.fomod_selections]]
+if = "res == 2k"
+step = "Textures"
+group = "Resolution"
+options = ["2K"]
+
+[[mods.archives]]
+layout = "bain"
+bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
+```
+
+A FOMOD group whose rows are all left out gets the installer's own default, as
+if it had no row. A mod whose archives are all left out, or a BAIN archive
+whose subpackages all are, is refused by `query`: it would install nothing, and
+the condition belongs on the mod (or the archive) instead.
+
+Conditions are resolved by `query`: the plan holds only the mods, actions,
+archives and selections that apply, with no conditions left in it, so
+`download` fetches only what applies, and a changed answer changes the
+affected mods' definitions and `install` restages them.

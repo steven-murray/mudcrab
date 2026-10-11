@@ -95,9 +95,10 @@ on Windows yet.
 
 ## Phase B — Optional mods, and inputs that earn their keep
 
-**Partly done.** Conditions can ask about mods (B1). `[inputs]` take a declared `default`, `query` takes `--set`,
-conditions sit on actions as well as mods, and `validate` rejects a condition
-naming an undeclared input. MOFAM's first input, `decompress_dxt1_alpha`, gates
+**Mostly done.** `[inputs]` take a declared `default` and `query` takes
+`--set`. Conditions sit on mods, actions, archives, FOMOD rows and BAIN
+subpackages, can ask about other mods, and `validate` rejects one naming an
+undeclared input or mod. MOFAM's first input, `decompress_dxt1_alpha`, gates
 ten `dds_decompress` actions. What is left:
 
 ### B1. ~~Conditions can ask about mods~~ — done
@@ -108,11 +109,11 @@ ten `dds_decompress` actions. What is left:
 `validate` refuses unknown mods and conditions that loop; `query` refuses a
 plan that leaves out a mod another included mod lists in `dependencies`.
 
-### B2. Conditions on archives and FOMOD selections
+### B2. ~~Conditions on archives and FOMOD selections~~ — done
 
-Actions are done. An optional mod is the easy case; "1K or 2K textures?" is one
-input that should reach dozens of archive and FOMOD rows, and `if` is not yet
-available there.
+`if` sits on archive rows, FOMOD selection rows and BAIN subpackages
+(`{ name = "...", if = "..." }`). `query` resolves them, so the plan --
+and `download`, `check` and `install` -- see only what applies.
 
 ### B5. Prove it on MOFAM
 

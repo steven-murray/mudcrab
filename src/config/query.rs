@@ -1,5 +1,5 @@
 use crate::config::schema::{
-    CompiledModlist, InputSpec, InputType, InputValue, PersonalizedMod, PersonalizedPlan,
+    BainSubpackage, CompiledArchive, CompiledModlist, FomodSelection, InputSpec, InputType, InputValue, PersonalizedMod, PersonalizedPlan,
 };
 use crate::config::condition::Condition;
 use std::collections::HashMap;
@@ -49,17 +49,28 @@ pub fn build_plan(
             );
         }
 
-        let mut actions = Vec::new();
-        for action in &entry.actions {
-            let applies = match &action.condition {
+        let applies = |expr: Option<&str>| -> anyhow::Result<bool> {
+            match expr {
                 Some(expr) => Condition::parse(expr)?
                     .eval(&responses, &mut |id| known(&included, id))
-                    .map_err(|err| anyhow::anyhow!("mod {}: {err:#}", entry.id))?,
-                None => true,
-            };
-            if applies {
+                    .map_err(|err| anyhow::anyhow!("mod {}: {err:#}", entry.id)),
+                None => Ok(true),
+            }
+        };
+
+        let mut actions = Vec::new();
+        for action in &entry.actions {
+            if applies(action.condition.as_deref())? {
                 actions.push(action.action.clone());
             }
+        }
+        let archives = resolve_archives(&entry.id, &entry.archives, &applies)?;
+        if archives.is_empty() && !entry.archives.is_empty() {
+            anyhow::bail!(
+                "mod {}: every archive's `if` left it out, so it would install nothing; \
+                 put the condition on the mod instead",
+                entry.id
+            );
         }
 
         selected_mods.push(entry.id.clone());
@@ -69,7 +80,7 @@ pub fn build_plan(
             section: entry.section.clone(),
             mod_type: entry.mod_type,
             merge: entry.merge.clone(),
-            archives: entry.archives.clone(),
+            archives,
             files: entry.files.clone(),
             actions,
         });
@@ -143,6 +154,50 @@ fn parse_answer(id: &str, spec: &InputSpec, raw: &str) -> anyhow::Result<InputVa
         }
         InputType::Text => Ok(InputValue::Text(raw.to_string())),
     }
+}
+
+/// The archives, FOMOD selections and BAIN subpackages that apply, with their
+/// conditions resolved away: nothing after `query` knows they existed.
+fn resolve_archives(
+    mod_id: &str,
+    archives: &[CompiledArchive],
+    applies: &dyn Fn(Option<&str>) -> anyhow::Result<bool>,
+) -> anyhow::Result<Vec<CompiledArchive>> {
+    let mut out = Vec::new();
+    for archive in archives {
+        if !applies(archive.condition.as_deref())? {
+            continue;
+        }
+        let mut archive = archive.clone();
+        archive.condition = None;
+
+        let mut selections = Vec::new();
+        for selection in archive.fomod_selections {
+            if applies(selection.condition.as_deref())? {
+                selections.push(FomodSelection { condition: None, ..selection });
+            }
+        }
+        archive.fomod_selections = selections;
+
+        if !archive.bain_subpackages.is_empty() {
+            let mut subpackages = Vec::new();
+            for subpackage in &archive.bain_subpackages {
+                if applies(subpackage.condition())? {
+                    subpackages.push(BainSubpackage::from(subpackage.name()));
+                }
+            }
+            if subpackages.is_empty() {
+                anyhow::bail!(
+                    "mod {mod_id}: every BAIN subpackage's `if` left it out of {}, so it would \
+                     install nothing; put the condition on the archive instead",
+                    archive.path.as_deref().unwrap_or("its archive")
+                );
+            }
+            archive.bain_subpackages = subpackages;
+        }
+        out.push(archive);
+    }
+    Ok(out)
 }
 
 fn known(included: &HashMap<&str, bool>, id: &str) -> anyhow::Result<bool> {

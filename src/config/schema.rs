@@ -713,6 +713,10 @@ pub enum ArchiveLayout {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArchiveSpec {
+    /// Only use this archive when the condition holds; see
+    /// [`crate::config::condition`].
+    #[serde(rename = "if", default)]
+    pub condition: Option<String>,
     #[serde(default)]
     pub path: Option<String>,
     /// The archive's own filename, as the host serves it.
@@ -740,7 +744,7 @@ pub struct ArchiveSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inner_archive: Option<String>,
     #[serde(default)]
-    pub bain_subpackages: Vec<String>,
+    pub bain_subpackages: Vec<BainSubpackage>,
     #[serde(default)]
     pub fomod_selections: Vec<FomodSelection>,
     #[serde(default)]
@@ -763,10 +767,50 @@ pub struct ArchiveSpec {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
 pub struct FomodSelection {
+    /// Only make this selection when the condition holds. Resolved by `query`:
+    /// a plan's selections never carry one.
+    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
     pub step: String,
     pub group: String,
     #[serde(default)]
     pub options: Vec<String>,
+}
+
+/// A BAIN subpackage to install: its folder name, or, when it depends on an
+/// answer, `{ name = "...", if = "..." }`.
+///
+/// `query` resolves the condition, so a plan only ever holds bare names.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(untagged)]
+pub enum BainSubpackage {
+    Name(String),
+    Conditional {
+        name: String,
+        #[serde(rename = "if")]
+        condition: String,
+    },
+}
+
+impl BainSubpackage {
+    pub fn name(&self) -> &str {
+        match self {
+            BainSubpackage::Name(name) | BainSubpackage::Conditional { name, .. } => name,
+        }
+    }
+
+    pub fn condition(&self) -> Option<&str> {
+        match self {
+            BainSubpackage::Name(_) => None,
+            BainSubpackage::Conditional { condition, .. } => Some(condition),
+        }
+    }
+}
+
+impl From<&str> for BainSubpackage {
+    fn from(name: &str) -> Self {
+        BainSubpackage::Name(name.to_string())
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -836,6 +880,10 @@ pub struct CompiledMod {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CompiledArchive {
+    /// `ArchiveSpec::condition`. Resolved by `query`: a plan's archives never
+    /// carry one.
+    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
     /// The archive's own filename; see `ArchiveSpec::file_name`.
@@ -849,7 +897,7 @@ pub struct CompiledArchive {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inner_archive: Option<String>,
     #[serde(default)]
-    pub bain_subpackages: Vec<String>,
+    pub bain_subpackages: Vec<BainSubpackage>,
     #[serde(default)]
     pub fomod_selections: Vec<FomodSelection>,
     #[serde(default)]

@@ -602,3 +602,50 @@ fn rejects_a_malformed_condition() {
     let err = validate_src(&MOD_CONDITION.replace("mod:base", "Some Mod")).expect_err("should fail");
     assert!(format!("{err:#}").contains("mod:\"Some Mod\""), "{err:#}");
 }
+
+const ARCHIVE_CONDITION: &str = r#"
+name = "Archive conditions"
+
+[inputs.hd]
+type = "bool"
+query = "HD?"
+default = false
+
+[[mods]]
+id = "m"
+
+[[mods.archives]]
+path = "manual:m.7z"
+layout = "bain"
+bain_subpackages = ["00 Core", { name = "01 HD", if = "hd" }]
+
+[[mods.archives]]
+if = "hd"
+path = "manual:m-hd.7z"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+if = "hd"
+step = "S"
+group = "G"
+options = ["O"]
+"#;
+
+#[test]
+fn accepts_conditions_on_archives_fomod_rows_and_bain_subpackages() {
+    validate_src(ARCHIVE_CONDITION).expect("should validate");
+}
+
+#[test]
+fn rejects_undeclared_inputs_in_archive_level_conditions() {
+    for (from, site) in [
+        ("{ name = \"01 HD\", if = \"hd\" }", "BAIN subpackage 01 HD"),
+        ("if = \"hd\"\npath = \"manual:m-hd.7z\"", "archive manual:m-hd.7z"),
+        ("if = \"hd\"\nstep", "FOMOD selection S / G"),
+    ] {
+        let src = ARCHIVE_CONDITION.replacen(from, &from.replacen("\"hd\"", "\"hdd\"", 1), 1);
+        assert_ne!(src, ARCHIVE_CONDITION, "{from}");
+        let err = validate_src(&src).expect_err("should fail").to_string();
+        assert!(err.contains("'hdd'") && err.contains(site), "{site}: {err}");
+    }
+}

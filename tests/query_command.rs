@@ -180,3 +180,102 @@ fn query_headless_writes_personalized_plan() {
     assert_eq!(selected_mods.len(), 1);
     assert_eq!(selected_mods[0], "skyui");
 }
+
+/// One "resolution" answer reaching an archive, a FOMOD row and a BAIN
+/// subpackage -- B2's "1K or 2K textures?".
+const ARCHIVE_CONDITIONS: &str = r#"
+name = "Archive conditions"
+
+[inputs.res]
+type = "choice"
+query = "Texture resolution?"
+choices = ["1k", "2k"]
+default = "1k"
+
+[[mods]]
+id = "textures"
+
+[[mods.archives]]
+path = "manual:textures-1k.7z"
+
+[[mods.archives]]
+if = "res == 2k"
+path = "manual:textures-2k.7z"
+
+[[mods]]
+id = "fomod mod"
+
+[[mods.archives]]
+path = "manual:fomod.7z"
+layout = "fomod"
+
+[[mods.archives.fomod_selections]]
+if = "res == 1k"
+step = "Textures"
+group = "Resolution"
+options = ["1K"]
+
+[[mods.archives.fomod_selections]]
+if = "res == 2k"
+step = "Textures"
+group = "Resolution"
+options = ["2K"]
+
+[[mods]]
+id = "bain mod"
+
+[[mods.archives]]
+path = "manual:bain.7z"
+layout = "bain"
+bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
+"#;
+
+fn mod_entry<'a>(plan: &'a Value, id: &str) -> &'a Value {
+    plan["mods"].as_array().unwrap().iter().find(|m| m["id"] == id).unwrap()
+}
+
+#[test]
+fn one_answer_reaches_archives_fomod_rows_and_bain_subpackages() {
+    let low = plan_for(ARCHIVE_CONDITIONS, &[]).unwrap();
+    let archives = mod_entry(&low, "textures")["archives"].as_array().unwrap();
+    assert_eq!(archives.len(), 1);
+    assert_eq!(archives[0]["path"], "manual:textures-1k.7z");
+    let selections = &mod_entry(&low, "fomod mod")["archives"][0]["fomod_selections"];
+    assert_eq!(selections.as_array().unwrap().len(), 1);
+    assert_eq!(selections[0]["options"][0], "1K");
+    assert_eq!(
+        mod_entry(&low, "bain mod")["archives"][0]["bain_subpackages"],
+        serde_json::json!(["00 Core"])
+    );
+
+    let high = plan_for(ARCHIVE_CONDITIONS, &["--set", "res=2k"]).unwrap();
+    assert_eq!(mod_entry(&high, "textures")["archives"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        mod_entry(&high, "fomod mod")["archives"][0]["fomod_selections"][0]["options"][0],
+        "2K"
+    );
+    assert_eq!(
+        mod_entry(&high, "bain mod")["archives"][0]["bain_subpackages"],
+        serde_json::json!(["00 Core", "01 2K Textures"])
+    );
+
+    // Nothing downstream of query sees a condition.
+    let text = high.to_string();
+    assert!(!text.contains("\"if\""), "{text}");
+}
+
+#[test]
+fn conditions_that_leave_a_mod_with_no_archive_are_an_error() {
+    let src = ARCHIVE_CONDITIONS.replace(
+        "[[mods.archives]]\npath = \"manual:textures-1k.7z\"",
+        "[[mods.archives]]\nif = \"res == 2k\"\npath = \"manual:textures-1k.7z\"",
+    );
+    assert_ne!(src, ARCHIVE_CONDITIONS);
+    let err = plan_for(&src, &[]).unwrap_err();
+    assert!(err.contains("mod textures") && err.contains("on the mod instead"), "{err}");
+
+    let src = ARCHIVE_CONDITIONS.replace("[\"00 Core\", ", "[{ name = \"00 Core\", if = \"res == 2k\" }, ");
+    assert_ne!(src, ARCHIVE_CONDITIONS);
+    let err = plan_for(&src, &[]).unwrap_err();
+    assert!(err.contains("BAIN subpackage") && err.contains("manual:bain.7z"), "{err}");
+}

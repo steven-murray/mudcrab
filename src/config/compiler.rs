@@ -43,6 +43,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                             ));
                         }
                         Ok(CompiledArchive {
+                            condition: archive.condition.clone(),
                             path: archive.path.clone(),
                             file_name: archive
                                 .file_name

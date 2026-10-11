@@ -1,5 +1,5 @@
 use crate::config::condition::Condition;
-use crate::config::schema::{InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist};
+use crate::config::schema::{BainSubpackage, InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -67,6 +67,34 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
                     .condition
                     .as_ref()
                     .map(|expr| (expr, format!("its {} action", action.action.name()), false))
+            }))
+            .chain(spec.archives.iter().flat_map(|archive| {
+                let label = archive.path.as_deref().unwrap_or("(build)").to_string();
+                archive
+                    .condition
+                    .iter()
+                    .map({
+                        let label = label.clone();
+                        move |expr| (expr, format!("its archive {label}"), false)
+                    })
+                    .chain(archive.fomod_selections.iter().filter_map({
+                        let label = label.clone();
+                        move |selection| {
+                            selection.condition.as_ref().map(|expr| {
+                                let site = format!(
+                                    "the FOMOD selection {} / {} of {label}",
+                                    selection.step, selection.group
+                                );
+                                (expr, site, false)
+                            })
+                        }
+                    }))
+                    .chain(archive.bain_subpackages.iter().filter_map(move |subpackage| {
+                        let BainSubpackage::Conditional { name, condition } = subpackage else {
+                            return None;
+                        };
+                        Some((condition, format!("the BAIN subpackage {name} of {label}"), false))
+                    }))
             }));
         for (expr, site, gates_mod) in conditions {
             let condition = Condition::parse(expr).map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err:#}"))?;

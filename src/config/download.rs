@@ -710,6 +710,7 @@ mod tests {
     #[test]
     fn resolves_nexus_handler_from_source_shape() {
         let explicit = CompiledArchive {
+            condition: None,
             path: Some("https://www.nexusmods.com/skyrimspecialedition/mods/1".to_string()),
             file_name: None,
             download_handler: None,
@@ -727,6 +728,7 @@ mod tests {
         assert_eq!(resolve_handler(explicit.path.as_deref().unwrap_or_default(), explicit.download_handler.as_deref()), "nexus");
 
         let scheme = CompiledArchive {
+            condition: None,
             path: Some("nexus:skyrimspecialedition/1/2".to_string()),
             file_name: None,
             download_handler: None,
@@ -846,6 +848,7 @@ mod tests {
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
+                    condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,
                     download_handler: Some("nexus".to_string()),
@@ -924,6 +927,7 @@ mod tests {
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
+                    condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,
                     download_handler: Some("nexus".to_string()),
