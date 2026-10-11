@@ -475,7 +475,8 @@ pub struct InstallArgs {
     /// Profile name to use when exporting to ModOrganizer2.
     #[arg(long, default_value = "Default")]
     pub profile_name: String,
-    /// Optional game root for game-scoped install actions (e.g. Oblivion.ini edits).
+    /// The game folder, for game-scoped install actions (e.g. Oblivion.ini edits).
+    /// Defaults to `GAME_DIR`, then to the folder the MO2 instance was set up with.
     #[arg(long)]
     pub game_dir: Option<PathBuf>,
     /// Do not execute post-install actions.
@@ -620,7 +621,8 @@ pub struct SetupToolsArgs {
     /// Path to the source modlist TOML to scan for required tools.
     pub input: PathBuf,
     /// Output path for the generated tools.toml template.
-    /// Defaults to tools.toml in the same directory as the input file.
+    /// Defaults to where every other command looks for it:
+    /// ~/.config/mudcrab/tools.toml (%APPDATA%\mudcrab\tools.toml on Windows).
     #[arg(short, long)]
     pub output: Option<PathBuf>,
     /// Overwrite an existing tools.toml file.

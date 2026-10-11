@@ -132,7 +132,7 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
     if let Some(game_dir) = &settings.game_dir {
         let source = locate_game_ini_source(game_dir, "Oblivion.ini").ok_or_else(|| {
             anyhow::anyhow!(
-                "failed to locate Oblivion.ini for game directory {}; expected either the game root or a Steam Proton compatdata Documents/My Games/Oblivion path",
+                "failed to locate Oblivion.ini for game directory {}; looked in the game folder, Documents/My Games/Oblivion and Steam Proton's compatdata. Run the game once from its launcher to create it",
                 game_dir.display()
             )
         })?;
@@ -169,6 +169,10 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
                 "seeded the MO2 profile's Oblivion.ini from the game directory"
             );
         }
+    }
+
+    if settings.game_dir.is_some() {
+        use_profile_ini(&profile_dir, settings.dry_run)?;
     }
 
     // MO2 profile expects this file; keep it empty by default.
@@ -273,6 +277,27 @@ fn scoped_section_names(
     }
 
     Some(out)
+}
+
+/// Turn on the profile's own game INI files (MO2's "Use profile-specific Game
+/// INI Files"): `LocalSettings=true` in its `settings.ini`. Game-scoped edits
+/// are made to the profile's copy of `Oblivion.ini`, never the game's own, and
+/// without this MO2 ignores that copy and every edit with it.
+fn use_profile_ini(profile_dir: &Path, dry_run: bool) -> anyhow::Result<()> {
+    let path = profile_dir.join("settings.ini");
+    let existing = std::fs::read_to_string(&path).unwrap_or_default();
+    let updated = set_ini_key(&existing, "General", "LocalSettings", "true");
+    if updated == existing {
+        return Ok(());
+    }
+    if dry_run {
+        tracing::info!(settings = %path.display(), "install dry-run: would turn on profile-specific game INI files");
+        return Ok(());
+    }
+    std::fs::write(&path, updated)
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))?;
+    tracing::info!(settings = %path.display(), "turned on profile-specific game INI files");
+    Ok(())
 }
 
 /// Point the instance's MO2 at the downloads folder: `download_directory`
@@ -606,6 +631,47 @@ pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
     )
 }
 
+/// The game folder an MO2 instance was set up with: `gamePath` in its
+/// `ModOrganizer.ini`. `None` when the instance has none, or names it by a
+/// Wine drive this side cannot see.
+pub(crate) fn instance_game_path(instance: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).ok()?;
+    parse_game_path(&text, cfg!(windows))
+}
+
+/// MO2 writes `gamePath=@ByteArray(C:\\Games\\Oblivion)`: a Qt byte array,
+/// backslashes escaped. Under Wine the Unix root is drive `Z:`; any other drive
+/// is inside a prefix we do not know, so it is not guessed at.
+fn parse_game_path(ini: &str, windows: bool) -> Option<PathBuf> {
+    let mut in_general = false;
+    for line in ini.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_general = line.eq_ignore_ascii_case("[General]");
+            continue;
+        }
+        let Some(value) = line.strip_prefix("gamePath=").filter(|_| in_general) else {
+            continue;
+        };
+        let value = value
+            .strip_prefix("@ByteArray(")
+            .and_then(|v| v.strip_suffix(')'))
+            .unwrap_or(value)
+            .replace("\\\\", "\\");
+        if value.is_empty() {
+            return None;
+        }
+        if windows {
+            return Some(PathBuf::from(value));
+        }
+        let unix = value
+            .strip_prefix("Z:")
+            .or_else(|| value.strip_prefix("z:"))?;
+        return Some(PathBuf::from(unix.replace('\\', "/")));
+    }
+    None
+}
+
 pub(crate) fn locate_game_ini_source(game_dir: &Path, file_name: &str) -> Option<PathBuf> {
     let direct = game_dir.join(file_name);
     if direct.exists() {
@@ -614,6 +680,21 @@ pub(crate) fn locate_game_ini_source(game_dir: &Path, file_name: &str) -> Option
 
     if !file_name.eq_ignore_ascii_case("Oblivion.ini") {
         return None;
+    }
+
+    // On Windows the game keeps it in Documents, which OneDrive may have
+    // moved.
+    if cfg!(windows) {
+        let documents = ["OneDrive", "USERPROFILE"]
+            .iter()
+            .filter_map(std::env::var_os)
+            .map(|root| PathBuf::from(root).join("Documents"));
+        for documents in documents {
+            let candidate = documents.join("My Games/Oblivion/Oblivion.ini");
+            if candidate.exists() {
+                return Some(candidate);
+            }
+        }
     }
 
     let mut candidates = Vec::new();
@@ -663,4 +744,41 @@ pub(crate) fn steam_compatdata_roots(game_dir: &Path) -> Vec<PathBuf> {
     roots.sort();
     roots.dedup();
     roots.into_iter().filter(|path| path.exists()).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_game_path_comes_from_mo2s_own_settings() {
+        let ini = "[General]\r\ngameName=Oblivion\r\ngamePath=@ByteArray(Z:\\\\home\\\\me\\\\Steam\\\\common\\\\Oblivion)\r\n";
+        assert_eq!(
+            parse_game_path(ini, false),
+            Some(PathBuf::from("/home/me/Steam/common/Oblivion"))
+        );
+        let windows = "[General]\ngamePath=@ByteArray(C:\\\\Games\\\\Oblivion)\n";
+        assert_eq!(
+            parse_game_path(windows, true),
+            Some(PathBuf::from("C:\\Games\\Oblivion"))
+        );
+        // A Wine drive other than Z: is inside a prefix; not guessed at.
+        assert_eq!(parse_game_path(windows, false), None);
+        assert_eq!(parse_game_path("[Settings]\ngamePath=x\n", false), None);
+    }
+
+    #[test]
+    fn profile_ini_files_are_turned_on_and_the_rest_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("settings.ini"),
+            "[General]\nLocalSaves=true\nLocalSettings=false\n",
+        )
+        .unwrap();
+        use_profile_ini(dir.path(), false).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.path().join("settings.ini")).unwrap(),
+            "[General]\nLocalSaves=true\nLocalSettings=true\n"
+        );
+    }
 }

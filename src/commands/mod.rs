@@ -23,21 +23,34 @@ pub mod validate;
 use crate::cli::{Cli, Command};
 use std::path::PathBuf;
 
-pub fn require_game_dir(explicit: Option<PathBuf>) -> anyhow::Result<PathBuf> {
+/// The game folder: `--game-dir`, else `GAME_DIR`, else the folder the MO2
+/// instance being installed into was set up with -- so an MO2 install needs
+/// neither.
+pub fn require_game_dir(
+    explicit: Option<PathBuf>,
+    mo2_instance: Option<&std::path::Path>,
+) -> anyhow::Result<PathBuf> {
     if let Some(path) = explicit {
         return Ok(path);
     }
-
-    let value = std::env::var("GAME_DIR").map_err(|_| {
-        anyhow::anyhow!("GAME_DIR must be defined (or pass --game-dir where supported)")
-    })?;
-
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        anyhow::bail!("GAME_DIR is defined but empty");
+    if let Ok(value) = std::env::var("GAME_DIR") {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            anyhow::bail!("GAME_DIR is defined but empty");
+        }
+        return Ok(PathBuf::from(trimmed));
     }
-
-    Ok(PathBuf::from(trimmed))
+    if let Some(path) = mo2_instance.and_then(crate::config::mo2::instance_game_path) {
+        return Ok(path);
+    }
+    anyhow::bail!(
+        "no game folder: pass --game-dir or set GAME_DIR{}",
+        if mo2_instance.is_some() {
+            " (the MO2 instance's ModOrganizer.ini names none this can read)"
+        } else {
+            ""
+        }
+    )
 }
 
 /// The downloads folder: `--downloads`, else `downloads_dir` in tools.toml,

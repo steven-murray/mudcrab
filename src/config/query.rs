@@ -356,8 +356,10 @@ fn prompt_input(spec: &InputSpec) -> anyhow::Result<InputValue> {
             let default = matches!(spec.default, Some(InputValue::Bool(true)));
             prompt_bool(&spec.query, default).map(InputValue::Bool)
         }
-        InputType::Choice => prompt_choice(&spec.query, &spec.choices).map(InputValue::Text),
-        InputType::Text => prompt_text(&spec.query).map(InputValue::Text),
+        InputType::Choice => {
+            prompt_choice(&spec.query, &spec.choices, text_default(spec)).map(InputValue::Text)
+        }
+        InputType::Text => prompt_text(&spec.query, text_default(spec)).map(InputValue::Text),
     }
 }
 
@@ -385,14 +387,27 @@ fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
     }
 }
 
-fn prompt_choice(query: &str, choices: &[String]) -> anyhow::Result<String> {
+/// The declared default of a choice or text input, as text.
+fn text_default(spec: &InputSpec) -> Option<&str> {
+    match &spec.default {
+        Some(InputValue::Text(text)) => Some(text),
+        _ => None,
+    }
+}
+
+fn prompt_choice(query: &str, choices: &[String], default: Option<&str>) -> anyhow::Result<String> {
     if choices.is_empty() {
         anyhow::bail!("choice input is missing available choices");
     }
 
     println!("{query}");
     for (idx, choice) in choices.iter().enumerate() {
-        println!("  {}. {}", idx + 1, choice);
+        let marker = if Some(choice.as_str()) == default {
+            " (default)"
+        } else {
+            ""
+        };
+        println!("  {}. {choice}{marker}", idx + 1);
     }
 
     loop {
@@ -401,30 +416,60 @@ fn prompt_choice(query: &str, choices: &[String]) -> anyhow::Result<String> {
 
         let mut buf = String::new();
         io::stdin().read_line(&mut buf)?;
-        let answer = buf.trim();
-
-        if let Ok(idx) = answer.parse::<usize>()
-            && (1..=choices.len()).contains(&idx)
-        {
-            return Ok(choices[idx - 1].clone());
+        if let Some(choice) = pick_choice(buf.trim(), choices, default) {
+            return Ok(choice);
         }
 
         eprintln!("Please enter a valid selection index.");
     }
 }
 
-fn prompt_text(query: &str) -> anyhow::Result<String> {
-    print!("{}: ", query);
+/// An answer to a choice prompt: its number, or nothing for the default.
+fn pick_choice(answer: &str, choices: &[String], default: Option<&str>) -> Option<String> {
+    if answer.is_empty() {
+        return default
+            .filter(|d| choices.iter().any(|c| c == d))
+            .map(str::to_string);
+    }
+    let idx = answer.parse::<usize>().ok()?;
+    choices.get(idx.checked_sub(1)?).cloned()
+}
+
+fn prompt_text(query: &str, default: Option<&str>) -> anyhow::Result<String> {
+    match default {
+        Some(default) => print!("{query} [{default}]: "),
+        None => print!("{query}: "),
+    }
     io::stdout().flush()?;
 
     let mut buf = String::new();
     io::stdin().read_line(&mut buf)?;
-    Ok(buf.trim().to_string())
+    let answer = buf.trim();
+    Ok(match default {
+        Some(default) if answer.is_empty() => default.to_string(),
+        _ => answer.to_string(),
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn enter_takes_a_choices_default() {
+        let choices = vec!["none".to_string(), "v0500".to_string()];
+        assert_eq!(
+            pick_choice("", &choices, Some("none")),
+            Some("none".to_string())
+        );
+        assert_eq!(
+            pick_choice("2", &choices, Some("none")),
+            Some("v0500".to_string())
+        );
+        assert_eq!(pick_choice("", &choices, None), None);
+        assert_eq!(pick_choice("0", &choices, None), None);
+        assert_eq!(pick_choice("3", &choices, None), None);
+    }
 
     fn bool_input(default: Option<bool>) -> HashMap<String, InputSpec> {
         HashMap::from([(

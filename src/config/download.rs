@@ -445,10 +445,18 @@ async fn download_nexus(
     }
 
     let (game, mod_id, file_id) = parse_nexus_spec(source)?;
-    let api_key = settings
-        .nexus_api_key
-        .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("NEXUS_API_KEY must be set for nexus downloads"))?;
+    // Most people will meet one of the two failures below before anything
+    // else, so each says what to do instead: fetch the file by hand, which
+    // every later stage then finds by name.
+    let by_hand = format!(
+        "download it by hand from https://www.nexusmods.com/{game}/mods/{mod_id}?tab=files&file_id={file_id} \
+         into the downloads folder (or a folder given with --archive-search-path)"
+    );
+    let api_key = settings.nexus_api_key.as_deref().ok_or_else(|| {
+        anyhow::anyhow!(
+            "NEXUS_API_KEY is not set, so Nexus cannot be asked for this file; {by_hand}"
+        )
+    })?;
 
     let api_base = settings
         .nexus_api_base
@@ -462,12 +470,23 @@ async fn download_nexus(
         file_id
     );
 
-    let links = client
+    let response = client
         .get(&endpoint)
         .header("apikey", api_key)
         .send()
         .await
-        .map_err(|err| anyhow::anyhow!("nexus api request failed: {err}"))?
+        .map_err(|err| anyhow::anyhow!("nexus api request failed: {err}"))?;
+    match response.status() {
+        reqwest::StatusCode::FORBIDDEN => {
+            anyhow::bail!("Nexus gives download links to premium accounts only; {by_hand}")
+        }
+        reqwest::StatusCode::UNAUTHORIZED => anyhow::bail!(
+            "Nexus refused the API key: check NEXUS_API_KEY (your key is at \
+             https://next.nexusmods.com/settings/api-keys)"
+        ),
+        _ => {}
+    }
+    let links = response
         .error_for_status()
         .map_err(|err| anyhow::anyhow!("nexus api returned error: {err}"))?
         .json::<Vec<NexusDownloadLink>>()
@@ -802,6 +821,44 @@ mod tests {
         assert_eq!(
             describe_search_paths(&[PathBuf::from("/a"), PathBuf::from("/b")]),
             "/a, /b"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_free_account_is_told_where_to_download_by_hand() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(
+                "/v1/games/oblivion/mods/1234/files/5678/download_link.json",
+            ))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&server)
+            .await;
+
+        let temp = tempdir().expect("temp dir should be created");
+        let settings = DownloadSettings {
+            cache_dir: temp.path().to_path_buf(),
+            retry: 1,
+            nexus_api_key: Some("test-key".to_string()),
+            nexus_api_base: Some(format!("{}/v1", server.uri())),
+            filter: ModFilter::default(),
+            archive_search_paths: Vec::new(),
+            parallel: 4,
+        };
+        let client = Client::new();
+        let err = download_nexus(
+            &client,
+            "nexus:oblivion/1234/5678",
+            &temp.path().join("x"),
+            &settings,
+        )
+        .await
+        .expect_err("a 403 fails");
+        let message = err.to_string();
+        assert!(message.contains("premium"), "{message}");
+        assert!(
+            message.contains("https://www.nexusmods.com/oblivion/mods/1234?tab=files&file_id=5678"),
+            "{message}"
         );
     }
 

@@ -2,7 +2,7 @@ use crate::cli::SetupToolsArgs;
 use crate::config::loader::load_modlist;
 use crate::config::schema::ModAction;
 use crate::config::schema::PostInstallAction;
-use crate::config::tools::{RequiredTools, generate_tools_toml};
+use crate::config::tools::{RequiredTools, ToolsConfig, generate_tools_toml};
 use std::path::PathBuf;
 
 pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
@@ -47,10 +47,9 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
     let output_path = args
         .output
         .clone()
-        .or_else(|| {
-            // Default: tools.toml alongside the input file.
-            args.input.parent().map(|p| p.join("tools.toml"))
-        })
+        // Where the other commands look when not told, so the template
+        // takes effect once filled in.
+        .or_else(ToolsConfig::default_path)
         .unwrap_or_else(|| PathBuf::from("tools.toml"));
 
     if output_path.exists() && !args.force {

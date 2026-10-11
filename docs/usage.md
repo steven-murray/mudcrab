@@ -251,10 +251,12 @@ mudcrab validate <modlist.toml> [--strict]
 
 ## install
 
-Install from a personalized plan and the downloads folder into a mods directory.
+Install from a personalized plan and the downloads folder into an MO2 instance
+(`--mo2-instance-dir`) or a plain mods directory (`--mods-dir`).
 
 ```bash
-mudcrab install <plan.json> [--downloads <dir>] --mods-dir <mods_dir> [--dry-run] [--skip-actions]
+mudcrab install <plan.json> [--downloads <dir>] (--mo2-instance-dir <dir> | --mods-dir <mods_dir>)
+                [--profile-name <name>] [--game-dir <dir>] [--dry-run] [--skip-actions]
                 [--force-merges]
                 [--section <name>]... [--only <mod id>]...
                 [--archive-search-path <dir>]...
@@ -265,6 +267,15 @@ Example:
 ```bash
 mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads --mods-dir build/mods
 ```
+
+Into an MO2 instance, `install` writes the mods, the profile (`--profile-name`,
+default `Default`, which it then owns: its `modlist.txt` and `plugins.txt` are
+rewritten from the plan every run) and the load order, and points MO2 at the
+downloads folder. Game INI edits go into the profile's own copy of
+`Oblivion.ini`, seeded once from the game's, and `install` turns on MO2's
+"profile-specific game INI files" for the profile so they take effect. The game
+folder is `--game-dir`, else `GAME_DIR`, else the one the MO2 instance was set
+up with.
 
 Current behavior:
 
@@ -742,19 +753,21 @@ own: see [exporters.md](exporters.md).
 ## setup-tools
 
 Scan a source modlist and generate a `tools.toml` configuration template for the
-machine-local tools (e.g. LOOT, xEdit) that the modlist's actions require.
+machine-local tools (e.g. LOOT, xEdit) that the modlist's actions require, and
+for the downloads folder.
 
 ```bash
 mudcrab setup-tools <modlist.toml> [--output <tools.toml>] [--force]
 ```
 
-`--output` defaults to `tools.toml` in the same directory as the input file.
-`--force` overwrites an existing `tools.toml`.
+`--output` defaults to where every command looks for it when not given
+`--tools-config`: `~/.config/mudcrab/tools.toml` (`%APPDATA%\mudcrab\tools.toml`
+on Windows). `--force` overwrites an existing `tools.toml`.
 
 Example:
 
 ```bash
-mudcrab setup-tools path/to/modlist.toml --output tools.toml
+mudcrab setup-tools path/to/modlist.toml
 ```
 
 ## Nexus Sources
