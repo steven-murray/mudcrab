@@ -143,6 +143,7 @@ pub enum ModAction {
     FileMove(FileMoveAction),
     ExtractBsa(ExtractBsaAction),
     DeleteRecords(DeleteRecordsAction),
+    DdsDecompress(DdsDecompressAction),
 }
 
 impl ModAction {
@@ -167,7 +168,8 @@ impl ModAction {
             | ModAction::FileHide(_)
             | ModAction::FileMove(_)
             | ModAction::ExtractBsa(_)
-            | ModAction::DeleteRecords(_) => false,
+            | ModAction::DeleteRecords(_)
+            | ModAction::DdsDecompress(_) => false,
         }
     }
 
@@ -185,6 +187,7 @@ impl ModAction {
             ModAction::FileMove(_) => "file_move",
             ModAction::ExtractBsa(_) => "extract_bsa",
             ModAction::DeleteRecords(_) => "delete_records",
+            ModAction::DdsDecompress(_) => "dds_decompress",
         }
     }
 }
@@ -245,6 +248,24 @@ pub struct IniTweakAction {
     pub value: IniValue,
     #[serde(default)]
     pub format: IniSetFormat,
+}
+
+/// Decode DXT1 textures that use punch-through transparency to uncompressed
+/// 32-bit BGRA.
+///
+/// Not a guide instruction: a workaround for the D3D9 stack this list is
+/// tested on (DXVK on NVIDIA under Proton), whose menu renderer draws DXT1's
+/// transparent texels as opaque black. DarNified UI's compass frame is the
+/// visible case -- a black box over the compass. The decode is exact, so on a
+/// stack without the problem the result looks identical; it only costs size.
+/// `mudcrab dds audit` lists the textures this would touch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DdsDecompressAction {
+    /// Files or folders relative to the mod's staged data folder, resolved
+    /// case-insensitively. A file must be a DXT1 texture with transparency; a
+    /// folder converts every such texture below it and leaves the rest alone.
+    pub paths: Vec<String>,
 }
 
 /// Pack the mod's staged files into a BSA.

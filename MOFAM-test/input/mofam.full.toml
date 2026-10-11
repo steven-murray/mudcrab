@@ -1248,6 +1248,12 @@ file = "Oblivion.ini"
 key = "SFontFile_5"
 value = "Data\\Fonts\\Handwritten.fnt"
 
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
+
 [[mods]]
 id = "UHD Fonts for Darnified UI"
 section = ["UI & UX IMPROVEMENTS"]
@@ -1300,6 +1306,12 @@ file = "Ini/Dynamic Map.ini"
 format = "set-to"
 key = "tnoDM.zoomReset"
 value = "258"
+
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus", "textures/menus50", "textures/menus80"]
 
 [[mods]]
 id = "VKVII Oblivion Cyrodiil Map"
@@ -1358,6 +1370,12 @@ section = ["UI & UX IMPROVEMENTS"]
 [[mods.archives]]
 path = "nexus:oblivion/50326/1000029030"
 
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus", "textures/menus50", "textures/menus80"]
+
 [[mods]]
 id = "Loot Menu"
 section = ["UI & UX IMPROVEMENTS"]
@@ -1367,6 +1385,12 @@ path = "nexus:oblivion/48027/1000024916"
 
 [[mods.archives]]
 path = "nexus:oblivion/48027/1000018717"
+
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
 
 [[mods]]
 id = "Loot Feed"
@@ -5211,6 +5235,12 @@ file_name = "VGR Reasonable patch-51851-3-4-7-1743341721.7z"
 layout = "bain"
 bain_subpackages = ["00 core patch"]
 
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
+
 [[mods]]
 id = "Blue Darker Glass - Armor and Weapons"
 section = ["20 - WEAPONS ARMOUR & CLOTHING IMPROVEMENTS"]
@@ -6390,6 +6420,12 @@ archive = "Colorful Clothing - Collection.bsa"
 action = "file_prune"
 paths = ["Colorful Clothing - Collection.esp"]
 
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus", "textures/menus50"]
+
 [[mods]]
 id = "AI Enhanced - Colorful Clothing - Middleclass"
 section = ["24 - NEW WEAPONS & ARMOURS"]
@@ -6430,6 +6466,12 @@ plugins = ["Travelling Equipment.esp"]
 path = "nexus:oblivion/50205/1000031591"
 download_handler = "nexus"
 file_name = "Travelling Equipment-50205-1-0-1-1655646100.7z"
+
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
 
 # ── Part 25 - ARTHMOOR'S TOWNS ──────────────────────────────────────────────
 #
@@ -8248,6 +8290,12 @@ file_name = "Hackdirt The Deep Ones 3.5-36224-3-5-1766515330.7z"
 layout = "custom-data-folder"
 data_folder = "HackdirtTheDeepOnes3.5/Data"
 
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
+
 [[mods]]
 id = "The Well of Minlorada"
 section = ["28 - NEW & MODIFIED QUESTS"]
@@ -8629,6 +8677,12 @@ plugins = ["OCRAFT - Stations for Sale.esp"]
 path = "nexus:oblivion/54541/1000043966"
 download_handler = "nexus"
 file_name = "OCRAFT - Stations for Sale-54541-1-43-1769532332.7z"
+
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
 
 [[mods]]
 id = "OCRAFT - Compatibility Settings"
@@ -9056,6 +9110,12 @@ download_handler = "nexus"
 file_name = "Cobl-21104-174-1598559328.7z"
 layout = "bain"
 bain_subpackages = ["00 Cobl Core", "01 StableCore"]
+
+# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
+# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+[[mods.actions]]
+action = "dds_decompress"
+paths = ["textures/menus"]
 
 # Guide 2: the Apachii and COBL manual-install file, minus the four Apachii
 # folders. Only the Meteoric arrows and their textures survive -- 7 of 34.

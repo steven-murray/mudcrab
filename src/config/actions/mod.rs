@@ -11,6 +11,7 @@
 
 pub mod conflicts;
 pub mod create_dummy_plugin;
+mod dds_decompress;
 mod delete_records;
 pub mod extract_bsa;
 pub mod file_hide;
@@ -65,6 +66,7 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
         ModAction::FileMove(spec) => file_move::apply(spec, cx),
         ModAction::ExtractBsa(spec) => extract_bsa::apply(spec, cx),
         ModAction::DeleteRecords(spec) => delete_records::apply(spec, cx),
+        ModAction::DdsDecompress(spec) => dds_decompress::apply(spec, cx),
     }
 }
 
