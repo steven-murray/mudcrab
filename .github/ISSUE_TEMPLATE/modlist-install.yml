@@ -1,0 +1,42 @@
+name: A modlist installs wrongly
+description: An install finished, or failed, and the result is not what the list describes.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. [CONTRIBUTING.md](https://github.com/steven-murray/mudcrab/blob/main/CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly) explains the attachments below. Check them for secrets (API keys, tokens) before attaching; please do not attach mod archives.
+  - type: textarea
+    id: what
+    attributes:
+      label: What is wrong
+      description: Which mod, which files, and what you expected instead. Paste `mudcrab diff` output if you have a reference instance.
+    validations:
+      required: true
+  - type: input
+    id: list
+    attributes:
+      label: The modlist
+      description: A link, if it is public; otherwise its name.
+  - type: textarea
+    id: plan
+    attributes:
+      label: The plan
+      description: Attach the JSON `mudcrab query --output plan.json` wrote (drag the file in).
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: The log
+      description: Attach the log of the run; a failed run names it on its last line (`full log: <path>`).
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: "`mudcrab --version`, your OS, and MO2's version."
+      placeholder: mudcrab 0.2.0, Arch Linux (Proton 9), MO2 2.5.2
+    validations:
+      required: true

@@ -1,0 +1,24 @@
+name: Bug report
+description: A command fails or misbehaves, outside a particular modlist's install.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The command you ran, what it did, and what you expected.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: The log
+      description: Attach the run's log if there is one (`full log: <path>` on the last line of a failed run). Check it for secrets first.
+  - type: input
+    id: version
+    attributes:
+      label: Versions
+      description: "`mudcrab --version` and your OS."
+    validations:
+      required: true

@@ -219,15 +219,14 @@ Needed:
 
 ## Phase E — Publishing mechanics
 
-Done: dual MIT/Apache licence, Cargo metadata, CI (`cargo test` and
-`clippy -D warnings` on push), and tagged releases with Linux and Windows
-binaries. Left:
+Done: dual MIT/Apache licence, Cargo metadata, CI (`cargo fmt --check`,
+`cargo test` and `clippy -D warnings` on push), and tagged releases with Linux
+and Windows binaries. Left:
 
-- **Contributing guide and issue templates**, including how to report a modlist
-  that installs wrongly (the plan JSON and the diff output are the useful
-  attachments).
-- **A scope statement in the readme**: Oblivion and MO2 today; the design is not
-  limited to either, but nothing else has been run.
+- ~~**Contributing guide and issue templates**~~ -- done: `CONTRIBUTING.md`,
+  and a template for a modlist that installs wrongly asking for the plan, the
+  log and `diff` output.
+- ~~**A scope statement in the readme**~~ -- done: "What it covers".
 - ~~**Pin CI's toolchain**~~ -- done: `rust-toolchain.toml` pins it for
   development, CI and releases, and CI checks formatting.
 

@@ -42,6 +42,28 @@ It is **not yet packaged for other people to use**. See
 [docs/roadmap.md](docs/roadmap.md) for what stands between here and that, and
 [docs/known-issues.md](docs/known-issues.md) for what will bite you meanwhile.
 
+## What it covers
+
+Today, mudcrab is for **Oblivion** (TES4) with **Mod Organizer 2**, and that is
+all that has been run:
+
+- **Game:** Oblivion, tested with the Steam GOTY edition. Its plugin and BSA code is TES4's; nothing else is
+  read or written. Nothing in the pipeline above that is tied to one game, but
+  no other has been tried.
+- **Mod manager:** MO2, a portable instance. mudcrab writes the instance --
+  mods, profile, load order -- and never touches the game folder; files that
+  belong there go through the Root Builder MO2 plugin.
+- **Platform:** the full pipeline has been run on **Linux**, with the game, MO2
+  and xEdit under Proton. Windows binaries are built, but a whole install
+  has not been run on Windows yet.
+- **Nexus:** downloading through the Nexus API needs a premium account (Nexus's
+  rule). Without one, download the archives by hand into a folder mudcrab
+  searches; everything else, including identifying archives, works on any
+  account.
+
+Reports from setups other than these are especially welcome: see
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Getting it
 
 Prebuilt binaries for Linux and Windows are attached to each
@@ -64,6 +86,7 @@ tools and no API key. See
 | [docs/merge-standalone.md](docs/merge-standalone.md) | Using the merge engine on its own, as a zMerge replacement |
 | [docs/usage.md](docs/usage.md) | Command reference, and what each action does |
 | [docs/modlist-format.md](docs/modlist-format.md) | The TOML format |
+| [docs/exporters.md](docs/exporters.md) | Turning a modlist back into a guide: Nexus BBCode, Markdown, a GitHub Pages site |
 | [docs/mo2-output-structure.md](docs/mo2-output-structure.md) | What gets written into an MO2 instance |
 | [docs/known-issues.md](docs/known-issues.md) | Limitations, and what to do about them |
 | [docs/roadmap.md](docs/roadmap.md) | What is planned before a release |
@@ -86,7 +109,8 @@ mudcrab install  build/plan.json --downloads ~/Games/OblivionModDownloads --mo2-
 Authoring commands sit alongside it: `inspect` an archive to see its layout and
 installer options, `add` a mod to a list without disturbing its comments,
 `identify` an archive by hash, `conflicts` to see what two mods both provide,
-`diff` to compare a built instance against a reference, `check` and `validate`.
+`diff` to compare a built instance against a reference, `check` and `validate`,
+and `export` to write the list back out as a guide people can follow by hand.
 `mudcrab --help` lists them all.
 
 ## Licence
@@ -105,15 +129,12 @@ MIT or Apache-2.0, at your option. See [LICENSE-MIT](LICENSE-MIT) and
 ## Development
 
 ```bash
+cargo fmt
 cargo test
 cargo clippy --all-targets -- -D warnings
 ```
 
-Both must pass. There is no CI yet, so this is convention rather than
-automation — [roadmap Phase E](docs/roadmap.md#phase-e--publishing-mechanics).
-
-The codebase is heavily commented, deliberately: most of what mudcrab does is
-work around some undocumented behaviour of a twenty-year-old file format or of
-MO2, and the comment explaining why a line is the way it is tends to be the most
-valuable thing in the file. Keep that up. No blanket `#[allow]` — fix the lint,
-or suppress it narrowly with a reason.
+All three must pass, and CI checks them on every push, with the toolchain
+pinned in `rust-toolchain.toml`. [CONTRIBUTING.md](CONTRIBUTING.md) has the
+rest: how to report a modlist that installs wrongly, and the conventions the
+code keeps -- chief among them that it is heavily commented, deliberately.

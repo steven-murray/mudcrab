@@ -1,0 +1,16 @@
+name: Idea
+description: Something mudcrab should do, or do differently.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you were trying to do, and where mudcrab got in the way. This matters more than a proposed solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: An idea for it
+      description: Optional.
