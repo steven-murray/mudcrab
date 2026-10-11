@@ -118,5 +118,5 @@ fn a_dry_run_reports_uncached_archives_instead_of_aborting() {
         ])
         .assert()
         .success()
-        .stdout(predicates::str::contains("not cached"));
+        .stdout(predicates::str::contains("not in the downloads folder"));
 }

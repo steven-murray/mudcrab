@@ -90,11 +90,14 @@ fn install_exports_modorganizer2_instance_structure() {
     let extracted = instance_dir.join("mods").join("core").join("test.txt");
     assert!(extracted.exists());
 
-    let downloads = std::fs::read_dir(instance_dir.join("downloads"))
-        .expect("downloads dir should exist")
-        .filter_map(Result::ok)
-        .collect::<Vec<_>>();
-    assert_eq!(downloads.len(), 1);
+    // MO2 is pointed at the downloads folder rather than given copies.
+    let ini = std::fs::read_to_string(instance_dir.join("ModOrganizer.ini"))
+        .expect("ModOrganizer.ini should be written");
+    assert!(ini.contains("[Settings]") && ini.contains("download_directory="), "{ini}");
+    let copied = std::fs::read_dir(instance_dir.join("downloads"))
+        .map(|entries| entries.count())
+        .unwrap_or(0);
+    assert_eq!(copied, 0, "no archive should be copied into the instance's downloads/");
 
     let profile_dir = instance_dir.join("profiles").join("test-profile");
     let modlist_txt = std::fs::read_to_string(profile_dir.join("modlist.txt"))

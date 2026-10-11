@@ -20,7 +20,7 @@
 
 use super::InstallSettings;
 use crate::archive::ArchiveFilters;
-use crate::config::download;
+use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::install::layout::{self, bain::list_relative_paths, EntryReader};
 use crate::config::schema::{ModType, PersonalizedMod};
 use crate::util::fs::staging_dir_for;
@@ -118,18 +118,15 @@ fn from_plan(
         }
 
         let path = archive.path.as_deref().unwrap_or_default();
-        let cache_name = download::cache_file_name(&mod_entry.id, archive_index, path);
-        let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-            .or_else(|| {
-                download::find_local_archive(
-                    archive.file_name.as_deref(),
-                    &settings.archive_search_paths,
-                )
-            })
+        let source = archive_store::find(
+            &settings.cache_dir,
+            &settings.archive_search_paths,
+            &ArchiveRef::new(path, archive.file_name.as_deref()),
+        )
             .ok_or_else(|| {
                 anyhow::anyhow!(
-                    "cannot predict the files mod '{}' contributes: archive {} is not cached. \
-                     Run `mudcrab download` first.",
+                    "cannot predict the files mod '{}' contributes: archive {} is not in the \
+                     downloads folder. Run `mudcrab download` first.",
                     mod_entry.id,
                     archive_index
                 )

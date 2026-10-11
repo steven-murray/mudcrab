@@ -4,7 +4,7 @@ use super::bain::{apply_bain_from_staging, list_relative_paths};
 use super::fomod::apply_fomod_from_staging;
 use super::plan::plan_simple;
 use crate::archive::{extract_with_builtins, list_archive_paths, ArchiveFilters};
-use crate::config::download;
+use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::schema::{ArchiveLayout, CompiledArchive};
 use crate::util::fs::{copy_filtered_tree, normalize_relative_path, staging_dir_for};
 use std::collections::{BTreeMap, HashSet};
@@ -105,19 +105,21 @@ fn resolve_build_layers(
 ) -> anyhow::Result<Vec<PathBuf>> {
     let mut out = Vec::with_capacity(archive.build.len());
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let cache_name =
-            download::build_layer_cache_file_name(mod_id, archive_index, layer_index, &layer.path);
-        let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-            .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
-
-        if !source.exists() {
+        let reference = ArchiveRef::new(&layer.path, None);
+        let found = if settings.dry_run {
+            archive_store::find(&settings.cache_dir, &settings.archive_search_paths, &reference)
+        } else {
+            archive_store::resolve(&settings.cache_dir, &settings.archive_search_paths, &reference)?
+        };
+        let Some(source) = found else {
             anyhow::bail!(
-                "missing cached archive for build layer {} of mod {}: {}",
+                "build layer {} of mod {} archive {} ({}) is not in the downloads folder",
                 layer_index,
                 mod_id,
-                source.display()
+                archive_index,
+                layer.path
             );
-        }
+        };
         out.push(source);
     }
     Ok(out)

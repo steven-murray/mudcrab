@@ -1,6 +1,5 @@
 use crate::cli::DownloadArgs;
 use crate::config;
-use std::path::PathBuf;
 
 pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
     let raw = std::fs::read_to_string(&args.input)
@@ -12,10 +11,7 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = args
-        .cache
-        .clone()
-        .unwrap_or_else(|| PathBuf::from(".mudcrab-cache"));
+    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
     let settings = config::download::DownloadSettings {
         cache_dir,
         retry: args.retry,
@@ -30,7 +26,7 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
 
     tracing::info!(
         input = %args.input.display(),
-        cache = ?args.cache.as_ref().map(|p| p.display().to_string()),
+        downloads = %settings.cache_dir.display(),
         parallel = args.parallel,
         retry = args.retry,
         "download requested"

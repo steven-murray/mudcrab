@@ -11,6 +11,10 @@ use std::process::Command;
 /// config (all defaults apply).
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ToolsConfig {
+    /// The downloads folder every command uses unless `--downloads` says
+    /// otherwise. One central folder, with each MO2 instance pointed at it, is
+    /// the recommended setup.
+    pub downloads_dir: Option<PathBuf>,
     /// Wine / Proton runner used on non-Windows hosts for Windows-only tools.
     /// On Windows this section is ignored.
     pub wine: Option<WineConfig>,

@@ -6,12 +6,10 @@
 pub mod running;
 
 use super::install::InstallSettings;
-use crate::config::download;
 use crate::config::install::is_plugin_file;
 use crate::config::schema::{Mo2ModlistEntry, PersonalizedPlan};
-use crate::util::fs::{find_child_case_insensitive, link_or_copy, write_text_file};
+use crate::util::fs::{find_child_case_insensitive, write_text_file};
 use std::collections::HashSet;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
@@ -178,7 +176,7 @@ pub(crate) fn export_mo2_instance(
     scope: ExportScope<'_>,
 ) -> anyhow::Result<()> {
     let root = mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
-    export_downloads(plan, settings, &root.join("downloads"), scope)?;
+    point_at_downloads(root, &settings.cache_dir, settings.dry_run)?;
     ensure_mo2_section_folders(plan, settings, scope)?;
 
     let profile_dir = mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
@@ -251,136 +249,75 @@ fn scoped_section_names(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> Opti
     Some(out)
 }
 
-pub(crate) fn export_downloads(
-    plan: &PersonalizedPlan,
-    settings: &InstallSettings,
-    downloads_dir: &Path,
-    scope: ExportScope<'_>,
-) -> anyhow::Result<()> {
-    std::fs::create_dir_all(downloads_dir)
-        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", downloads_dir.display()))?;
-
-    for mod_entry in &plan.mods {
-        // Out-of-scope mods were never downloaded, so demanding their cached
-        // archives here would make every filtered install fail.
-        if !in_scope(scope, &mod_entry.id) {
-            continue;
-        }
-
-        for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
-            if !archive.build.is_empty() {
-                // Build archives have no single pre-built file to export; skip for now.
-                continue;
-            }
-            let path = archive.path.as_deref().unwrap_or_default();
-            let cache_name = download::cache_file_name(&mod_entry.id, archive_index, path);
-            let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-                .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
-            if !source.exists() {
-                anyhow::bail!("missing cached archive for MO2 export: {}", source.display());
-            }
-
-            // The modlist's own `file_name` beats the sidecar: it is the name
-            // the author declared, whereas the sidecar only records whatever the
-            // server happened to call the file on the day it was fetched.
-            let dest_name = declared_download_name(archive.file_name.as_deref())
-                .or_else(|| read_cached_original_name(&settings.cache_dir, &cache_name))
-                .unwrap_or_else(|| {
-                    let ext = detect_archive_ext(&source);
-                    format!("{cache_name}{ext}")
-                });
-            let destination = downloads_dir.join(&dest_name);
-
-            // MO2's downloads/ is a second copy of an archive set that runs to
-            // tens of gigabytes, and installs are re-run constantly. Re-copying
-            // a file that is already there wastes the disk twice over: once on
-            // the redundant write, and once because an unconditional copy breaks
-            // the hard link that made the first export free.
-            if same_size(&source, &destination) {
-                tracing::debug!(
-                    mod_id = %mod_entry.id,
-                    destination = %destination.display(),
-                    "mo2 export: archive already present, skipping"
-                );
-                continue;
-            }
-
-            link_or_copy(&source, &destination)?;
-        }
+/// Point the instance's MO2 at the downloads folder: `download_directory`
+/// under `[Settings]` in `ModOrganizer.ini`.
+///
+/// Rather than linking each archive into the instance's own `downloads/`, MO2
+/// is shown the folder itself, so it lists everything there -- including
+/// archives the user may want to install by hand afterwards -- and one
+/// central folder can serve every instance on the machine. MO2 stores the path
+/// with forward slashes, under Wine as a `Z:` path.
+pub(crate) fn point_at_downloads(instance: &Path, downloads: &Path, dry_run: bool) -> anyhow::Result<()> {
+    let absolute = std::path::absolute(downloads)
+        .map_err(|err| anyhow::anyhow!("failed to resolve {}: {err}", downloads.display()))?;
+    let value = mo2_path(&absolute);
+    let ini_path = instance.join("ModOrganizer.ini");
+    if dry_run {
+        tracing::info!(ini = %ini_path.display(), download_directory = %value, "install dry-run: would point MO2 at the downloads folder");
+        return Ok(());
     }
-
+    let existing = std::fs::read_to_string(&ini_path).unwrap_or_default();
+    let updated = set_ini_key(&existing, "Settings", "download_directory", &value);
+    if updated != existing {
+        std::fs::write(&ini_path, updated)
+            .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", ini_path.display()))?;
+        tracing::info!(ini = %ini_path.display(), download_directory = %value, "pointed MO2 at the downloads folder");
+    }
     Ok(())
 }
 
-/// Whether `destination` is already the same file, by size.
-///
-/// Size alone rather than a hash: these are immutable published archives keyed
-/// by a name that encodes the mod and file id, so a same-named, same-sized file
-/// in downloads/ is the same file. Hashing tens of gigabytes on every install to
-/// prove it would cost more than the copy this avoids.
-fn same_size(source: &Path, destination: &Path) -> bool {
-    let (Ok(source), Ok(destination)) = (source.metadata(), destination.metadata()) else {
-        return false;
-    };
-    destination.is_file() && source.len() == destination.len()
+/// A path as MO2 writes one: forward slashes, and under Wine the `Z:` drive
+/// that maps the Unix root.
+fn mo2_path(path: &Path) -> String {
+    let forward = path.to_string_lossy().replace('\\', "/");
+    if cfg!(windows) { forward } else { format!("Z:{forward}") }
 }
 
-/// A `file_name` from the modlist, if it is usable as a filename.
-///
-/// Rejects anything with a path separator: the value is user-authored TOML and
-/// is joined straight onto the downloads directory.
-fn declared_download_name(file_name: Option<&str>) -> Option<String> {
-    let trimmed = file_name?.trim();
-    if trimmed.is_empty()
-        || trimmed.contains('/')
-        || trimmed.contains('\\')
-        || trimmed == "."
-        || trimmed == ".."
-    {
-        return None;
-    }
-    Some(trimmed.to_string())
-}
+/// Set `key=value` in `[section]` of an INI, keeping everything else -- line
+/// endings included -- as it was. Adds the section if it is missing.
+fn set_ini_key(text: &str, section: &str, key: &str, value: &str) -> String {
+    let newline = if text.contains("\r\n") || text.is_empty() { "\r\n" } else { "\n" };
+    let header = format!("[{section}]");
+    let assignment = format!("{key}={value}");
+    let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
 
-pub(crate) fn read_cached_original_name(cache_dir: &Path, cache_name: &str) -> Option<String> {
-    let sidecar_name = format!("{cache_name}.orig-name");
-    let metadata_path = download::resolve_cache_path(cache_dir, &sidecar_name)
-        .unwrap_or_else(|| download::cache_original_name_path(cache_dir, cache_name));
-    let name = std::fs::read_to_string(metadata_path).ok()?;
-    let trimmed = name.trim();
-    if trimmed.is_empty() || trimmed.contains('/') || trimmed.contains('\\') {
-        return None;
+    let section_start = lines.iter().position(|line| line.trim().eq_ignore_ascii_case(&header));
+    match section_start {
+        Some(start) => {
+            let end = lines[start + 1..]
+                .iter()
+                .position(|line| line.trim_start().starts_with('['))
+                .map_or(lines.len(), |offset| start + 1 + offset);
+            let existing = lines[start + 1..end].iter().position(|line| {
+                line.split_once('=')
+                    .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+            });
+            match existing {
+                Some(offset) => lines[start + 1 + offset] = assignment,
+                None => lines.insert(start + 1, assignment),
+            }
+        }
+        None => {
+            if lines.last().is_some_and(|line| !line.is_empty()) {
+                lines.push(String::new());
+            }
+            lines.push(header);
+            lines.push(assignment);
+        }
     }
-    Some(trimmed.to_string())
-}
-
-/// Detect the archive extension by reading magic bytes.
-pub(crate) fn detect_archive_ext(path: &Path) -> &'static str {
-    let Ok(mut file) = std::fs::File::open(path) else {
-        return "";
-    };
-    let mut buf = [0u8; 8];
-    let n = file.read(&mut buf).unwrap_or(0);
-    if n < 2 {
-        return "";
-    }
-    // 7z: 37 7A BC AF 27 1C
-    if n >= 6 && buf[..6] == [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C] {
-        return ".7z";
-    }
-    // Zip: 50 4B 03 04
-    if n >= 4 && buf[..4] == [0x50, 0x4B, 0x03, 0x04] {
-        return ".zip";
-    }
-    // Rar: 52 61 72 21 (Rar!)
-    if n >= 4 && buf[..4] == [0x52, 0x61, 0x72, 0x21] {
-        return ".rar";
-    }
-    // gzip (tar.gz): 1F 8B
-    if n >= 2 && buf[..2] == [0x1F, 0x8B] {
-        return ".tar.gz";
-    }
-    ""
+    let mut out = lines.join(newline);
+    out.push_str(newline);
+    out
 }
 
 pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> String {

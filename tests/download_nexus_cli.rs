@@ -69,24 +69,9 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
         .assert()
         .success();
 
-    let files = std::fs::read_dir(&cache)
-        .expect("cache should exist")
-        .filter_map(Result::ok)
-        .collect::<Vec<_>>();
-
-    let archive = files
-        .iter()
-        .find(|entry| entry.path().extension().and_then(|ext| ext.to_str()) != Some("orig-name"))
-        .expect("archive payload should exist");
-    let metadata = files
-        .iter()
-        .find(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("orig-name"))
-        .expect("archive metadata sidecar should exist");
-
-    let payload = std::fs::read(archive.path()).expect("downloaded file should be readable");
+    // Saved under the server's name, with the .meta MO2 would write.
+    let payload = std::fs::read(cache.join("archive.bin")).expect("downloaded file should be readable");
     assert_eq!(payload, b"nexus-cli-payload");
-
-    let original_name = std::fs::read_to_string(metadata.path())
-        .expect("original filename metadata should be readable");
-    assert_eq!(original_name, "archive.bin");
+    let meta = std::fs::read_to_string(cache.join("archive.bin.meta")).expect(".meta should exist");
+    assert!(meta.contains("modID=") && meta.contains("fileID="), "{meta}");
 }

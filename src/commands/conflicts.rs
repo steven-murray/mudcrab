@@ -12,7 +12,6 @@ use crate::config::install::index::staged_paths_detailed;
 use crate::config::install::safe_mod_dir_name;
 use crate::config::tools::ToolsConfig;
 use std::collections::BTreeSet;
-use std::path::PathBuf;
 
 pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     let raw = std::fs::read_to_string(&args.plan)
@@ -21,10 +20,7 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("failed to parse plan {}: {err}", args.plan.display()))?;
 
     let settings = config::install::InstallSettings {
-        cache_dir: args
-            .cache
-            .clone()
-            .unwrap_or_else(|| PathBuf::from(".mudcrab-cache")),
+        cache_dir: super::resolve_downloads_dir(args.downloads.clone(), None, None)?,
         mods_dir: args.mods_dir.clone(),
         mo2_instance_dir: None,
         profile_name: String::new(),

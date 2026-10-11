@@ -1,9 +1,11 @@
 pub mod actions;
 pub mod add;
+pub mod archive_store;
 pub mod check;
 pub mod compiler;
 pub mod diff;
 pub mod download;
+pub mod downloads_tidy;
 pub mod filter;
 pub mod identify;
 pub mod inspect;

@@ -55,6 +55,9 @@ pub enum Command {
     /// Inspect DDS textures.
     #[command(subcommand)]
     Dds(DdsCommand),
+    /// Manage the downloads folder.
+    #[command(subcommand)]
+    Downloads(DownloadsCommand),
 }
 
 /// Add one `[[mods]]` block to a source modlist.
@@ -299,9 +302,11 @@ pub struct ArchiveSourceArgs {
 pub struct DownloadArgs {
     /// Path to personalized install plan.
     pub input: PathBuf,
-    /// Cache directory for downloaded archives.
-    #[arg(long)]
-    pub cache: Option<PathBuf>,
+    /// The downloads folder: archives under their real names, with MO2
+    /// `.meta` files. Defaults to `downloads_dir` in tools.toml, then (for an
+    /// MO2 install) the instance's own `downloads/`.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
     /// Maximum concurrent downloads.
     #[arg(long, default_value_t = 4)]
     pub parallel: usize,
@@ -318,9 +323,11 @@ pub struct DownloadArgs {
 pub struct CheckArgs {
     /// Path to personalized install plan.
     pub input: PathBuf,
-    /// Cache directory for downloaded archives.
-    #[arg(long)]
-    pub cache: Option<PathBuf>,
+    /// The downloads folder: archives under their real names, with MO2
+    /// `.meta` files. Defaults to `downloads_dir` in tools.toml, then (for an
+    /// MO2 install) the instance's own `downloads/`.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
     #[command(flatten)]
@@ -357,9 +364,11 @@ pub struct ConflictsArgs {
     /// Restrict the comparison to one subtree, e.g. `textures/`.
     #[arg(long)]
     pub under: Option<String>,
-    /// Archive cache directory.
-    #[arg(long)]
-    pub cache: Option<PathBuf>,
+    /// The downloads folder: archives under their real names, with MO2
+    /// `.meta` files. Defaults to `downloads_dir` in tools.toml, then (for an
+    /// MO2 install) the instance's own `downloads/`.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
     #[command(flatten)]
     pub archive_sources: ArchiveSourceArgs,
 }
@@ -389,9 +398,11 @@ pub enum InspectFormat {
 pub struct InstallArgs {
     /// Path to personalized install plan.
     pub input: PathBuf,
-    /// Source cache directory for archives.
-    #[arg(long)]
-    pub cache: Option<PathBuf>,
+    /// The downloads folder: archives under their real names, with MO2
+    /// `.meta` files. Defaults to `downloads_dir` in tools.toml, then (for an
+    /// MO2 install) the instance's own `downloads/`.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
     /// Installation output directory for plain staged installs.
     #[arg(long)]
     pub mods_dir: Option<PathBuf>,
@@ -571,4 +582,25 @@ pub struct DdsAuditArgs {
     /// case. Either slash direction matches.
     #[arg(long)]
     pub filter: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DownloadsCommand {
+    /// Convert a downloads folder from mudcrab's old derived names
+    /// (`{mod}_{index}_{source}` + `.orig-name`) to real names with MO2 `.meta`
+    /// files. Prints what it would do; changes nothing without --apply.
+    Tidy(DownloadsTidyArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DownloadsTidyArgs {
+    /// The downloads folder to tidy.
+    pub dir: PathBuf,
+    /// A plan, so archives named only by their Nexus or URL source get the
+    /// `.meta` that lookup needs to find them.
+    #[arg(long)]
+    pub plan: Option<PathBuf>,
+    /// Carry out the plan rather than only printing it.
+    #[arg(long)]
+    pub apply: bool,
 }

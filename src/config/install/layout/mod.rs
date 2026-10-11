@@ -7,7 +7,7 @@ pub mod fomod;
 pub mod plan;
 
 use crate::archive::{extract_entries, extract_with_builtins, list_archive_paths, ArchiveFilters};
-use crate::config::download;
+use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::schema::{ArchiveLayout, CompiledArchive, ModType, PersonalizedMod};
 use build::extract_build_archive;
 
@@ -192,52 +192,45 @@ pub(crate) fn install_mod_archives(
         }
 
         let path = archive.path.as_deref().unwrap_or_default();
-        let cache_name = download::cache_file_name(&mod_entry.id, archive_index, path);
-        let mut source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-            .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
-
-        if !source.exists() {
-            // A dry run exists to show the whole plan, so an uncached archive
-            // is something to report and carry on from -- aborting on the
-            // first one hides everything after it. `check` is the command that
-            // verifies the cache; this one previews.
-            if settings.dry_run {
-                // A dry run must not write, so it reports what adoption *would*
-                // find rather than linking it into the cache.
-                match download::find_local_archive(
-                    archive.file_name.as_deref(),
-                    &settings.archive_search_paths,
-                ) {
-                    Some(local) => tracing::info!(
+        let reference = ArchiveRef::new(path, archive.file_name.as_deref());
+        let source = if settings.dry_run {
+            // A dry run exists to show the whole plan, so a missing archive is
+            // something to report and carry on from -- aborting on the first
+            // one hides everything after it. It must not write, so a search
+            // path copy is reported rather than linked in.
+            match archive_store::locate(&settings.cache_dir, &settings.archive_search_paths, &reference) {
+                Some(archive_store::Found::Downloads(path)) => path,
+                Some(archive_store::Found::SearchPath(local)) => {
+                    tracing::info!(
                         mod_id = %mod_entry.id,
                         local = %local.display(),
-                        "install dry-run: archive would be adopted from a local search path"
-                    ),
-                    None => tracing::warn!(
-                        mod_id = %mod_entry.id,
-                        archive = %source.display(),
-                        "install dry-run: archive is not cached, would need downloading"
-                    ),
+                        "install dry-run: archive would be linked in from a search path"
+                    );
+                    continue;
                 }
-                continue;
+                None => {
+                    tracing::warn!(
+                        mod_id = %mod_entry.id,
+                        archive = reference.describe(),
+                        "install dry-run: archive is not in the downloads folder, would need downloading"
+                    );
+                    continue;
+                }
             }
-
+        } else {
             // Installing straight from archives already on disk is the point of
             // --archive-search-path: no `download` run has to have happened.
-            match download::link_local_archive(
-                archive.file_name.as_deref(),
-                &settings.cache_dir,
-                &cache_name,
-                &settings.archive_search_paths,
-            )? {
-                Some(linked) => source = linked,
+            match archive_store::resolve(&settings.cache_dir, &settings.archive_search_paths, &reference)? {
+                Some(found) => found,
                 None => anyhow::bail!(
-                    "missing cached archive for mod {}: {}",
+                    "mod {}: archive {} is not in the downloads folder ({}) or any search path; \
+                     run `mudcrab download` first",
                     mod_entry.id,
-                    source.display()
+                    reference.describe(),
+                    settings.cache_dir.display()
                 ),
             }
-        }
+        };
 
         // Game-root files go to the mod's own `root/`, where Root Builder
         // picks them up. They are also excluded from the normal pass below.

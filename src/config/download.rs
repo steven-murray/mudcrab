@@ -1,11 +1,13 @@
+use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::filter::ModFilter;
 use crate::config::schema::PersonalizedPlan;
-use crate::util::fs::{find_child_case_insensitive, link_or_copy};
 use reqwest::Client;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Default)]
 pub struct DownloadSettings {
+    /// The downloads folder: archives under their real names, with MO2
+    /// `.meta` files. See `archive_store`.
     pub cache_dir: PathBuf,
     pub retry: u32,
     pub nexus_api_key: Option<String>,
@@ -13,7 +15,7 @@ pub struct DownloadSettings {
     /// Which mods to fetch. Empty means the whole plan.
     pub filter: ModFilter,
     /// Read-only directories that may already hold the archives, tried in order
-    /// before anything goes over the network. See `link_local_archive`.
+    /// before anything goes over the network. See `archive_store::resolve`.
     pub archive_search_paths: Vec<PathBuf>,
     /// How many archives to fetch at once. At least 1.
     pub parallel: usize,
@@ -21,9 +23,8 @@ pub struct DownloadSettings {
 
 #[derive(Debug)]
 enum DownloadOutcome {
+    /// Already in the downloads folder, or linked in from a search path.
     Cached(PathBuf),
-    /// Adopted from an `--archive-search-path` rather than fetched.
-    Local(PathBuf),
     Downloaded(PathBuf),
 }
 
@@ -43,8 +44,9 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     // at the first one turns finding them into one round trip each.
     let mut errors: Vec<String> = Vec::new();
 
-    // Collected first, then fetched `settings.parallel` at a time. Each job has
-    // its own destination, so concurrent jobs never write the same file.
+    // Collected first, then fetched `settings.parallel` at a time. Two jobs for
+    // one archive (a file several mods use) are run once: the second would
+    // only race the first to the same name.
     let mut jobs: Vec<Job<'_>> = Vec::new();
     for mod_entry in &plan.mods {
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
@@ -63,12 +65,6 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                         path: &layer.path,
                         file_name: None,
                         handler: layer.download_handler.as_deref(),
-                        destination: settings.cache_dir.join(build_layer_cache_file_name(
-                            &mod_entry.id,
-                            archive_index,
-                            layer_index,
-                            &layer.path,
-                        )),
                     });
                 }
             } else {
@@ -83,13 +79,13 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                     path,
                     file_name: archive.file_name.as_deref(),
                     handler: archive.download_handler.as_deref(),
-                    destination: settings
-                        .cache_dir
-                        .join(cache_file_name(&mod_entry.id, archive_index, path)),
                 });
             }
         }
     }
+
+    let mut seen = std::collections::HashSet::new();
+    jobs.retain(|job| seen.insert((job.path, job.file_name)));
 
     use futures_util::stream::{self, StreamExt};
     let results: Vec<_> = stream::iter(jobs)
@@ -101,7 +97,6 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                     job.path,
                     job.file_name,
                     job.handler,
-                    &job.destination,
                     settings,
                 )
                 .await;
@@ -154,88 +149,36 @@ struct Job<'a> {
     path: &'a str,
     file_name: Option<&'a str>,
     handler: Option<&'a str>,
-    destination: PathBuf,
 }
 
-/// Whether a cached archive no longer matches the file it was adopted from.
-///
-/// The cache is keyed by a *derived* name -- mod id, archive index, file id --
-/// which says nothing about content. Re-download an archive under its own name
-/// in a search path and the derived name is unchanged, so the cache keeps
-/// serving the old bytes forever. That is not hypothetical: a MOFAM archive was
-/// repaired in place and the next install still unpacked the broken copy,
-/// silently, because the cache hit short-circuits before adoption.
-///
-/// Compared by size, not by hash. The cache holds tens of gigabytes and this
-/// runs once per archive per install; a size change is what a replaced download
-/// looks like, and a same-size different-content replacement is not a case
-/// worth reading 50GB to catch.
-pub(crate) fn cache_entry_is_stale(
-    cached: &Path,
-    file_name: Option<&str>,
-    search_paths: &[PathBuf],
-) -> bool {
-    let Some(source) = find_local_archive(file_name, search_paths) else {
-        // Nothing to compare against, so nothing to say. An archive with no
-        // local twin is the cache's own business.
-        return false;
-    };
-
-    let (Ok(cached_meta), Ok(source_meta)) = (cached.metadata(), source.metadata()) else {
-        return false;
-    };
-    if cached_meta.len() == source_meta.len() {
-        return false;
-    }
-
-    tracing::warn!(
-        cached = %cached.display(),
-        source = %source.display(),
-        cached_bytes = cached_meta.len(),
-        source_bytes = source_meta.len(),
-        "cached archive no longer matches the file it came from; re-adopting"
-    );
-    true
-}
-
-/// Resolution order for one archive: cache, then the read-only search paths,
-/// then the network. The first two never touch the network at all, which is the
-/// whole point -- a large modlist is mostly archives the machine already has.
+/// Resolution order for one archive: the downloads folder, then the read-only
+/// search paths, then the network. The first two never touch the network,
+/// which is the whole point -- a large modlist is mostly archives the machine
+/// already has.
 async fn download_with_retry(
     client: &Client,
     path: &str,
     file_name: Option<&str>,
     handler: Option<&str>,
-    destination: &Path,
     settings: &DownloadSettings,
 ) -> anyhow::Result<DownloadOutcome> {
-    let cache_dir = destination.parent().unwrap_or_else(|| Path::new("."));
-    let cache_name = destination
-        .file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or_default();
+    let downloads = &settings.cache_dir;
+    let archive = ArchiveRef::new(path, file_name);
 
-    if let Some(existing) = resolve_cache_path(cache_dir, cache_name)
-        && !cache_entry_is_stale(&existing, file_name, &settings.archive_search_paths)
-    {
-        tracing::info!(source = %path, destination = %existing.display(), "archive already cached, skipping download");
-        return Ok(DownloadOutcome::Cached(existing));
-    }
-
-    if let Some(linked) =
-        link_local_archive(file_name, cache_dir, cache_name, &settings.archive_search_paths)?
-    {
-        return Ok(DownloadOutcome::Local(linked));
+    if let Some(found) = archive_store::resolve(downloads, &settings.archive_search_paths, &archive)? {
+        return Ok(DownloadOutcome::Cached(found));
     }
 
     // A manual archive is one no automated fetch can reach -- a login-walled
-    // forum host, a dead link, a file the author distributes by hand. The two
-    // steps above are the only ones that can ever satisfy it, so fail here
-    // rather than falling into the retry loop: retrying a fetch that does not
-    // exist just delays the same message three times over.
+    // forum host, a dead link, a file the author distributes by hand. The step
+    // above is the only one that can ever satisfy it, so fail here rather than
+    // falling into the retry loop: retrying a fetch that does not exist just
+    // delays the same message three times over.
     if resolve_handler(path, handler) == "manual" {
-        let wanted = file_name.unwrap_or(path);
-        let similar = similar_archives(wanted, &settings.archive_search_paths);
+        let wanted = archive.describe();
+        let mut searched = vec![downloads.clone()];
+        searched.extend(settings.archive_search_paths.iter().cloned());
+        let similar = similar_archives(wanted, &searched);
         let hint = if similar.is_empty() {
             String::new()
         } else {
@@ -251,34 +194,38 @@ async fn download_with_retry(
         };
         anyhow::bail!(
             "archive '{}' must be downloaded by hand -- it is not fetchable from any \
-             automated source. Put it in one of the --archive-search-path directories \
-             (or the download cache) and re-run. Searched: {}{hint}",
+             automated source. Put it in the downloads folder ({}) or one of the \
+             --archive-search-path directories and re-run. Searched: {}{hint}",
             wanted,
+            downloads.display(),
             describe_search_paths(&settings.archive_search_paths),
         );
     }
 
+    std::fs::create_dir_all(downloads)
+        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", downloads.display()))?;
+    // Fetched under a scratch name, then renamed to the archive's real name
+    // once the server has said what that is.
+    let partial = downloads.join(format!(".mudcrab-{}.part", scratch_name(path)));
     let attempts = settings.retry.max(1);
 
     for attempt in 1..=attempts {
-        let result = download_once(client, path, handler, destination, settings).await;
+        let result = download_once(client, path, handler, &partial, settings).await;
         match result {
-            Ok(original_name) => {
-                let actual_dest = if let Some(name) = &original_name {
-                    append_extension_from_original_name(destination, name)
-                } else {
-                    destination.to_path_buf()
-                };
-                if let Some(name) = original_name {
-                    let metadata_path = cache_original_name_path_for_destination(&actual_dest);
-                    std::fs::write(&metadata_path, name).map_err(|err| {
-                        anyhow::anyhow!(
-                            "failed to write download filename metadata {}: {err}",
-                            metadata_path.display()
-                        )
-                    })?;
+            Ok(server_name) => {
+                let mut name = final_name(&archive, server_name.as_deref(), downloads);
+                // A name with no archive extension cannot be unpacked by
+                // extension; the file's own magic bytes say what it is.
+                if !has_archive_extension(&name) {
+                    name.push_str(archive_store::detect_archive_ext(&partial));
                 }
-                return Ok(DownloadOutcome::Downloaded(actual_dest));
+                let final_path = downloads.join(name);
+                std::fs::rename(&partial, &final_path).map_err(|err| {
+                    anyhow::anyhow!("failed to move download to {}: {err}", final_path.display())
+                })?;
+                archive_store::write_meta(&final_path, &archive)?;
+                archive_store::note_written(downloads);
+                return Ok(DownloadOutcome::Downloaded(final_path));
             }
             Err(err) if attempt < attempts => {
                 tracing::warn!(
@@ -290,6 +237,7 @@ async fn download_with_retry(
                 );
             }
             Err(err) => {
+                let _ = std::fs::remove_file(&partial);
                 return Err(anyhow::anyhow!(
                     "failed to download {} after {} attempt(s): {err}",
                     path,
@@ -300,6 +248,47 @@ async fn download_with_retry(
     }
 
     unreachable!("retry loop always returns");
+}
+
+fn has_archive_extension(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [".7z", ".zip", ".rar", ".tar.gz", ".gz", ".tar", ".esp", ".esm", ".bsa"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
+}
+
+/// A filesystem-safe token for a source, for the scratch file only.
+fn scratch_name(source: &str) -> String {
+    source
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect()
+}
+
+/// What a freshly downloaded archive is called: the declared `file_name`, else
+/// what the server called it, else something derived from the source. If that
+/// name is already taken -- by a different file, since lookup missed -- a
+/// suffix keeps both, as MO2 does.
+fn final_name(archive: &ArchiveRef<'_>, server_name: Option<&str>, downloads: &Path) -> String {
+    let base = archive
+        .file_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .or_else(|| server_name.map(str::to_string))
+        .or_else(|| archive.expected_name().map(str::to_string))
+        .unwrap_or_else(|| scratch_name(archive.source));
+    if !downloads.join(&base).exists() {
+        return base;
+    }
+    let (stem, ext) = match base.rsplit_once('.') {
+        Some((stem, ext)) if !stem.is_empty() => (stem.to_string(), format!(".{ext}")),
+        _ => (base.clone(), String::new()),
+    };
+    (1..)
+        .map(|n| format!("{stem} ({n}){ext}"))
+        .find(|candidate| !downloads.join(candidate).exists())
+        .expect("an unused name exists")
 }
 
 async fn download_once(
@@ -371,15 +360,7 @@ fn log_download_outcome(mod_id: &str, source: &str, outcome: &DownloadOutcome) {
                 mod_id,
                 source,
                 destination = %p.display(),
-                "archive ready from cache"
-            );
-        }
-        DownloadOutcome::Local(p) => {
-            tracing::info!(
-                mod_id,
-                source,
-                destination = %p.display(),
-                "archive ready from a local search path"
+                "archive ready in the downloads folder"
             );
         }
         DownloadOutcome::Downloaded(p) => {
@@ -514,104 +495,39 @@ fn filename_from_content_disposition(value: &str) -> Option<String> {
     None
 }
 
+/// A server-supplied filename, reduced to a bare name. Kept as the server
+/// spelled it -- spaces and all, after percent-decoding -- because it becomes
+/// the archive's name in a folder MO2 shows the user.
 fn sanitize_filename_component(value: &str) -> Option<String> {
-    let basename = value
-        .rsplit('/')
-        .next()
-        .unwrap_or(value)
-        .rsplit('\\')
-        .next()
-        .unwrap_or(value)
-        .trim();
-
-    if basename.is_empty() || basename == "." || basename == ".." || basename.contains('\0') {
+    let decoded = percent_decode(value);
+    let basename = decoded.rsplit(['/', '\\']).next().unwrap_or(&decoded).trim();
+    if basename.is_empty()
+        || basename == "."
+        || basename == ".."
+        || basename.chars().any(|c| c.is_control())
+    {
         return None;
     }
-
-    let sanitized: String = basename
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-
-    if sanitized.is_empty() {
-        None
-    } else {
-        Some(sanitized)
-    }
+    Some(basename.to_string())
 }
 
-pub fn cache_original_name_path(cache_dir: &Path, cache_name: &str) -> PathBuf {
-    cache_dir.join(format!("{cache_name}.orig-name"))
-}
-
-pub fn resolve_cache_path(cache_dir: &Path, cache_name: &str) -> Option<PathBuf> {
-    let exact = cache_dir.join(cache_name);
-    if exact.exists() {
-        return Some(exact);
-    }
-
-    let name_lower = cache_name.to_ascii_lowercase();
-    let mut extension_match: Option<PathBuf> = None;
-    let entries = std::fs::read_dir(cache_dir).ok()?;
-    for entry in entries.flatten() {
-        let candidate_name = entry.file_name();
-        let candidate_lower = candidate_name.to_string_lossy().to_ascii_lowercase();
-
-        if candidate_lower == name_lower {
-            return Some(entry.path());
-        }
-
-        // Accept "{cache_name}.{ext}" where ext is all alphanumeric (e.g. "7z", "zip", "rar").
-        // This matches files that were renamed post-download to include the archive extension,
-        // while excluding sidecar files like "…orig-name".
-        if extension_match.is_none()
-            && let Some(suffix) = candidate_lower.strip_prefix(&format!("{name_lower}."))
-            && !suffix.is_empty()
-            && suffix.chars().all(|c| c.is_ascii_alphanumeric())
+fn percent_decode(value: &str) -> String {
+    let bytes = value.as_bytes();
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%'
+            && i + 2 < bytes.len()
+            && let Ok(byte) = u8::from_str_radix(&value[i + 1..i + 3], 16)
         {
-            extension_match = Some(entry.path());
+            out.push(byte);
+            i += 3;
+        } else {
+            out.push(bytes[i]);
+            i += 1;
         }
     }
-
-    extension_match
-}
-
-fn cache_original_name_path_for_destination(destination: &Path) -> PathBuf {
-    let mut sidecar = destination.as_os_str().to_os_string();
-    sidecar.push(".orig-name");
-    PathBuf::from(sidecar)
-}
-
-/// Find an archive that is already on this machine, by its declared filename.
-///
-/// Search paths are read-only sources -- the user's existing MO2 and Wabbajack
-/// download folders -- so nothing here writes to, renames within, or deletes
-/// from them. They are tried in order and the first hit wins, which is what
-/// makes the ordering on the command line meaningful.
-///
-/// Matching is case-insensitive because these filenames are transcribed from
-/// Windows-authored mod pages onto a case-sensitive filesystem.
-pub fn find_local_archive(file_name: Option<&str>, search_paths: &[PathBuf]) -> Option<PathBuf> {
-    let file_name = file_name?.trim();
-    if file_name.is_empty() {
-        return None;
-    }
-
-    for directory in search_paths {
-        if let Some(found) = find_child_case_insensitive(directory, file_name)
-            && found.is_file()
-        {
-            return Some(found);
-        }
-    }
-
-    None
+    String::from_utf8(out).unwrap_or_else(|_| value.to_string())
 }
 
 /// Files in the search paths whose names look like `wanted` with a different
@@ -660,102 +576,6 @@ fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
     scored.into_iter().take(3).map(|(_, path)| path).collect()
 }
 
-/// Adopt an archive found in a search path into the cache.
-///
-/// The cache is keyed by `cache_file_name`, a derived name that has nothing to
-/// do with what the archive is called on disk, so adopting one means placing it
-/// under the derived name *and* recording its real name in the `.orig-name`
-/// sidecar -- exactly the pair a download would have left behind, so everything
-/// downstream cannot tell the difference.
-///
-/// Hard-links where it can (the search paths are typically on the same
-/// filesystem as the cache), which is what keeps a second copy of ~50GB of
-/// archives off the disk.
-pub fn link_local_archive(
-    file_name: Option<&str>,
-    cache_dir: &Path,
-    cache_name: &str,
-    search_paths: &[PathBuf],
-) -> anyhow::Result<Option<PathBuf>> {
-    let Some(source) = find_local_archive(file_name, search_paths) else {
-        return Ok(None);
-    };
-    let original_name = file_name.unwrap_or_default().trim();
-
-    std::fs::create_dir_all(cache_dir).map_err(|err| {
-        anyhow::anyhow!("failed to create cache directory {}: {err}", cache_dir.display())
-    })?;
-
-    let destination =
-        cache_path_with_original_extension(&cache_dir.join(cache_name), original_name);
-    link_or_copy(&source, &destination)?;
-
-    let sidecar = cache_original_name_path_for_destination(&destination);
-    std::fs::write(&sidecar, original_name).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to write download filename metadata {}: {err}",
-            sidecar.display()
-        )
-    })?;
-
-    tracing::info!(
-        file_name = original_name,
-        source = %source.display(),
-        destination = %destination.display(),
-        "archive resolved from a local search path; no download needed"
-    );
-
-    Ok(Some(destination))
-}
-
-/// If the `destination` path doesn't already end with the extension from `original_name`, rename
-/// the file on disk to append it and return the new path.  This ensures cached archives are
-/// recognisable by external tools (e.g. `.7z`, `.zip`).  When the source URL already encoded the
-/// filename (e.g. `https://…/mod.7z`), `destination` will already have the correct extension and
-/// no rename is performed.
-fn append_extension_from_original_name(destination: &Path, original_name: &str) -> PathBuf {
-    let new_path = cache_path_with_original_extension(destination, original_name);
-    if new_path == destination {
-        return new_path;
-    }
-
-    if let Err(err) = std::fs::rename(destination, &new_path) {
-        tracing::warn!(
-            from = %destination.display(),
-            to = %new_path.display(),
-            "failed to rename cached archive to include extension: {err}"
-        );
-        return destination.to_path_buf();
-    }
-    new_path
-}
-
-/// The cache path an archive belongs at, given what it was originally called.
-///
-/// Shared by the download path (which renames onto it) and by local adoption
-/// (which links straight to it), so a cached archive looks identical however it
-/// got there.
-fn cache_path_with_original_extension(destination: &Path, original_name: &str) -> PathBuf {
-    let Some(ext) = Path::new(original_name)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase())
-    else {
-        return destination.to_path_buf();
-    };
-
-    let current_ext = destination
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(|e| e.to_ascii_lowercase());
-
-    if current_ext.as_deref() == Some(ext.as_str()) {
-        return destination.to_path_buf();
-    }
-
-    PathBuf::from(format!("{}.{ext}", destination.display()))
-}
-
 #[derive(Debug, serde::Deserialize)]
 struct NexusDownloadLink {
     #[serde(default, alias = "URI")]
@@ -782,63 +602,6 @@ fn parse_nexus_spec(source: &str) -> anyhow::Result<(&str, &str, &str)> {
     }
 
     Ok((game, mod_id, file_id))
-}
-
-fn safe_filename(mod_id: &str, archive_index: usize, source: &str) -> String {
-    let tail = source.rsplit('/').next().unwrap_or("archive.bin");
-    let tail = tail.split('?').next().unwrap_or(tail);
-
-    let sanitized: String = tail
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-
-    format!("{}_{}_{}", mod_id, archive_index, sanitized)
-}
-
-pub fn cache_file_name(mod_id: &str, archive_index: usize, source: &str) -> String {
-    safe_filename(mod_id, archive_index, source)
-}
-
-pub fn build_layer_cache_file_name(
-    mod_id: &str,
-    archive_index: usize,
-    layer_index: usize,
-    source: &str,
-) -> String {
-    let safe_id: String = mod_id
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
-        .collect();
-    let tail = source.rsplit('/').next().unwrap_or("archive.bin");
-    let tail = tail.split('?').next().unwrap_or(tail);
-    let safe_tail: String = tail
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
-                c
-            } else {
-                '_'
-            }
-        })
-        .collect();
-    format!("{safe_id}_{archive_index}_layer{layer_index}_{safe_tail}")
-}
-
-/// Test hook for `cache_entry_is_stale`, which is otherwise private to the
-/// resolution path.
-pub fn cache_entry_is_stale_for_test(
-    cached: &Path,
-    file_name: Option<&str>,
-    search_paths: &[PathBuf],
-) -> bool {
-    cache_entry_is_stale(cached, file_name, search_paths)
 }
 
 #[cfg(test)]
@@ -890,23 +653,6 @@ mod tests {
         assert_eq!(game, "skyrimspecialedition");
         assert_eq!(mod_id, "1234");
         assert_eq!(file_id, "5678");
-    }
-
-    #[test]
-    fn resolves_cache_file_case_insensitively() {
-        let temp = tempdir().expect("temp dir should be created");
-        let existing = temp
-            .path()
-            .join("Thieves Den Barter for Upgrades_0_1000018326");
-        std::fs::write(&existing, b"payload").expect("write cache file");
-
-        let resolved = resolve_cache_path(
-            temp.path(),
-            "Thieves Den Barter For Upgrades_0_1000018326",
-        )
-        .expect("cache file should resolve");
-
-        assert_eq!(resolved, existing);
     }
 
     #[test]
@@ -975,7 +721,6 @@ mod tests {
             "manual:WACv_1beta.7z",
             Some("WACv_1beta.7z"),
             None,
-            &cache.join("WAC_0_manual"),
             &settings,
         )
         .await
@@ -983,7 +728,7 @@ mod tests {
 
         let message = err.to_string();
         // The file name, not the descriptor: it is what the user has to go and
-        // find, and it is what `link_local_archive` matches on.
+        // find, and it is what lookup matches on.
         assert!(message.contains("WACv_1beta.7z"), "{message}");
         assert!(message.contains(&searched.display().to_string()), "{message}");
         // No retry wrapper -- a hand-fetched file will not appear on attempt 2.
@@ -1074,25 +819,27 @@ mod tests {
             .await
             .expect("download should succeed");
 
-        let files: Vec<_> = std::fs::read_dir(temp.path())
-            .expect("cache dir should exist")
-            .filter_map(Result::ok)
-            .collect();
-        let archive = files
-            .iter()
-            .find(|entry| entry.path().extension().and_then(|ext| ext.to_str()) != Some("orig-name"))
-            .expect("archive payload should exist");
-        let metadata = files
-            .iter()
-            .find(|entry| entry.path().extension().and_then(|ext| ext.to_str()) == Some("orig-name"))
-            .expect("archive metadata sidecar should exist");
-
-        let payload = std::fs::read(archive.path()).expect("downloaded file should be readable");
+        // Saved under the server's name, with the .meta MO2 would write.
+        let payload = std::fs::read(temp.path().join("archive.bin"))
+            .expect("the archive should be saved under its real name");
         assert_eq!(payload, b"nexus-payload");
+        let meta = std::fs::read_to_string(temp.path().join("archive.bin.meta"))
+            .expect("a .meta should be written beside it");
+        assert!(meta.contains("gameName=SkyrimSE"), "{meta}");
+        assert!(meta.contains("modID=1234") && meta.contains("fileID=5678"), "{meta}");
+        let leftovers: Vec<_> = std::fs::read_dir(temp.path())
+            .unwrap()
+            .filter_map(Result::ok)
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .filter(|name| name != "archive.bin" && name != "archive.bin.meta")
+            .collect();
+        assert!(leftovers.is_empty(), "no scratch files left behind: {leftovers:?}");
 
-        let original_name = std::fs::read_to_string(metadata.path())
-            .expect("original filename metadata should be readable");
-        assert_eq!(original_name, "archive.bin");
+        // A second run finds it by its ids and does not fetch again.
+        download_all(&plan, &settings)
+            .await
+            .expect("second download should find the archive");
+        assert_eq!(std::fs::read_dir(temp.path()).unwrap().count(), 2);
     }
 
     #[tokio::test]

@@ -1,5 +1,5 @@
 use crate::archive;
-use crate::config::download;
+use crate::config::archive_store::{self, ArchiveRef, Found};
 use crate::config::filter::ModFilter;
 use crate::config::schema::{CompiledArchive, PersonalizedPlan};
 use globset::{GlobBuilder, GlobMatcher};
@@ -19,9 +19,9 @@ pub struct CheckSettings {
 /// Where an archive can be had from, best case first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ArchiveAvailability {
-    /// Already in the cache.
+    /// Already in the downloads folder.
     Cached,
-    /// Not cached, but sitting in one of the search paths.
+    /// Not in the downloads folder, but sitting in one of the search paths.
     Local,
     /// Neither -- the network is the only way to get it.
     MustDownload,
@@ -137,46 +137,48 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
 /// linked into the cache here -- doing so would make a diagnostic command
 /// silently mutate the cache it is reporting on.
 fn archive_availability(
-    mod_id: &str,
-    archive_index: usize,
+    _mod_id: &str,
+    _archive_index: usize,
     archive: &CompiledArchive,
     settings: &CheckSettings,
 ) -> ArchiveAvailability {
+    let locate = |source: &str, file_name: Option<&str>| {
+        archive_store::locate(
+            &settings.cache_dir,
+            &settings.archive_search_paths,
+            &ArchiveRef::new(source, file_name),
+        )
+    };
+
     if !archive.build.is_empty() {
-        // Build layers have no declared filename to match a local copy against,
-        // so they are cached or they are not.
-        let all_cached = archive.build.iter().enumerate().all(|(layer_index, layer)| {
-            let cache_name = download::build_layer_cache_file_name(
-                mod_id,
-                archive_index,
-                layer_index,
-                &layer.path,
-            );
-            download::resolve_cache_path(&settings.cache_dir, &cache_name)
-                .is_some_and(|path| path.is_file())
-        });
-        return if all_cached {
+        let found: Vec<_> = archive.build.iter().map(|layer| locate(&layer.path, None)).collect();
+        return if found.iter().all(|f| matches!(f, Some(Found::Downloads(_)))) {
             ArchiveAvailability::Cached
+        } else if found.iter().all(Option::is_some) {
+            ArchiveAvailability::Local
         } else {
             ArchiveAvailability::MustDownload
         };
     }
 
-    let path = archive.path.as_deref().unwrap_or_default();
-    let cache_name = download::cache_file_name(mod_id, archive_index, path);
-    if download::resolve_cache_path(&settings.cache_dir, &cache_name)
-        .is_some_and(|path| path.is_file())
-    {
-        return ArchiveAvailability::Cached;
+    match locate(archive.path.as_deref().unwrap_or_default(), archive.file_name.as_deref()) {
+        Some(Found::Downloads(_)) => ArchiveAvailability::Cached,
+        Some(Found::SearchPath(_)) => ArchiveAvailability::Local,
+        None => ArchiveAvailability::MustDownload,
     }
+}
 
-    if download::find_local_archive(archive.file_name.as_deref(), &settings.archive_search_paths)
-        .is_some()
-    {
-        return ArchiveAvailability::Local;
-    }
-
-    ArchiveAvailability::MustDownload
+/// Where an archive is, in the downloads folder or a search path. A search
+/// path copy is validated in place: `check` only ever reads.
+fn located(settings: &CheckSettings, source: &str, file_name: Option<&str>) -> Option<PathBuf> {
+    archive_store::locate(
+        &settings.cache_dir,
+        &settings.archive_search_paths,
+        &ArchiveRef::new(source, file_name),
+    )
+    .map(|found| match found {
+        Found::Downloads(path) | Found::SearchPath(path) => path,
+    })
 }
 
 fn check_single_archive(
@@ -186,28 +188,17 @@ fn check_single_archive(
     settings: &CheckSettings,
 ) -> anyhow::Result<usize> {
     let path = archive.path.as_deref().unwrap_or_default();
-    let cache_name = download::cache_file_name(mod_id, archive_index, path);
-    // Falling back to the search-path copy lets the contents be validated
-    // in place, so a not-yet-adopted archive is checked as thoroughly as a
-    // cached one -- and the search path is only ever read.
-    let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-        .or_else(|| {
-            download::find_local_archive(
-                archive.file_name.as_deref(),
-                &settings.archive_search_paths,
-            )
-        })
-        .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
-
-    if !source.exists() {
+    let reference = ArchiveRef::new(path, archive.file_name.as_deref());
+    let Some(source) = located(settings, path, archive.file_name.as_deref()) else {
         anyhow::bail!(
-            "archive must be downloaded; no cached copy at {} and no search path holds {}",
-            source.display(),
-            archive.file_name.as_deref().unwrap_or("it (no file_name declared)")
+            "mod '{mod_id}' archive {archive_index}: must be downloaded; {} is not in {} or any \
+             search path",
+            reference.describe(),
+            settings.cache_dir.display(),
         );
-    }
+    };
     if source.is_dir() {
-        anyhow::bail!("cached archive path is a directory: {}", source.display());
+        anyhow::bail!("archive path is a directory: {}", source.display());
     }
 
     // Listing the archive is what actually proves it is readable and not a
@@ -215,7 +206,7 @@ fn check_single_archive(
     // archive is openable" in a comment and then returned without opening it,
     // so `check` only stat'd files unless game_root_files was set.
     let file_paths = archive::list_archive_paths(&source)
-        .map_err(|err| anyhow::anyhow!("cached archive is not readable ({}): {err}", source.display()))?;
+        .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
 
     if archive.game_root_files.is_empty() {
         return Ok(0);
@@ -234,18 +225,14 @@ fn check_build_archive(
     let mut merged_paths: Vec<String> = Vec::new();
 
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let cache_name =
-            download::build_layer_cache_file_name(mod_id, archive_index, layer_index, &layer.path);
-        let source = download::resolve_cache_path(&settings.cache_dir, &cache_name)
-            .unwrap_or_else(|| settings.cache_dir.join(&cache_name));
-
-        if !source.exists() {
+        let Some(source) = located(settings, &layer.path, None) else {
             anyhow::bail!(
-                "missing cached archive for build layer {}: {}",
-                layer_index,
-                source.display()
+                "mod '{mod_id}' archive {archive_index}: build layer {layer_index} ({}) is not in \
+                 {} or any search path",
+                layer.path,
+                settings.cache_dir.display()
             );
-        }
+        };
         if source.is_dir() {
             anyhow::bail!(
                 "cached archive path is a directory for build layer {}: {}",

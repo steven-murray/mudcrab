@@ -1,6 +1,5 @@
 use crate::cli::CheckArgs;
 use crate::config;
-use std::path::PathBuf;
 
 pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
     let raw = std::fs::read_to_string(&args.input)
@@ -12,10 +11,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = args
-        .cache
-        .clone()
-        .unwrap_or_else(|| PathBuf::from(".mudcrab-cache"));
+    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
     let settings = config::check::CheckSettings {
         cache_dir,
         filter: args.filter.to_mod_filter(),
@@ -26,7 +22,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
 
     tracing::info!(
         input = %args.input.display(),
-        cache = ?args.cache.as_ref().map(|p| p.display().to_string()),
+        downloads = %settings.cache_dir.display(),
         mods_checked = report.mods_checked,
         archives_checked = report.archives_checked,
         references_checked = report.file_references_checked,

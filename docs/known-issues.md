@@ -12,21 +12,20 @@ format. Treat anything else as unimplemented rather than untested.
 
 ## Archives
 
-**The download cache key includes the mod id.** It is
-`{mod_id}_{archive_index}_{fileid}`, so renaming a mod orphans its cached
-archive, and two mods sourcing the same Nexus file cache two copies of it.
+**A downloads folder from before 0.2 needs converting once.** Archives used to
+be kept under derived names (`{mod}_{index}_{source}` + `.orig-name`); lookup
+now uses real names and MO2 `.meta` files, and does not see the old names.
+`mudcrab downloads tidy <dir> --plan <plan.json>` prints the conversion, and
+`--apply` does it.
 
-> Give every archive a `file_name` and pass `--archive-search-path`. Resolution
-> then matches on the real filename and a rename costs nothing. This is worth
-> doing for every entry regardless — it is what makes a build work offline.
+**Manual (non-Nexus) archives are matched by filename.** If the host re-uploads
+under a new name, lookup misses; the "download it by hand" error then names the
+closest-matching files already in the folders it searched.
 
-**Manual (non-Nexus) archives are matched by exact filename.** A `manual:`
-source resolves by looking for its `file_name` in the search paths. If the host
-has re-uploaded the file under a different name, you get "archive must be
-downloaded by hand" — with no hint that renaming your download would fix it.
-The error does name the file it wanted and the paths it searched.
-
-**`--parallel` is accepted and ignored.** Downloads are sequential.
+**Lookup needs a `.meta` for a Nexus archive the modlist gives no `file_name`.**
+MO2 writes one for every download through it, and mudcrab for every download it
+makes; an archive dropped into the folder by hand has none, and is only found if
+its entry declares `file_name`.
 
 ## Nexus pinning
 

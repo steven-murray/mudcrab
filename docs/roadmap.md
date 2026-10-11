@@ -16,15 +16,12 @@ outside user would actually hit.
 Each of these is a place the build worked partly because of something true of
 this machine. Details in [known-issues.md](known-issues.md).
 
-### A1. Key the download cache by source, not by mod id
+### A1. ~~Key the download cache by source, not by mod id~~ — done
 
-`cache_file_name` is `{mod_id}_{archive_index}_{fileid}`. Renaming a mod orphans
-its archive; two mods sourcing one Nexus file cache it twice.
-
-The key should be a function of the source. The reason it has not changed is
-that re-keying orphans an existing cache and forces a re-download, so this wants
-a migration path — read the old name, fall back to it, write the new one — not a
-flag day.
+The cache is gone as a separate idea: the downloads folder holds archives under
+their real names with MO2 `.meta` files, found by Nexus ids or filename, and MO2
+is pointed at it rather than given copies. `downloads tidy` converts a folder
+from the old derived names.
 
 ### A2. Make manual archives resolvable when the host renames the file — error done
 

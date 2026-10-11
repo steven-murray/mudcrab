@@ -6,8 +6,9 @@ This guide describes the currently implemented command flow.
 
 1. Compile source TOML into compiled JSON.
 2. Resolve query inputs into a personalized plan JSON.
-3. Download archives into a local cache.
-4. Install staged mod archive layout from cache, then build any declared merges.
+3. Download archives into the downloads folder.
+4. Install staged mod archive layout from those archives, then build any
+   declared merges.
 5. Diff the result against a reference instance to verify the section.
 
 `inspect` sits before all of this: it reads an archive and prints the modlist
@@ -94,7 +95,7 @@ mudcrab query build/compiled.json --output build/plan.json --headless
 Download archives required by a personalized plan.
 
 ```bash
-mudcrab download <plan.json> [--cache <dir>] [--retry <n>] [--parallel <n>]
+mudcrab download <plan.json> [--downloads <dir>] [--retry <n>] [--parallel <n>]
                  [--section <name>]... [--only <mod id>]...
                  [--archive-search-path <dir>]...
 ```
@@ -102,42 +103,79 @@ mudcrab download <plan.json> [--cache <dir>] [--retry <n>] [--parallel <n>]
 Example:
 
 ```bash
-mudcrab download build/plan.json --cache .mudcrab-cache --retry 3
+mudcrab download build/plan.json --downloads ~/Games/OblivionModDownloads --retry 3
 ```
 
-Note: `--parallel` is accepted but currently downloads sequentially.
+`--parallel` (default 4) is how many archives are fetched at once.
 
 A failed source does not stop the run. Every archive is attempted, the failures
 are reported together at the end and the exit code is non-zero -- the same shape
 as `check`. A section routinely contains more than one dead Nexus link, and
 aborting on the first one turned finding them into one round trip each.
 
+## The downloads folder
+
+Archives live in one **downloads folder**, under their real names, each with the
+`.meta` file MO2 writes beside a download. It is an ordinary MO2 downloads
+folder, so MO2 can be pointed straight at it, and the recommended setup is one
+central folder -- `~/Games/OblivionModDownloads`, say -- that every MO2 instance
+and every modlist share.
+
+It is chosen by, in order: `--downloads <dir>` (`--cache` is an alias);
+`downloads_dir` in tools.toml; and, for an MO2 install, the instance's own
+`downloads/`. `install --mo2-instance-dir` sets `download_directory` in the
+instance's `ModOrganizer.ini` to the folder, so MO2 lists everything there --
+including archives you may want to install by hand afterwards -- rather than
+being given copies.
+
+An archive is found by what it is, never by which mod uses it:
+
+- a Nexus archive by the `modID`/`fileID` in its `.meta` (so MO2's `(1)`
+  suffixes and hand renames do not matter);
+- anything else by its `file_name`, case-insensitively, or for a URL source by
+  the `url` in its `.meta`.
+
+So renaming a mod, reordering its archives or using one archive in several mods
+changes nothing on disk. A download mudcrab makes is saved under the server's
+name with a `.meta` written as MO2 would.
+
 ## Using archives you already have
 
-Most of a large modlist is usually already on the machine, in an MO2 or
-Wabbajack downloads folder from an earlier build. `--archive-search-path` points
-`download`, `check` and `install` at those folders so the archives are reused
-instead of fetched again.
+`--archive-search-path` points `download`, `check` and `install` at other
+folders that may hold archives -- another instance's downloads, a Wabbajack
+folder. Each archive is resolved in this order:
+
+1. In the downloads folder -- used as is.
+2. In a search path, matched the same way -- hard-linked into the downloads
+   folder under its own name, with its `.meta` (a copy across filesystems), so
+   no download runs.
+3. Otherwise downloaded.
+
+Search paths are read-only sources: nothing is ever written, renamed or deleted
+inside them. If a search path holds a newer, different-sized copy of an archive
+already in the downloads folder, it replaces it -- a re-downloaded fix there is
+not silently ignored.
 
 ```bash
-mudcrab install build/plan.json --cache .mudcrab-cache \
+mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads \
   --mo2-instance-dir ~/mo2/MOFAM \
-  --archive-search-path ~/Games/mod-organizer-2-oblivion/modorganizer2/downloads \
   --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
 ```
 
-Each archive is resolved in this order:
+## downloads tidy
 
-1. Already in the cache -- used as is.
-2. Otherwise, if the archive declares `file_name`, each search path is scanned
-   for that exact filename, case-insensitively, in the order given. The first
-   hit is hard-linked into the cache (falling back to a copy across
-   filesystems) and recorded there under its cache name, so no download runs.
-3. Otherwise the archive is downloaded as usual.
+Convert a downloads folder written by mudcrab before 0.2, when archives were
+kept under derived names (`{mod}_{index}_{source}` with a `.orig-name`
+sidecar), to real names.
 
-Search paths are read-only sources: nothing is ever written, renamed or deleted
-inside them. An archive with no `file_name` has nothing to match against, so it
-always takes the download path.
+```bash
+mudcrab downloads tidy <dir> [--plan <plan.json>] [--apply]
+```
+
+A derived name that is the same file as a real-named one is deleted; one that
+is the only copy is renamed; one whose real name holds a different file is left
+and reported. With `--plan`, archives the modlist names only by Nexus or URL
+source get the `.meta` lookup needs. Without `--apply` it only prints the plan.
 
 Because resolution happens during `install` too, a list whose archives are all
 already on disk can be installed without running `download` at all.
@@ -160,8 +198,8 @@ partial compiled artifact or plan would leave every later stage working from a
 document that no longer describes the modlist.
 
 ```bash
-mudcrab download build/plan.json --cache .mudcrab-cache --section "5 - LOD"
-mudcrab install  build/plan.json --cache .mudcrab-cache \
+mudcrab download build/plan.json --downloads ~/Games/OblivionModDownloads --section "5 - LOD"
+mudcrab install  build/plan.json --downloads ~/Games/OblivionModDownloads \
   --mo2-instance-dir ~/mo2/MOFAM --section "5 - LOD"
 ```
 
@@ -184,10 +222,10 @@ mudcrab validate <modlist.toml> [--strict]
 
 ## install
 
-Install from a personalized plan and cache into a mods directory.
+Install from a personalized plan and the downloads folder into a mods directory.
 
 ```bash
-mudcrab install <plan.json> --cache <dir> --mods-dir <mods_dir> [--dry-run] [--skip-actions]
+mudcrab install <plan.json> [--downloads <dir>] --mods-dir <mods_dir> [--dry-run] [--skip-actions]
                 [--force-merges]
                 [--section <name>]... [--only <mod id>]...
                 [--archive-search-path <dir>]...
@@ -196,12 +234,12 @@ mudcrab install <plan.json> --cache <dir> --mods-dir <mods_dir> [--dry-run] [--s
 Example:
 
 ```bash
-mudcrab install build/plan.json --cache .mudcrab-cache --mods-dir build/mods
+mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads --mods-dir build/mods
 ```
 
 Current behavior:
 
-1. Verifies required cached archives exist.
+1. Finds every archive in the downloads folder (or a search path).
 2. Unpacks archives under per-mod directories.
 3. Writes `install_manifest.json` in the mods directory.
 4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar`. The
@@ -439,17 +477,17 @@ mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
 
 ## check
 
-Validate cached archives and archive-backed file references without installing.
+Validate downloaded archives and archive-backed file references without installing.
 
 ```bash
-mudcrab check <plan.json> [--cache <dir>] [--section <name>]... [--only <mod id>]...
+mudcrab check <plan.json> [--downloads <dir>] [--section <name>]... [--only <mod id>]...
               [--archive-search-path <dir>]...
 ```
 
 Example:
 
 ```bash
-mudcrab check build/plan.json --cache .mudcrab-cache \
+mudcrab check build/plan.json --downloads ~/Games/OblivionModDownloads \
   --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
 ```
 
@@ -457,8 +495,8 @@ Every archive is reported as one of `cached`, `resolvable locally` (present in a
 search path) or `MUST BE DOWNLOADED`, followed by a summary count. The summary is
 printed even when the check fails, since a failing run is the one whose report
 matters -- it is how a dead link is found before a later section depends on it.
-`check` only reports: it never adopts a locally resolvable archive into the
-cache.
+`check` only reports: it never links a search-path archive into the downloads
+folder.
 
 ## inspect
 
@@ -644,6 +682,5 @@ download_handler = "nexus"
 
 `path` says where to get an archive; `file_name` says what it is called. A nexus
 descriptor carries no filename, so declaring `file_name` is what lets an install
-find a copy already sitting in an `--archive-search-path`. It is also the name
-the archive is exported under into MO2's `downloads/`, in preference to whatever
-the server happened to call it.
+find a copy without a `.meta` (a manual download, say), and it is the name a
+download is saved under, in preference to whatever the server calls it.

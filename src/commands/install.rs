@@ -29,10 +29,11 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = args
-        .cache
-        .clone()
-        .unwrap_or_else(|| PathBuf::from(".mudcrab-cache"));
+    let cache_dir = super::resolve_downloads_dir(
+        args.downloads.clone(),
+        args.tools_config.as_deref(),
+        args.mo2_instance_dir.as_deref(),
+    )?;
     let mods_dir = match (&args.mods_dir, &args.mo2_instance_dir) {
         (Some(path), _) => path.clone(),
         (None, Some(instance_dir)) => instance_dir.join("mods"),
@@ -66,7 +67,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
 
     tracing::info!(
         input = %args.input.display(),
-        cache = ?args.cache.as_ref().map(|p| p.display().to_string()),
+        downloads = %settings.cache_dir.display(),
         mods_dir = %mods_dir.display(),
         mo2_instance_dir = ?args.mo2_instance_dir.as_ref().map(|p| p.display().to_string()),
         profile_name = %args.profile_name,

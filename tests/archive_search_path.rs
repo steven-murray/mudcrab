@@ -117,15 +117,13 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
         "hello from a local archive"
     );
 
-    // The archive landed in the cache under its derived cache name, not its
-    // original one, with the original recorded in the sidecar beside it.
-    let cached = cache.join("core_0_9999.zip");
-    assert!(cached.is_file(), "archive should be adopted into the cache");
-    assert_eq!(
-        std::fs::read_to_string(cache.join("core_0_9999.zip.orig-name"))
-            .expect("orig-name sidecar should exist"),
-        "Really Big Mod-4321-1-0.zip"
-    );
+    // The archive is now in the downloads folder under its own name, with
+    // the .meta MO2 would have written, so it is found by its Nexus ids.
+    let cached = cache.join("Really Big Mod-4321-1-0.zip");
+    assert!(cached.is_file(), "archive should be linked into the downloads folder");
+    let meta = std::fs::read_to_string(cache.join("Really Big Mod-4321-1-0.zip.meta"))
+        .expect(".meta should be written");
+    assert!(meta.contains("modID=4321") && meta.contains("fileID=9999"), "{meta}");
 
     #[cfg(unix)]
     {
@@ -183,7 +181,7 @@ fn download_resolves_from_a_search_path_instead_of_fetching() {
         .assert()
         .success();
 
-    assert!(cache.join("core_0_2.zip").is_file());
+    assert!(cache.join("Local Copy-1-0.zip").is_file());
 }
 
 #[test]
@@ -348,11 +346,11 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
 }
 
 #[test]
-fn mo2_export_skips_a_download_that_is_already_there_at_the_same_size() {
+fn an_mo2_install_points_mo2_at_the_downloads_folder_instead_of_copying() {
     let dir = tempdir().expect("temp dir should be created");
     let game_dir = dir.path().join("game");
     let search_dir = dir.path().join("downloads");
-    let cache = dir.path().join("cache");
+    let cache = dir.path().join("central");
     let instance_dir = dir.path().join("mo2-instance");
     let modlist = dir.path().join("modlist.toml");
     let compiled = dir.path().join("compiled.json");
@@ -360,61 +358,49 @@ fn mo2_export_skips_a_download_that_is_already_there_at_the_same_size() {
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
     std::fs::write(game_dir.join("Oblivion.ini"), "bFull Screen = 1\n")
         .expect("game ini should be written");
+    std::fs::create_dir_all(&instance_dir).unwrap();
+    // An existing ModOrganizer.ini, CRLF like MO2's, whose other settings
+    // must survive.
+    std::fs::write(
+        instance_dir.join("ModOrganizer.ini"),
+        "[General]\r\ngameName=Oblivion\r\n\r\n[Settings]\r\nlanguage=en\r\ndownload_directory=C:/old\r\n",
+    )
+    .unwrap();
 
     make_zip_with_files(
         &search_dir.join("Exported-7-1-0.zip"),
         &[("Data/test.txt", b"payload")],
     );
 
-    let source = "name = \"Export Skip Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:oblivion/7/8\"\nfile_name = \"Exported-7-1-0.zip\"\n";
+    let source = "name = \"Export Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:oblivion/7/8\"\nfile_name = \"Exported-7-1-0.zip\"\n";
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    let install = || {
-        Command::cargo_bin("mudcrab")
-            .expect("binary should build")
-            .env_remove("NEXUS_API_KEY")
-            .args(["install", plan.to_str().unwrap()])
-            .args(["--cache", cache.to_str().unwrap()])
-            .args(["--mo2-instance-dir", instance_dir.to_str().unwrap()])
-            .args(["--game-dir", game_dir.to_str().unwrap()])
-            .args(["--archive-search-path", search_dir.to_str().unwrap()])
-            .assert()
-            .success();
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .env_remove("NEXUS_API_KEY")
+        .args(["install", plan.to_str().unwrap()])
+        .args(["--downloads", cache.to_str().unwrap()])
+        .args(["--mo2-instance-dir", instance_dir.to_str().unwrap()])
+        .args(["--game-dir", game_dir.to_str().unwrap()])
+        .args(["--archive-search-path", search_dir.to_str().unwrap()])
+        .assert()
+        .success();
+
+    let ini = std::fs::read_to_string(instance_dir.join("ModOrganizer.ini")).unwrap();
+    let absolute = std::path::absolute(&cache).unwrap();
+    let expected = if cfg!(windows) {
+        format!("download_directory={}", absolute.display()).replace('\\', "/")
+    } else {
+        format!("download_directory=Z:{}", absolute.display())
     };
+    assert!(ini.contains(&expected), "{ini}");
+    assert!(!ini.contains("C:/old"), "{ini}");
+    assert!(ini.contains("language=en") && ini.contains("gameName=Oblivion"), "{ini}");
+    assert!(!ini.contains("\r\n\n") && ini.matches('\n').count() == ini.matches("\r\n").count(), "line endings kept: {ini:?}");
 
-    install();
-
-    // The declared file_name, not the derived cache name, is what MO2 sees.
-    let exported = instance_dir.join("downloads").join("Exported-7-1-0.zip");
-    assert!(exported.is_file(), "archive should be exported into downloads/");
-    let original = std::fs::read(&exported).expect("exported archive should be readable");
-
-    // Stand in a same-sized sentinel. A re-export would overwrite it; a skip
-    // leaves it alone. (Removing first so the sentinel is not written through a
-    // hard link into the cache.)
-    std::fs::remove_file(&exported).expect("exported archive should be removable");
-    std::fs::write(&exported, vec![b'X'; original.len()]).expect("sentinel should be written");
-
-    install();
-
-    assert_eq!(
-        std::fs::read(&exported).expect("exported archive should be readable"),
-        vec![b'X'; original.len()],
-        "an existing download of the same size should not be re-exported"
-    );
-
-    // A different size is not the same file, so it is replaced.
-    std::fs::remove_file(&exported).expect("exported archive should be removable");
-    std::fs::write(&exported, b"truncated").expect("short sentinel should be written");
-
-    install();
-
-    assert_eq!(
-        std::fs::read(&exported).expect("exported archive should be readable"),
-        original,
-        "a download of a different size should be re-exported"
-    );
+    // Nothing is copied into the instance's own downloads/.
+    assert!(!instance_dir.join("downloads").join("Exported-7-1-0.zip").exists());
 }
 
 #[test]
@@ -501,41 +487,32 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
     );
 }
 
-/// The cache is keyed by a derived name -- mod id, archive index, file id --
-/// which says nothing about content. Replace the archive in a search path and
-/// the derived name does not change, so a naive cache hit keeps serving the old
-/// bytes. A MOFAM archive was repaired in place and the next install still
-/// unpacked the broken copy, silently.
+/// A downloads-folder copy linked in from a search path does not change when
+/// the search-path file is replaced. A MOFAM archive was repaired in place and
+/// the next install still unpacked the broken copy, silently.
 #[test]
-fn a_replaced_source_archive_supersedes_the_cached_copy() {
+fn a_replaced_source_archive_supersedes_the_downloads_copy() {
+    use mudcrab::config::archive_store::{resolve, ArchiveRef};
     let dir = tempfile::tempdir().expect("temp dir");
-    let search = dir.path().join("downloads");
-    let cache = dir.path().join("cache");
+    let search = dir.path().join("search");
+    let downloads = dir.path().join("downloads");
     std::fs::create_dir_all(&search).unwrap();
-    std::fs::create_dir_all(&cache).unwrap();
+    std::fs::create_dir_all(&downloads).unwrap();
 
-    // The stale cache entry, under its derived name, and the sidecar adoption
-    // would have written.
-    std::fs::write(cache.join("mod_0_123.zip"), vec![b'x'; 4096]).unwrap();
-    std::fs::write(cache.join("mod_0_123.zip.orig-name"), "real.zip").unwrap();
-
-    // The archive as it now stands in the search path: same name, new content.
+    std::fs::write(downloads.join("real.zip"), vec![b'x'; 4096]).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(20));
     std::fs::write(search.join("real.zip"), b"fixed").unwrap();
 
-    assert!(
-        mudcrab::config::download::cache_entry_is_stale_for_test(
-            &cache.join("mod_0_123.zip"),
-            Some("real.zip"),
-            std::slice::from_ref(&search),
-        ),
-        "a cache entry that no longer matches its source is stale"
-    );
+    let archive = ArchiveRef::new("manual:real.zip", None);
+    let found = resolve(&downloads, std::slice::from_ref(&search), &archive)
+        .unwrap()
+        .unwrap();
+    assert_eq!(found, downloads.join("real.zip"));
+    assert_eq!(std::fs::read(&found).unwrap(), b"fixed");
 
-    // And one that does match is not, so a normal run still short-circuits.
-    std::fs::write(cache.join("same_0_1.zip"), b"fixed").unwrap();
-    assert!(!mudcrab::config::download::cache_entry_is_stale_for_test(
-        &cache.join("same_0_1.zip"),
-        Some("real.zip"),
-        &[search],
-    ));
+    // An older search-path copy never replaces a newer downloads copy.
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    std::fs::write(downloads.join("real.zip"), b"updated by hand").unwrap();
+    resolve(&downloads, &[search], &archive).unwrap();
+    assert_eq!(std::fs::read(downloads.join("real.zip")).unwrap(), b"updated by hand");
 }

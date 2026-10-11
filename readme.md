@@ -73,8 +73,8 @@ tools and no API key. See
 ```bash
 mudcrab compile  modlist.toml   --output build/compiled.json
 mudcrab query    build/compiled.json --output build/plan.json --headless
-mudcrab download build/plan.json --cache .mudcrab-cache
-mudcrab install  build/plan.json --cache .mudcrab-cache --mo2-instance-dir ~/mo2/MyList
+mudcrab download build/plan.json --downloads ~/Games/OblivionModDownloads
+mudcrab install  build/plan.json --downloads ~/Games/OblivionModDownloads --mo2-instance-dir ~/mo2/MyList
 ```
 
 1. **compile** — validate the source list and resolve what can be resolved.

@@ -41,9 +41,9 @@ The initial ModOrganizer2-compatible output structure is:
 
 ### downloads/
 
-- Contains downloaded mod archives.
-- Initial implementation may copy cached archives into this directory.
-- This is launcher-facing output, distinct from mudcrab's internal cache.
+- Not written by mudcrab. `install` points MO2 at the downloads folder instead,
+  by setting `download_directory` under `[Settings]` in `ModOrganizer.ini`. A
+  per-instance setup simply names this folder as the downloads folder.
 
 ### profiles/<profile-name>/modlist.txt
 
@@ -93,7 +93,7 @@ Example:
 ## Install Responsibilities
 
 - Install extracted mod contents into `mods/`.
-- Export cached archives into `downloads/`.
+- Point `ModOrganizer.ini`'s `download_directory` at the downloads folder.
 - Generate MO2 profile files under `profiles/<profile-name>/`.
 - Copy `Oblivion.ini` from the game directory into the profile.
 - Apply game-scoped INI edits to the copied profile-local `oblivion.ini`.

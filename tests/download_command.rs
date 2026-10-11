@@ -103,7 +103,7 @@ download_handler = "local"
         .map(|entry| entry.file_name().to_string_lossy().to_string())
         .collect();
     assert!(
-        cached.iter().any(|name| name.starts_with("alive_0_")),
+        cached.iter().any(|name| name == "good.zip"),
         "the good archive should have been fetched anyway, got {cached:?}"
     );
 }
