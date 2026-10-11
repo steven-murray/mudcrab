@@ -44,15 +44,19 @@ pub fn running_in(instance: &Path) -> Vec<u32> {
     }
 }
 
-/// Whether a NUL-separated command line names `ModOrganizer.exe` inside
+/// Whether a NUL-separated command line's program is `ModOrganizer.exe` inside
 /// `instance`, as a Unix path or a Wine `Z:\` one.
+///
+/// Only the first argument: Steam's launcher and runtime wrappers also carry
+/// MO2's path, further along, and are not MO2.
 fn cmdline_runs_instance(cmdline: &[u8], instance: &Path) -> bool {
     let instance = normalise(&instance.to_string_lossy());
     cmdline
         .split(|byte| *byte == 0)
-        .filter_map(|arg| std::str::from_utf8(arg).ok())
-        .filter_map(as_unix_path)
-        .any(|path| {
+        .next()
+        .and_then(|arg| std::str::from_utf8(arg).ok())
+        .and_then(as_unix_path)
+        .is_some_and(|path| {
             let path = normalise(&path.to_string_lossy());
             path.rsplit_once('/').is_some_and(|(dir, exe)| {
                 exe == "modorganizer.exe" && dir == instance
@@ -90,7 +94,7 @@ mod tests {
 
     #[test]
     fn a_unix_path_matches_case_insensitively() {
-        let cmdline = b"wine\0/home/u/Games/mudcrab test/modorganizer.exe\0-p\0Default\0";
+        let cmdline = b"/home/u/Games/mudcrab test/modorganizer.exe\0-p\0Default\0";
         assert!(cmdline_runs_instance(cmdline, Path::new(INSTANCE)));
     }
 
@@ -102,5 +106,8 @@ mod tests {
         assert!(!cmdline_runs_instance(game, Path::new(INSTANCE)));
         let grep = b"pgrep\0-f\0ModOrganizer.exe\0";
         assert!(!cmdline_runs_instance(grep, Path::new(INSTANCE)));
+        // Steam's wrapper names MO2 as an argument, not as itself.
+        let wrapper = b"c:\\windows\\system32\\steam.exe\0/home/u/Games/MudCrab Test/ModOrganizer.exe\0";
+        assert!(!cmdline_runs_instance(wrapper, Path::new(INSTANCE)));
     }
 }
