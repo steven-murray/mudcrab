@@ -91,9 +91,13 @@ step.
 
 ## 4. Add the mods
 
-`add --archive` writes the whole entry from the archive: where it came from,
-its file name, its layout and installer choices. `--section` files it under an
-MO2 separator.
+`add --archive` writes the mod's entry into your list, worked out from the
+archive: where it came from, its file name, its layout and installer choices.
+`--section` files it under an MO2 separator.
+
+`add` only **declares** the mod. Nothing is installed or unpacked, and the
+archive stays as it is; the list now says what to do with it, and `install`
+does it, later, for the whole list at once (step 6).
 
 ```console
 $ mudcrab add little.toml --id "Engine Bug Fixes" --section Fixes \
@@ -120,21 +124,47 @@ error: BettysButterflies.esp is not in the load order yet; say where with
 --load-after <plugin> or --load-last (or add it to `plugins` yourself first)
 ```
 
-For an installer, `add` takes the defaults and says so:
+**An installer's choices are put to you**, as MO2 would put them, and your
+answers go into the entry. A FOMOD is walked step by step -- a step that only
+appears after certain answers appears here exactly when it would during the
+install -- and a BAIN package asks which subpackages to take. Enter accepts
+the installer's own choice; a group with only one possible answer is not
+asked at all.
 
 ```console
 $ mudcrab add little.toml --id "HD Septim" --section Clutter \
     --archive "HD Septims-49017-1-4a-1543613153.zip"
-note: 'HD Septim' has a FOMOD installer; the entry picks each group's default.
-`mudcrab inspect` lists the options, to change `fomod_selections`.
+'HD Septim' has a FOMOD installer. Enter takes the installer's own choice.
+
+Step1: Main (choose one)
+  1. Textures  (default)
+       installs the textures
+  -> Textures
+
+Step1: Meshes (choose one)
+  1. Normal Size Mesh  (default)
+       Slartibart has provided me with his mesh to use, this is the original mesh size.
+  2. Smaller Mesh
+       Slartibart has provided me with his improved mesh to use, this mesh is 25% smaller.
+  Your choice [1]:
+added 'HD Septim' to little.toml at line 28, at the end of the file
 
 $ mudcrab add little.toml --id "Savilla's Stone Enhanced" --section Clutter \
     --archive "Savilla's Stone Enhanced-52713-1-1a-1675795943.7z" \
     --plugin SavillaStoneEnhanced.esp --load-after BettysButterflies.esp
-note: 'Savilla's Stone Enhanced' is a BAIN package and every subpackage is
-listed; delete from `bain_subpackages` the ones that are alternatives to each
-other.
+'Savilla's Stone Enhanced' is a BAIN package. Pick the subpackages to install;
+numbered alike (01 ..., 01 ...) usually means alternatives.
+
+Subpackages (choose one or more, separated by spaces)
+  1. 01 - Iced Style (.esp FREE)  (default)
+  2. 01 - Marbled Style - Alternative  (default)
+  Your choice [1 2]: 2
+added 'Savilla's Stone Enhanced' to little.toml at line 48, after the last mod in section Clutter
 ```
+
+The two styles are alternatives, so only the second is taken. In a script, or
+with `--defaults`, `add` asks nothing: it takes every default (all of a BAIN
+package's subpackages) and notes what you may want to change.
 
 A few more ways in:
 
@@ -151,14 +181,7 @@ A few more ways in:
 
 ## 5. Finish by hand
 
-Some decisions only you can make, and the file is plain text. Savilla's Stone
-Enhanced offers two alternative styles, and `add` listed both, so delete one:
-
-```toml
-bain_subpackages = [
-  "01 - Marbled Style - Alternative",
-]
-```
+Some things no command asks, and the file is plain text.
 
 To make a mod optional, declare a question under `[inputs]` and give the mod
 an `if`. Tables go after the top-level keys (`name`, `plugins`), or TOML reads

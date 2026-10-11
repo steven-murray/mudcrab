@@ -746,15 +746,8 @@ fn inspect_archive(
     (Some(listing), wizard)
 }
 
-/// Somewhere on disk to pull a single file out of an archive: the user's
-/// cache, never `/tmp`, which is often RAM.
 fn scratch_dir() -> std::path::PathBuf {
-    std::env::var_os("XDG_CACHE_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache")))
-        .unwrap_or_else(std::env::temp_dir)
-        .join("mudcrab")
-        .join(format!("export-{}", std::process::id()))
+    crate::util::fs::cache_scratch_dir("export")
 }
 
 fn archive_source(archive: &CompiledArchive) -> String {

@@ -12,20 +12,20 @@
 //! exception is a FOMOD's `ModuleConfig.xml`, which has to be read to be
 //! parsed, and is extracted on its own with an include filter naming just it.
 
-use crate::archive::{self, ArchiveFilters, extract_with_builtins};
+use crate::archive::{self, ArchiveFilters};
 use crate::config::install::is_plugin_file;
 use crate::config::install::layout::auto::{content_roots_below, detect_auto_root};
 use crate::config::install::layout::fomod::{
     FomodInstallEntry, FomodOptionType, build_fomod_selection_map, child_elements,
     collect_fomod_entries, find_child_element, find_fomod_config, fomod_dependencies_match,
-    fomod_option_type, read_xml_text, select_fomod_options,
+    fomod_option_type, select_fomod_options,
 };
 use crate::config::install::layout::plan::{Listing, plan_data_folder};
-use crate::util::fs::{eq_ci, staging_dir_for};
+use crate::util::fs::eq_ci;
 use roxmltree::Document;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// What `inspect` found, in the order a modlist entry needs it.
 #[derive(Debug, Serialize)]
@@ -334,28 +334,12 @@ fn guess_layout(tree: &ArchiveTree, paths: &[String], fomod_config: Option<&str>
 /// The include pattern is the entry path escaped as a literal, because mod
 /// archives are full of `[` and `{` in folder names and a raw glob would either
 /// fail to compile or match the wrong thing.
-fn extract_single_entry(source: &Path, entry_path: &str) -> anyhow::Result<String> {
-    let staging = staging_dir_for(Path::new("inspect"))?;
-    std::fs::create_dir_all(&staging).map_err(|err| {
-        anyhow::anyhow!("failed to create staging dir {}: {err}", staging.display())
-    })?;
-
-    let include = vec![globset::escape(entry_path)];
-    let result = ArchiveFilters::new(&include, &[])
-        .and_then(|filters| extract_with_builtins(source, &staging, &filters))
-        .and_then(|_| {
-            let extracted: PathBuf = staging.join(entry_path);
-            if !extracted.is_file() {
-                anyhow::bail!(
-                    "{} lists {entry_path} but it could not be extracted",
-                    source.display()
-                );
-            }
-            read_xml_text(&extracted)
-        });
-
-    let _ = std::fs::remove_dir_all(&staging);
-    result
+/// One text file out of an archive -- a FOMOD config -- pulled out into the
+/// user's cache and decoded. Never the whole archive, never `/tmp`.
+pub(crate) fn extract_single_entry(source: &Path, entry_path: &str) -> anyhow::Result<String> {
+    let scratch = crate::util::fs::cache_scratch_dir("inspect");
+    let bytes = crate::archive::read_entry(source, entry_path, &scratch)?;
+    crate::config::install::layout::fomod::decode_xml(&bytes, entry_path)
 }
 
 fn inspect_fomod(source: &Path, config_path: &str) -> anyhow::Result<FomodReport> {
@@ -513,11 +497,27 @@ fn toml_string(value: &str) -> String {
     format!("\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
+/// Choices made for an installer, in place of its defaults.
+pub(crate) enum Chosen {
+    Fomod(Vec<crate::config::schema::FomodSelection>),
+    Bain(Vec<String>),
+}
+
 pub(crate) fn render_toml_snippet(
     file_name: &str,
     source_path: Option<&str>,
     layout: &LayoutGuess,
     fomod: Option<&FomodReport>,
+) -> String {
+    render_toml_snippet_with(file_name, source_path, layout, fomod, None)
+}
+
+pub(crate) fn render_toml_snippet_with(
+    file_name: &str,
+    source_path: Option<&str>,
+    layout: &LayoutGuess,
+    fomod: Option<&FomodReport>,
+    chosen: Option<&Chosen>,
 ) -> String {
     let mut out = String::from("[[mods.archives]]\n");
     out.push_str(&format!(
@@ -529,7 +529,16 @@ pub(crate) fn render_toml_snippet(
     match layout {
         LayoutGuess::Fomod { .. } => {
             out.push_str("layout = \"fomod\"\n");
-            if let Some(fomod) = fomod {
+            if let Some(Chosen::Fomod(selections)) = chosen {
+                for selection in selections {
+                    let options: Vec<String> =
+                        selection.options.iter().map(|o| toml_string(o)).collect();
+                    out.push_str("\n[[mods.archives.fomod_selections]]\n");
+                    out.push_str(&format!("step = {}\n", toml_string(&selection.step)));
+                    out.push_str(&format!("group = {}\n", toml_string(&selection.group)));
+                    out.push_str(&format!("options = [{}]\n", options.join(", ")));
+                }
+            } else if let Some(fomod) = fomod {
                 for step in &fomod.steps {
                     for group in &step.groups {
                         let chosen: Vec<String> = group
@@ -552,6 +561,10 @@ pub(crate) fn render_toml_snippet(
             // alternatives to each other (`01a`, `01b`, ...) and the author has
             // to delete the ones they are not taking.
             out.push_str("bain_subpackages = [\n");
+            let subpackages = match chosen {
+                Some(Chosen::Bain(picked)) => picked,
+                _ => subpackages,
+            };
             for name in subpackages {
                 out.push_str(&format!("  {},\n", toml_string(name)));
             }

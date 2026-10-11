@@ -169,6 +169,24 @@ pub(crate) fn plan_fomod(
     )
 }
 
+/// One option group, as it is put to whoever is choosing: the modlist's
+/// answers during install, a person during `add`.
+pub(crate) struct GroupPrompt<'a> {
+    pub step: &'a str,
+    pub group: &'a str,
+    /// `SelectExactlyOne`, `SelectAny`, ...
+    pub group_type: &'a str,
+    pub options: Vec<OptionPrompt>,
+    /// What install picks when the modlist names nothing for this group.
+    pub default: Vec<usize>,
+}
+
+pub(crate) struct OptionPrompt {
+    pub name: String,
+    pub description: String,
+    pub kind: FomodOptionType,
+}
+
 /// Walk the install steps, applying the modlist's answers, and gather every
 /// file and folder the resulting selection installs.
 fn collect_selected_entries(
@@ -177,6 +195,59 @@ fn collect_selected_entries(
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<Vec<FomodInstallEntry>> {
     let selection_map = build_fomod_selection_map(&archive.fomod_selections);
+    walk_fomod(root, active_plugins, &mut |prompt, nodes, types| {
+        select_fomod_options(
+            prompt.step,
+            prompt.group,
+            prompt.group_type,
+            nodes,
+            types,
+            &selection_map,
+        )
+    })
+}
+
+/// Walk an installer with someone else making the choices, and return them as
+/// the `fomod_selections` that would make install choose the same: one per
+/// group shown, in order. Steps hidden by earlier choices are never asked,
+/// because the walk is install's own.
+pub(crate) fn choose_fomod(
+    xml: &str,
+    config_path: &str,
+    active_plugins: &HashSet<String>,
+    choose: &mut dyn FnMut(&GroupPrompt<'_>) -> anyhow::Result<Vec<usize>>,
+) -> anyhow::Result<Vec<crate::config::schema::FomodSelection>> {
+    let doc = Document::parse(xml)
+        .map_err(|err| anyhow::anyhow!("failed to parse FOMOD config {config_path}: {err}"))?;
+    let mut chosen = Vec::new();
+    walk_fomod(doc.root_element(), active_plugins, &mut |prompt, _, _| {
+        let picked = choose(prompt)?;
+        chosen.push(crate::config::schema::FomodSelection {
+            condition: None,
+            step: prompt.step.to_string(),
+            group: prompt.group.to_string(),
+            options: picked
+                .iter()
+                .map(|&idx| prompt.options[idx].name.clone())
+                .collect(),
+        });
+        Ok(picked)
+    })?;
+    Ok(chosen)
+}
+
+type Chooser<'c> = dyn FnMut(&GroupPrompt<'_>, &[Node<'_, '_>], &[FomodOptionType]) -> anyhow::Result<Vec<usize>>
+    + 'c;
+
+/// The installer's own walk: steps in order, a step skipped when its
+/// `<visible>` condition fails on the flags set so far, each group answered by
+/// `choose`, the chosen options' flags set for the steps after.
+fn walk_fomod(
+    root: Node<'_, '_>,
+    active_plugins: &HashSet<String>,
+    choose: &mut Chooser<'_>,
+) -> anyhow::Result<Vec<FomodInstallEntry>> {
+    let no_selections = build_fomod_selection_map(&[]);
     let mut flags = HashMap::<String, String>::new();
     let mut entries = Vec::<FomodInstallEntry>::new();
 
@@ -217,15 +288,34 @@ fn collect_selected_entries(
                     .iter()
                     .map(|plugin| fomod_option_type(*plugin, active_plugins, &flags))
                     .collect::<anyhow::Result<_>>()?;
-
-                let selected_indices = select_fomod_options(
-                    step_name,
-                    group_name,
+                let prompt = GroupPrompt {
+                    step: step_name,
+                    group: group_name,
                     group_type,
-                    &plugin_nodes,
-                    &option_types,
-                    &selection_map,
-                )?;
+                    options: plugin_nodes
+                        .iter()
+                        .zip(&option_types)
+                        .map(|(plugin, kind)| OptionPrompt {
+                            name: plugin.attribute("name").unwrap_or("").to_string(),
+                            description: find_child_element(*plugin, "description")
+                                .and_then(|node| node.text())
+                                .unwrap_or("")
+                                .trim()
+                                .to_string(),
+                            kind: *kind,
+                        })
+                        .collect(),
+                    default: select_fomod_options(
+                        step_name,
+                        group_name,
+                        group_type,
+                        &plugin_nodes,
+                        &option_types,
+                        &no_selections,
+                    )?,
+                };
+
+                let selected_indices = choose(&prompt, &plugin_nodes, &option_types)?;
 
                 for idx in selected_indices {
                     let plugin = plugin_nodes[idx];
@@ -726,6 +816,79 @@ pub(crate) fn normalize_fomod_path_allow_empty(value: &str) -> anyhow::Result<St
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const BRANCHING: &str = r#"<config>
+      <installSteps order="Explicit">
+        <installStep name="Style">
+          <optionalFileGroups order="Explicit">
+            <group name="Look" type="SelectExactlyOne">
+              <plugins order="Explicit">
+                <plugin name="Coloured">
+                  <description>Colours.</description>
+                  <conditionFlags><flag name="colour">On</flag></conditionFlags>
+                  <typeDescriptor><type name="Optional"/></typeDescriptor>
+                </plugin>
+                <plugin name="Plain">
+                  <description>No colour.</description>
+                  <typeDescriptor><type name="Recommended"/></typeDescriptor>
+                </plugin>
+              </plugins>
+            </group>
+          </optionalFileGroups>
+        </installStep>
+        <installStep name="Palette">
+          <visible><dependencies><flagDependency flag="colour" value="On"/></dependencies></visible>
+          <optionalFileGroups order="Explicit">
+            <group name="Hue" type="SelectAny">
+              <plugins order="Explicit">
+                <plugin name="Red"><typeDescriptor><type name="Optional"/></typeDescriptor></plugin>
+                <plugin name="Blue"><typeDescriptor><type name="Optional"/></typeDescriptor></plugin>
+              </plugins>
+            </group>
+          </optionalFileGroups>
+        </installStep>
+      </installSteps>
+    </config>"#;
+
+    /// Answer each group from a script keyed by group name, recording what
+    /// was asked.
+    fn walk(
+        answers: &[(&str, Vec<usize>)],
+    ) -> (Vec<String>, Vec<crate::config::schema::FomodSelection>) {
+        let mut asked = Vec::new();
+        let chosen = choose_fomod(
+            BRANCHING,
+            "fomod/ModuleConfig.xml",
+            &HashSet::new(),
+            &mut |group| {
+                asked.push(format!("{} default {:?}", group.group, group.default));
+                Ok(answers
+                    .iter()
+                    .find(|(name, _)| *name == group.group)
+                    .map(|(_, picked)| picked.clone())
+                    .unwrap_or_else(|| group.default.clone()))
+            },
+        )
+        .unwrap();
+        (asked, chosen)
+    }
+
+    #[test]
+    fn a_step_hidden_by_an_earlier_answer_is_never_asked() {
+        let (asked, chosen) = walk(&[]);
+        assert_eq!(
+            asked,
+            ["Look default [1]"],
+            "the recommended option is the default"
+        );
+        assert_eq!(chosen.len(), 1);
+        assert_eq!(chosen[0].options, ["Plain"]);
+
+        let (asked, chosen) = walk(&[("Look", vec![0]), ("Hue", vec![1])]);
+        assert_eq!(asked, ["Look default [1]", "Hue default []"]);
+        assert_eq!(chosen[1].step, "Palette");
+        assert_eq!(chosen[1].options, ["Blue"]);
+    }
 
     /// DarNified UI installs its stats menu through `conditionalFileInstalls`,
     /// gated on `Oblivion XP.esp` being absent. The block was ignored outright,

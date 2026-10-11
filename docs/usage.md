@@ -40,11 +40,19 @@ mudcrab add <modlist.toml> --from-oracle <ORACLE_MODS_DIR> --mod "<mod folder>" 
 
 [authoring.md](authoring.md) walks through using it on a new list.
 
+`add` only writes the mod's declaration into the list; nothing is installed or
+unpacked until `install`.
+
 `--archive` writes the archive entry from the archive itself, as `inspect`
 reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
-`--manual` for `manual:<file name>`), the file name, the layout, each FOMOD
-group's default option and every BAIN subpackage. It notes what is left to
-decide -- FOMOD options, alternative BAIN packages, plugins in the archive not
+`--manual` for `manual:<file name>`), the file name and the layout. In a
+terminal, an installer's choices are asked: a FOMOD step by step, through the
+same walk install makes (so a step shown only after certain answers is shown
+here only then), and a BAIN package's subpackages as one list. Enter takes the
+installer's own choice; the answers are written as `fomod_selections` or
+`bain_subpackages`. With `--defaults`, or when input is not a terminal, nothing
+is asked: each FOMOD group gets its default, every BAIN subpackage is listed,
+and `add` notes what may need changing, as well as plugins in the archive not
 given with `--plugin`. `--nexus` alone writes the source, and, with
 `NEXUS_API_KEY` set, the file name from Nexus's list of the mod's files.
 

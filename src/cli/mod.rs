@@ -114,8 +114,16 @@ pub struct AddArgs {
     /// MO2 `.meta` beside it, or --nexus / --manual), file name, layout, FOMOD
     /// defaults and BAIN packages, as `inspect` reports them. Only ever read
     /// from.
+    ///
+    /// In a terminal, a FOMOD installer or BAIN package is walked through
+    /// question by question and your answers written as the entry's
+    /// selections; Enter takes the installer's default.
     #[arg(long, value_name = "FILE")]
     pub archive: Option<PathBuf>,
+    /// With --archive, take every installer default instead of asking.
+    /// Also what happens when input is not a terminal.
+    #[arg(long, requires = "archive")]
+    pub defaults: bool,
     /// Name of the mod folder inside the Oracle mods directory.
     #[arg(long = "mod", value_name = "FOLDER", requires = "from_oracle")]
     pub mod_folder: Option<String>,

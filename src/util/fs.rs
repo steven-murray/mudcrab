@@ -99,6 +99,19 @@ pub fn write_text_file(path: &Path, content: &str) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
 }
 
+/// Somewhere on disk to pull a single file out of an archive: the user's
+/// cache, never `/tmp`, which is often RAM. One per process and purpose; the
+/// caller removes it.
+pub fn cache_scratch_dir(purpose: &str) -> PathBuf {
+    std::env::var_os("XDG_CACHE_HOME")
+        .map(PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".cache")))
+        .or_else(|| std::env::var_os("LOCALAPPDATA").map(PathBuf::from))
+        .unwrap_or_else(std::env::temp_dir)
+        .join("mudcrab")
+        .join(format!("{purpose}-{}", std::process::id()))
+}
+
 /// Prefixes of the scratch directories mudcrab creates under the temp dir.
 const STAGING_PREFIXES: [&str; 2] = ["mudcrab-stage-", "mudcrab-sys-"];
 

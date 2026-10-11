@@ -214,7 +214,8 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
 /// archive cannot decide -- which FOMOD options, which of several BAIN
 /// packages, where its plugins load -- is reported for the author to settle.
 fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
-    use crate::config::inspect::{LayoutGuess, inspect_archive, render_toml_snippet};
+    use crate::config::inspect::{LayoutGuess, inspect_archive, render_toml_snippet_with};
+    use std::io::IsTerminal;
 
     let id = args
         .id
@@ -235,13 +236,23 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
             )
         })?,
     };
+    // In a terminal, an installer's questions are put to the author, and the
+    // answers are what the entry records.
+    let interactive = !args.defaults && std::io::stdin().is_terminal();
+    let chosen = if interactive {
+        choose_installer(archive, &id, &args.input, &report.layout)?
+    } else {
+        None
+    };
+
     // Comments in the snippet talk to someone reading `inspect`'s report; in
     // the list they would only be noise.
-    let block = render_toml_snippet(
+    let block = render_toml_snippet_with(
         &report.file_name,
         Some(&source),
         &report.layout,
         report.fomod.as_ref(),
+        chosen.as_ref(),
     )
     .lines()
     .filter(|line| !line.trim_start().starts_with('#'))
@@ -249,6 +260,7 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     .join("\n");
 
     match &report.layout {
+        _ if chosen.is_some() => {}
         LayoutGuess::Fomod { .. } => eprintln!(
             "note: '{id}' has a FOMOD installer; the entry picks each group's default. \
              `mudcrab inspect` lists the options, to change `fomod_selections`."
@@ -282,6 +294,87 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
         archive_block: Some(block),
         ..NewMod::default()
     })
+}
+
+/// Walk an archive's installer with the author: each FOMOD group in the order
+/// install meets them, or the BAIN package list. `None` for a layout with
+/// nothing to choose.
+fn choose_installer(
+    archive: &Path,
+    id: &str,
+    modlist: &Path,
+    layout: &crate::config::inspect::LayoutGuess,
+) -> anyhow::Result<Option<crate::config::inspect::Chosen>> {
+    use super::choose::{Availability, Choice, Question, Rule, ask};
+    use crate::config::inspect::{Chosen, LayoutGuess, extract_single_entry};
+    use crate::config::install::layout::fomod::{FomodOptionType, choose_fomod};
+
+    let stdin = std::io::stdin();
+    let mut input = stdin.lock();
+    let mut output = std::io::stdout();
+    match layout {
+        LayoutGuess::Fomod { config_path } => {
+            let xml = extract_single_entry(archive, config_path)?;
+            // A step can depend on which plugins are active; install answers
+            // that from the list's load order, so the walk here does too.
+            let active: std::collections::HashSet<String> =
+                crate::config::loader::load_modlist(modlist)?
+                    .plugins
+                    .iter()
+                    .map(|plugin| plugin.to_ascii_lowercase())
+                    .collect();
+            println!("'{id}' has a FOMOD installer. Enter takes the installer's own choice.");
+            let selections = choose_fomod(&xml, config_path, &active, &mut |group| {
+                let question = Question {
+                    title: format!("{}: {}", group.step, group.group),
+                    rule: Rule::from_fomod(group.group_type),
+                    choices: group
+                        .options
+                        .iter()
+                        .map(|option| Choice {
+                            name: option.name.clone(),
+                            description: option.description.clone(),
+                            availability: match option.kind {
+                                FomodOptionType::Required => Availability::Required,
+                                FomodOptionType::Recommended => Availability::Recommended,
+                                FomodOptionType::NotUsable => Availability::Unavailable,
+                                FomodOptionType::Optional | FomodOptionType::CouldBeUsable => {
+                                    Availability::Free
+                                }
+                            },
+                        })
+                        .collect(),
+                    default: group.default.clone(),
+                };
+                ask(&mut input, &mut output, &question)
+            })?;
+            Ok(Some(Chosen::Fomod(selections)))
+        }
+        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => {
+            println!(
+                "'{id}' is a BAIN package. Pick the subpackages to install; numbered alike \
+                 (01 ..., 01 ...) usually means alternatives."
+            );
+            let question = Question {
+                title: "Subpackages".to_string(),
+                rule: Rule::AtLeastOne,
+                choices: subpackages
+                    .iter()
+                    .map(|name| Choice {
+                        name: name.clone(),
+                        description: String::new(),
+                        availability: Availability::Free,
+                    })
+                    .collect(),
+                default: (0..subpackages.len()).collect(),
+            };
+            let picked = ask(&mut input, &mut output, &question)?;
+            Ok(Some(Chosen::Bain(
+                picked.into_iter().map(|i| subpackages[i].clone()).collect(),
+            )))
+        }
+        _ => Ok(None),
+    }
 }
 
 fn parse_nexus_arg(spec: &str) -> anyhow::Result<(u64, u64)> {

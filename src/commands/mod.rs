@@ -1,6 +1,7 @@
 pub mod add;
 mod bsa;
 pub mod check;
+mod choose;
 pub mod compile;
 pub mod conflicts;
 mod dds;
