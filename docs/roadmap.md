@@ -26,20 +26,14 @@ that re-keying orphans an existing cache and forces a re-download, so this wants
 a migration path — read the old name, fall back to it, write the new one — not a
 flag day.
 
-### A2. Make manual archives resolvable when the host renames the file
+### A2. Make manual archives resolvable when the host renames the file — error done
 
-Today a `manual:` source matches its `file_name` exactly, and a re-upload under
-a new name reads to the user as "go download it by hand" when they already have
-it. Three options, none obviously right:
-
-- match on content hash, with the filename as a hint (robust, but the hash is
-  only knowable after someone has downloaded it once, so it does not help a
-  first-time user);
-- allow `file_name` to be a set of alternates or a glob;
-- keep exact matching and improve the error: if exactly one archive in the
-  search paths is unclaimed by any other mod, say so.
-
-The third is cheap and helps immediately; it does not preclude the others.
+Today a `manual:` source matches its `file_name` exactly. The cheap part is
+done: when one is missing, the error now names the best-matching files in the
+search paths (same words, ignoring version-like ones), so "go download it by
+hand" no longer hides the copy already on disk. Matching on content hash, or
+letting `file_name` be a set of alternates, would make it resolve by itself;
+neither is done.
 
 ### A3. One implementation of "where is the content root"
 
@@ -86,16 +80,15 @@ ones *can*. All 192 functions now come from xEdit's table.
 All six MOFAM merges rebuild **byte-identical** with the correction, so nothing
 already built was affected. The next list would not have been so lucky.
 
-### A4d. Refuse to install while MO2 is running
+### A4d. ~~Refuse to install while MO2 is running~~ — done (Linux)
 
-A running MO2 writes its in-memory profile back over what `install` wrote (see
-known-issues). Detect it -- a lock file, or the process -- and refuse, rather
-than let a test run against a stale profile.
+`install` refuses while an MO2 running from this instance is visible in
+`/proc`, which covers MO2 under Wine; `--ignore-running-mo2` overrides. No check
+on Windows yet.
 
-### A5. Honour `--parallel`, or remove it
+### A5. ~~Honour `--parallel`, or remove it~~ — done
 
-It is accepted and ignored. Either is fine; claiming a flag that does nothing is
-not.
+`download` now fetches `--parallel` archives at once.
 
 ---
 
@@ -199,6 +192,12 @@ binaries. Left:
 - **Pin CI's toolchain**, or keep a matching one locally: CI's newer clippy has
   twice failed a push that passed here (`chunks_exact` with a constant size).
 
+- **An end-to-end run by hand before a release.** Steven installs the full
+  MOFAM list from scratch -- empty instance, empty cache -- driving mudcrab
+  himself from the published docs, to judge whether the whole thing is elegant
+  as well as correct. Everything so far has been run section by section, by the
+  person who wrote the code, with the code's author watching.
+
 ---
 
 ## Phase F — Beyond a first release
@@ -216,5 +215,10 @@ Genuinely wanted, none of it blocking.
   plugin or another mod names, and that nothing provides, would have caught the
   OOO v1.7 pin (1009 files gone) outright, where the POST-GUIDE flag was read
   as harmless version drift.
+- **A GUI for editing a modlist.** Something that reads the TOML and offers
+  more intuitive editing -- sections, mods, archives, actions, inputs -- than a
+  700-entry text file. It must preserve comments and formatting the way
+  `mudcrab add` does (line-based splicing, never re-emitting parsed TOML),
+  since the comments are where the list's reasoning lives.
 - **A modlist test-suite command** — `mudcrab check --strict` against a fresh
   machine, so an author can find out that a row broke before a user does.

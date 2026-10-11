@@ -234,11 +234,26 @@ async fn download_with_retry(
     // rather than falling into the retry loop: retrying a fetch that does not
     // exist just delays the same message three times over.
     if resolve_handler(path, handler) == "manual" {
+        let wanted = file_name.unwrap_or(path);
+        let similar = similar_archives(wanted, &settings.archive_search_paths);
+        let hint = if similar.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "\nSimilarly named files in the search paths -- if one is this archive \
+                 re-uploaded under a new name, set its file_name to match:\n{}",
+                similar
+                    .iter()
+                    .map(|found| format!("  {}", found.display()))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            )
+        };
         anyhow::bail!(
             "archive '{}' must be downloaded by hand -- it is not fetchable from any \
              automated source. Put it in one of the --archive-search-path directories \
-             (or the download cache) and re-run. Searched: {}",
-            file_name.unwrap_or(path),
+             (or the download cache) and re-run. Searched: {}{hint}",
+            wanted,
             describe_search_paths(&settings.archive_search_paths),
         );
     }
@@ -599,6 +614,52 @@ pub fn find_local_archive(file_name: Option<&str>, search_paths: &[PathBuf]) -> 
     None
 }
 
+/// Files in the search paths whose names look like `wanted` with a different
+/// version: the usual shape of a host re-uploading an archive under a new name.
+///
+/// Names are compared on their words, ignoring the extension and any word with
+/// a digit in it (`2`, `v2`, `1beta`), since those are what a new version
+/// changes. Only the best-scoring candidates are offered. A candidate must
+/// share more than half of `wanted`'s words -- half lets a lone "Oblivion"
+/// match half a downloads folder -- including one of three letters or more.
+/// At most three, closest first.
+fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
+    fn words(name: &str) -> std::collections::BTreeSet<String> {
+        let stem = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
+        stem.split(|c: char| !c.is_ascii_alphanumeric())
+            .filter(|word| !word.is_empty() && !word.chars().any(|c| c.is_ascii_digit()))
+            .map(str::to_ascii_lowercase)
+            .collect()
+    }
+
+    let target = words(wanted);
+    if target.is_empty() {
+        return Vec::new();
+    }
+
+    let mut scored: Vec<(usize, PathBuf)> = Vec::new();
+    for directory in search_paths {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            // MO2 and mudcrab sidecars, not archives.
+            if name.ends_with(".meta") || name.ends_with(".orig-name") || !entry.path().is_file() {
+                continue;
+            }
+            let shared: Vec<String> = words(&name).intersection(&target).cloned().collect();
+            if shared.len() * 2 > target.len() && shared.iter().any(|word| word.len() >= 3) {
+                scored.push((shared.len(), entry.path()));
+            }
+        }
+    }
+    let best = scored.iter().map(|(score, _)| *score).max().unwrap_or(0);
+    scored.retain(|(score, _)| *score == best);
+    scored.sort_by(|a, b| a.1.cmp(&b.1));
+    scored.into_iter().take(3).map(|(_, path)| path).collect()
+}
+
 /// Adopt an archive found in a search path into the cache.
 ///
 /// The cache is keyed by `cache_file_name`, a derived name that has nothing to
@@ -778,6 +839,38 @@ pub fn cache_entry_is_stale_for_test(
     search_paths: &[PathBuf],
 ) -> bool {
     cache_entry_is_stale(cached, file_name, search_paths)
+}
+
+#[cfg(test)]
+mod similar_archive_tests {
+    use super::similar_archives;
+
+    #[test]
+    fn a_renamed_version_is_suggested_and_unrelated_files_are_not() {
+        let dir = tempfile::tempdir().unwrap();
+        for name in [
+            "Oblivion Trees v2.7z",
+            "Oblivion Trees v2.7z.meta",
+            "Oblivion Character Overhaul V2.7z",
+            "Unrelated Mod 1.0.zip",
+            "Oblivion.zip",
+        ] {
+            std::fs::write(dir.path().join(name), b"").unwrap();
+        }
+        let found = similar_archives("Oblivion Trees.7z", &[dir.path().to_path_buf()]);
+        let names: Vec<_> = found
+            .iter()
+            .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(names, ["Oblivion Trees v2.7z"]);
+    }
+
+    #[test]
+    fn a_name_of_only_numbers_suggests_nothing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("2024.zip"), b"").unwrap();
+        assert!(similar_archives("2023.zip", &[dir.path().to_path_buf()]).is_empty());
+    }
 }
 
 #[cfg(test)]
