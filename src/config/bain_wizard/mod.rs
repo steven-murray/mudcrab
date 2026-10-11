@@ -10,6 +10,10 @@
 //! Deliberately not an interpreter: `If`, variables and nested prompts are
 //! read past, not evaluated. That can only cost a match -- an explanation is
 //! offered only when the choices it names reproduce the selection exactly.
+//! Running a wizard, for `add`, is [`run`]'s job.
+
+pub mod run;
+pub mod script;
 
 use std::collections::BTreeSet;
 
@@ -22,10 +26,6 @@ pub struct Wizard {
     /// more than which subpackages install, so naming only the answers that
     /// explain the subpackages would leave a reader's other choices to chance.
     pub chooses_more: bool,
-    /// The first thing in the script that its prompts, read as above, do not
-    /// account for: a condition, a variable, a prompt inside a case. With one,
-    /// asking the prompts in order would not reproduce what Wrye Bash does.
-    pub beyond_prompts: Option<String>,
 }
 
 #[derive(Debug)]
@@ -97,30 +97,6 @@ pub fn parse(script: &str) -> Wizard {
                 | "editini"
         ) {
             wizard.chooses_more = true;
-        }
-        if wizard.beyond_prompts.is_none() {
-            let unaccounted = match word.as_str() {
-                "selectone" | "selectmany" if current.is_some() => {
-                    Some("a question inside an answer")
-                }
-                "if" | "elif" | "else" | "endif" => Some("a condition (If)"),
-                "while" | "endwhile" | "for" | "endfor" | "continue" => Some("a loop"),
-                "default" => Some("a Default answer"),
-                "deselectsubpackage" | "selectall" => {
-                    Some("a change to the selection outside the questions")
-                }
-                // Harmless before anything is selected, which is where wizards put it.
-                "deselectall" if !wizard.always.is_empty() || !wizard.prompts.is_empty() => {
-                    Some("a change to the selection outside the questions")
-                }
-                "return" | "cancel" | "exec" => Some("a way to end or redirect the script"),
-                "selectsubpackage" | "selectone" | "selectmany" | "case" | "break"
-                | "endselect" | "note" | "requireversions" | "deselectall" => None,
-                _ if statement.contains('=') => Some("a variable"),
-                _ if wizard.chooses_more => Some("a choice of plugins or an INI edit"),
-                _ => None,
-            };
-            wizard.beyond_prompts = unaccounted.map(str::to_string);
         }
         match word.as_str() {
             // A prompt inside a case (an "individual selection" branch) is
@@ -202,34 +178,6 @@ pub fn parse(script: &str) -> Wizard {
 }
 
 impl Wizard {
-    /// Whether asking the prompts in order, and selecting what each chosen
-    /// option's `Case` selects, does exactly what the script does: `Err` with
-    /// what stands in the way.
-    pub fn askable(&self) -> Result<(), String> {
-        if self.chooses_more {
-            return Err("it also chooses plugins or edits INIs".to_string());
-        }
-        match &self.beyond_prompts {
-            Some(what) => Err(format!("it contains {what}")),
-            None if self.prompts.is_empty() => Err("it asks nothing".to_string()),
-            None => Ok(()),
-        }
-    }
-
-    /// The subpackages the given answers select (lowercased, as recorded):
-    /// one list of chosen option indices per prompt.
-    pub fn selection(&self, answers: &[Vec<usize>]) -> BTreeSet<String> {
-        let mut out = self.always.clone();
-        for (prompt, chosen) in self.prompts.iter().zip(answers) {
-            for &index in chosen {
-                if let Some((_, picks)) = prompt.options.get(index) {
-                    out.extend(picks.iter().cloned());
-                }
-            }
-        }
-        out
-    }
-
     /// The answers -- (question, chosen options) per prompt -- that select
     /// exactly `selected`, if the wizard offers such a path.
     pub fn explain(&self, selected: &[String]) -> Option<Vec<(String, Vec<String>)>> {
@@ -323,39 +271,5 @@ EndSelect
         ));
         assert!(picky.chooses_more);
         assert_eq!(picky.explain(&["00 core".into(), "02 a".into()]), None);
-        assert!(picky.askable().is_err());
-    }
-
-    #[test]
-    fn a_wizard_of_questions_alone_can_be_asked() {
-        // J3's third answer opens a question of its own, which asking the
-        // top-level questions in order would skip.
-        let j3 = super::parse(J3);
-        assert_eq!(
-            j3.askable(),
-            Err("it contains a question inside an answer".to_string())
-        );
-
-        let simple = super::parse(
-            "DeSelectAll\nSelectSubPackage \"00 Core\"\n\
-             SelectOne \"Style\", \"|Plain\",\"No colour.\",\"\", \"Coloured\",\"Colour.\",\"\"\n\
-             Case \"Plain\"\nSelectSubPackage \"01 Plain\"\nBreak\n\
-             Case \"Coloured\"\nSelectSubPackage \"01 Coloured\"\nBreak\nEndSelect\n",
-        );
-        assert_eq!(simple.askable(), Ok(()));
-        let prompt = &simple.prompts[0];
-        assert_eq!(prompt.defaults, [0]);
-        assert_eq!(prompt.descriptions, ["No colour.", "Colour."]);
-        assert_eq!(
-            simple.selection(&[vec![1]]).into_iter().collect::<Vec<_>>(),
-            ["00 core", "01 coloured"]
-        );
-
-        let conditional =
-            super::parse("If CompareObVersion(\"1.2\") > 0\nSelectSubPackage \"a\"\nEndIf\n");
-        assert_eq!(
-            conditional.askable(),
-            Err("it contains a condition (If)".to_string())
-        );
     }
 }

@@ -1,4 +1,5 @@
 pub mod add;
+mod add_wizard;
 mod bsa;
 pub mod check;
 mod choose;

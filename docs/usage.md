@@ -48,14 +48,21 @@ reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
 `--manual` for `manual:<file name>`), the file name and the layout. In a
 terminal, an installer's choices are asked: a FOMOD step by step, through the
 same walk install makes (so a step shown only after certain answers is shown
-here only then), and a BAIN package's subpackages as one list -- or, when the
-package has a `wizard.txt` made only of questions and the subpackages each
-answer selects, the wizard's own questions. A wizard that does more (variables,
-conditions, plugin choices, INI edits; most real ones) is not run: `add` says
-why and offers the subpackage list. Enter takes the
+here only then), and a BAIN package's subpackages as one list. A BAIN package
+with a `wizard.txt` has its wizard run instead, as Wrye Bash runs it --
+questions, conditions, variables, loops -- and what it does becomes the entry:
+the subpackages it selects, the plugins in them it leaves unselected (as
+`exclude`), plugins it renames (`file_move` actions) and its `EditINI` calls
+(`ini_tweak` actions). When the wizard asks whether a file is already
+installed, a plugin is answered from the list's load order and the game's own
+files are taken as present; anything else is put to you, since only you know
+what the rest of your list installs. A wizard that cancels, or uses something
+not followed (`Exec`), falls back to the subpackage list. Enter takes the
 installer's own choice; the answers are written as `fomod_selections` or
 `bain_subpackages`. With `--defaults`, or when input is not a terminal, nothing
-is asked: each FOMOD group gets its default, every BAIN subpackage is listed,
+is asked: each FOMOD group gets its default, a BAIN wizard runs on its own
+defaults (a file it asks about counts as absent), other BAIN packages list
+every subpackage,
 and `add` notes what may need changing, as well as plugins in the archive not
 given with `--plugin`. `--nexus` alone writes the source, and, with
 `NEXUS_API_KEY` set, the file name from Nexus's list of the mod's files.

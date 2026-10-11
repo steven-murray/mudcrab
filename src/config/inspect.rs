@@ -501,6 +501,12 @@ fn toml_string(value: &str) -> String {
 pub(crate) enum Chosen {
     Fomod(Vec<crate::config::schema::FomodSelection>),
     Bain(Vec<String>),
+    /// What a BAIN wizard selected: subpackages, and plugins in them it left
+    /// unselected (written as `exclude`).
+    Wizard {
+        subpackages: Vec<String>,
+        exclude: Vec<String>,
+    },
 }
 
 pub(crate) fn render_toml_snippet(
@@ -561,14 +567,27 @@ pub(crate) fn render_toml_snippet_with(
             // alternatives to each other (`01a`, `01b`, ...) and the author has
             // to delete the ones they are not taking.
             out.push_str("bain_subpackages = [\n");
-            let subpackages = match chosen {
-                Some(Chosen::Bain(picked)) => picked,
-                _ => subpackages,
+            let (subpackages, exclude) = match chosen {
+                Some(Chosen::Bain(picked)) => (picked, None),
+                Some(Chosen::Wizard {
+                    subpackages,
+                    exclude,
+                }) => (subpackages, Some(exclude)),
+                _ => (subpackages, None),
             };
             for name in subpackages {
                 out.push_str(&format!("  {},\n", toml_string(name)));
             }
             out.push_str("]\n");
+            if let Some(exclude) = exclude.filter(|e| !e.is_empty()) {
+                // Globs, matched inside each subpackage: escaped, so a
+                // plugin named with brackets matches itself.
+                let names: Vec<String> = exclude
+                    .iter()
+                    .map(|name| toml_string(&globset::escape(name)))
+                    .collect();
+                out.push_str(&format!("exclude = [{}]\n", names.join(", ")));
+            }
         }
         LayoutGuess::Simple { .. } => {
             out.push_str("# no layout, data_folder or target_subdir needed\n");

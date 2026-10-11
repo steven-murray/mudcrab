@@ -162,9 +162,16 @@ Subpackages (choose one or more, separated by spaces)
 added 'Savilla's Stone Enhanced' to little.toml at line 48, after the last mod in section Clutter
 ```
 
-The two styles are alternatives, so only the second is taken. In a script, or
-with `--defaults`, `add` asks nothing: it takes every default (all of a BAIN
-package's subpackages) and notes what you may want to change.
+The two styles are alternatives, so only the second is taken. Many BAIN
+packages ship a wizard (`wizard.txt`) instead; `add` runs it as Wrye Bash
+would, asks its questions, and records what it does -- the subpackages, any
+plugins it leaves out, its INI tweaks. Some wizards check whether another
+mod's file is already installed; `add` answers that from your load order when
+it can and asks you when it cannot.
+
+In a script, or with `--defaults`, `add` asks nothing: it takes every default
+(a wizard's own, or all of a BAIN package's subpackages) and notes what you may
+want to change.
 
 A few more ways in:
 
@@ -257,8 +264,8 @@ The four mods above needed nothing more. Real lists usually do:
   see [merge-standalone.md](merge-standalone.md) and
   [modlist-format.md](modlist-format.md#merges).
 - **Checking against a reference.** If you have built the list by hand
-  before, `mudcrab diff` compares each installed mod against that instance,
-  file by file.
+  before (e.g. directly in MO2), `mudcrab diff` compares each installed mod
+  against that instance, file by file.
 - **A readable guide.** `docs` tables add prose and pictures to the list,
   section and mods, and `mudcrab export` turns the list into a guide for
   people installing by hand, as a Nexus page, Markdown or a website; see

@@ -594,3 +594,58 @@ fn an_archive_writes_its_own_entry() {
             .contains("# no layout")
     );
 }
+
+#[test]
+fn a_bain_wizard_is_run_and_its_result_recorded() {
+    let (dir, path) = fixture();
+    let archive = dir.path().join("Wiz-88-1-0.zip");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+    let options = zip::write::SimpleFileOptions::default();
+    let wizard = "\
+DeSelectAll
+SelectSubPackage \"00 Core\"
+If !DataFileExists(\"Missing.esm\")
+    DeSelectEspm \"Core - Patch.esp\"
+EndIf
+SelectOne \"Style\", \"Plain\", \"\", \"\", \"|Coloured\", \"\", \"\"
+    Case \"Plain\"
+        SelectSubPackage \"01 Plain\"
+        Break
+    Case \"Coloured\"
+        SelectSubPackage \"01 Coloured\"
+        EditINI('ini\\\\Wiz.ini', 'set', 'Wiz.bColour', 1)
+        Break
+EndSelect
+";
+    for (name, body) in [
+        ("wizard.txt", wizard),
+        ("00 Core/Core.esp", "x"),
+        ("00 Core/Core - Patch.esp", "x"),
+        ("01 Plain/textures/a.dds", "x"),
+        ("01 Coloured/textures/a.dds", "x"),
+    ] {
+        zip.start_file(name, options).unwrap();
+        std::io::Write::write_all(&mut zip, body.as_bytes()).unwrap();
+    }
+    zip.finish().unwrap();
+
+    // Not a terminal, so the wizard runs on its defaults.
+    add(&path)
+        .arg("--archive")
+        .arg(&archive)
+        .args(["--nexus", "88/99", "--id", "Wiz", "--section", "CORE"])
+        .args(["--plugin", "Core.esp", "--load-last"])
+        .assert()
+        .success();
+    let source = load_modlist(&path).unwrap();
+    let wiz = source.mods.iter().find(|m| m.id == "Wiz").unwrap();
+    let archive = &wiz.archives[0];
+    let subpackages: Vec<&str> = archive.bain_subpackages.iter().map(|s| s.name()).collect();
+    assert_eq!(subpackages, ["00 Core", "01 Coloured"]);
+    assert_eq!(archive.exclude, ["Core - Patch.esp"]);
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains("action = \"ini_tweak\"\nfile = \"Wiz.ini\"\nkey = \"Wiz.bColour\"\nvalue = \"1\"\nformat = \"set-to\""),
+        "{text}"
+    );
+}

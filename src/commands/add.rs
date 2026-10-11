@@ -239,11 +239,7 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     // In a terminal, an installer's questions are put to the author, and the
     // answers are what the entry records.
     let interactive = !args.defaults && std::io::stdin().is_terminal();
-    let chosen = if interactive {
-        choose_installer(archive, &id, &args.input, &report)?
-    } else {
-        None
-    };
+    let (chosen, actions) = choose_installer(archive, &id, &args.input, &report, interactive)?;
 
     // Comments in the snippet talk to someone reading `inspect`'s report; in
     // the list they would only be noise.
@@ -258,6 +254,10 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     .filter(|line| !line.trim_start().starts_with('#'))
     .collect::<Vec<_>>()
     .join("\n");
+    // Actions the installer's choices call for follow the archive.
+    let block = actions
+        .iter()
+        .fold(block, |block, action| format!("{block}\n\n{action}"));
 
     match &report.layout {
         _ if chosen.is_some() => {}
@@ -297,14 +297,17 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
 }
 
 /// Walk an archive's installer with the author: each FOMOD group in the order
-/// install meets them, or the BAIN package list. `None` for a layout with
-/// nothing to choose.
+/// install meets them, or the BAIN package's wizard, or its package list; and
+/// any actions those choices call for. `None` for a layout with nothing to
+/// choose. Not interactive, only a wizard is run (on its defaults): what it
+/// selects beats listing every subpackage.
 fn choose_installer(
     archive: &Path,
     id: &str,
     modlist: &Path,
     report: &crate::config::inspect::InspectReport,
-) -> anyhow::Result<Option<crate::config::inspect::Chosen>> {
+    interactive: bool,
+) -> anyhow::Result<(Option<crate::config::inspect::Chosen>, Vec<String>)> {
     use super::choose::{Availability, Choice, Question, Rule, ask};
     use crate::config::inspect::{Chosen, LayoutGuess, extract_single_entry};
     use crate::config::install::layout::fomod::{FomodOptionType, choose_fomod};
@@ -313,7 +316,7 @@ fn choose_installer(
     let mut input = stdin.lock();
     let mut output = std::io::stdout();
     match &report.layout {
-        LayoutGuess::Fomod { config_path } => {
+        LayoutGuess::Fomod { config_path } if interactive => {
             let xml = extract_single_entry(archive, config_path)?;
             // A step can depend on which plugins are active; install answers
             // that from the list's load order, so the walk here does too.
@@ -348,74 +351,55 @@ fn choose_installer(
                 };
                 ask(&mut input, &mut output, &question)
             })?;
-            Ok(Some(Chosen::Fomod(selections)))
+            Ok((Some(Chosen::Fomod(selections)), Vec::new()))
         }
         LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => {
-            // A wizard asks its own questions, in words; when it is nothing
-            // more than questions and the packages each answer selects, those
-            // are the questions to put.
+            // A wizard asks its own questions, in words, and decides what
+            // they mean; run it, rather than ask about folder names.
             let wizard_path = report
                 .top_level_files
                 .iter()
                 .find(|name| name.eq_ignore_ascii_case("wizard.txt"));
             if let Some(path) = wizard_path {
                 let script = extract_single_entry(archive, path)?;
-                let wizard = crate::config::bain_wizard::parse(&script);
-                match wizard.askable() {
-                    Ok(()) => {
-                        println!(
-                            "'{id}' is a BAIN package with a wizard. Enter takes the wizard's \
-                             own choice."
-                        );
-                        let mut answers = Vec::new();
-                        for prompt in &wizard.prompts {
-                            let question = Question {
-                                title: prompt.question.clone(),
-                                rule: if prompt.many {
-                                    Rule::Any
-                                } else {
-                                    Rule::ExactlyOne
-                                },
-                                choices: prompt
-                                    .options
-                                    .iter()
-                                    .zip(&prompt.descriptions)
-                                    .map(|((name, _), description)| Choice {
-                                        name: name.clone(),
-                                        description: description.clone(),
-                                        availability: Availability::Free,
-                                    })
-                                    .collect(),
-                                default: if prompt.defaults.is_empty() && !prompt.many {
-                                    vec![0]
-                                } else {
-                                    prompt.defaults.clone()
-                                },
-                            };
-                            answers.push(ask(&mut input, &mut output, &question)?);
-                        }
-                        let selected = wizard.selection(&answers);
-                        let picked: Vec<String> = subpackages
-                            .iter()
-                            .filter(|name| selected.contains(&name.to_ascii_lowercase()))
-                            .cloned()
-                            .collect();
-                        for name in &selected {
-                            if !subpackages.iter().any(|s| s.eq_ignore_ascii_case(name)) {
-                                eprintln!(
-                                    "note: the wizard selects '{name}', which the archive does \
-                                     not have; left out"
-                                );
-                            }
-                        }
-                        println!("  subpackages: {}", picked.join(", "));
-                        return Ok(Some(Chosen::Bain(picked)));
-                    }
-                    Err(why) => println!(
-                        "'{id}' has a BAIN wizard, but its questions cannot be asked here \
-                         ({why}); pick the subpackages directly."
-                    ),
+                let listing = crate::config::inspect::inspect_archive(archive, true)?;
+                let package = crate::config::bain_wizard::run::Package {
+                    subpackages: subpackages.clone(),
+                    files: listing.files.unwrap_or_default(),
+                };
+                if interactive {
+                    println!(
+                        "'{id}' is a BAIN package with a wizard. Enter takes the wizard's own \
+                         choice."
+                    );
                 }
+                let result = super::add_wizard::run_wizard(
+                    &script,
+                    &package,
+                    modlist,
+                    interactive,
+                    &mut input,
+                    &mut output,
+                )?;
+                if let Some(result) = result {
+                    println!("  subpackages: {}", result.subpackages.join(", "));
+                    if !result.exclude.is_empty() {
+                        println!("  plugins left out: {}", result.exclude.join(", "));
+                    }
+                    return Ok((
+                        Some(Chosen::Wizard {
+                            subpackages: result.subpackages,
+                            exclude: result.exclude,
+                        }),
+                        result.actions,
+                    ));
+                }
+                if !interactive {
+                    return Ok((None, Vec::new()));
+                }
+                println!("Pick the subpackages directly instead.");
+            } else if !interactive {
+                return Ok((None, Vec::new()));
             } else {
                 println!(
                     "'{id}' is a BAIN package. Pick the subpackages to install; numbered alike \
@@ -436,11 +420,14 @@ fn choose_installer(
                 default: (0..subpackages.len()).collect(),
             };
             let picked = ask(&mut input, &mut output, &question)?;
-            Ok(Some(Chosen::Bain(
-                picked.into_iter().map(|i| subpackages[i].clone()).collect(),
-            )))
+            Ok((
+                Some(Chosen::Bain(
+                    picked.into_iter().map(|i| subpackages[i].clone()).collect(),
+                )),
+                Vec::new(),
+            ))
         }
-        _ => Ok(None),
+        _ => Ok((None, Vec::new())),
     }
 }
 
