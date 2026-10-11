@@ -660,8 +660,13 @@ that plan selected, and the answers that chose them.
 stdout. It is the contract for rendering a list with your own tools:
 `document_version` changes only when a field changes meaning or disappears.
 
-Template exporters (`nexus`, `markdown`, `github-pages`, and your own) are not
-built yet; see [roadmap.md](roadmap.md), Phase C.
+`--to nexus` writes BBCode for a Nexus mod page or article: paste it into the
+editor's source (BBCode) mode. Nexus pages cannot hold files, so it links images
+by their `url`, and warns about any that only have a local `path`.
+
+Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
+modlist; `--list-options` shows them) and can be customised or replaced by your
+own: see [exporters.md](exporters.md).
 
 ## setup-tools
 

@@ -34,6 +34,8 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zip = "2.2"
+minijinja = { version = "2", features = ["loader"] }
+pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 
 [profile.release]
 # The audience downloads a binary rather than building one; debug symbols are

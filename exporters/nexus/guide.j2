@@ -1,0 +1,42 @@
+{% import "macros.j2" as m %}
+[center][size=6][b]{{ doc.docs.title or doc.name }}[/b][/size][/center]
+
+{% if doc.docs.summary %}
+[center][i]{{ doc.docs.summary | markup }}[/i][/center]
+
+{% endif %}
+{{ m.images(doc.docs, "the guide") }}
+{{ doc.docs.body | markup }}
+
+{% if options.choices and doc.inputs %}
+[size=4][b]Choices[/b][/size]
+[list]
+{% for input in doc.inputs %}
+[*]{{ input.query }}{{ " [i](" ~ m.answer(input.answer) ~ ")[/i]" if input.answer is defined else " [i](default: " ~ m.answer(input.default) ~ ")[/i]" if input.default is defined }}
+{% endfor %}
+[/list]
+
+{% endif %}
+{% if options.contents %}
+[size=4][b]Contents[/b][/size]
+[list]
+{% for entry in doc.entries if entry.kind == "section" %}
+[*]{{ entry.title }}
+{% endfor %}
+[/list]
+
+{% endif %}
+{% for entry in doc.entries %}
+{% include "entry.j2" %}
+
+{% endfor %}
+{% if options.load_order and doc.load_order %}
+[line]
+[size=5][b]Load order[/b][/size]
+
+[spoiler]
+{% for plugin in doc.load_order %}
+{{ plugin.name }}{{ " (inactive)" if not plugin.active }}
+{% endfor %}
+[/spoiler]
+{% endif %}

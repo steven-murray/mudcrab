@@ -555,7 +555,8 @@ pub struct ValidateArgs {
 #[derive(Debug, Args)]
 pub struct ExportArgs {
     /// The source modlist TOML. Its docs (and `docs_file`) supply the prose.
-    pub input: PathBuf,
+    #[arg(required_unless_present = "eject")]
+    pub input: Option<PathBuf>,
     /// Exporter: a built-in name, or a path to an exporter folder.
     #[arg(long = "to", value_name = "EXPORTER", default_value = "json")]
     pub exporter: String,
@@ -566,6 +567,17 @@ pub struct ExportArgs {
     /// Describe one build: only the mods this plan selected, with its answers.
     #[arg(long)]
     pub plan: Option<PathBuf>,
+    /// Set an exporter option, `key=value`; repeatable. Overrides the
+    /// modlist's `[export.<exporter>]`.
+    #[arg(long = "opt", value_name = "KEY=VALUE")]
+    pub options: Vec<String>,
+    /// List the exporter's options and their defaults, and export nothing.
+    #[arg(long)]
+    pub list_options: bool,
+    /// Copy the built-in exporter named by --to into this new folder, to
+    /// customise, and export nothing.
+    #[arg(long, value_name = "DIR")]
+    pub eject: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

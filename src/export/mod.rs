@@ -12,7 +12,10 @@
 //! document describes that one build: only the mods it selected, conditions
 //! already resolved, and the answers that produced it.
 
+pub mod builtin;
 pub mod describe;
+pub mod exporter;
+pub mod markup;
 
 use crate::config::condition::Condition;
 use crate::config::docs::Docs;

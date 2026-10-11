@@ -1,0 +1,14 @@
+{#- Pictures for a guide, section or mod: centred, captioned. -#}
+{% macro images(docs, place) %}
+{% for image in docs.images %}
+{% set src = image | image_src(place) %}
+{% if src %}
+[center][img]{{ src }}[/img]{% if image.caption %}
+
+[i]{{ image.caption }}[/i]{% endif %}[/center]
+{% endif %}
+{% endfor %}
+{% endmacro %}
+
+{#- A yes/no or a choice, as a reader would write it. -#}
+{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% else %}{{ value }}{% endif %}{% endmacro %}

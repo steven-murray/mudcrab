@@ -191,3 +191,173 @@ fn docs_that_would_vanish_are_refused() {
         assert!(err.contains(expected), "{expected}: {err}");
     }
 }
+
+fn export_text(path: &Path, extra: &[&str]) -> Result<(String, String), String> {
+    let out = mudcrab()
+        .arg("export")
+        .arg(path)
+        .args(extra)
+        .output()
+        .expect("runs");
+    let stderr = String::from_utf8_lossy(&out.stderr).into_owned();
+    if !out.status.success() {
+        return Err(stderr);
+    }
+    Ok((String::from_utf8(out.stdout).expect("utf-8"), stderr))
+}
+
+#[test]
+fn nexus_writes_bbcode_with_links_conditions_and_steps() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let (bbcode, _) = export_text(&list, &["--to", "nexus"]).unwrap();
+    assert!(
+        bbcode.contains("[size=5][b]1 - AUDIO[/b][/size]"),
+        "{bbcode}"
+    );
+    assert!(
+        bbcode.contains(
+            "1. [url=https://www.nexusmods.com/oblivion/mods/52661]Rats[/url] \
+             [i](optional: only if you answer yes to “Install the rats?”)[/i]"
+        ),
+        "{bbcode}"
+    );
+    assert!(
+        bbcode.contains("[img]https://example.com/audio.png[/img]"),
+        "{bbcode}"
+    );
+    assert!(
+        bbcode.contains("[*]In the BAIN installer, select [font=Courier New]00 Core[/font]."),
+        "{bbcode}"
+    );
+    assert!(bbcode.contains("Optional, as the guide says."), "{bbcode}");
+    assert!(
+        bbcode.contains("[spoiler]\nRats.esp\n[/spoiler]"),
+        "{bbcode}"
+    );
+
+    let (lean, _) = export_text(
+        &list,
+        &[
+            "--to",
+            "nexus",
+            "--opt",
+            "load_order=false",
+            "--opt",
+            "steps=no",
+        ],
+    )
+    .unwrap();
+    assert!(
+        !lean.contains("[spoiler]") && !lean.contains("BAIN"),
+        "{lean}"
+    );
+
+    let err = export_text(&list, &["--to", "nexus", "--opt", "load_ordr=false"]).unwrap_err();
+    assert!(
+        err.contains("no such option") && err.contains("load_order"),
+        "{err}"
+    );
+}
+
+#[test]
+fn an_image_without_a_url_is_left_out_of_nexus_and_said_so() {
+    let dir = tempdir().unwrap();
+    let list = write_list(
+        dir.path(),
+        &MODLIST.replace(", url = \"https://example.com/audio.png\"", ""),
+        DOCS_FILE,
+    );
+    let (bbcode, stderr) = export_text(&list, &["--to", "nexus"]).unwrap();
+    assert!(!bbcode.contains("[img]"), "{bbcode}");
+    assert!(
+        stderr.contains("section 1 - AUDIO: image shots/audio.png has no url"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn a_folder_can_override_one_template_of_a_builtin() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let custom = dir.path().join("exporters").join("mine");
+    std::fs::create_dir_all(&custom).unwrap();
+    std::fs::write(
+        custom.join("exporter.toml"),
+        "name = \"mine\"\nbase = \"nexus\"\n\n[options.stars]\ndefault = 3\n",
+    )
+    .unwrap();
+    // Replaces how a mod is written; the built-in guide and section templates
+    // find this one, because includes go through the same layers.
+    std::fs::write(
+        custom.join("mod.j2"),
+        "MOD {{ mod.title }} {{ '*' * options.stars }}\n",
+    )
+    .unwrap();
+
+    let (text, _) = export_text(&list, &["--to", "mine", "--opt", "stars=2"]).unwrap();
+    assert!(
+        text.contains("MOD Rats **") && text.contains("MOD Bells **"),
+        "{text}"
+    );
+    assert!(
+        text.contains("[size=5][b]1 - AUDIO[/b][/size]"),
+        "the rest is still nexus: {text}"
+    );
+
+    // Options default from the modlist's [export.<name>].
+    let with_defaults = format!("{MODLIST}\n[export.mine]\nstars = 1\n");
+    let list = write_list(dir.path(), &with_defaults, DOCS_FILE);
+    let (text, _) = export_text(&list, &["--to", "mine"]).unwrap();
+    assert!(text.contains("MOD Rats *\n"), "{text}");
+}
+
+#[test]
+fn a_template_can_extend_a_builtin_and_eject_copies_one_out() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let ejected = dir.path().join("my-nexus");
+    let out = mudcrab()
+        .args(["export", "--to", "nexus", "--eject"])
+        .arg(&ejected)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(ejected.join("mod.j2").is_file() && ejected.join("exporter.toml").is_file());
+
+    // An ejected copy runs as it stands...
+    let (original, _) = export_text(&list, &["--to", "nexus"]).unwrap();
+    let (copy, _) = export_text(&list, &["--to", ejected.to_str().unwrap()]).unwrap();
+    assert_eq!(original, copy);
+
+    // ...and ejecting over an existing folder is refused.
+    let again = mudcrab()
+        .args(["export", "--to", "nexus", "--eject"])
+        .arg(&ejected)
+        .output()
+        .unwrap();
+    assert!(!again.status.success());
+
+    // A template that wraps the built-in guide rather than replacing it.
+    let wrap = dir.path().join("wrap");
+    std::fs::create_dir_all(&wrap).unwrap();
+    std::fs::write(
+        wrap.join("exporter.toml"),
+        "name = \"wrap\"\nbase = \"nexus\"\n\n[[pages]]\ntemplate = \"outer.j2\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        wrap.join("outer.j2"),
+        "HEADER\n{% include \"builtin/nexus/guide.j2\" %}FOOTER\n",
+    )
+    .unwrap();
+    let (text, _) = export_text(&list, &["--to", wrap.to_str().unwrap()]).unwrap();
+    assert!(
+        text.starts_with("HEADER\n") && text.ends_with("FOOTER\n") && text.contains("[url="),
+        "{text}"
+    );
+}

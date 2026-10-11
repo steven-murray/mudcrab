@@ -1,0 +1,24 @@
+{% import "macros.j2" as m %}
+{% if section.depth == 1 %}
+[line]
+[size=5][b]{{ section.title }}[/b][/size]
+{% else %}
+[size=4][b]{{ section.title }}[/b][/size]
+{% endif %}
+
+{% if section.docs.summary %}
+[i]{{ section.docs.summary | markup }}[/i]
+
+{% endif %}
+{{ m.images(section.docs, "section " ~ section.name) }}
+{% if section.docs.body %}
+{{ section.docs.body | markup }}
+
+{% endif %}
+{% set counter = namespace(n=0) %}
+{% for entry in section.entries %}
+{% if entry.kind == "mod" %}{% set counter.n = counter.n + 1 %}{% endif %}
+{% set number = counter.n %}
+{% include "entry.j2" %}
+
+{% endfor %}

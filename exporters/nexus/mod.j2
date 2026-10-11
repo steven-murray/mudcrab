@@ -1,0 +1,36 @@
+{% import "macros.j2" as m %}
+{{ number }}. {% if mod.nexus %}[url={{ mod.nexus.mod_url }}]{{ mod.title }}[/url]{% else %}[b]{{ mod.title }}[/b]{% endif %}{% if mod.condition %} [i](optional: only if {{ mod.condition.text }})[/i]{% endif %}
+
+{% if mod.docs.summary %}
+{{ mod.docs.summary | markup }}
+{% endif %}
+{% if options.files or options.steps %}
+{% for archive in mod.archives %}
+{% if options.files and (archive.file_name or archive.condition) %}
+File: {% if archive.nexus %}[url={{ archive.nexus.file_url }}]{{ archive.file_name or archive.nexus.file_id }}[/url]{% else %}{{ archive.file_name or archive.path }}{% endif %}{% if archive.condition %} [i](only if {{ archive.condition.text }})[/i]{% endif %}
+
+{% endif %}
+{% if options.steps and archive.instructions %}
+[list]
+{% for line in archive.instructions %}
+[*]{{ line | markup }}
+{% endfor %}
+[/list]
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if options.steps and mod.steps %}
+[i]After installing:[/i]
+[list]
+{% for step in mod.steps %}
+[*]{{ step.text | markup }}{{ " [i](only if " ~ step.condition.text ~ ")[/i]" if step.condition }}
+{% if step.code %}
+[code]{{ step.code }}[/code]
+{% endif %}
+{% endfor %}
+[/list]
+{% endif %}
+{% if mod.docs.body %}
+{{ mod.docs.body | markup }}
+{% endif %}
+{{ m.images(mod.docs, "mod " ~ mod.id) }}

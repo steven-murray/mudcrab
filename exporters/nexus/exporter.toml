@@ -1,0 +1,30 @@
+# The guide as BBCode, to paste into a Nexus mod page or article (the editor's
+# source mode). Nexus pages cannot hold files, so images are linked by `url`.
+name = "nexus"
+description = "BBCode for a Nexus mod page or article"
+output = "file"
+markup = "bbcode"
+images = "url"
+
+[[pages]]
+template = "guide.j2"
+
+[options.contents]
+default = true
+help = "List the top-level sections before the first one"
+
+[options.choices]
+default = true
+help = "List the questions the list asks (its inputs), with their defaults"
+
+[options.files]
+default = true
+help = "Name each mod's file(s), linked to the Nexus files tab"
+
+[options.steps]
+default = true
+help = "Write out installer choices and the changes to make after installing"
+
+[options.load_order]
+default = true
+help = "Close with the load order, in a spoiler"
