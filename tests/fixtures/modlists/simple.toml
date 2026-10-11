@@ -4,6 +4,7 @@ plugins = ["SkyUI_SE.esp"]
 [inputs.use_hd_textures]
 type = "bool"
 query = "Install HD textures?"
+default = false
 
 [[mods]]
 id = "skyui"

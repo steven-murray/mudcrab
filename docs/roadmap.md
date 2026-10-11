@@ -95,11 +95,10 @@ not.
 
 ## Phase B — Optional mods, and inputs that earn their keep
 
-**The machinery half-exists.** `[inputs]` (`bool` / `choice` / `text`) and
-per-mod `if = "<expr>"` are in the schema, and `query` evaluates conditions and
-drops excluded mods from the plan. But the MOFAM list's `[inputs]` table is
-**empty** and not one of its 700 rows is conditional, so none of it has been
-exercised at scale — and the gaps show on inspection:
+**Partly done.** `[inputs]` take a declared `default`, `query` takes `--set`,
+conditions sit on actions as well as mods, and `validate` rejects a condition
+naming an undeclared input. MOFAM's first input, `decompress_dxt1_alpha`, gates
+ten `dds_decompress` actions. What is left:
 
 ### B1. Conditions can only ask about inputs
 
@@ -109,24 +108,11 @@ A is included"* — which needs conditions to see the resolved mod set. That is
 the whole reason the format is declarative and compiled rather than executed in
 order, so it should be true.
 
-### B2. Conditions apply to whole mods only
+### B2. Conditions on archives and FOMOD selections
 
-An optional mod is the easy case. The harder and more common one is a mod that
-is always installed but whose **FOMOD selection, action, or archive** depends on
-an answer — "1K or 2K textures?" is one input that should reach dozens of rows.
-`if` needs to be available on archives and actions, not just `[[mods]]`.
-
-### B3. Headless runs need declared defaults
-
-`query --headless` currently defaults a `bool` to false and a `choice` to its
-first entry. That is a silent policy, not a decision by the modlist author.
-Inputs should carry an explicit `default`, and `query` should take
-`--set key=value` so a scripted or CI run can pin answers without a TTY.
-
-### B4. Validate conditions
-
-A condition naming an input that does not exist should be a compile error. Today
-it evaluates to false and silently drops the mod.
+Actions are done. An optional mod is the easy case; "1K or 2K textures?" is one
+input that should reach dozens of archive and FOMOD rows, and `if` is not yet
+available there.
 
 ### B5. Prove it on MOFAM
 

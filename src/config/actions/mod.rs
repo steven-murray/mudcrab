@@ -95,6 +95,24 @@ mod tests {
     }
 
     #[test]
+    fn a_conditional_action_reads_if_beside_action_and_keeps_strictness() {
+        use crate::config::schema::ConditionalAction;
+        let parsed: ConditionalAction =
+            toml::from_str("if = \"flag\"\naction = \"dds_decompress\"\npaths = [\"t\"]").unwrap();
+        assert_eq!(parsed.condition.as_deref(), Some("flag"));
+        assert_eq!(parsed.action.name(), "dds_decompress");
+
+        let plain: ConditionalAction =
+            toml::from_str("action = \"ini_set\"\nfile = \"a.ini\"\nkey = \"k\"\nvalue = 0").unwrap();
+        assert!(plain.condition.is_none());
+
+        let typo = toml::from_str::<ConditionalAction>(
+            "if = \"flag\"\naction = \"dds_decompress\"\npaths = []\npathz = []",
+        );
+        assert!(typo.unwrap_err().to_string().contains("pathz"));
+    }
+
+    #[test]
     fn unknown_field_in_a_known_action_is_a_parse_error() {
         let err = parse(
             r#"

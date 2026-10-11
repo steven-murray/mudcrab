@@ -1,4 +1,4 @@
-use crate::config::schema::{InputType, ModAction, ModEntry, ModType, SourceModlist};
+use crate::config::schema::{InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -20,6 +20,23 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         if spec.input_type == InputType::Choice && spec.choices.is_empty() {
             anyhow::bail!("input {id} is choice type and must include choices");
         }
+
+        match (&spec.default, spec.input_type) {
+            (None, _)
+            | (Some(InputValue::Bool(_)), InputType::Bool)
+            | (Some(InputValue::Text(_)), InputType::Text) => {}
+            (Some(InputValue::Text(value)), InputType::Choice) => {
+                if !spec.choices.contains(value) {
+                    anyhow::bail!(
+                        "input {id}: default {value:?} is not one of its choices {:?}",
+                        spec.choices
+                    );
+                }
+            }
+            (Some(_), input_type) => {
+                anyhow::bail!("input {id}: default does not match its type ({input_type:?})")
+            }
+        }
     }
 
     for (key, value) in &modlist.ini {
@@ -35,6 +52,29 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
     }
 
     let flattened_mods = modlist.flatten_mods()?;
+
+    // A condition naming an input that does not exist would evaluate to false
+    // and silently drop what it guards.
+    for (mod_id, spec) in &flattened_mods {
+        let conditions = spec
+            .condition
+            .iter()
+            .map(|expr| (expr, "its `if`".to_string()))
+            .chain(spec.actions.iter().filter_map(|action| {
+                action
+                    .condition
+                    .as_ref()
+                    .map(|expr| (expr, format!("its {} action", action.action.name())))
+            }));
+        for (expr, site) in conditions {
+            let input = crate::config::query::condition_input(expr);
+            if !modlist.inputs.contains_key(input) {
+                anyhow::bail!(
+                    "mod {mod_id}: {site} asks about input '{input}', which [inputs] does not declare"
+                );
+            }
+        }
+    }
 
     // Plugins some merge with `hide_sources` swallows. Collected first because
     // the per-mod check below has to know about a merge declared further down
@@ -153,7 +193,7 @@ const PLUGIN_LIMIT: usize = 255;
 
 /// Every mod id a mod's actions declare a conflict against.
 fn conflict_partners(spec: &ModEntry) -> impl Iterator<Item = &String> {
-    spec.actions.iter().flat_map(|action| match action {
+    spec.actions.iter().flat_map(|action| match &action.action {
         ModAction::FilePrune(prune) => prune.conflicts_with.iter(),
         ModAction::FileHide(hide) => hide.conflicts_with.iter(),
         _ => [].iter(),

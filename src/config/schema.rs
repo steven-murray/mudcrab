@@ -113,6 +113,12 @@ pub struct InputSpec {
     pub query: String,
     #[serde(default)]
     pub choices: Vec<String>,
+    /// The author's answer when nobody is asked: what `query --headless`
+    /// uses, and what an interactive prompt offers. A `bool` takes `true` or
+    /// `false`, a `choice` one of its `choices`. Without one, a headless run
+    /// must be given the answer with `--set`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<InputValue>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -550,7 +556,21 @@ pub struct ModEntry {
     #[serde(default)]
     pub files: Vec<String>,
     #[serde(default)]
-    pub actions: Vec<ModAction>,
+    pub actions: Vec<ConditionalAction>,
+}
+
+/// A per-mod action that may depend on an input.
+///
+/// `if` sits in the same table as `action`, as it does on `[[mods]]`. `query`
+/// resolves it: the plan carries only the actions that apply, as plain
+/// [`ModAction`]s, so nothing downstream knows conditions exist -- and a mod
+/// whose answer changes gets a different definition hash and is restaged.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionalAction {
+    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    #[serde(flatten)]
+    pub action: ModAction,
 }
 
 /// A mod that is produced rather than extracted.
@@ -776,7 +796,7 @@ pub struct CompiledMod {
     #[serde(default)]
     pub files: Vec<String>,
     #[serde(default)]
-    pub actions: Vec<ModAction>,
+    pub actions: Vec<ConditionalAction>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

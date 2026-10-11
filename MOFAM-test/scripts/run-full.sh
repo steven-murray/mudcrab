@@ -12,7 +12,10 @@
 # compile and query have no filters: they always process the whole modlist, and
 # the plan they produce carries each mod's section for the later stages to
 # select on. Flags only `install` understands (--force, --force-merges,
-# --skip-actions, --dry-run) are routed to it alone.
+# --skip-actions, --dry-run) are routed to it alone, and `--set name=value`
+# answers one of the modlist's [inputs] for this run:
+#
+#   ./MOFAM-test/scripts/run-full.sh --set decompress_dxt1_alpha=false
 #
 # The last stage is `diff` against the Oracle. Its output is the point of the
 # exercise -- every difference has to be explained, not glanced at.
@@ -48,11 +51,17 @@ SEARCH_PATHS=(
 )
 export GAME_DIR="${GAME_DIR:-/home/steven/.local/share/Steam/steamapps/common/Oblivion}"
 
-# Split the arguments: filters go to every stage, install-only flags to install.
+# Split the arguments: filters go to every stage, install-only flags to
+# install, and `--set name=value` answers to query.
 FILTERS=()
 INSTALL_ONLY=()
+QUERY_ONLY=()
 while [ $# -gt 0 ]; do
 	case "$1" in
+	--set)
+		QUERY_ONLY+=("$1" "$2")
+		shift 2
+		;;
 	--force | --force-merges | --skip-actions | --dry-run)
 		INSTALL_ONLY+=("$1")
 		shift
@@ -82,7 +91,8 @@ echo "[1/6] compile"
 "${MUDCRAB[@]}" compile "$INPUT" --output "$OUT_DIR/compiled.json"
 
 echo "[2/6] query"
-"${MUDCRAB[@]}" query "$OUT_DIR/compiled.json" --output "$OUT_DIR/plan.json" --headless
+"${MUDCRAB[@]}" query "$OUT_DIR/compiled.json" --output "$OUT_DIR/plan.json" --headless \
+	"${QUERY_ONLY[@]+"${QUERY_ONLY[@]}"}"
 
 echo "[3/6] download"
 "${MUDCRAB[@]}" download "$OUT_DIR/plan.json" --cache "$CACHE_DIR" --retry 2 \

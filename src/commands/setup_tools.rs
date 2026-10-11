@@ -26,7 +26,7 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
     })?;
     for (_id, spec) in &flat {
         for action in &spec.actions {
-            if matches!(action, ModAction::Qac(_)) {
+            if matches!(action.action, ModAction::Qac(_)) {
                 required.needs_tes4edit = true;
             }
         }

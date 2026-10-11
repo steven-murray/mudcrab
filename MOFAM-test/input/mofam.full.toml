@@ -25,6 +25,23 @@ name = "MOFAM Full"
 # re-derived, or it will be answering the old question.
 guide = { published = "2025-03-18", file_id = 1000041165 }
 
+# Choices this list leaves to whoever installs it. `query` asks each one; a
+# headless run takes `default`, and `--set name=value` overrides either.
+# Dotted keys rather than `[inputs.*]` tables so they can sit up here: TOML puts
+# every table after the top-level keys, which would mean after `plugins`.
+
+# DEVIATION (not in the guide), for one class of machine. On DXVK + NVIDIA under
+# Proton, Oblivion's menus draw the transparent texels of a DXT1 texture as
+# opaque black: DarNified UI's compass frame becomes a black box over the
+# compass, map-marker and inventory icons sit on black squares. With this on,
+# `dds_decompress` rewrites the 246 affected menu textures (10 mods) as
+# uncompressed BGRA -- an exact decode, so nothing changes visually anywhere it
+# was not broken; it costs ~36 MiB. Leave it off on Windows.
+# `mudcrab dds audit <mods dir> --filter textures/menus` lists the textures.
+inputs.decompress_dxt1_alpha.type = "bool"
+inputs.decompress_dxt1_alpha.query = "Decompress menu textures that use DXT1 transparency (needed on Linux/Proton with DXVK)?"
+inputs.decompress_dxt1_alpha.default = true
+
 
 # Source: nexus:oblivion/52949
 # This is the full translation target and may include entries requiring future mudcrab features.
@@ -351,8 +368,6 @@ SMainMenuMovieIntro = ""
 "bSaveOnWait" = 0
 "bAllowScriptedAutosave" = 0
 
-
-[inputs]
 
 # ------------------------------
 # Part 1 - CLEANED MASTERS
@@ -1248,9 +1263,9 @@ file = "Oblivion.ini"
 key = "SFontFile_5"
 value = "Data\\Fonts\\Handwritten.fnt"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -1333,9 +1348,9 @@ set tnoDM.h to 4096
 SetStage tnoDM 10
 """
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus", "textures/menus50", "textures/menus80"]
 
@@ -1396,9 +1411,9 @@ section = ["UI & UX IMPROVEMENTS"]
 [[mods.archives]]
 path = "nexus:oblivion/50326/1000029030"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus", "textures/menus50", "textures/menus80"]
 
@@ -1412,9 +1427,9 @@ path = "nexus:oblivion/48027/1000024916"
 [[mods.archives]]
 path = "nexus:oblivion/48027/1000018717"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -5261,9 +5276,9 @@ file_name = "VGR Reasonable patch-51851-3-4-7-1743341721.7z"
 layout = "bain"
 bain_subpackages = ["00 core patch"]
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -6446,9 +6461,9 @@ archive = "Colorful Clothing - Collection.bsa"
 action = "file_prune"
 paths = ["Colorful Clothing - Collection.esp"]
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus", "textures/menus50"]
 
@@ -6493,9 +6508,9 @@ path = "nexus:oblivion/50205/1000031591"
 download_handler = "nexus"
 file_name = "Travelling Equipment-50205-1-0-1-1655646100.7z"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -8316,9 +8331,9 @@ file_name = "Hackdirt The Deep Ones 3.5-36224-3-5-1766515330.7z"
 layout = "custom-data-folder"
 data_folder = "HackdirtTheDeepOnes3.5/Data"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -8704,9 +8719,9 @@ path = "nexus:oblivion/54541/1000043966"
 download_handler = "nexus"
 file_name = "OCRAFT - Stations for Sale-54541-1-43-1769532332.7z"
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
@@ -9137,9 +9152,9 @@ file_name = "Cobl-21104-174-1598559328.7z"
 layout = "bain"
 bain_subpackages = ["00 Cobl Core", "01 StableCore"]
 
-# DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
-# black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
+# DEVIATION, optional: see [inputs.decompress_dxt1_alpha].
 [[mods.actions]]
+if = "decompress_dxt1_alpha"
 action = "dds_decompress"
 paths = ["textures/menus"]
 
