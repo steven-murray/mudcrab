@@ -1,6 +1,7 @@
 use crate::config::schema::{
     CompiledModlist, InputSpec, InputType, InputValue, PersonalizedMod, PersonalizedPlan,
 };
+use crate::config::condition::Condition;
 use std::collections::HashMap;
 use std::io::{self, Write};
 
@@ -30,37 +31,48 @@ pub fn build_plan(
     let responses = resolve_responses(&compiled.inputs, headless, overrides)?;
 
     let mod_order = compiled.mods.iter().map(|entry| entry.id.clone()).collect();
+    let included = resolve_included(compiled, &responses)?;
+
     let mut selected_mods = Vec::new();
     let mut mods = Vec::new();
     for entry in &compiled.mods {
-        let include = match &entry.condition {
-            Some(expr) => evaluate_condition(expr, &responses),
-            None => true,
-        };
-
-        if include {
-            selected_mods.push(entry.id.clone());
-            mods.push(PersonalizedMod {
-                id: entry.id.clone(),
-                oracle_name: entry.oracle_name.clone(),
-                section: entry.section.clone(),
-                mod_type: entry.mod_type,
-                merge: entry.merge.clone(),
-                archives: entry.archives.clone(),
-                files: entry.files.clone(),
-                actions: entry
-                    .actions
-                    .iter()
-                    .filter(|action| {
-                        action
-                            .condition
-                            .as_deref()
-                            .is_none_or(|expr| evaluate_condition(expr, &responses))
-                    })
-                    .map(|action| action.action.clone())
-                    .collect(),
-            });
+        if !included[entry.id.as_str()] {
+            continue;
         }
+        if let Some(dep) = entry.dependencies.iter().find(|dep| !included.get(dep.as_str()).copied().unwrap_or(false)) {
+            anyhow::bail!(
+                "mod {} is included but depends on {dep}, which is not; give {} `if = '{}'` \
+                 (or change the answers) so they come and go together",
+                entry.id,
+                entry.id,
+                crate::config::condition::mod_term(dep)
+            );
+        }
+
+        let mut actions = Vec::new();
+        for action in &entry.actions {
+            let applies = match &action.condition {
+                Some(expr) => Condition::parse(expr)?
+                    .eval(&responses, &mut |id| known(&included, id))
+                    .map_err(|err| anyhow::anyhow!("mod {}: {err:#}", entry.id))?,
+                None => true,
+            };
+            if applies {
+                actions.push(action.action.clone());
+            }
+        }
+
+        selected_mods.push(entry.id.clone());
+        mods.push(PersonalizedMod {
+            id: entry.id.clone(),
+            oracle_name: entry.oracle_name.clone(),
+            section: entry.section.clone(),
+            mod_type: entry.mod_type,
+            merge: entry.merge.clone(),
+            archives: entry.archives.clone(),
+            files: entry.files.clone(),
+            actions,
+        });
     }
 
     Ok(PersonalizedPlan {
@@ -133,19 +145,72 @@ fn parse_answer(id: &str, spec: &InputSpec, raw: &str) -> anyhow::Result<InputVa
     }
 }
 
-/// The input a condition asks about. Conditions are `flag`, `!flag`,
-/// `key == value` and `key != value`, each naming exactly one input.
-pub fn condition_input(expr: &str) -> &str {
-    let trimmed = expr.trim();
-    if let Some(rest) = trimmed.strip_prefix('!') {
-        return rest.trim();
+fn known(included: &HashMap<&str, bool>, id: &str) -> anyhow::Result<bool> {
+    included
+        .get(id)
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("asks about mod {id}, which the modlist does not have"))
+}
+
+/// Whether each mod is in the list, by its `if`.
+///
+/// A condition may ask about another mod, so mods are resolved on demand:
+/// asking about one resolves its own condition first. A mod met again while
+/// its own condition is still being answered is a cycle, which `validate`
+/// rejects but a hand-edited compiled file could still contain.
+fn resolve_included<'a>(
+    compiled: &'a CompiledModlist,
+    responses: &HashMap<String, InputValue>,
+) -> anyhow::Result<HashMap<&'a str, bool>> {
+    let mut conditions: HashMap<&str, Option<Condition>> = HashMap::new();
+    for entry in &compiled.mods {
+        let condition = entry
+            .condition
+            .as_deref()
+            .map(Condition::parse)
+            .transpose()
+            .map_err(|err| anyhow::anyhow!("mod {}: {err:#}", entry.id))?;
+        conditions.insert(entry.id.as_str(), condition);
     }
-    for op in ["==", "!="] {
-        if let Some((key, _)) = trimmed.split_once(op) {
-            return key.trim();
+
+    fn resolve<'a>(
+        id: &str,
+        conditions: &HashMap<&'a str, Option<Condition>>,
+        responses: &HashMap<String, InputValue>,
+        done: &mut HashMap<&'a str, bool>,
+        stack: &mut Vec<&'a str>,
+    ) -> anyhow::Result<bool> {
+        let Some((&key, condition)) = conditions.get_key_value(id) else {
+            anyhow::bail!("asks about mod {id}, which the modlist does not have");
+        };
+        if let Some(&answer) = done.get(key) {
+            return Ok(answer);
         }
+        if let Some(at) = stack.iter().position(|seen| *seen == key) {
+            let mut cycle = stack[at..].to_vec();
+            cycle.push(key);
+            anyhow::bail!("mod conditions depend on each other: {}", cycle.join(" -> "));
+        }
+        let answer = match condition {
+            None => true,
+            Some(condition) => {
+                stack.push(key);
+                let answer = condition
+                    .eval(responses, &mut |other| resolve(other, conditions, responses, done, stack))
+                    .map_err(|err| anyhow::anyhow!("mod {key}: {err:#}"));
+                stack.pop();
+                answer?
+            }
+        };
+        done.insert(key, answer);
+        Ok(answer)
     }
-    trimmed
+
+    let mut done = HashMap::new();
+    for entry in &compiled.mods {
+        resolve(&entry.id, &conditions, responses, &mut done, &mut Vec::new())?;
+    }
+    Ok(done)
 }
 
 fn prompt_input(spec: &InputSpec) -> anyhow::Result<InputValue> {
@@ -220,75 +285,9 @@ fn prompt_text(query: &str) -> anyhow::Result<String> {
     Ok(buf.trim().to_string())
 }
 
-pub fn evaluate_condition(expr: &str, responses: &HashMap<String, InputValue>) -> bool {
-    let trimmed = expr.trim();
-
-    if let Some(rest) = trimmed.strip_prefix('!') {
-        return !resolve_truthy(rest.trim(), responses);
-    }
-
-    if let Some((key, expected)) = split_binary(trimmed, "==") {
-        return resolve_string(key, responses)
-            .map(|value| value == expected)
-            .unwrap_or(false);
-    }
-
-    if let Some((key, expected)) = split_binary(trimmed, "!=") {
-        return resolve_string(key, responses)
-            .map(|value| value != expected)
-            .unwrap_or(false);
-    }
-
-    resolve_truthy(trimmed, responses)
-}
-
-fn split_binary<'a>(expr: &'a str, op: &str) -> Option<(&'a str, String)> {
-    let (left, right) = expr.split_once(op)?;
-    let expected = right.trim().trim_matches('"').to_string();
-    Some((left.trim(), expected))
-}
-
-fn resolve_truthy(key: &str, responses: &HashMap<String, InputValue>) -> bool {
-    match responses.get(key) {
-        Some(InputValue::Bool(v)) => *v,
-        Some(InputValue::Text(v)) => !v.trim().is_empty(),
-        None => false,
-    }
-}
-
-fn resolve_string(key: &str, responses: &HashMap<String, InputValue>) -> Option<String> {
-    match responses.get(key) {
-        Some(InputValue::Bool(v)) => Some(v.to_string()),
-        Some(InputValue::Text(v)) => Some(v.clone()),
-        None => None,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn evaluates_basic_expressions() {
-        let mut responses = HashMap::new();
-        responses.insert("a".to_string(), InputValue::Bool(true));
-        responses.insert("b".to_string(), InputValue::Text("orange".to_string()));
-
-        assert!(evaluate_condition("a", &responses));
-        assert!(!evaluate_condition("!a", &responses));
-        assert!(evaluate_condition("b == orange", &responses));
-        assert!(evaluate_condition("b == \"orange\"", &responses));
-        assert!(evaluate_condition("b != blue", &responses));
-        assert!(!evaluate_condition("missing", &responses));
-    }
-
-    #[test]
-    fn condition_input_names_the_one_key_asked_about() {
-        assert_eq!(condition_input("a"), "a");
-        assert_eq!(condition_input(" ! a "), "a");
-        assert_eq!(condition_input("b == orange"), "b");
-        assert_eq!(condition_input("b!=\"blue\""), "b");
-    }
 
     fn bool_input(default: Option<bool>) -> HashMap<String, InputSpec> {
         HashMap::from([(

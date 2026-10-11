@@ -547,3 +547,58 @@ fn a_simple_layout_with_a_data_folder_is_rejected() {
     let src = "name = \"S\"\n\n[[mods]]\nid = \"m\"\n\n[[mods.archives]]\npath = \"x.zip\"\nlayout = \"simple\"\ndata_folder = \"sub\"\n";
     assert!(validate_src(src).unwrap_err().to_string().contains("custom-data-folder"));
 }
+
+const MOD_CONDITION: &str = r#"
+name = "Mod conditions"
+
+[[mods]]
+id = "base"
+type = "empty"
+
+[[mods]]
+id = "patch"
+if = "mod:base"
+type = "empty"
+"#;
+
+#[test]
+fn accepts_a_condition_naming_another_mod() {
+    validate_src(MOD_CONDITION).expect("should validate");
+}
+
+#[test]
+fn rejects_a_condition_naming_an_unknown_mod() {
+    let err = validate_src(&MOD_CONDITION.replace("mod:base", "mod:bsae")).expect_err("should fail");
+    assert!(err.to_string().contains("'bsae'"), "{err}");
+}
+
+#[test]
+fn rejects_a_mod_condition_asking_about_itself() {
+    let err = validate_src(&MOD_CONDITION.replace("mod:base", "!mod:patch")).expect_err("should fail");
+    assert!(err.to_string().contains("the mod itself"), "{err}");
+}
+
+#[test]
+fn rejects_mod_conditions_that_need_each_other() {
+    let src = MOD_CONDITION.replace("id = \"base\"", "id = \"base\"\nif = \"!mod:patch\"");
+    let err = validate_src(&src).expect_err("should fail");
+    assert!(err.to_string().contains("base -> patch -> base"), "{err}");
+}
+
+#[test]
+fn an_action_may_ask_about_its_own_mod() {
+    // Only a mod's own `if` decides whether it is in; an action asking about
+    // its mod is merely redundant, not a loop.
+    let src = MOD_CONDITION.replace(
+        "if = \"mod:base\"\ntype = \"empty\"",
+        "type = \"generated\"\n\n[[mods.actions]]\nif = \"mod:patch\"\naction = \"write_file\"\npath = \"a\"\ncontent = \"b\"",
+    );
+    assert_ne!(src, MOD_CONDITION);
+    validate_src(&src).expect("should validate");
+}
+
+#[test]
+fn rejects_a_malformed_condition() {
+    let err = validate_src(&MOD_CONDITION.replace("mod:base", "Some Mod")).expect_err("should fail");
+    assert!(format!("{err:#}").contains("mod:\"Some Mod\""), "{err:#}");
+}

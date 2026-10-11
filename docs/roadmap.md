@@ -95,18 +95,18 @@ on Windows yet.
 
 ## Phase B — Optional mods, and inputs that earn their keep
 
-**Partly done.** `[inputs]` take a declared `default`, `query` takes `--set`,
+**Partly done.** Conditions can ask about mods (B1). `[inputs]` take a declared `default`, `query` takes `--set`,
 conditions sit on actions as well as mods, and `validate` rejects a condition
 naming an undeclared input. MOFAM's first input, `decompress_dxt1_alpha`, gates
 ten `dds_decompress` actions. What is left:
 
-### B1. Conditions can only ask about inputs
+### B1. ~~Conditions can ask about mods~~ — done
 
-`evaluate_condition` reads the input responses and nothing else. The readme
-promises more than that — *"conditionally include Mod B depending on whether Mod
-A is included"* — which needs conditions to see the resolved mod set. That is
-the whole reason the format is declarative and compiled rather than executed in
-order, so it should be true.
+`mod:id` is a condition term, terms combine with `&&`, `||` and `!`, and
+`query` resolves mods in whatever order their conditions need, so the readme's
+*"conditionally include Mod B depending on whether Mod A is included"* is true.
+`validate` refuses unknown mods and conditions that loop; `query` refuses a
+plan that leaves out a mod another included mod lists in `dependencies`.
 
 ### B2. Conditions on archives and FOMOD selections
 

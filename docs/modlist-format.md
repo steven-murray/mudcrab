@@ -286,9 +286,30 @@ Since TOML puts every table after the top-level keys, an input declared with a
 (`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top
 of the file instead; MOFAM does this.
 
-Conditions accept `flag`, `!flag`, `key == value` and `key != value`, and
-`validate` rejects one that names an undeclared input. They are resolved by
-`query`: the plan holds only the mods and actions that apply, so a changed
-answer changes the affected mods' definitions and `install` restages them.
-Conditions cannot yet ask about other mods, nor sit on archives or FOMOD
+A condition is one or more terms joined by `&&` and `||` (`&&` binds tighter;
+no parentheses). Each term may be negated with `!` and is one of:
+
+| Term | True when |
+|---|---|
+| `flag` | the bool input is true, or the text input is non-empty |
+| `key == value`, `key != value` | the input's answer is (not) `value`; quotes optional |
+| `mod:id` | mod `id` is in the resolved list; `mod:"Some Mod"` when the id has spaces |
+
+```toml
+[[mods]]
+id = "HD Pack Compatibility Patch"
+if = 'mod:"HD Pack" && !mod:"Other Overhaul"'   # follows whichever way HD Pack went
+```
+
+A mod condition may name a mod declared further down the file: `query` answers
+each mod's condition when it is first needed. `validate` rejects a condition
+naming an undeclared input or a mod that does not exist, a mod whose `if` asks
+about itself, and mod conditions that ask about each other in a loop (which
+have no answer, or two). A mod listed in another's `dependencies` must be
+included whenever that one is; `query` refuses a plan where a condition left
+it out, and says which `mod:` condition would keep the two together.
+
+Conditions are resolved by `query`: the plan holds only the mods and actions
+that apply, so a changed answer changes the affected mods' definitions and
+`install` restages them. Conditions cannot yet sit on archives or FOMOD
 selections -- see Phase B of [roadmap.md](roadmap.md).

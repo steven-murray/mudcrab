@@ -1,3 +1,4 @@
+use crate::config::condition::Condition;
 use crate::config::schema::{InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
@@ -53,28 +54,46 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
 
     let flattened_mods = modlist.flatten_mods()?;
 
-    // A condition naming an input that does not exist would evaluate to false
-    // and silently drop what it guards.
+    // A condition naming an input or mod that does not exist would evaluate
+    // to false and silently drop what it guards.
+    let mut mod_condition_refs: HashMap<&str, Vec<String>> = HashMap::new();
     for (mod_id, spec) in &flattened_mods {
         let conditions = spec
             .condition
             .iter()
-            .map(|expr| (expr, "its `if`".to_string()))
+            .map(|expr| (expr, "its `if`".to_string(), true))
             .chain(spec.actions.iter().filter_map(|action| {
                 action
                     .condition
                     .as_ref()
-                    .map(|expr| (expr, format!("its {} action", action.action.name())))
+                    .map(|expr| (expr, format!("its {} action", action.action.name()), false))
             }));
-        for (expr, site) in conditions {
-            let input = crate::config::query::condition_input(expr);
-            if !modlist.inputs.contains_key(input) {
+        for (expr, site, gates_mod) in conditions {
+            let condition = Condition::parse(expr).map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err:#}"))?;
+            if let Some(input) = condition.inputs().into_iter().find(|i| !modlist.inputs.contains_key(*i)) {
                 anyhow::bail!(
                     "mod {mod_id}: {site} asks about input '{input}', which [inputs] does not declare"
                 );
             }
+            for other in condition.mods() {
+                if !flattened_mods.contains_key(other) {
+                    anyhow::bail!(
+                        "mod {mod_id}: {site} asks about mod '{other}', which is not a mod in this modlist"
+                    );
+                }
+                if gates_mod && other == mod_id {
+                    anyhow::bail!("mod {mod_id}: its `if` asks about the mod itself");
+                }
+            }
+            if gates_mod {
+                mod_condition_refs.insert(
+                    mod_id.as_str(),
+                    condition.mods().into_iter().map(str::to_string).collect(),
+                );
+            }
         }
     }
+    reject_condition_cycles(&mod_condition_refs)?;
 
     // Plugins some merge with `hide_sources` swallows. Collected first because
     // the per-mod check below has to know about a merge declared further down
@@ -386,5 +405,41 @@ fn visit(
     visiting.remove(mod_id);
     visited.insert(mod_id.to_string());
 
+    Ok(())
+}
+
+/// Refuse mod conditions that ask about each other in a loop: `A if mod:B`
+/// and `B if !mod:A` has no answer, and one that happens to be consistent
+/// (`A if mod:B`, `B if mod:A`) has two.
+fn reject_condition_cycles(refs: &HashMap<&str, Vec<String>>) -> anyhow::Result<()> {
+    fn visit<'a>(
+        id: &'a str,
+        refs: &'a HashMap<&str, Vec<String>>,
+        finished: &mut HashSet<&'a str>,
+        stack: &mut Vec<&'a str>,
+    ) -> anyhow::Result<()> {
+        if finished.contains(id) {
+            return Ok(());
+        }
+        if let Some(at) = stack.iter().position(|seen| *seen == id) {
+            let mut cycle = stack[at..].to_vec();
+            cycle.push(id);
+            anyhow::bail!("mod conditions depend on each other: {}", cycle.join(" -> "));
+        }
+        stack.push(id);
+        for other in refs.get(id).into_iter().flatten() {
+            visit(other, refs, finished, stack)?;
+        }
+        stack.pop();
+        finished.insert(id);
+        Ok(())
+    }
+
+    let mut ids: Vec<&&str> = refs.keys().collect();
+    ids.sort();
+    let mut finished = HashSet::new();
+    for id in ids {
+        visit(id, refs, &mut finished, &mut Vec::new())?;
+    }
     Ok(())
 }
