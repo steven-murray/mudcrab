@@ -3,7 +3,7 @@
 A declarative modlist compiler and installer for TES4: Oblivion, written in Rust
 and independent of platform.
 
-**I've seen mudcrabs more fearsome than you!**
+**I've fought mudcrabs more fearsome than you!**
 
 ## What mudcrab is
 
