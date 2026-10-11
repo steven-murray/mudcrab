@@ -1,0 +1,44 @@
+{#- The setup page's title: the guide's `body_title`, or a plain default. -#}
+{% macro setup_title(doc) %}{{ doc.docs.body_title or "Before you start" }}{% endmacro %}
+
+{#- Whether the guide has anything to say before its first section. -#}
+{% macro has_setup(doc, options) %}{{ "yes" if doc.docs.body or doc.docs.images or doc.tools or doc.game_settings or (options.choices and doc.inputs) or (doc.entries | selectattr("kind", "equalto", "mod") | list) else "no" }}{% endmacro %}
+
+{#- The site's pages in reading order, written either as the contents list or
+    as one page's previous / next links. One list, so the two cannot disagree.
+    `here` is the current page's file name. -#}
+{% macro walk(doc, options, mode, here="") %}
+{# A loop's `set` stays inside the loop; a namespace's does not. #}
+{% set ns = namespace(pages=[]) %}
+{% if options.key %}
+{% set ns.pages = ns.pages + [{"title": "Key", "url": "key.md", "summary": "What the symbols in each part mean"}] %}
+{% endif %}
+{% if has_setup(doc, options) == "yes" %}
+{% set ns.pages = ns.pages + [{"title": setup_title(doc), "url": "setup.md", "summary": doc.docs.body_summary}] %}
+{% endif %}
+{% for entry in doc.entries if entry.kind == "section" %}
+{% set ns.pages = ns.pages + [{"title": entry.title, "url": entry.anchor ~ ".md", "summary": entry.docs.summary}] %}
+{% endfor %}
+{% if doc.docs.footer %}
+{% set ns.pages = ns.pages + [{"title": doc.docs.footer_title or "After installing", "url": "closing.md"}] %}
+{% endif %}
+{% if options.load_order and doc.load_order %}
+{% set ns.pages = ns.pages + [{"title": "Load order", "url": "load-order.md"}] %}
+{% endif %}
+{% set pages = ns.pages %}
+{% if mode == "contents" %}
+{% for page in pages %}
+- [{{ page.title }}]({{ page.url }}){{ " — " ~ page.summary if page.summary }}
+{% endfor %}
+{% else %}
+{% for page in pages %}
+{% if page.url == here %}
+{% set previous = pages[loop.index0 - 1] if loop.index0 > 0 %}
+{% set next = pages[loop.index0 + 1] if loop.index0 + 1 < pages | length %}
+---
+
+{{ "← [" ~ previous.title ~ "](" ~ previous.url ~ ") · " if previous }}[Contents](index.md){{ " · [" ~ next.title ~ "](" ~ next.url ~ ") →" if next }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endmacro %}

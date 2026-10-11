@@ -6,17 +6,34 @@
 > This whole install can be done automatically, from the same list, with [mudcrab](https://github.com/steven-murray/mudcrab).
 
 {% endif %}
+{% if doc.docs.summary %}
+{{ doc.docs.summary | markup }}
+
+{% endif %}
 {% if options.contents %}
 ## Contents
 
+{% if options.key %}
+- [Key](#key)
+{% endif %}
+{% if doc.docs.body_title %}
+- [{{ doc.docs.body_title }}](#setup)
+{% endif %}
 {% for entry in doc.entries if entry.kind == "section" %}
 - [{{ entry.title }}](#{{ entry.anchor }})
 {% endfor %}
 
 {% endif %}
+{% if options.key %}
+## Key
 
-{% if doc.docs.summary %}
-*{{ doc.docs.summary | markup }}*
+{{ m.key(doc.kinds, sym, options.steps) }}
+
+{% endif %}
+{% if doc.docs.body_title %}
+<a id="setup"></a>
+
+## {{ doc.docs.body_title }}
 
 {% endif %}
 {{ m.images(doc.docs, "the guide") }}
@@ -28,12 +45,6 @@
 ## Choices
 
 {{ m.choices(doc.inputs) }}
-
-{% endif %}
-{% if options.key %}
-## Key
-
-{{ m.key(doc.kinds, sym, options.steps) }}
 
 {% endif %}
 {# Section headings start one level below the guide's title. #}

@@ -1,10 +1,20 @@
 # Written by `mudcrab export --to github-pages`.
 title: {{ (doc.docs.title or doc.name) | tojson }}
 {% if doc.docs.summary %}
-description: {{ doc.docs.summary | tojson }}
+description: {{ doc.docs.summary | trim | split("\n\n") | first | tojson }}
 {% endif %}
+{% if options.theme == "just-the-docs" %}
+# A sidebar with every page, in reading order (each page's `nav_order`), and
+# a search box. GitHub Pages fetches the theme from its repository.
+remote_theme: just-the-docs/just-the-docs@v0.12.0
+plugins:
+  - jekyll-remote-theme
+  - jekyll-include-cache
+search_enabled: true
+{% else %}
 theme: {{ options.theme }}
 # Themes like minima put every page in the header unless told which; a guide
 # has dozens. The site title already links home.
 header_pages:
   - load-order.md
+{% endif %}

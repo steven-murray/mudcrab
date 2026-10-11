@@ -1,0 +1,33 @@
+{#- Everything before the first section: the guide's own opening prose, the
+    choices a reader makes, tools, game settings and any mods outside a
+    section. Nothing is written when there is none. -#}
+{% import "macros.md.j2" as m %}
+{% import "symbols.j2" as sym %}
+{% import "site.j2" as site %}
+{% if site.has_setup(doc, options) == "yes" %}
+{% with title = site.setup_title(doc) | string, nav_order = 2 %}{% include "front-matter.j2" %}{% endwith %}
+{{ "{% raw %}" }}
+# {{ site.setup_title(doc) }}
+
+{{ m.images(doc.docs, "the guide") }}
+{% if doc.docs.body %}
+{{ doc.docs.body | markup }}
+
+{% endif %}
+{% if options.choices and doc.inputs %}
+## Choices
+
+{{ m.choices(doc.inputs) }}
+
+{% endif %}
+{% set heading_base = 1 %}
+{% include "setup.md.j2" %}
+{# Mods outside any section have no page of their own. #}
+{% set heading_base = 1 %}
+{% for entry in doc.entries if entry.kind == "mod" %}
+{% include "entry.md.j2" %}
+
+{% endfor %}
+{{ site.walk(doc, options, "nav", "setup.md") }}
+{{ "{% endraw %}" }}
+{% endif %}

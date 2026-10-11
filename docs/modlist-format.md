@@ -267,9 +267,10 @@ docs.links = [{ label = "Swearing Mudcrabs (Skyrim)", url = "https://..." }]
 | Key | Meaning |
 |---|---|
 | `title` | What to show instead of the id or section name |
-| `summary` | One line |
+| `summary` | One line; for the guide, a short introduction (a site's landing page) |
 | `body` | Longer prose, Markdown |
 | `footer` | Prose after the contents: the guide's closing notes and credits, or a section's steps once its mods are in |
+| `body_title` | (Guide only) the title the guide's `body` gets where it is a page of its own, e.g. "Part 0 - Setup" on a GitHub Pages site; with tools and game settings, it is what to do before the first section |
 | `footer_title` | (Guide only) the title the closing text gets where it is a page of its own, e.g. on a GitHub Pages site |
 | `images` | `{ path, url, caption }`: a local `path` (relative to the modlist) for exporters that write a site, a `url` for ones pasted somewhere that cannot hold files, such as Nexus; give both and each takes what it can |
 | `links` | `{ label, url }` |

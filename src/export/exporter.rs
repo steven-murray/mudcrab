@@ -510,14 +510,24 @@ fn render_markup(text: Option<String>, markup: Markup) -> String {
 
 /// A template error with where it happened, which minijinja keeps in the chain.
 fn describe_error(err: &Error) -> String {
-    let mut out = err.to_string();
-    if let Some(detail) = err
-        .display_debug_info()
-        .to_string()
-        .lines()
-        .find(|l| l.contains("-->"))
-    {
-        out.push_str(&format!(" ({})", detail.trim()));
+    // An error inside an include is wrapped, once per level; the innermost
+    // is the one that says what went wrong.
+    let mut out = String::new();
+    let mut current: Option<&Error> = Some(err);
+    while let Some(err) = current {
+        if !out.is_empty() {
+            out.push_str(": ");
+        }
+        out.push_str(&err.to_string());
+        if let Some(detail) = err
+            .display_debug_info()
+            .to_string()
+            .lines()
+            .find(|l| l.contains("-->"))
+        {
+            out.push_str(&format!(" ({})", detail.trim()));
+        }
+        current = std::error::Error::source(err).and_then(|e| e.downcast_ref::<Error>());
     }
     out
 }

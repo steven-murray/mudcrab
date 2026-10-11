@@ -1,17 +1,14 @@
-{% with title = section.title %}{% include "front-matter.j2" %}{% endwith %}
+{% import "site.j2" as site %}
+{# Sections follow the key (1) and the setup page (2) in the sidebar. #}
+{% for entry in doc.entries if entry.kind == "section" %}
+{% if entry.anchor == section.anchor %}
+{% with title = section.title, nav_order = 2 + loop.index %}{% include "front-matter.j2" %}{% endwith %}
+{% endif %}
+{% endfor %}
 {{ "{% raw %}" }}
 {# The page is the section, so its heading is the page's first. #}
 {% set heading_base = 0 %}
 {% include "section.md.j2" %}
 
-{% set sections = doc.entries | selectattr("kind", "equalto", "section") | list %}
-{% for other in sections %}
-{% if other.anchor == section.anchor %}
-{% set previous = sections[loop.index0 - 1] if loop.index0 > 0 %}
-{% set next = sections[loop.index0 + 1] if loop.index0 + 1 < sections | length %}
----
-
-{{ "← [" ~ previous.title ~ "](" ~ previous.anchor ~ ".md) · " if previous }}[Contents](index.md){{ " · [" ~ next.title ~ "](" ~ next.anchor ~ ".md) →" if next }}{{ " · [" ~ (doc.docs.footer_title or "After installing") ~ "](closing.md) →" if not next and doc.docs.footer }}
-{% endif %}
-{% endfor %}
+{{ site.walk(doc, options, "nav", section.anchor ~ ".md") }}
 {{ "{% endraw %}" }}

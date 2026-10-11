@@ -1,5 +1,6 @@
 {% import "macros.md.j2" as m %}
-{% with title = "Load order" %}{% include "front-matter.j2" %}{% endwith %}
+{% import "site.j2" as site %}
+{% with title = "Load order", nav_order = 1001 %}{% include "front-matter.j2" %}{% endwith %}
 {{ "{% raw %}" }}
 # Load order
 
@@ -15,5 +16,5 @@
 This list has no plugins.
 {% endif %}
 
-[Contents](index.md)
+{{ site.walk(doc, options, "nav", "load-order.md") }}
 {{ "{% endraw %}" }}

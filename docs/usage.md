@@ -709,19 +709,31 @@ editor's source (BBCode) mode. Nexus pages cannot hold files, so it links images
 by their `url`, and warns about any that only have a local `path`.
 
 `--to markdown` writes one GitHub-flavoured Markdown file. `--to github-pages`
-writes a Jekyll site into the `-o` directory -- an index, a page per top-level
-section, the load order -- with local images copied into `images/`; put it in a
-repository's `docs/` folder and turn on GitHub Pages.
+writes a Jekyll site into the `-o` directory -- a landing page (the guide's
+`summary` and the contents), the key, the setup (the guide's `body`, tools and
+game settings), a page per top-level section, the closing text and the load
+order -- with local images copied into `images/`; put it in a repository's
+`docs/` folder and turn on GitHub Pages. Its default theme,
+[Just the Docs](https://just-the-docs.com/), keeps every page in a sidebar and
+adds a search box; `--opt theme=minima` gives a plainer site navigated from
+the landing page.
 
 To preview a site before publishing it, with Jekyll installed
-(`gem install --user-install jekyll minima jekyll-relative-links`):
+(`gem install --user-install jekyll just-the-docs jekyll-relative-links jekyll-seo-tag`):
 
 ```bash
 jekyll serve -s <site> --config <site>/_config.yml,<extra>.yml
 ```
 
-where `<extra>.yml` turns on what GitHub Pages enables by default:
-`plugins: [jekyll-relative-links]` (links between pages are written as `.md`).
+where `<extra>.yml` stands in for what GitHub Pages does itself -- fetching the
+theme, and turning links between pages (written as `.md`) into links that work:
+
+```yaml
+theme: just-the-docs
+plugins: [jekyll-relative-links, jekyll-seo-tag, jekyll-include-cache]
+relative_links:
+  enabled: true
+```
 
 Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
 modlist; `--list-options` shows them) and can be customised or replaced by your

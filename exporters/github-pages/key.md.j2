@@ -1,0 +1,14 @@
+{#- The key to the symbols, as a page of its own. -#}
+{% import "macros.md.j2" as m %}
+{% import "symbols.j2" as sym %}
+{% import "site.j2" as site %}
+{% if options.key %}
+{% with title = "Key", nav_order = 1 %}{% include "front-matter.j2" %}{% endwith %}
+{{ "{% raw %}" }}
+# Key
+
+{{ m.key(doc.kinds, sym, options.steps) }}
+
+{{ site.walk(doc, options, "nav", "key.md") }}
+{{ "{% endraw %}" }}
+{% endif %}

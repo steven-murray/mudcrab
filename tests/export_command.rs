@@ -429,11 +429,11 @@ fn github_pages_writes_a_site_with_its_images() {
     assert!(read("_config.yml").contains("title: \"Docs\""));
     let index = read("index.md");
     assert!(
-        index.starts_with("---\nlayout: default\ntitle: \"Docs\"\n---\n{% raw %}\n"),
+        index.starts_with("---\nlayout: default\ntitle: \"Docs\"\nnav_order: 0\n---\n{% raw %}\n"),
         "{index}"
     );
     assert!(
-        index.contains("1. [1 - AUDIO](1-audio.md) — Sounds."),
+        index.contains("- [1 - AUDIO](1-audio.md) — Sounds."),
         "{index}"
     );
     assert!(
@@ -504,7 +504,11 @@ fn a_guides_closing_text_is_a_page_of_its_own_when_there_is_one() {
     let dir = tempdir().unwrap();
     let site = dir.path().join("site");
     let list = write_list(dir.path(), MODLIST, DOCS_FILE);
-    export_text(&list, &["--to", "github-pages", "-o", site.to_str().unwrap()]).unwrap();
+    export_text(
+        &list,
+        &["--to", "github-pages", "-o", site.to_str().unwrap()],
+    )
+    .unwrap();
     assert!(!site.join("closing.md").exists(), "no footer, no page");
 
     let with_footer = MODLIST.replace(
@@ -514,11 +518,77 @@ fn a_guides_closing_text_is_a_page_of_its_own_when_there_is_one() {
     assert_ne!(with_footer, MODLIST);
     let site = dir.path().join("site2");
     let list = write_list(dir.path(), &with_footer, DOCS_FILE);
-    export_text(&list, &["--to", "github-pages", "-o", site.to_str().unwrap()]).unwrap();
+    export_text(
+        &list,
+        &["--to", "github-pages", "-o", site.to_str().unwrap()],
+    )
+    .unwrap();
     let closing = std::fs::read_to_string(site.join("closing.md")).unwrap();
-    assert!(closing.contains("# Epilogue\n\nThanks for playing."), "{closing}");
+    assert!(
+        closing.contains("# Epilogue\n\nThanks for playing."),
+        "{closing}"
+    );
     let index = std::fs::read_to_string(site.join("index.md")).unwrap();
-    assert!(index.contains("- [Epilogue](closing.md)") && !index.contains("Thanks for playing"), "{index}");
-    let contents = index.find("## Contents").unwrap();
-    assert!(contents < index.find("## Key").unwrap_or(usize::MAX), "contents come first: {index}");
+    assert!(
+        index.contains("- [Epilogue](closing.md)") && !index.contains("Thanks for playing"),
+        "{index}"
+    );
+}
+
+#[test]
+fn the_site_puts_the_key_and_the_setup_on_pages_of_their_own() {
+    let dir = tempdir().unwrap();
+    let site = dir.path().join("site");
+    let titled = MODLIST.replace(
+        "[docs]\nsummary = \"A tiny list.\"",
+        "[docs]\nsummary = \"A tiny list.\"\nbody = \"Install MO2 first.\"\nbody_title = \"Part 0 - Setup\"",
+    );
+    assert_ne!(titled, MODLIST);
+    let list = write_list(dir.path(), &titled, DOCS_FILE);
+    export_text(
+        &list,
+        &["--to", "github-pages", "-o", site.to_str().unwrap()],
+    )
+    .unwrap();
+    let read =
+        |name: &str| std::fs::read_to_string(site.join(name)).unwrap_or_else(|_| panic!("{name}"));
+
+    // The landing page: what the guide is, then the contents, in reading order.
+    let index = read("index.md");
+    assert!(index.contains("A tiny list."), "{index}");
+    for gone in ["## Key", "Install MO2 first", "## Tools"] {
+        assert!(!index.contains(gone), "{gone} has its own page: {index}");
+    }
+    let order: Vec<usize> = [
+        "- [Key](key.md)",
+        "- [Part 0 - Setup](setup.md)",
+        "- [1 - AUDIO](1-audio.md)",
+    ]
+    .iter()
+    .map(|line| {
+        index
+            .find(line)
+            .unwrap_or_else(|| panic!("{line}: {index}"))
+    })
+    .collect();
+    assert!(order.windows(2).all(|w| w[0] < w[1]), "{index}");
+
+    assert!(read("key.md").contains("\n# Key\n"));
+    let setup = read("setup.md");
+    assert!(setup.contains("nav_order: 2"), "{setup}");
+    assert!(
+        setup.contains("# Part 0 - Setup\n\nInstall MO2 first."),
+        "{setup}"
+    );
+    assert!(
+        setup.contains("## Tools"),
+        "tools are part of the setup: {setup}"
+    );
+    assert!(
+        setup.contains("← [Key](key.md) · [Contents](index.md) · [1 - AUDIO](1-audio.md) →"),
+        "{setup}"
+    );
+    assert!(read("1-audio.md").contains("← [Part 0 - Setup](setup.md)"));
+    // The sidebar comes from the theme, ordered by each page's nav_order.
+    assert!(read("_config.yml").contains("remote_theme: just-the-docs/just-the-docs"));
 }

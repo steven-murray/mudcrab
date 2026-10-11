@@ -1,6 +1,6 @@
-# The guide as a Jekyll site for GitHub Pages: an index, a page per top-level
-# section, and the load order. Write it into a repository's `docs/` folder (or
-# its root) and turn on Pages. Local images are copied into `images/`.
+# The guide as a Jekyll site for GitHub Pages: a landing page, the key, the
+# setup, a page per top-level section, the closing text and the load order.
+# Write it into a repository's `docs/` folder (or its root) and turn on Pages. Local images are copied into `images/`.
 name = "github-pages"
 description = "A Jekyll site for GitHub Pages: an index, a page per section, the load order"
 base = "markdown"
@@ -14,6 +14,14 @@ output = "_config.yml"
 [[pages]]
 template = "index.md.j2"
 output = "index.md"
+
+[[pages]]
+template = "key.md.j2"
+output = "key.md"
+
+[[pages]]
+template = "setup-page.md.j2"
+output = "setup.md"
 
 [[pages]]
 template = "section-page.md.j2"
@@ -35,5 +43,5 @@ default = true
 help = "Ask browsers not to send a referrer for images; some image hosts refuse some referrers"
 
 [options.theme]
-default = "minima"
-help = "Jekyll theme; GitHub Pages supports minima and the jekyll-theme-* themes"
+default = "just-the-docs"
+help = "Jekyll theme: just-the-docs (a sidebar of every page, and search), or minima or a jekyll-theme-* theme (pages linked from the index only)"

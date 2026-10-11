@@ -1,43 +1,16 @@
-{% import "macros.md.j2" as m %}
-{% import "symbols.j2" as sym %}
-{% with title = doc.docs.title or doc.name %}{% include "front-matter.j2" %}{% endwith %}
+{#- The landing page: what the guide is, then its contents. -#}
+{% import "site.j2" as site %}
+{% with title = doc.docs.title or doc.name, nav_order = 0 %}{% include "front-matter.j2" %}{% endwith %}
 {{ "{% raw %}" }}
 # {{ doc.docs.title or doc.name }}
 
+{% if doc.docs.summary %}
+{{ doc.docs.summary | markup }}
+
+{% endif %}
 {% if options.mudcrab_note %}
 > This whole install can be done automatically, from the same list, with [mudcrab](https://github.com/steven-murray/mudcrab).
 
 {% endif %}
 {% include "contents.md.j2" %}
-
-
-{% if doc.docs.summary %}
-*{{ doc.docs.summary | markup }}*
-
-{% endif %}
-{{ m.images(doc.docs, "the guide") }}
-{% if doc.docs.body %}
-{{ doc.docs.body | markup }}
-
-{% endif %}
-{% if options.choices and doc.inputs %}
-## Choices
-
-{{ m.choices(doc.inputs) }}
-
-{% endif %}
-{% if options.key %}
-## Key
-
-{{ m.key(doc.kinds, sym, options.steps) }}
-
-{% endif %}
-{% set heading_base = 1 %}
-{% include "setup.md.j2" %}
-{# Mods outside any section have no page of their own. #}
-{% set heading_base = 1 %}
-{% for entry in doc.entries if entry.kind == "mod" %}
-{% include "entry.md.j2" %}
-
-{% endfor %}
 {{ "{% endraw %}" }}
