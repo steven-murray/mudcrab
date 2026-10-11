@@ -127,8 +127,7 @@ include = ["Meshes/arg*"]
 ```
 
 Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/per-mod
-via the `actions` machinery in `src/config/actions/` -- see `MOFAM-test/input/mofam.full.toml`
-for real examples.
+via the `actions` machinery in `src/config/actions/`; see [Actions](#actions).
 
 ## Actions
 

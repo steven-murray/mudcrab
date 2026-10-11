@@ -1766,7 +1766,7 @@ mod tests {
 
     /// The era MOFAM declares, for tests about dating rather than about where
     /// the era comes from. Mirrors the `[guide]` table in
-    /// `MOFAM-test/input/mofam.full.toml`.
+    /// the MOFAM case study's `mofam.full.toml`.
     const MOFAM: Option<GuideEra> = Some(GuideEra {
         published: 1_740_787_200,
         file_id: Some(1_000_040_999),
@@ -2071,7 +2071,7 @@ mod file_id_age_tests {
 
     /// The era MOFAM declares, for tests about dating rather than about where
     /// the era comes from. Mirrors the `[guide]` table in
-    /// `MOFAM-test/input/mofam.full.toml`.
+    /// the MOFAM case study's `mofam.full.toml`.
     const MOFAM: Option<GuideEra> = Some(GuideEra {
         published: 1_740_787_200,
         file_id: Some(1_000_040_999),
@@ -2153,7 +2153,7 @@ mod file_id_provenance_tests {
 
     /// The era MOFAM declares, for tests about dating rather than about where
     /// the era comes from. Mirrors the `[guide]` table in
-    /// `MOFAM-test/input/mofam.full.toml`.
+    /// the MOFAM case study's `mofam.full.toml`.
     const MOFAM: Option<GuideEra> = Some(GuideEra {
         published: 1_740_787_200,
         file_id: Some(1_000_040_999),

@@ -33,10 +33,10 @@ you.
 Yes, on a hard case. mudcrab reproduces
 [MOFAM](https://www.nexusmods.com/oblivion/mods/52949) — a 40-part, ~700-mod
 Oblivion guide with six plugin merges, BSA repacking, xEdit cleaning, FOMOD and
-BAIN installers and a fixed 242-plugin load order — from a single TOML file, on
+BAIN installers and a fixed 244-plugin load order — from a single TOML file, on
 Linux, with no GUI tool involved except the final Wrye Bash step. It was
 verified mod-by-mod against a hand-built reference instance and then played.
-See [MOFAM-test](MOFAM-test/) for that case study.
+The list itself is kept privately: it transcribes someone else's guide.
 
 It is **not yet packaged for other people to use**. See
 [docs/roadmap.md](docs/roadmap.md) for what stands between here and that, and

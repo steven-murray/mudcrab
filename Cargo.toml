@@ -11,7 +11,7 @@ repository = "https://github.com/steven-murray/mudcrab"
 readme = "readme.md"
 keywords = ["oblivion", "modding", "modlist", "bethesda", "mod-organizer"]
 categories = ["command-line-utilities", "game-development"]
-exclude = ["MOFAM-test/", "docs/design/bsa-header-flags.csv"]
+exclude = ["docs/design/bsa-header-flags.csv"]
 
 [dependencies]
 anyhow = "1.0"

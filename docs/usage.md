@@ -467,7 +467,7 @@ mudcrab merge <modlist.toml> --mods-dir <mods> --output <dir> [--only <merge id>
 Example:
 
 ```bash
-mudcrab merge MOFAM-test/input/mofam.merges.toml \
+mudcrab merge mofam.merges.toml \
   --mods-dir ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
   --output /tmp/mudcrab-merges --only "Unique Forts Merged"
 ```

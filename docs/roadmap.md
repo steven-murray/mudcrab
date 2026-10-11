@@ -184,7 +184,7 @@ Known differences an export of MOFAM shows, not bugs in `export`:
   of the install data. `--opt steps=false` leaves out the second.
 - **The transcription lost some formatting** (stray emphasis around lists):
   a fresh conversion of the page's HTML would do better than
-  `mofam-source.md`.
+  the transcription.
 
 ## Phase D — User-facing documentation
 

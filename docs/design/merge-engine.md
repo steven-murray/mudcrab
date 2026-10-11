@@ -6,7 +6,7 @@ from it, before any merge code was written, so that the engine could implement
 what Oblivion plugins actually contain rather than what the format permits.
 
 This is the evidence behind several decisions that look arbitrary in the code.
-Reproduce with `MOFAM-test/scripts/recon-plugins.py`.
+Reproduced with the MOFAM case study's `recon-plugins.py` (kept privately).
 
 ## 1. The FormID allocation algorithm
 

@@ -24,13 +24,16 @@ rather than on reasoning, put the evidence in `docs/design/` and cite it.
 
 ## The MOFAM workspace
 
-`MOFAM-test/` holds a real ~700-mod list used as the development case study; see
-its README. To run anything there:
+The development case study -- a real ~700-mod list -- lives in its own
+**private** repository, `steven-murray/mofam-test`, checked out beside this one
+(`../mofam-test`). It is private because it transcribes someone else's guide;
+nothing from it belongs in this repository, which is public. See its README.
+To run anything there:
 
 ```bash
 export GAME_DIR=/home/steven/.local/share/Steam/steamapps/common/Oblivion
-export NEXUS_API_KEY="$(cat MOFAM-test/input/api-key.txt)"   # gitignored; never commit it
-./MOFAM-test/scripts/run-full.sh --section "<name>"
+export NEXUS_API_KEY="$(cat ../mofam-test/input/api-key.txt)"   # gitignored; never commit it
+../mofam-test/scripts/run-full.sh --section "<name>"
 ```
 
 The pipeline's last stage is `mudcrab diff` against a reference instance. **Its
@@ -41,7 +44,7 @@ follow the guide and say so.
 
 ### Adding a section to `mofam.full.toml`
 
-Work through that Part of `input/mofam-source.md` and, per row:
+Work through that Part of `mofam-test/input/mofam-source.md` and, per row:
 
 - decide how the mod is best represented — one mod, several archives, or several
   mods; `mudcrab inspect` the archive before guessing at its layout;

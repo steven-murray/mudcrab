@@ -4,7 +4,7 @@
 //! tool exists to maintain carry their reasoning in comments: source URLs, why a
 //! layout is overridden, what still needs checking. Parsing to a `toml::Table`
 //! and re-emitting would drop every one of those, so `add` works the same way
-//! `MOFAM-test/scripts/migrate-schema.py` does -- it parses only enough to find
+//! the MOFAM case study's `migrate-schema.py` does -- it parses only enough to find
 //! the insertion point, splices in new text, and leaves every other byte alone.
 //!
 //! The two halves are cross-checked: the file is parsed normally to get the mod

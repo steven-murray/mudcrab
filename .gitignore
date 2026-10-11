@@ -1,7 +1,7 @@
 # Build output
 /target
 
-# Python venv (vestigial — the one script in MOFAM-test/scripts is stdlib-only)
+# Python venv
 .venv/
 __pycache__/
 
@@ -11,10 +11,6 @@ tools.toml
 # Secrets
 api-key.txt
 .env
-
-# MOFAM working area: generated artifacts, real mod binaries (hundreds of MB),
-# and downloaded archives. The *inputs* (source markdown, TOML, notes) are tracked.
-MOFAM-test/output/
 
 # Run logs
 *.log
