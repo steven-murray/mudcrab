@@ -52,6 +52,9 @@ pub enum Command {
     /// List or extract the files inside a BSA archive.
     #[command(subcommand)]
     Bsa(BsaCommand),
+    /// Inspect DDS textures.
+    #[command(subcommand)]
+    Dds(DdsCommand),
 }
 
 /// Add one `[[mods]]` block to a source modlist.
@@ -544,6 +547,24 @@ pub struct BsaExtractArgs {
     pub destination: PathBuf,
     /// Only files whose path contains this text, ignoring case. Either
     /// slash direction matches.
+    #[arg(long)]
+    pub filter: Option<String>,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DdsCommand {
+    /// List DXT1 textures that use punch-through transparency, which some
+    /// D3D9 stacks render as opaque black. These are what `dds_decompress`
+    /// converts.
+    Audit(DdsAuditArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DdsAuditArgs {
+    /// A mods directory, one mod's folder, or any directory of textures.
+    pub root: PathBuf,
+    /// Only textures whose path below `root` contains this text, ignoring
+    /// case. Either slash direction matches.
     #[arg(long)]
     pub filter: Option<String>,
 }

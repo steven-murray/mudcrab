@@ -1,5 +1,6 @@
 pub mod add;
 mod bsa;
+mod dds;
 pub mod check;
 pub mod compile;
 pub mod conflicts;
@@ -55,5 +56,6 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Merge(args) => merge::run(args).await,
         Command::NewMerge(args) => new_merge::run(args).await,
         Command::Bsa(command) => bsa::run(command),
+        Command::Dds(command) => dds::run(command),
     }
 }
