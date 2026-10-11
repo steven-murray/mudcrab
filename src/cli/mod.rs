@@ -423,6 +423,10 @@ pub struct InstallArgs {
     /// Print planned operations without applying them.
     #[arg(long)]
     pub dry_run: bool,
+    /// Install even though Mod Organizer 2 has this instance open. MO2 writes
+    /// its own copy of the profile back on exit, undoing the install's.
+    #[arg(long)]
+    pub ignore_running_mo2: bool,
     /// Path to tools.toml machine-local tool configuration.
     /// Defaults to ~/.config/mudcrab/tools.toml (or %APPDATA%\mudcrab\tools.toml on Windows).
     #[arg(long)]

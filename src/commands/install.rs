@@ -4,6 +4,21 @@ use crate::config::tools::ToolsConfig;
 use std::path::PathBuf;
 
 pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
+    if let Some(instance) = &args.mo2_instance_dir
+        && !args.dry_run
+        && !args.ignore_running_mo2
+    {
+        let pids = config::mo2::running::running_in(instance);
+        if !pids.is_empty() {
+            anyhow::bail!(
+                "Mod Organizer 2 has {} open (pid {}). Close it first: MO2 writes its own copy of \
+                 the profile back when it exits, which would undo this install. \
+                 (--ignore-running-mo2 overrides this.)",
+                instance.display(),
+                pids.iter().map(u32::to_string).collect::<Vec<_>>().join(", ")
+            );
+        }
+    }
     let game_dir = super::require_game_dir(args.game_dir.clone())?;
     let raw = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;

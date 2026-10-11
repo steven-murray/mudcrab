@@ -3,6 +3,8 @@
 //! MO2 is the first concrete export target, not the internal abstraction --
 //! the install pipeline itself stays launcher-agnostic.
 
+pub mod running;
+
 use super::install::InstallSettings;
 use crate::config::download;
 use crate::config::install::is_plugin_file;
