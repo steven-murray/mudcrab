@@ -456,3 +456,70 @@ fn a_mod_declaring_an_unmerged_plugin_outside_the_load_order_is_an_error() {
     assert!(msg.contains("Orphan.esp"), "{msg}");
     assert!(msg.contains("no merge consumes it"), "{msg}");
 }
+
+fn validate_src(src: &str) -> anyhow::Result<Vec<String>> {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    std::fs::write(&path, src).expect("fixture should be written");
+    let source = load_modlist(&path)?;
+    validate(&source)
+}
+
+const OPTIONAL_ACTION: &str = r#"
+name = "Inputs"
+
+[inputs.decompress]
+type = "bool"
+query = "Decompress?"
+default = true
+
+[[mods]]
+id = "ui"
+
+[[mods.actions]]
+if = "decompress"
+action = "dds_decompress"
+paths = ["textures/menus"]
+"#;
+
+#[test]
+fn accepts_an_action_conditioned_on_a_declared_input() {
+    validate_src(OPTIONAL_ACTION).expect("should validate");
+}
+
+#[test]
+fn rejects_an_action_condition_naming_an_undeclared_input() {
+    let err = validate_src(&OPTIONAL_ACTION.replace("if = \"decompress\"", "if = \"!decompres\""))
+        .expect_err("should fail");
+    assert!(err.to_string().contains("'decompres'"), "{err}");
+    assert!(err.to_string().contains("dds_decompress"), "{err}");
+}
+
+#[test]
+fn rejects_a_mod_condition_naming_an_undeclared_input() {
+    let err = validate_src(&OPTIONAL_ACTION.replace("id = \"ui\"", "id = \"ui\"\nif = \"nope == x\""))
+        .expect_err("should fail");
+    assert!(err.to_string().contains("'nope'"), "{err}");
+}
+
+#[test]
+fn rejects_a_default_of_the_wrong_type() {
+    let err = validate_src(&OPTIONAL_ACTION.replace("default = true", "default = \"yes\""))
+        .expect_err("should fail");
+    assert!(err.to_string().contains("default"), "{err}");
+}
+
+#[test]
+fn rejects_a_choice_default_that_is_not_a_choice() {
+    let src = r#"
+name = "Inputs"
+
+[inputs.res]
+type = "choice"
+query = "Resolution?"
+choices = ["1k", "2k"]
+default = "4k"
+"#;
+    let err = validate_src(src).expect_err("should fail");
+    assert!(err.to_string().contains("\"4k\""), "{err}");
+}

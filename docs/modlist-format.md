@@ -243,21 +243,38 @@ file.
 
 ## Optional mods and inputs
 
-`[inputs]` and per-mod `if = "<expr>"` are in the schema and `query` evaluates
-them, but the surface is narrower than it looks: conditions can only test input
-responses (not which mods were included), they apply to whole mods only (not to
-archives, actions or FOMOD selections), and headless defaults are chosen by
-mudcrab rather than declared by the author. See Phase B of
-[roadmap.md](roadmap.md) before relying on any of it.
+An input is a question the list leaves to whoever installs it. `query` asks it;
+`query --headless` takes the declared `default` (and fails if there is none,
+rather than guessing); `--set name=value` answers it on the command line and
+beats both.
 
 ```toml
 [inputs.use_hd_textures]
-type = "bool"        # or "choice" / "text"
+type = "bool"        # or "choice" (with `choices`) / "text"
 query = "Install HD textures?"
+default = false      # must match the type; a choice's must be one of its choices
 
 [[mods]]
 id = "hd_pack"
-if = "use_hd_textures"
+if = "use_hd_textures"          # whole mod
+
+[[mods]]
+id = "some_ui"
+
+[[mods.actions]]
+if = "!use_hd_textures"         # just this action
+action = "file_prune"
+paths = ["textures/menus/big.dds"]
 ```
 
-Conditions accept `flag`, `!flag`, `key == value` and `key != value`.
+Since TOML puts every table after the top-level keys, an input declared with a
+`[inputs.*]` header lands below `plugins`. Dotted keys
+(`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top
+of the file instead; MOFAM does this.
+
+Conditions accept `flag`, `!flag`, `key == value` and `key != value`, and
+`validate` rejects one that names an undeclared input. They are resolved by
+`query`: the plan holds only the mods and actions that apply, so a changed
+answer changes the affected mods' definitions and `install` restages them.
+Conditions cannot yet ask about other mods, nor sit on archives or FOMOD
+selections -- see Phase B of [roadmap.md](roadmap.md).

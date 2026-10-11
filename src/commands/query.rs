@@ -12,7 +12,8 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let plan = config::query::build_plan(&compiled, args.headless)?;
+    let overrides = config::query::parse_overrides(&args.set)?;
+    let plan = config::query::build_plan(&compiled, args.headless, &overrides)?;
 
     if let Some(parent) = args.output.parent()
         && !parent.as_os_str().is_empty()

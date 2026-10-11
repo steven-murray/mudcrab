@@ -244,9 +244,13 @@ pub struct QueryArgs {
     /// Output path for personalized install plan.
     #[arg(short, long)]
     pub output: PathBuf,
-    /// Use defaults and skip all interactive prompts.
+    /// Use each input's declared `default` and skip all interactive prompts.
     #[arg(long)]
     pub headless: bool,
+    /// Answer an input without being asked, as `key=value`. Repeatable.
+    /// Takes precedence over the declared default.
+    #[arg(long = "set", value_name = "KEY=VALUE")]
+    pub set: Vec<String>,
 }
 
 /// Narrow a command to part of the modlist.

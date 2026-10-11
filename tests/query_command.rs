@@ -3,6 +3,48 @@ use serde_json::Value;
 use std::path::PathBuf;
 use tempfile::tempdir;
 
+/// Compile the simple fixture and run `query --headless` with `extra` args,
+/// returning the plan.
+fn headless_plan(extra: &[&str]) -> Value {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures")
+        .join("modlists")
+        .join("simple.toml");
+    let dir = tempdir().expect("temp dir should be created");
+    let compiled = dir.path().join("compiled.json");
+    let query_out = dir.path().join("plan.json");
+
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .arg("compile")
+        .arg(&fixture)
+        .arg("--output")
+        .arg(&compiled)
+        .assert()
+        .success();
+    Command::cargo_bin("mudcrab")
+        .expect("binary should build")
+        .arg("query")
+        .arg(&compiled)
+        .arg("--output")
+        .arg(&query_out)
+        .arg("--headless")
+        .args(extra)
+        .assert()
+        .success();
+
+    serde_json::from_str(&std::fs::read_to_string(&query_out).expect("plan written"))
+        .expect("plan should be valid json")
+}
+
+#[test]
+fn set_overrides_the_declared_default() {
+    let plan = headless_plan(&["--set", "use_hd_textures=true"]);
+    assert_eq!(plan["responses"]["use_hd_textures"], true);
+    assert_eq!(plan["selected_mods"].as_array().unwrap().len(), 2);
+}
+
 #[test]
 fn query_headless_writes_personalized_plan() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
