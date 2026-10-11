@@ -58,9 +58,15 @@ inputs.dxvk_report_amd_vendor.default = true
 # guide's choice, but optional here: it has never run on the Linux test machine
 # (it may now, with dxvk_report_amd_vendor), and the reference instance has it
 # disabled. Needs Root Builder, like every game-root file.
-inputs.enb.type = "bool"
-inputs.enb.query = "Install ENB (CandidENB Reborn), as the guide does?"
-inputs.enb.default = true
+# A choice rather than a bool because the guide names two ENB binaries: the
+# latest (v0500) and v0181 "if visual glitches arise". Default "none" because
+# under Proton both crash inside ENB's d3d9.dll on save load: Wine's D3DX9
+# cannot assemble ENB's shaders, and forcing Microsoft's d3dx9_43 did not take
+# through MO2. See docs/known-issues.md. Choose "v0500" on Windows.
+inputs.enb.type = "choice"
+inputs.enb.query = "Install ENB (CandidENB Reborn), as the guide does -- and which ENBSeries binary?"
+inputs.enb.choices = ["v0500", "v0181", "none"]
+inputs.enb.default = "none"
 
 
 # Source: nexus:oblivion/52949
@@ -3770,11 +3776,26 @@ value = "0"
 id = "ENBSeries"
 oracle_name = "enbseries_oblivion_v"
 section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
-if = "enb"
+if = "enb == v0500"
 
 [[mods.archives]]
 path = "manual:enbseries_oblivion_v0500.zip"
 file_name = "enbseries_oblivion_v0500.zip"
+layout = "custom-data-folder"
+data_folder = "WrapperVersion"
+include = ["d3d9.dll"]
+target_subdir = "root"
+
+# The guide's fallback binary, the same way.
+[[mods]]
+id = "ENBSeries v0181"
+oracle_name = "enbseries_oblivion_v0180"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+if = "enb == v0181"
+
+[[mods.archives]]
+path = "manual:enbseries_oblivion_v0181.zip"
+file_name = "enbseries_oblivion_v0181.zip"
 layout = "custom-data-folder"
 data_folder = "WrapperVersion"
 include = ["d3d9.dll"]
@@ -3786,7 +3807,7 @@ target_subdir = "root"
 [[mods]]
 id = "CandidENB_Reborn"
 section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
-if = "enb"
+if = "enb != none"
 
 [[mods.archives]]
 path = "nexus:oblivion/47810/1000018329"
@@ -3806,7 +3827,7 @@ data_folder = "CandidENB_Reborn_6/Data"
 [[mods]]
 id = "Candid ENB Tweaked ENBSeries Ini"
 section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
-if = "enb"
+if = "enb != none"
 
 [[mods.archives]]
 path = "nexus:oblivion/52949/1000039515"

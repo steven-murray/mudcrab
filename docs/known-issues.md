@@ -113,6 +113,24 @@ that defaults on and should be off on Windows:
   RESZ path. `ORC.log` line 6 says which path it took. Hiding NVAPI with a DLL
   override does *not* work: ORC decides by vendor id.
 
+**ENB does not run** (input `enb`, default `none` for that reason). Both v0500
+and v0181 crash inside ENB's `d3d9.dll` on save load, deployed correctly by
+Root Builder over DXVK. A `PROTON_LOG=1` run shows 711 `d3dcompiler:
+assemble_shader Asm reading failed` from the moment ENB loads: Wine's D3DX9
+cannot assemble ENB's shaders. Microsoft's `d3dx9_43`/`d3dcompiler_43` are in the
+prefix (Steam's DirectX redistributable), but neither `WINEDLLOVERRIDES` nor a
+winecfg override made the game load them -- the log still says `builtin` -- and
+the crash persisted. Untried: why the override does not take (MO2/usvfs is the
+suspect), and chaining ENB to DXVK through `ProxyLibrary`, which the reference
+instance's hand-edited `enbseries.ini` attempted earlier.
+
+## MO2 must be closed while installing
+
+`install` writes the profile's `modlist.txt` and `plugins.txt`; a running MO2
+holds its own copy and writes it back on exit, silently undoing the install. It
+happened once in testing: MO2 re-enabled the previous ENB binary and dropped
+the new one, so a whole test ran against the wrong version.
+
 ## Layout detection
 
 **`inspect` and `install` decide an archive's content root by different code.**

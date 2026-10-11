@@ -86,6 +86,12 @@ ones *can*. All 192 functions now come from xEdit's table.
 All six MOFAM merges rebuild **byte-identical** with the correction, so nothing
 already built was affected. The next list would not have been so lucky.
 
+### A4d. Refuse to install while MO2 is running
+
+A running MO2 writes its in-memory profile back over what `install` wrote (see
+known-issues). Detect it -- a lock file, or the process -- and refuse, rather
+than let a test run against a stale profile.
+
 ### A5. Honour `--parallel`, or remove it
 
 It is accepted and ignored. Either is fine; claiming a flag that does nothing is
