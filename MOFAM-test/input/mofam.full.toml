@@ -54,6 +54,14 @@ inputs.dxvk_report_amd_vendor.type = "bool"
 inputs.dxvk_report_amd_vendor.query = "Make DXVK report an AMD card, so ORC's water and depth effects work (needed on NVIDIA under Proton)?"
 inputs.dxvk_report_amd_vendor.default = true
 
+# Part 14 rows 1-3, ENB (ENBSeries + CandidENB Reborn + the tweaked ini). The
+# guide's choice, but optional here: it has never run on the Linux test machine
+# (it may now, with dxvk_report_amd_vendor), and the reference instance has it
+# disabled. Needs Root Builder, like every game-root file.
+inputs.enb.type = "bool"
+inputs.enb.query = "Install ENB (CandidENB Reborn), as the guide does?"
+inputs.enb.default = true
+
 
 # Source: nexus:oblivion/52949
 # This is the full translation target and may include entries requiring future mudcrab features.
@@ -3747,14 +3755,64 @@ key = "bUseRefractionShader"
 value = "0"
 
 # --------------------------------------------------------------------------
-# Part 14 rows 1-3 (ENB) are NOT here. See notes/part-14-enb-and-orc.md.
-#
-# Short version: they are `d3d9.dll` and shader files for the game ROOT folder,
-# not Data content; all four of the Oracle's ENB mods are *disabled*; and
-# mudcrab has no way to express a disabled mod, so building them would put a
-# d3d9.dll into the virtual Data folder where it does nothing and belongs to
-# nobody. Pinned for Steven rather than improvised.
+# Part 14 rows 1-3: ENB. Everything ENB reads sits beside Oblivion.exe, so it
+# is staged under each mod's root/ (`target_subdir = "root"`) for Root Builder
+# to deploy. Optional (see [inputs.enb]): the Oracle has all four ENB mods
+# *disabled*, ENB has never run on the Linux machine this list is tested on,
+# and the DXVK vendor fix may be what changes that.
 # --------------------------------------------------------------------------
+
+# Guide 1: "Extract the d3d9.dll from the wrapper version to the oblivion root
+# folder." Only the dll: the preset below supplies the rest. The guide prefers
+# the latest (v0500) and names v0181 as the fallback for visual glitches; both
+# zips are hand downloads from enbdev.com.
+[[mods]]
+id = "ENBSeries"
+oracle_name = "enbseries_oblivion_v"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+if = "enb"
+
+[[mods.archives]]
+path = "manual:enbseries_oblivion_v0500.zip"
+file_name = "enbseries_oblivion_v0500.zip"
+layout = "custom-data-folder"
+data_folder = "WrapperVersion"
+include = ["d3d9.dll"]
+target_subdir = "root"
+
+# Guide 2. The preset's ENB files go to the game root; its Data/ (an Oblivion
+# Reloaded colouring ini) is ordinary Data content. Same archive twice, once
+# per destination.
+[[mods]]
+id = "CandidENB_Reborn"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+if = "enb"
+
+[[mods.archives]]
+path = "nexus:oblivion/47810/1000018329"
+file_name = "Candid ENB Reborn-47810-6-0.rar"
+layout = "custom-data-folder"
+data_folder = "CandidENB_Reborn_6"
+exclude = ["Data/**"]
+target_subdir = "root"
+
+[[mods.archives]]
+path = "nexus:oblivion/47810/1000018329"
+file_name = "Candid ENB Reborn-47810-6-0.rar"
+layout = "custom-data-folder"
+data_folder = "CandidENB_Reborn_6/Data"
+
+# Guide 3: "Simply download & replace the one from above."
+[[mods]]
+id = "Candid ENB Tweaked ENBSeries Ini"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+if = "enb"
+
+[[mods.archives]]
+path = "nexus:oblivion/52949/1000039515"
+file_name = "Candid ENB Tweaked ENBSeries Ini-52949-09-24-1727616864.7z"
+layout = "simple"
+target_subdir = "root"
 
 # Guide 4: ORC 180. The Oracle carries four ORC versions (180, 194, 311, 315F)
 # and only 180 is enabled -- which is the version the guide names.
