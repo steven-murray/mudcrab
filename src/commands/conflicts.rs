@@ -29,7 +29,6 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         mo2_instance_dir: None,
         profile_name: String::new(),
         game_dir: None,
-        game_root_dir: None,
         execute_actions: false,
         dry_run: true,
         tools: ToolsConfig::default(),

@@ -150,6 +150,7 @@ pub enum ModAction {
     ExtractBsa(ExtractBsaAction),
     DeleteRecords(DeleteRecordsAction),
     DdsDecompress(DdsDecompressAction),
+    WriteFile(WriteFileAction),
 }
 
 impl ModAction {
@@ -175,7 +176,8 @@ impl ModAction {
             | ModAction::FileMove(_)
             | ModAction::ExtractBsa(_)
             | ModAction::DeleteRecords(_)
-            | ModAction::DdsDecompress(_) => false,
+            | ModAction::DdsDecompress(_)
+            | ModAction::WriteFile(_) => false,
         }
     }
 
@@ -194,6 +196,7 @@ impl ModAction {
             ModAction::ExtractBsa(_) => "extract_bsa",
             ModAction::DeleteRecords(_) => "delete_records",
             ModAction::DdsDecompress(_) => "dds_decompress",
+            ModAction::WriteFile(_) => "write_file",
         }
     }
 }
@@ -348,6 +351,20 @@ pub struct FilePruneAction {
     /// carve-out cannot quietly outlive the reason for it.
     #[serde(default)]
     pub except: Vec<String>,
+}
+
+/// Write a file the modlist itself authors into the mod's staged folder.
+///
+/// For content no archive ships: a `dxvk.conf` under `root/` for Root Builder
+/// to deploy. The file must not already exist -- this creates content, it
+/// does not edit what an archive provided (`ini_set` and friends do that).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WriteFileAction {
+    /// Path relative to the mod's staged folder. Parent folders are created.
+    pub path: String,
+    /// The file's contents, written verbatim.
+    pub content: String,
 }
 
 /// Rename staged files to `<name>.mohidden`, MO2's way of dropping something
@@ -591,6 +608,9 @@ pub enum ModType {
     /// `meta.ini` are the whole point -- the contents arrive at runtime, from
     /// outside the modlist.
     Empty,
+    /// A mod whose whole content is written by its own actions -- `write_file`
+    /// for a config file the list authors rather than downloads. No archives.
+    Generated,
 }
 
 /// How overlapping records are resolved when two sources define the same one.
@@ -719,8 +739,13 @@ pub struct ArchiveSpec {
     pub include: Vec<String>,
     #[serde(default)]
     pub exclude: Vec<String>,
-    /// Glob patterns for files to extract directly to the game-root output directory.
-    /// Matched files are automatically excluded from normal mod installation.
+    /// Glob patterns for files that belong next to `Oblivion.exe` rather than
+    /// in `Data`: a script extender's loader and DLLs, a `dxvk.conf`.
+    ///
+    /// They are staged in the mod's own `root/` folder, which the Root Builder
+    /// MO2 plugin deploys to the game folder when MO2 launches the game and
+    /// removes again afterwards. mudcrab never writes to the game folder
+    /// itself. Matched files are excluded from the normal (Data) extraction.
     #[serde(default)]
     pub game_root_files: Vec<String>,
 }

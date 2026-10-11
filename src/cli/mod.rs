@@ -404,10 +404,6 @@ pub struct InstallArgs {
     /// Optional game root for game-scoped install actions (e.g. Oblivion.ini edits).
     #[arg(long)]
     pub game_dir: Option<PathBuf>,
-    /// Output directory for files declared with game_root_files in the modlist.
-    /// Defaults to a 'game-root/' sibling of the cache directory.
-    #[arg(long)]
-    pub game_root_dir: Option<PathBuf>,
     /// Do not execute post-install actions.
     #[arg(long)]
     pub skip_actions: bool,

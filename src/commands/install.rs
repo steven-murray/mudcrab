@@ -18,9 +18,6 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         .cache
         .clone()
         .unwrap_or_else(|| PathBuf::from(".mudcrab-cache"));
-    let game_root_dir = args.game_root_dir.clone().or_else(|| {
-        cache_dir.parent().map(|p| p.join("game-root"))
-    });
     let mods_dir = match (&args.mods_dir, &args.mo2_instance_dir) {
         (Some(path), _) => path.clone(),
         (None, Some(instance_dir)) => instance_dir.join("mods"),
@@ -32,7 +29,6 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         mo2_instance_dir: args.mo2_instance_dir.clone(),
         profile_name: args.profile_name.clone(),
         game_dir: Some(game_dir.clone()),
-        game_root_dir,
         execute_actions: !args.skip_actions,
         dry_run: args.dry_run,
         tools: {

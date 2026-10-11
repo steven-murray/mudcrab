@@ -83,7 +83,7 @@ fn install_unpacks_zip_archives_for_each_selected_mod() {
 }
 
 #[test]
-fn install_extracts_game_root_files_to_game_root_dir_and_excludes_from_mod_folder() {
+fn install_stages_game_root_files_in_the_mods_root_folder_for_root_builder() {
     let dir = tempdir().expect("temp dir should be created");
     let archive = dir.path().join("core.zip");
     let modlist = dir.path().join("modlist.toml");
@@ -91,12 +91,11 @@ fn install_extracts_game_root_files_to_game_root_dir_and_excludes_from_mod_folde
     let plan = dir.path().join("plan.json");
     let cache = dir.path().join("cache");
     let mods_dir = dir.path().join("mods");
-    let game_root_dir = dir.path().join("game-root");
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
     // Archive contains two files:
-    //   game_loader.exe  -> should land in game-root/, not in the mod folder
+    //   game_loader.exe  -> should land in the mod's root/, for Root Builder
     //   Data/mod.txt     -> should land in the mod folder only
     let zip_file = std::fs::File::create(&archive).expect("zip fixture should be created");
     let mut zip = zip::ZipWriter::new(zip_file);
@@ -159,14 +158,12 @@ fn install_extracts_game_root_files_to_game_root_dir_and_excludes_from_mod_folde
         .arg(&mods_dir)
         .arg("--game-dir")
         .arg(&game_dir)
-        .arg("--game-root-dir")
-        .arg(&game_root_dir)
         .assert()
         .success();
 
-    // Exe landed in game-root
-    let exe_in_root = game_root_dir.join("game_loader.exe");
-    assert!(exe_in_root.exists(), "game_loader.exe should be in game-root dir");
+    // Exe landed in the mod's root/ folder
+    let exe_in_root = mods_dir.join("core").join("root").join("game_loader.exe");
+    assert!(exe_in_root.exists(), "game_loader.exe should be in the mod's root/");
     let exe_payload = std::fs::read(&exe_in_root).expect("game-root exe should be readable");
     assert_eq!(exe_payload, b"fake-loader-exe");
 
@@ -677,4 +674,56 @@ fn make_zip_with_files(path: &std::path::Path, entries: &[(&str, &[u8])]) {
             .expect("zip payload should be written");
     }
     zip.finish().expect("zip should finalize");
+}
+
+#[test]
+fn a_generated_mod_is_what_its_write_file_actions_write() {
+    let dir = tempdir().expect("temp dir should be created");
+    let modlist = dir.path().join("modlist.toml");
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    let mods_dir = dir.path().join("mods");
+    let game_dir = dir.path().join("game");
+    std::fs::create_dir_all(&game_dir).expect("game dir should be created");
+
+    std::fs::write(
+        &modlist,
+        r#"name = "Generated Test"
+
+[[mods]]
+id = "DXVK Linux Config"
+type = "generated"
+
+[[mods.actions]]
+action = "write_file"
+path = "root/dxvk.conf"
+content = "d3d9.customVendorId = 1002\n"
+"#,
+    )
+    .expect("fixture modlist should be written");
+
+    for args in [
+        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec!["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"],
+    ] {
+        Command::cargo_bin("mudcrab").unwrap().args(&args).assert().success();
+    }
+    Command::cargo_bin("mudcrab")
+        .unwrap()
+        .arg("install")
+        .arg(&plan)
+        .arg("--cache")
+        .arg(dir.path().join("cache"))
+        .arg("--mods-dir")
+        .arg(&mods_dir)
+        .arg("--game-dir")
+        .arg(&game_dir)
+        .assert()
+        .success();
+
+    let written = mods_dir.join("DXVK Linux Config").join("root").join("dxvk.conf");
+    assert_eq!(
+        std::fs::read_to_string(&written).expect("dxvk.conf should be written"),
+        "d3d9.customVendorId = 1002\n"
+    );
 }

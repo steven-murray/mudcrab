@@ -22,7 +22,6 @@ fn settings(root: &Path) -> InstallSettings {
         mo2_instance_dir: None,
         profile_name: "Default".to_string(),
         game_dir: None,
-        game_root_dir: None,
         execute_actions: true,
         dry_run: false,
         tools: Default::default(),

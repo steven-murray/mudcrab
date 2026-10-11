@@ -42,6 +42,18 @@ inputs.decompress_dxt1_alpha.type = "bool"
 inputs.decompress_dxt1_alpha.query = "Decompress menu textures that use DXT1 transparency (needed on Linux/Proton with DXVK)?"
 inputs.decompress_dxt1_alpha.default = true
 
+# DEVIATION (not in the guide), for one class of machine. ORC reads the depth
+# buffer through NVAPI when the card says it is NVIDIA, and under Proton that
+# path returns nothing: every depth effect breaks, and the water -- which
+# blends towards whatever is behind it by depth -- vanishes. DXVK reporting an
+# AMD vendor id sends ORC down its RESZ path instead, which works. With this on,
+# the "DXVK Linux Config" mod carries a `dxvk.conf` saying so, deployed beside
+# Oblivion.exe by the Root Builder MO2 plugin. Leave it off on Windows and on
+# AMD/Intel cards.
+inputs.dxvk_report_amd_vendor.type = "bool"
+inputs.dxvk_report_amd_vendor.query = "Make DXVK report an AMD card, so ORC's water and depth effects work (needed on NVIDIA under Proton)?"
+inputs.dxvk_report_amd_vendor.default = true
+
 
 # Source: nexus:oblivion/52949
 # This is the full translation target and may include entries requiring future mudcrab features.
@@ -403,8 +415,9 @@ plugins = ["DLC*.esp", "Knights.esp"]
 # ------------------------------
 
 # 1. OBSE 22.11 Ini
-# Root DLLs/EXEs (obse_1_2_416.dll, obse_loader.exe, obse_steam_loader.dll, obse_editor_1_2.dll)
-# are placed in the game-root output folder. Data/OBSE/ content is installed as the mod.
+# Root DLLs/EXEs (obse_1_2_416.dll, obse_loader.exe, obse_steam_loader.dll,
+# obse_editor_1_2.dll) are staged in the mod's `root/`, which the Root Builder
+# MO2 plugin deploys beside Oblivion.exe at launch. Data/OBSE/ is the mod.
 [[mods]]
 id = "xOBSE"
 section = ["OBSE PLUGINS"]
@@ -3781,6 +3794,23 @@ file = "Shaders/ORC/Fog/Fog.ini"
 section = "Interior"
 key = "Amount"
 value = "0.0"
+
+# DEVIATION, optional: see [inputs.dxvk_report_amd_vendor]. Authored here, not
+# downloaded; Root Builder copies root/dxvk.conf beside Oblivion.exe.
+[[mods]]
+id = "DXVK Linux Config"
+section = ["14 - ENB & OBLIVION RELOADED COMBINED"]
+type = "generated"
+if = "dxvk_report_amd_vendor"
+
+[[mods.actions]]
+action = "write_file"
+path = "root/dxvk.conf"
+content = """
+# Report an AMD card so ORC copies the depth buffer through RESZ rather than
+# NVAPI, which returns nothing under Proton. Written by mudcrab.
+d3d9.customVendorId = 1002
+"""
 
 [[mods]]
 id = "ORC Main Ini"

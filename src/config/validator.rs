@@ -245,6 +245,22 @@ fn validate_merges(
             );
         }
 
+        // A generated mod is exactly what its actions write.
+        if spec.mod_type == Some(ModType::Generated) {
+            if !spec.archives.is_empty() || !spec.files.is_empty() {
+                anyhow::bail!(
+                    "mod {mod_id} has type = \"generated\" but declares archives or files; its \
+                     content comes from its actions"
+                );
+            }
+            if spec.actions.is_empty() {
+                anyhow::bail!(
+                    "mod {mod_id} has type = \"generated\" but no actions, so it would be empty; \
+                     use type = \"empty\" for a deliberately empty folder"
+                );
+            }
+        }
+
         let Some(merge) = &spec.merge else { continue };
 
         if !spec.archives.is_empty() || !spec.files.is_empty() {
