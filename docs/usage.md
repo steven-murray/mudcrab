@@ -48,7 +48,11 @@ reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
 `--manual` for `manual:<file name>`), the file name and the layout. In a
 terminal, an installer's choices are asked: a FOMOD step by step, through the
 same walk install makes (so a step shown only after certain answers is shown
-here only then), and a BAIN package's subpackages as one list. Enter takes the
+here only then), and a BAIN package's subpackages as one list -- or, when the
+package has a `wizard.txt` made only of questions and the subpackages each
+answer selects, the wizard's own questions. A wizard that does more (variables,
+conditions, plugin choices, INI edits; most real ones) is not run: `add` says
+why and offers the subpackage list. Enter takes the
 installer's own choice; the answers are written as `fomod_selections` or
 `bain_subpackages`. With `--defaults`, or when input is not a terminal, nothing
 is asked: each FOMOD group gets its default, every BAIN subpackage is listed,

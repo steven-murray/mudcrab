@@ -240,7 +240,7 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     // answers are what the entry records.
     let interactive = !args.defaults && std::io::stdin().is_terminal();
     let chosen = if interactive {
-        choose_installer(archive, &id, &args.input, &report.layout)?
+        choose_installer(archive, &id, &args.input, &report)?
     } else {
         None
     };
@@ -303,7 +303,7 @@ fn choose_installer(
     archive: &Path,
     id: &str,
     modlist: &Path,
-    layout: &crate::config::inspect::LayoutGuess,
+    report: &crate::config::inspect::InspectReport,
 ) -> anyhow::Result<Option<crate::config::inspect::Chosen>> {
     use super::choose::{Availability, Choice, Question, Rule, ask};
     use crate::config::inspect::{Chosen, LayoutGuess, extract_single_entry};
@@ -312,7 +312,7 @@ fn choose_installer(
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let mut output = std::io::stdout();
-    match layout {
+    match &report.layout {
         LayoutGuess::Fomod { config_path } => {
             let xml = extract_single_entry(archive, config_path)?;
             // A step can depend on which plugins are active; install answers
@@ -351,10 +351,77 @@ fn choose_installer(
             Ok(Some(Chosen::Fomod(selections)))
         }
         LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => {
-            println!(
-                "'{id}' is a BAIN package. Pick the subpackages to install; numbered alike \
-                 (01 ..., 01 ...) usually means alternatives."
-            );
+            // A wizard asks its own questions, in words; when it is nothing
+            // more than questions and the packages each answer selects, those
+            // are the questions to put.
+            let wizard_path = report
+                .top_level_files
+                .iter()
+                .find(|name| name.eq_ignore_ascii_case("wizard.txt"));
+            if let Some(path) = wizard_path {
+                let script = extract_single_entry(archive, path)?;
+                let wizard = crate::config::bain_wizard::parse(&script);
+                match wizard.askable() {
+                    Ok(()) => {
+                        println!(
+                            "'{id}' is a BAIN package with a wizard. Enter takes the wizard's \
+                             own choice."
+                        );
+                        let mut answers = Vec::new();
+                        for prompt in &wizard.prompts {
+                            let question = Question {
+                                title: prompt.question.clone(),
+                                rule: if prompt.many {
+                                    Rule::Any
+                                } else {
+                                    Rule::ExactlyOne
+                                },
+                                choices: prompt
+                                    .options
+                                    .iter()
+                                    .zip(&prompt.descriptions)
+                                    .map(|((name, _), description)| Choice {
+                                        name: name.clone(),
+                                        description: description.clone(),
+                                        availability: Availability::Free,
+                                    })
+                                    .collect(),
+                                default: if prompt.defaults.is_empty() && !prompt.many {
+                                    vec![0]
+                                } else {
+                                    prompt.defaults.clone()
+                                },
+                            };
+                            answers.push(ask(&mut input, &mut output, &question)?);
+                        }
+                        let selected = wizard.selection(&answers);
+                        let picked: Vec<String> = subpackages
+                            .iter()
+                            .filter(|name| selected.contains(&name.to_ascii_lowercase()))
+                            .cloned()
+                            .collect();
+                        for name in &selected {
+                            if !subpackages.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+                                eprintln!(
+                                    "note: the wizard selects '{name}', which the archive does \
+                                     not have; left out"
+                                );
+                            }
+                        }
+                        println!("  subpackages: {}", picked.join(", "));
+                        return Ok(Some(Chosen::Bain(picked)));
+                    }
+                    Err(why) => println!(
+                        "'{id}' has a BAIN wizard, but its questions cannot be asked here \
+                         ({why}); pick the subpackages directly."
+                    ),
+                }
+            } else {
+                println!(
+                    "'{id}' is a BAIN package. Pick the subpackages to install; numbered alike \
+                     (01 ..., 01 ...) usually means alternatives."
+                );
+            }
             let question = Question {
                 title: "Subpackages".to_string(),
                 rule: Rule::AtLeastOne,
