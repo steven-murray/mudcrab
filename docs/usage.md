@@ -702,3 +702,14 @@ download_handler = "nexus"
 descriptor carries no filename, so declaring `file_name` is what lets an install
 find a copy without a `.meta` (a manual download, say), and it is the name a
 download is saved under, in preference to whatever the server calls it.
+
+To find the file id for a descriptor, list the mod's files:
+
+```bash
+mudcrab nexus-files 52661
+```
+
+Each current file is printed with its category, version and size, then the
+`path` and `file_name` lines to paste into `[[mods.archives]]`. Old and
+archived files are counted but hidden; `--all` lists them. Listing works for
+any account, unlike downloading, which Nexus reserves for premium accounts.

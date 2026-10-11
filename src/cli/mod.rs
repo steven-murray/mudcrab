@@ -38,6 +38,8 @@ pub enum Command {
     Inspect(InspectArgs),
     /// Ask Nexus which mod and file an archive is, by its MD5.
     Identify(IdentifyArgs),
+    /// List the files a Nexus mod publishes, with the descriptor for each.
+    NexusFiles(NexusFilesArgs),
     /// List the files two mods both provide, which is what `conflicts_with`
     /// acts on.
     Conflicts(ConflictsArgs),
@@ -156,6 +158,24 @@ pub struct IdentifyArgs {
     /// need no lookup.
     #[arg(long)]
     pub write_meta: bool,
+    /// Override the API base, for testing against a stub.
+    #[arg(long, hide = true)]
+    pub api_base: Option<String>,
+}
+
+/// List a Nexus mod's files, for choosing the one a modlist entry names.
+///
+/// Works for any Nexus account: listing files is not a download.
+#[derive(Debug, Args)]
+pub struct NexusFilesArgs {
+    /// The mod id, as in nexusmods.com/<game>/mods/<id>.
+    pub mod_id: u64,
+    /// Nexus game domain.
+    #[arg(long, default_value = "oblivion")]
+    pub game: String,
+    /// Also list old and archived files.
+    #[arg(long)]
+    pub all: bool,
     /// Override the API base, for testing against a stub.
     #[arg(long, hide = true)]
     pub api_base: Option<String>,

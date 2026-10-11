@@ -203,3 +203,42 @@ async fn a_file_in_neither_the_hash_index_nor_the_mods_file_list_is_reported() {
     assert!(stderr.contains("publishes no file with that name"), "{stderr}");
     assert!(stderr.contains("renamed"), "renaming is a likely cause:\n{stderr}");
 }
+
+#[tokio::test]
+async fn nexus_files_lists_current_files_as_descriptors() {
+    let server = MockServer::start().await;
+    Mock::given(method("GET"))
+        .and(path("/v1/games/oblivion/mods/52661/files.json"))
+        .and(header("apikey", "test-key"))
+        .respond_with(ResponseTemplate::new(200).set_body_raw(
+            r#"{"files": [
+                {"file_id": 1, "name": "Old", "version": "1.0", "file_name": "Old-52661-1-0.zip", "category_name": "OLD_VERSION"},
+                {"file_id": 7, "name": "Swearing Rats", "version": "1.1", "file_name": "Swearing Rats-52661-1-1.zip", "category_name": "MAIN", "size_kb": 3584}
+            ]}"#,
+            "application/json",
+        ))
+        .mount(&server)
+        .await;
+
+    let run = |extra: &[&str]| {
+        let out = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+            .expect("binary builds")
+            .env("NEXUS_API_KEY", "test-key")
+            .args(["nexus-files", "52661", "--api-base", &format!("{}/v1", server.uri())])
+            .args(extra)
+            .output()
+            .expect("runs");
+        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        String::from_utf8(out.stdout).expect("utf-8")
+    };
+
+    let current = run(&[]);
+    assert!(current.contains(r#"path = "nexus:oblivion/52661/7""#), "{current}");
+    assert!(current.contains(r#"file_name = "Swearing Rats-52661-1-1.zip""#), "{current}");
+    assert!(current.contains("3.5 MB"), "{current}");
+    assert!(!current.contains("Old-52661"), "{current}");
+    assert!(current.contains("1 old or archived"), "{current}");
+
+    let all = run(&["--all"]);
+    assert!(all.contains(r#"path = "nexus:oblivion/52661/1""#), "{all}");
+}

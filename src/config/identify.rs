@@ -89,9 +89,6 @@ struct Md5File {
     name: Option<String>,
     #[serde(default)]
     version: Option<String>,
-    /// Present in `files.json`; absent from an `md5_search` result.
-    #[serde(default)]
-    file_name: Option<String>,
 }
 
 /// Hex MD5 of a file, read in chunks so a multi-gigabyte archive does not have
@@ -140,11 +137,58 @@ pub fn mod_id_from_file_name(file_name: &str) -> Option<u64> {
         .and_then(|field| field.parse().ok())
 }
 
-/// One entry of `files.json`.
+/// One file a Nexus mod publishes, from `files.json`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct NexusFile {
+    pub file_id: u64,
+    /// The file's title on the mod page.
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub version: Option<String>,
+    /// The archive's filename as served.
+    #[serde(default)]
+    pub file_name: Option<String>,
+    /// MAIN, OPTIONAL, UPDATE, MISCELLANEOUS, OLD_VERSION, ARCHIVED...
+    #[serde(default)]
+    pub category_name: Option<String>,
+    #[serde(default)]
+    pub size_kb: Option<u64>,
+}
+
 #[derive(Debug, Deserialize)]
 struct FileListing {
     #[serde(default)]
-    files: Vec<Md5File>,
+    files: Vec<NexusFile>,
+}
+
+/// Every file a Nexus mod publishes. One request; works for any account,
+/// unlike download links.
+pub async fn nexus_files(
+    client: &reqwest::Client,
+    api_base: Option<&str>,
+    api_key: &str,
+    game: &str,
+    mod_id: u64,
+) -> anyhow::Result<Vec<NexusFile>> {
+    let endpoint = format!(
+        "{}/games/{}/mods/{}/files.json",
+        api_base.unwrap_or("https://api.nexusmods.com/v1").trim_end_matches('/'),
+        game,
+        mod_id
+    );
+    Ok(client
+        .get(&endpoint)
+        .header("apikey", api_key)
+        .send()
+        .await
+        .map_err(|err| anyhow::anyhow!("nexus file-list request failed for mod {mod_id}: {err}"))?
+        .error_for_status()
+        .map_err(|err| anyhow::anyhow!("nexus file list for {game}/{mod_id} returned an error: {err}"))?
+        .json::<FileListing>()
+        .await
+        .map_err(|err| anyhow::anyhow!("failed to parse the nexus file list: {err}"))?
+        .files)
 }
 
 /// Ask Nexus which mod and file this archive is.
@@ -239,27 +283,9 @@ async fn identify_by_file_list(
         );
     };
 
-    let endpoint = format!(
-        "{}/games/{}/mods/{}/files.json",
-        api_base.unwrap_or("https://api.nexusmods.com/v1").trim_end_matches('/'),
-        game,
-        mod_id
-    );
+    let files = nexus_files(client, api_base, api_key, game, mod_id).await?;
 
-    let listing = client
-        .get(&endpoint)
-        .header("apikey", api_key)
-        .send()
-        .await
-        .map_err(|err| anyhow::anyhow!("nexus file-list request failed for mod {mod_id}: {err}"))?
-        .error_for_status()
-        .map_err(|err| anyhow::anyhow!("nexus file list returned an error: {err}"))?
-        .json::<FileListing>()
-        .await
-        .map_err(|err| anyhow::anyhow!("failed to parse the nexus file list: {err}"))?;
-
-    let matched = listing
-        .files
+    let matched = files
         .into_iter()
         .find(|entry| {
             entry
@@ -275,9 +301,7 @@ async fn identify_by_file_list(
             )
         })?;
 
-    let file_id = matched
-        .file_id
-        .ok_or_else(|| anyhow::anyhow!("nexus listed {file_name} but gave it no file id"))?;
+    let file_id = matched.file_id;
 
     Ok(Identified {
         file_name: file_name.to_string(),

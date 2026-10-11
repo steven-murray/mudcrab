@@ -590,8 +590,7 @@ fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
     scored.into_iter().take(3).map(|(_, path)| path).collect()
 }
 
-/// The real filenames of a Nexus mod's files, by file id. One request; works
-/// for any account, unlike download links.
+/// The real filenames of a Nexus mod's files, by file id.
 pub async fn nexus_file_names(
     client: &Client,
     api_base: Option<&str>,
@@ -599,32 +598,13 @@ pub async fn nexus_file_names(
     game: &str,
     mod_id: &str,
 ) -> anyhow::Result<std::collections::HashMap<String, String>> {
-    #[derive(serde::Deserialize)]
-    struct Files {
-        files: Vec<File>,
-    }
-    #[derive(serde::Deserialize)]
-    struct File {
-        file_id: u64,
-        file_name: String,
-    }
-    let base = api_base.unwrap_or("https://api.nexusmods.com/v1");
-    let url = format!("{}/games/{game}/mods/{mod_id}/files.json", base.trim_end_matches('/'));
-    let files = client
-        .get(&url)
-        .header("apikey", api_key)
-        .send()
-        .await
-        .map_err(|err| anyhow::anyhow!("nexus api request failed: {err}"))?
-        .error_for_status()
-        .map_err(|err| anyhow::anyhow!("nexus api returned error for {game}/{mod_id}: {err}"))?
-        .json::<Files>()
-        .await
-        .map_err(|err| anyhow::anyhow!("failed to parse nexus files list: {err}"))?;
+    let mod_id: u64 = mod_id
+        .parse()
+        .map_err(|_| anyhow::anyhow!("nexus mod id {mod_id} is not a number"))?;
+    let files = crate::config::identify::nexus_files(client, api_base, api_key, game, mod_id).await?;
     Ok(files
-        .files
         .into_iter()
-        .map(|file| (file.file_id.to_string(), file.file_name))
+        .filter_map(|file| Some((file.file_id.to_string(), file.file_name?)))
         .collect())
 }
 
