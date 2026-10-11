@@ -181,21 +181,17 @@ Needed:
 
 ## Phase E — Publishing mechanics
 
-Nothing here is hard; all of it is missing.
+Done: dual MIT/Apache licence, Cargo metadata, CI (`cargo test` and
+`clippy -D warnings` on push), and tagged releases with Linux and Windows
+binaries. Left:
 
-- **Licence.** There is no licence file. Nothing else on this list matters until
-  there is one.
-- **Cargo metadata.** `description`, `license`, `repository`, `keywords`,
-  `categories`, `rust-version`. Currently just name/version/edition.
-- **CI.** `cargo test` and `cargo clippy --all-targets -- -D warnings` on push.
-  Both pass today by convention, which is not the same as by rule.
-- **Releases.** Tagged versions and prebuilt binaries for Linux and Windows —
-  the audience is modders, and `cargo install` is not a reasonable ask of them.
 - **Contributing guide and issue templates**, including how to report a modlist
   that installs wrongly (the plan JSON and the diff output are the useful
   attachments).
 - **A scope statement in the readme**: Oblivion and MO2 today; the design is not
   limited to either, but nothing else has been run.
+- **Pin CI's toolchain**, or keep a matching one locally: CI's newer clippy has
+  twice failed a push that passed here (`chunks_exact` with a constant size).
 
 ---
 
@@ -210,5 +206,9 @@ Genuinely wanted, none of it blocking.
 - **Download resume, checksum manifests, signature verification.**
 - **Other games and other mod managers.** The plugin and BSA code is TES4; the
   pipeline above it is not.
+- **Check referenced asset paths against the install.** A mesh or texture a
+  plugin or another mod names, and that nothing provides, would have caught the
+  OOO v1.7 pin (1009 files gone) outright, where the POST-GUIDE flag was read
+  as harmless version drift.
 - **A modlist test-suite command** — `mudcrab check --strict` against a fresh
   machine, so an author can find out that a row broke before a user does.

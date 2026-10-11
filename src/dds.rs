@@ -127,8 +127,8 @@ fn palette(block: &[u8]) -> [[u8; 4]; 4] {
     }
 }
 
-fn each_block(blocks: &[u8]) -> impl Iterator<Item = &[u8]> {
-    blocks.chunks_exact(8)
+fn each_block(blocks: &[u8]) -> impl Iterator<Item = &[u8; 8]> {
+    blocks.as_chunks::<8>().0.iter()
 }
 
 impl Dxt1<'_> {
