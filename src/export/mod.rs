@@ -42,6 +42,11 @@ pub struct Document {
     /// Present when the document describes one plan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan: Option<PlanDoc>,
+    /// Tools to set up before installing any mod: Mod Organizer 2 plugins.
+    /// Not part of the mod list, so not in `entries`.
+    pub tools: Vec<ModDoc>,
+    /// The game's own INI settings the list makes, in words.
+    pub game_settings: Vec<StepDoc>,
     /// Top level of the tree: sections, and any mod with no section.
     pub entries: Vec<Entry>,
     pub load_order: Vec<PluginDoc>,
@@ -129,6 +134,18 @@ pub struct ConditionDoc {
     pub expr: String,
     /// As a reader would say it, e.g. "you answer yes to “Install X?”".
     pub text: String,
+    /// The question itself, when the condition is just "yes to this
+    /// question": a manual guide can then say "Optional: <question>".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub question: Option<String>,
+}
+
+/// Where to find the archives, so the document can name the files a pattern
+/// means and leave out instructions MO2 makes unnecessary. Optional: without
+/// it, patterns are put into words instead.
+pub struct Archives<'a> {
+    pub downloads: &'a std::path::Path,
+    pub search_paths: &'a [std::path::PathBuf],
 }
 
 #[derive(Debug, Serialize)]
@@ -207,7 +224,9 @@ pub struct PluginDoc {
 pub fn build_document(
     modlist: &SourceModlist,
     plan: Option<&PersonalizedPlan>,
+    archives: Option<&Archives<'_>>,
 ) -> anyhow::Result<Document> {
+    let mut tools = Vec::new();
     let planned: Option<HashMap<&str, &crate::config::schema::PersonalizedMod>> =
         plan.map(|plan| plan.mods.iter().map(|m| (m.id.as_str(), m)).collect());
 
@@ -226,6 +245,17 @@ pub fn build_document(
             },
             None => None,
         };
+
+        if entry.mod_type == Some(ModType::Mo2Plugin) {
+            tools.push(mod_doc(
+                modlist,
+                entry,
+                planned_mod,
+                &mut anchors,
+                archives,
+            )?);
+            continue;
+        }
 
         let common = open
             .iter()
@@ -251,7 +281,7 @@ pub fn build_document(
             });
         }
 
-        let doc = mod_doc(modlist, entry, planned_mod, &mut anchors)?;
+        let doc = mod_doc(modlist, entry, planned_mod, &mut anchors, archives)?;
         mod_count += 1;
         match open.last_mut() {
             Some(section) => section.entries.push(Entry::Mod(Box::new(doc))),
@@ -262,7 +292,25 @@ pub fn build_document(
         close_section(&mut open, &mut root);
     }
 
-    let kinds = kinds_used(&collect_kinds(&root));
+    let game_settings: Vec<StepDoc> =
+        crate::config::compiler::compile_top_level_actions(&modlist.ini)
+            .into_iter()
+            .map(|action| {
+                let step = describe::action(&action);
+                StepDoc {
+                    action: action.name().to_string(),
+                    kind: step.kind.to_string(),
+                    text: step.text,
+                    code: step.code,
+                    condition: None,
+                    raw: action,
+                }
+            })
+            .collect();
+    let mut all_kinds: Vec<String> = tools.iter().flat_map(mod_kinds).collect();
+    all_kinds.extend(game_settings.iter().map(|s| s.kind.clone()));
+    all_kinds.extend(collect_kinds(&root));
+    let kinds = kinds_used(&all_kinds);
     Ok(Document {
         document_version: DOCUMENT_VERSION,
         generator: format!("mudcrab {}", env!("CARGO_PKG_VERSION")),
@@ -284,6 +332,8 @@ pub fn build_document(
         plan: plan.map(|plan| PlanDoc {
             responses: plan.responses.clone(),
         }),
+        tools,
+        game_settings,
         entries: root,
         load_order: load_order(modlist, plan),
         mod_count,
@@ -296,23 +346,30 @@ fn collect_kinds(entries: &[Entry]) -> Vec<String> {
     for entry in entries {
         match entry {
             Entry::Section(section) => out.extend(collect_kinds(&section.entries)),
-            Entry::Mod(m) => {
-                if m.condition.is_some() {
-                    out.push("optional".to_string());
-                }
-                for archive in &m.archives {
-                    if archive.source == "manual" {
-                        out.push("manual".to_string());
-                    }
-                    out.extend(archive.instructions.iter().map(|i| i.kind.to_string()));
-                }
-                if m.merge.is_some() {
-                    out.push("merge".to_string());
-                }
-                out.extend(m.steps.iter().map(|step| step.kind.clone()));
-            }
+            Entry::Mod(m) => out.extend(mod_kinds(m)),
         }
     }
+    out
+}
+
+fn mod_kinds(m: &ModDoc) -> Vec<String> {
+    let mut out = Vec::new();
+    if m.condition.is_some() {
+        out.push("optional".to_string());
+    }
+    if m.archives.len() > 1 {
+        out.push("combine".to_string());
+    }
+    for archive in &m.archives {
+        if archive.source == "manual" {
+            out.push("manual".to_string());
+        }
+        out.extend(archive.instructions.iter().map(|i| i.kind.to_string()));
+    }
+    if m.merge.is_some() {
+        out.push("merge".to_string());
+    }
+    out.extend(m.steps.iter().map(|step| step.kind.clone()));
     out
 }
 
@@ -336,9 +393,21 @@ fn close_section(open: &mut Vec<Section>, root: &mut Vec<Entry>) {
 
 fn condition_doc(expr: &str, modlist: &SourceModlist) -> anyhow::Result<ConditionDoc> {
     let condition = Condition::parse(expr)?;
+    let question = match &condition {
+        Condition::Input {
+            key,
+            test: crate::config::condition::InputTest::Truthy,
+        } => modlist
+            .inputs
+            .get(key)
+            .filter(|spec| spec.input_type == InputType::Bool)
+            .map(|spec| spec.query.clone()),
+        _ => None,
+    };
     Ok(ConditionDoc {
         expr: expr.to_string(),
         text: describe::condition(&condition, &modlist.inputs),
+        question,
     })
 }
 
@@ -347,6 +416,7 @@ fn mod_doc(
     entry: &ModEntry,
     planned: Option<&crate::config::schema::PersonalizedMod>,
     anchors: &mut Anchors,
+    lookup: Option<&Archives<'_>>,
 ) -> anyhow::Result<ModDoc> {
     let context = |err: anyhow::Error| anyhow::anyhow!("mod {}: {err:#}", entry.id);
 
@@ -390,7 +460,22 @@ fn mod_doc(
                 .map(|c| condition_doc(c, modlist))
                 .transpose()
                 .map_err(context)?,
-            instructions: describe::archive_instructions(&archive),
+            instructions: if entry.mod_type == Some(ModType::Mo2Plugin) {
+                vec![describe::Instruction {
+                    kind: "mo2_plugin",
+                    text: format!(
+                        "Extract {} into Mod Organizer 2's `plugins/` folder (MO2 closed).",
+                        archive
+                            .data_folder
+                            .as_deref()
+                            .map(|f| format!("`{f}`"))
+                            .unwrap_or_else(|| "the archive".to_string())
+                    ),
+                }]
+            } else {
+                let listing = lookup.and_then(|lookup| list_archive(lookup, &archive));
+                describe::archive_instructions(&archive, listing.as_deref())
+            },
             raw: archive,
         });
     }
@@ -456,6 +541,20 @@ fn mod_doc(
                 .collect(),
         }),
     })
+}
+
+/// The archive's entries, if it can be found and read; `None` otherwise,
+/// which only costs the reader some precision.
+fn list_archive(lookup: &Archives<'_>, archive: &CompiledArchive) -> Option<Vec<String>> {
+    if archive.inner_archive.is_some() {
+        return None;
+    }
+    let source = archive.path.as_deref()?;
+    let reference =
+        crate::config::archive_store::ArchiveRef::new(source, archive.file_name.as_deref());
+    let path =
+        crate::config::archive_store::find(lookup.downloads, lookup.search_paths, &reference)?;
+    crate::archive::list_archive_paths(&path).ok()
 }
 
 fn archive_source(archive: &CompiledArchive) -> String {

@@ -1,0 +1,25 @@
+{#- What to do before the first mod: tools, and the game's own settings. -#}
+{% import "macros.md.j2" as m %}
+{% import "symbols.j2" as sym %}
+{% if doc.tools %}
+## Tools
+
+Set these up first.
+
+{% set depth = 1 %}
+{% for mod in doc.tools %}
+{% set number = loop.index %}
+{% include "mod.md.j2" %}
+
+{% endfor %}
+{% endif %}
+{% if doc.game_settings %}
+## Game settings
+
+Using MO2's INI editor:
+
+{% for step in doc.game_settings %}
+- {{ sym.symbols[step.kind] }} {{ step.text | markup }}
+{% endfor %}
+
+{% endif %}

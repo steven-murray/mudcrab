@@ -2,6 +2,11 @@
 {% import "symbols.j2" as sym %}
 [center][size=6][b]{{ doc.docs.title or doc.name }}[/b][/size][/center]
 
+{% if options.mudcrab_note %}
+[quote]This whole install can be done automatically, from the same list, with [url=https://github.com/steven-murray/mudcrab]mudcrab[/url].[/quote]
+
+{% endif %}
+
 {% if doc.docs.summary %}
 [center][i]{{ doc.docs.summary | markup }}[/i][/center]
 
@@ -32,6 +37,7 @@
 [/list]
 
 {% endif %}
+{% include "setup.j2" %}
 {% for entry in doc.entries %}
 {% include "entry.j2" %}
 

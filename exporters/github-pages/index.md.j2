@@ -4,6 +4,11 @@
 {{ "{% raw %}" }}
 # {{ doc.docs.title or doc.name }}
 
+{% if options.mudcrab_note %}
+> This whole install can be done automatically, from the same list, with [mudcrab](https://github.com/steven-murray/mudcrab).
+
+{% endif %}
+
 {% if doc.docs.summary %}
 *{{ doc.docs.summary | markup }}*
 
@@ -25,6 +30,8 @@
 {{ m.key(doc.kinds, sym, options.steps) }}
 
 {% endif %}
+{% set heading_base = 1 %}
+{% include "setup.md.j2" %}
 ## Contents
 
 {% for entry in doc.entries if entry.kind == "section" %}

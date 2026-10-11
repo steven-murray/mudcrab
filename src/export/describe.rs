@@ -69,6 +69,15 @@ fn code(text: &str) -> String {
     format!("`{text}`")
 }
 
+/// An INI value as a reader should type it; an empty one has to be said.
+fn value(text: &str) -> String {
+    if text.is_empty() {
+        "nothing (leave it empty)".to_string()
+    } else {
+        code(text)
+    }
+}
+
 fn code_list(items: &[String]) -> String {
     items
         .iter()
@@ -96,7 +105,14 @@ pub struct Instruction {
 /// What to do with an archive beyond "install it": installer choices, the
 /// folder to take, the files to leave out. Empty for an archive installed as
 /// it comes.
-pub fn archive_instructions(archive: &CompiledArchive) -> Vec<Instruction> {
+///
+/// `listing` is the archive's entries, when the archive is to hand: with it,
+/// patterns are spelled as the files they match, and a data folder MO2 finds
+/// by itself goes unmentioned.
+pub fn archive_instructions(
+    archive: &CompiledArchive,
+    listing: Option<&[String]>,
+) -> Vec<Instruction> {
     let mut out = Vec::new();
     let mut push = |kind: &'static str, text: String| out.push(Instruction { kind, text });
     if let Some(inner) = &archive.inner_archive {
@@ -138,32 +154,86 @@ pub fn archive_instructions(archive: &CompiledArchive) -> Vec<Instruction> {
             ),
         );
     }
-    if let Some(folder) = &archive.data_folder {
+    // What the archive holds, below the folder the mod is made from, when the
+    // archive is at hand: patterns become the files they mean.
+    let content: Option<Vec<String>> =
+        listing.map(|paths| content_paths(paths, archive.data_folder.as_deref()));
+    if let Some(folder) = &archive.data_folder
+        && !listing.is_some_and(|paths| mo2_unwraps(paths, folder))
+    {
         push(
             "data_folder",
             format!(
-                "Install the contents of {} as the mod's data folder.",
+                "Manual install: in MO2's installer, right-click {} and choose *Set data directory*.",
                 code(folder)
             ),
         );
     }
+    let included = content
+        .as_deref()
+        .and_then(|c| matching(c, &archive.include, true));
     if let Some(subdir) = &archive.target_subdir {
-        push(
-            "subdir",
-            format!("Install it into {} inside the mod.", code(subdir)),
-        );
-    }
-    if !archive.include.is_empty() {
-        push(
-            "include",
-            format!("Install only {}.", code_list(&archive.include)),
-        );
+        let what = match &included {
+            Some(files) if !archive.include.is_empty() => code_list(files),
+            _ => "the archive's contents".to_string(),
+        };
+        let them = if what.starts_with("the") || what.contains(", ") {
+            "them"
+        } else {
+            "it"
+        };
+        let subdir = subdir.trim_matches('/');
+        let text = if let Some(rest) = subdir
+            .strip_prefix("root")
+            .filter(|r| r.is_empty() || r.starts_with('/'))
+        {
+            // Root Builder's folder: the files belong beside Oblivion.exe.
+            let place = rest.trim_start_matches('/');
+            let place = if place.is_empty() {
+                String::new()
+            } else {
+                format!(" in {}", code(place))
+            };
+            format!(
+                "{what} go{} in the game folder{place}, next to `Oblivion.exe`. With Root Builder, \
+                 put {them} in a new `root/` folder inside the mod instead.",
+                if them == "it" { "es" } else { "" }
+            )
+        } else {
+            let levels: Vec<&str> = subdir.split('/').collect();
+            let steps = levels
+                .iter()
+                .enumerate()
+                .map(|(i, level)| {
+                    if i == 0 {
+                        code(level)
+                    } else {
+                        format!("then {} inside it", code(level))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(", ");
+            format!(
+                "Manual install: {what} belong{} in a new {} folder. In MO2's installer, right-click \
+                 and *Create directory* {steps}, then drag {them} in.",
+                if them == "it" { "s" } else { "" },
+                code(&format!("{subdir}/"))
+            )
+        };
+        push("subdir", text);
+    } else if !archive.include.is_empty() {
+        let what = included
+            .map(|files| code_list(&files))
+            .unwrap_or_else(|| glob_words(&archive.include));
+        push("include", format!("Install only {what}."));
     }
     if !archive.exclude.is_empty() {
-        push(
-            "exclude",
-            format!("Leave out {}.", code_list(&archive.exclude)),
-        );
+        let what = content
+            .as_deref()
+            .and_then(|c| matching(c, &archive.exclude, false))
+            .map(|files| code_list(&files))
+            .unwrap_or_else(|| glob_words(&archive.exclude));
+        push("exclude", format!("Leave out {what}."));
     }
     if !archive.game_root_files.is_empty() {
         push(
@@ -180,6 +250,84 @@ pub fn archive_instructions(archive: &CompiledArchive) -> Vec<Instruction> {
         );
     }
     out
+}
+
+/// Files below `data_folder` (all files, without one), relative to it.
+fn content_paths(paths: &[String], data_folder: Option<&str>) -> Vec<String> {
+    let prefix = data_folder.map(|f| format!("{}/", f.trim_matches('/').to_ascii_lowercase()));
+    paths
+        .iter()
+        .filter_map(|path| match &prefix {
+            Some(prefix) if path.to_ascii_lowercase().starts_with(prefix.as_str()) => {
+                Some(path[prefix.len()..].to_string())
+            }
+            Some(_) => None,
+            None => Some(path.clone()),
+        })
+        .filter(|path| !path.is_empty() && !path.ends_with('/'))
+        .collect()
+}
+
+/// The files the patterns pick out (`keep` = include semantics), if few
+/// enough to list; a reader is better off with a pattern than with forty
+/// names.
+fn matching(content: &[String], patterns: &[String], keep: bool) -> Option<Vec<String>> {
+    let filters = if keep {
+        crate::archive::ArchiveFilters::new(patterns, &[]).ok()?
+    } else {
+        crate::archive::ArchiveFilters::new(&[], patterns).ok()?
+    };
+    let hits: Vec<String> = content
+        .iter()
+        .filter(|path| filters.should_extract(path) == keep)
+        .cloned()
+        .collect();
+    (!hits.is_empty() && hits.len() <= 8).then_some(hits)
+}
+
+/// Globs as words: `**/x.dll` is "`x.dll`, wherever it is in the archive",
+/// which is what it means and easier to act on than the pattern.
+fn glob_words(patterns: &[String]) -> String {
+    patterns
+        .iter()
+        .map(|pattern| match pattern.strip_prefix("**/") {
+            Some(rest) if !rest.contains(['*', '?', '[']) => {
+                format!("{} (wherever it is in the archive)", code(rest))
+            }
+            _ => code(pattern),
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+/// Whether MO2's installer would take `folder` as the data folder by itself:
+/// it is the archive's only top-level entry, which MO2 steps into, or it is a
+/// top-level `Data`.
+pub fn mo2_unwraps(paths: &[String], folder: &str) -> bool {
+    let folder = folder.trim_matches('/');
+    if folder.contains('/') {
+        return false;
+    }
+    // MO2 also takes a top-level `Data` folder as the data folder, whatever
+    // sits beside it.
+    if folder.eq_ignore_ascii_case("data") {
+        return paths.iter().any(|p| {
+            p.split('/')
+                .next()
+                .is_some_and(|t| t.eq_ignore_ascii_case("data"))
+                && p.contains('/')
+        });
+    }
+    let mut tops = paths
+        .iter()
+        .filter_map(|p| p.split('/').next())
+        .filter(|t| !t.is_empty());
+    let Some(first) = tops.next() else {
+        return false;
+    };
+    first.eq_ignore_ascii_case(folder)
+        && tops.all(|t| t.eq_ignore_ascii_case(first))
+        && paths.iter().all(|p| p.contains('/'))
 }
 
 /// One step, and a block of literal text that goes with it (an INI block to
@@ -228,14 +376,14 @@ pub fn action(action: &ModAction) -> Step {
             plain(format!(
                 "In {file}, set {}{section} to {}.",
                 code(&set.key),
-                code(&set.value.to_string())
+                value(&set.value.to_string())
             ))
         }
         ModAction::IniTweak(tweak) => plain(format!(
             "In {}, set {} to {}.",
             code(&tweak.file),
             code(&tweak.key),
-            code(&tweak.value.to_string())
+            value(&tweak.value.to_string())
         )),
         ModAction::IniAppendBlock(block) => Step {
             kind,
@@ -362,5 +510,78 @@ mod tests {
             "A is installed and B C is not installed"
         );
         assert_eq!(say("enb == v0500"), "you choose “v0500” for “enb”");
+    }
+
+    fn archive(f: impl FnOnce(&mut CompiledArchive)) -> CompiledArchive {
+        let mut archive = CompiledArchive::default();
+        f(&mut archive);
+        archive
+    }
+
+    fn texts(archive: &CompiledArchive, listing: Option<&[String]>) -> Vec<String> {
+        archive_instructions(archive, listing)
+            .into_iter()
+            .map(|i| i.text)
+            .collect()
+    }
+
+    #[test]
+    fn patterns_become_the_files_they_mean_when_the_archive_is_at_hand() {
+        let excluding = archive(|a| {
+            a.data_folder = Some("Oblivion/Data".into());
+            a.exclude = vec!["**/AddActorValues_CS.dll".into()];
+        });
+        let listing: Vec<String> = [
+            "Oblivion/Data/OBSE/Plugins/AddActorValues.dll",
+            "Oblivion/Data/OBSE/Plugins/AddActorValues_CS.dll",
+        ]
+        .map(String::from)
+        .into();
+        let with = texts(&excluding, Some(&listing));
+        assert!(
+            with.contains(&"Leave out `OBSE/Plugins/AddActorValues_CS.dll`.".to_string()),
+            "{with:?}"
+        );
+        let without = texts(&excluding, None);
+        assert!(
+            without.contains(
+                &"Leave out `AddActorValues_CS.dll` (wherever it is in the archive).".to_string()
+            ),
+            "{without:?}"
+        );
+    }
+
+    #[test]
+    fn a_data_folder_mo2_finds_itself_needs_no_instruction() {
+        let wrapped = archive(|a| a.data_folder = Some("Non Selectable Player".into()));
+        let only: Vec<String> = vec!["Non Selectable Player/OBSE/Plugins/x.dll".into()];
+        assert!(texts(&wrapped, Some(&only)).is_empty());
+        let beside: Vec<String> = vec![
+            "Non Selectable Player/OBSE/Plugins/x.dll".into(),
+            "readme.txt".into(),
+        ];
+        assert_eq!(texts(&wrapped, Some(&beside)).len(), 1);
+        // MO2 takes a top-level Data folder whatever is beside it.
+        let data = archive(|a| a.data_folder = Some("Data".into()));
+        let with_readme: Vec<String> = vec!["Data/x.esp".into(), "readme.txt".into()];
+        assert!(texts(&data, Some(&with_readme)).is_empty());
+        // Unknown without the archive: say it.
+        assert_eq!(texts(&wrapped, None).len(), 1);
+    }
+
+    #[test]
+    fn a_target_folder_is_spelled_out_level_by_level() {
+        let dll = archive(|a| {
+            a.target_subdir = Some("OBSE/Plugins".into());
+            a.include = vec!["**/*.dll".into()];
+        });
+        let listing: Vec<String> = vec!["FractionalMagicDamage.dll".into(), "readme.txt".into()];
+        assert_eq!(
+            texts(&dll, Some(&listing)),
+            [
+                "Manual install: `FractionalMagicDamage.dll` belongs in a new `OBSE/Plugins/` folder. In MO2's \
+              installer, right-click and *Create directory* `OBSE`, then `Plugins` inside it, then drag it in."
+            ]
+        );
     }
 }

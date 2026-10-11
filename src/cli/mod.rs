@@ -567,6 +567,14 @@ pub struct ExportArgs {
     /// Describe one build: only the mods this plan selected, with its answers.
     #[arg(long)]
     pub plan: Option<PathBuf>,
+    /// Where the list's archives are. With them, instructions name the files a
+    /// pattern means (`OBSE/Plugins/x.dll` rather than `**/x.dll`) and skip
+    /// steps MO2 does by itself. Without them, patterns are put into words.
+    #[arg(long, alias = "cache")]
+    pub downloads: Option<PathBuf>,
+    /// Further folders to look for archives in. Repeatable.
+    #[arg(long = "archive-search-path", value_name = "DIR")]
+    pub archive_search_paths: Vec<PathBuf>,
     /// Set an exporter option, `key=value`; repeatable. Overrides the
     /// modlist's `[export.<exporter>]`.
     #[arg(long = "opt", value_name = "KEY=VALUE")]

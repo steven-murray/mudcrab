@@ -4,7 +4,7 @@
 {{ number }}. [b]{{ mod.title }}[/b]{{ " " ~ sym.symbols.optional if mod.condition }}{{ " " ~ sym.symbols.merge if mod.merge }}{% if options.files %}{% for page in mod.pages %} [url={{ page.mod_url }}]{{ sym.symbols.page }}[/url]{% endfor %}{% for link in mod.docs.links %} [url={{ link.url }}]{{ sym.symbols.page }}[/url]{% endfor %}{% for archive in mod.archives %} {{ m.download(archive, loop.index if many, sym.symbols) }}{% endfor %}{% endif %}
 
 {% if mod.condition %}
-[i]{{ sym.symbols.optional }} Only if {{ mod.condition.text }}[/i]
+[i]{{ sym.symbols.optional }} {{ "Optional: " ~ mod.condition.question if mod.condition.question else "Only if " ~ mod.condition.text }}[/i]
 
 {% endif %}
 {% if mod.docs.summary %}
@@ -22,9 +22,12 @@
 {% if options.steps %}
 {% set rows = namespace(n=0) %}
 {% for archive in mod.archives %}{% set rows.n = rows.n + (archive.instructions | length) + (1 if archive.condition else 0) %}{% endfor %}
-{% set rows.n = rows.n + (mod.steps | length) %}
+{% set rows.n = rows.n + (mod.steps | length) + (1 if many else 0) %}
 {% if rows.n %}
 [list]
+{% if many %}
+[*]{{ sym.symbols.combine }} Install {% for archive in mod.archives %}{{ sym.symbols.download if archive.nexus or archive.url else sym.symbols.manual }}{{ m.superscript(loop.index) }}{{ ", " if not loop.last }}{% endfor %} into the same mod, in that order.
+{% endif %}
 {% for archive in mod.archives %}
 {% set mark = m.superscript(loop.index) if many else "" %}
 {% if archive.condition %}

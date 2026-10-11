@@ -51,7 +51,14 @@ pub async fn run(args: ExportArgs) -> anyhow::Result<()> {
         }
         None => None,
     };
-    let document = build_document(&modlist, plan.as_ref())?;
+    let archives = args
+        .downloads
+        .as_deref()
+        .map(|downloads| crate::export::Archives {
+            downloads,
+            search_paths: &args.archive_search_paths,
+        });
+    let document = build_document(&modlist, plan.as_ref(), archives.as_ref())?;
 
     let Some(exporter) = exporter else {
         anyhow::ensure!(args.options.is_empty(), "json has no options");

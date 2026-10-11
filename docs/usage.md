@@ -643,8 +643,14 @@ be read -- takes about 20 seconds.
 Render a modlist as a guide.
 
 ```bash
-mudcrab export <modlist.toml> [--to json] [-o <file>] [--plan <plan.json>]
+mudcrab export <modlist.toml> [--to json] [-o <file>] [--plan <plan.json>] [--downloads <dir>]
 ```
+
+With `--downloads` (and `--archive-search-path`), export reads each archive's
+file list, so instructions name real files -- "leave out
+`OBSE/Plugins/x.dll`" rather than the pattern `**/x.dll` -- and a data folder
+that Mod Organizer 2 unwraps by itself gets no instruction at all. Without it,
+patterns are put into words instead.
 
 The prose comes from the modlist's `docs` tables (see
 [modlist-format.md](modlist-format.md#docs-prose-for-export)); the rest --

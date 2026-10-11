@@ -2,6 +2,11 @@
 {% import "symbols.j2" as sym %}
 # {{ doc.docs.title or doc.name }}
 
+{% if options.mudcrab_note %}
+> This whole install can be done automatically, from the same list, with [mudcrab](https://github.com/steven-murray/mudcrab).
+
+{% endif %}
+
 {% if doc.docs.summary %}
 *{{ doc.docs.summary | markup }}*
 
@@ -33,6 +38,7 @@
 {% endif %}
 {# Section headings start one level below the guide's title. #}
 {% set heading_base = 1 %}
+{% include "setup.md.j2" %}
 {% for entry in doc.entries %}
 {% include "entry.md.j2" %}
 

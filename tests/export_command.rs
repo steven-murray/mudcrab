@@ -17,6 +17,8 @@ const MODLIST: &str = r#"
 name = "Docs"
 plugins = ["Rats.esp"]
 docs_file = "docs.toml"
+ini.bSaveOnRest = 0
+ini.SIntroSequence = ""
 
 inputs.rats.type = "bool"
 inputs.rats.query = "Install the rats?"
@@ -46,6 +48,16 @@ action = "ini_set"
 file = "ini/rats.ini"
 key = "rats.swear"
 value = 1
+
+[[mods]]
+id = "rootbuilder"
+section = ["MO2 PLUGINS"]
+type = "mo2-plugin"
+
+[[mods.archives]]
+path = "manual:rootbuilder.zip"
+layout = "custom-data-folder"
+data_folder = "rootbuilder"
 
 [[mods]]
 id = "Bells"
@@ -125,7 +137,8 @@ fn json_is_a_tree_of_sections_with_prose_and_words() {
     assert_eq!(rats["steps"][0]["kind"], "ini");
     assert_eq!(
         doc["kinds"],
-        serde_json::json!(["optional", "bain", "ini", "manual"])
+        // Tools and game settings first, then the mods in order.
+        serde_json::json!(["manual", "mo2_plugin", "ini", "optional", "bain"])
     );
     assert_eq!(
         rats["archives"][0]["instructions"][0]["text"],
@@ -225,7 +238,7 @@ fn nexus_writes_bbcode_with_links_conditions_and_steps() {
         bbcode.contains(
             "1. [b]Rats[/b] ❓ [url=https://www.nexusmods.com/oblivion/mods/52661]🌐[/url] \
              [url=https://www.nexusmods.com/oblivion/mods/52661?tab=files&file_id=1000033714]⬇️[/url]\n\
-             [i]❓ Only if you answer yes to “Install the rats?”[/i]"
+             [i]❓ Optional: Install the rats?[/i]"
         ),
         "{bbcode}"
     );
@@ -440,4 +453,48 @@ fn github_pages_writes_a_site_with_its_images() {
         b"png"
     );
     assert!(read("load-order.md").contains("1 plugins, in order."));
+}
+
+#[test]
+fn tools_and_game_settings_come_before_the_mods() {
+    let dir = tempdir().unwrap();
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    let doc = export(&list, &[]).unwrap();
+    assert_eq!(doc["tools"][0]["id"], "rootbuilder");
+    assert_eq!(
+        doc["tools"][0]["archives"][0]["instructions"][0]["kind"],
+        "mo2_plugin"
+    );
+    // An MO2 plugin is not a mod in the list, so its section does not appear.
+    assert!(
+        doc["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|e| e["name"] != "MO2 PLUGINS")
+    );
+    assert_eq!(doc["game_settings"].as_array().unwrap().len(), 2);
+
+    let (md, _) = export_text(&list, &["--to", "markdown"]).unwrap();
+    let tools = md.find("## Tools").expect("tools section");
+    let settings = md.find("## Game settings").expect("settings section");
+    let audio = md.find("\n## 1 - AUDIO").expect("audio section");
+    assert!(tools < settings && settings < audio, "{md}");
+    assert!(
+        md.contains("- 🧰 Extract `rootbuilder` into Mod Organizer 2's `plugins/` folder"),
+        "{md}"
+    );
+    assert!(md.contains("set `bSaveOnRest` to `0`."), "{md}");
+    assert!(
+        md.contains("set `SIntroSequence` to nothing (leave it empty)."),
+        "{md}"
+    );
+    assert!(
+        md.contains("This whole install can be done automatically"),
+        "{md}"
+    );
+    assert!(
+        !md.contains("## Choices"),
+        "a manual guide asks each question where it applies: {md}"
+    );
 }

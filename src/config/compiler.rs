@@ -111,7 +111,7 @@ fn manual_file_name(path: Option<&str>) -> Option<String> {
 ///
 /// These target Oblivion.ini specifically; game-scoped writes are redirected to
 /// the MO2 profile-local copy, never the original in the game directory.
-fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
+pub fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
     ini.iter()
         .map(|(key, value)| {
             ModAction::IniSet(IniSetAction {

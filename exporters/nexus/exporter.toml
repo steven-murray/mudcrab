@@ -13,8 +13,12 @@ template = "guide.j2"
 default = true
 help = "List the top-level sections before the first one"
 
-[options.choices]
+[options.mudcrab_note]
 default = true
+help = "Say near the top that mudcrab can do the whole install automatically"
+
+[options.choices]
+default = false
 help = "List the questions the list asks (its inputs), with their defaults"
 
 [options.key]
