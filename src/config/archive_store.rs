@@ -167,15 +167,37 @@ fn lookup_in(dir: &Path, archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<P
         && let Some(candidates) = index.by_nexus.get(&(mod_id.to_string(), file_id.to_string()))
     {
         let wanted_game = mo2_game_name(game);
-        let found = candidates.iter().find(|(meta_game, path)| {
-            path.is_file()
-                && match (wanted_game, meta_game) {
-                    (Some(wanted), Some(have)) => wanted.eq_ignore_ascii_case(have),
-                    _ => true,
+        let mut matching: Vec<&PathBuf> = candidates
+            .iter()
+            .filter(|(meta_game, path)| {
+                path.is_file()
+                    && match (wanted_game, meta_game) {
+                        (Some(wanted), Some(have)) => wanted.eq_ignore_ascii_case(have),
+                        _ => true,
+                    }
+            })
+            .map(|(_, path)| path)
+            .collect();
+        // Several files claiming one Nexus file is a re-download -- MO2 names
+        // the second `1_<name>` -- and one of them may be the broken download
+        // that prompted it. Prefer one that opens, deterministically.
+        matching.sort();
+        if matching.len() > 1
+            && let Some(good) = matching
+                .iter()
+                .find(|path| crate::archive::list_archive_paths(path).is_ok())
+        {
+                if matching.first() != Some(good) {
+                    tracing::warn!(
+                        chosen = %good.display(),
+                        skipped = ?matching.iter().take_while(|p| *p != good).map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                        "several archives claim the same Nexus file; using the first that opens"
+                    );
                 }
-        });
-        if let Some((_, path)) = found {
-            return Some(path.clone());
+                return Some((*good).clone());
+        }
+        if let Some(path) = matching.first() {
+            return Some((*path).clone());
         }
     }
     if let Some(name) = archive.expected_name()
@@ -483,6 +505,25 @@ mod tests {
 
         let wrong_game = ArchiveRef::new("nexus:skyrimspecialedition/47810/1000018329", None);
         assert_eq!(locate(dir.path(), &[], &wrong_game), None);
+    }
+
+    #[test]
+    fn of_two_files_claiming_one_nexus_file_the_one_that_opens_wins() {
+        use std::io::Write;
+        let dir = tempfile::tempdir().unwrap();
+        // "1_..." sorts before "Mod...", so make the good one sort second.
+        let broken = touch(dir.path(), "1_Mod-1-9.zip", "not really a zip");
+        let good = dir.path().join("Mod-1-9.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&good).unwrap());
+        zip.start_file("a.txt", zip::write::FileOptions::<()>::default()).unwrap();
+        zip.write_all(b"x").unwrap();
+        zip.finish().unwrap();
+        for archive in [&broken, &good] {
+            touch(dir.path(), &format!("{}.meta", archive.file_name().unwrap().to_string_lossy()),
+                "[General]\ngameName=Oblivion\nmodID=1\nfileID=9\n");
+        }
+        let wanted = ArchiveRef::new("nexus:oblivion/1/9", None);
+        assert_eq!(locate(dir.path(), &[], &wanted), Some(Found::Downloads(good)));
     }
 
     #[test]
