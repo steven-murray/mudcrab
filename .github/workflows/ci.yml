@@ -13,12 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
+      # Installs what rust-toolchain.toml pins, components included.
+      - run: rustup toolchain install
       - uses: Swatinem/rust-cache@v2
-      # Both of these have been enforced by convention since the start; this is
-      # where that becomes a rule.
+      - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
@@ -29,4 +27,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@1.88.0
-      - run: cargo check --all-targets
+      # `+1.88.0`, or rust-toolchain.toml would pick the pinned version instead.
+      - run: cargo +1.88.0 check --all-targets

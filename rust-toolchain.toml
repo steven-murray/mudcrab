@@ -1,0 +1,8 @@
+# The toolchain for development and CI, pinned so that formatting and clippy
+# lints change only when this line does -- not whenever stable moves. Bump it
+# deliberately, then run `cargo fmt` and `cargo clippy` and commit what moves.
+# (The minimum supported version is separate: `rust-version` in Cargo.toml,
+# checked by CI's msrv job.)
+[toolchain]
+channel = "1.94.0"
+components = ["rustfmt", "clippy"]

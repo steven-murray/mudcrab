@@ -23,9 +23,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      # The toolchain rust-toolchain.toml pins, so a release is built with what
+      # CI tested.
+      - run: rustup toolchain install
+      - run: rustup target add ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }}
 
       # The audience is modders, not Rust developers: ship something they can
