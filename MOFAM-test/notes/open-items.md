@@ -5,7 +5,7 @@ matches the guide's published one, and it has been played.
 
 ## In-game problems found by playing
 
-Four were reported. One is closed:
+Four were reported. Three are closed:
 
 - **~~Missing meshes (OOO's Fine Wood Desk and others)~~** — the modlist pinned
   **OOO BSA v1.7** (Dec 2025) where the guide meant **v1.5.15**, the newest file
@@ -30,8 +30,16 @@ Four were reported. One is closed:
   It is *not* the black compass: vanilla ships
   `textures\menus\hud\hud_compass_face.dds`, so the fallback was always there.
 
-Still open: the black compass, water not rendering, and dying when a gargoyle
-dies.
+- **~~Black compass~~** — DXT1 punch-through alpha draws as opaque black in
+  menus on DXVK/NVIDIA under Proton; DarNified's compass frame covered the face.
+  Fixed by the optional `decompress_dxt1_alpha` input (`dds_decompress`). See
+  `docs/known-issues.md`, Linux / Proton.
+
+- **~~Invisible water~~** — on an NVIDIA vendor id ORC reads the depth buffer
+  through NVAPI, which returns nothing under Proton. Fixed by the optional
+  `dxvk_report_amd_vendor` input: a `dxvk.conf` deployed by Root Builder.
+
+Still open: dying when a gargoyle dies.
 
 - **~~DarNified UI was missing two menus~~** — `menus/main/stats_menu.xml` and
   `menus/prefabs/darn/stats_config.xml`. Not a selection error: the FOMOD
@@ -51,19 +59,16 @@ dies.
   `ini_set` now refuses when a case twin exists rather than guessing. The
   duplicate still has to be removed by hand in the instance.
 
-### What the compass is not
+### Dying when a gargoyle dies (parked)
 
-Ruled out by inspection, so as not to be re-checked: every texture DarNified's
-compass asks for resolves (`menus/hud/*` from vanilla, `menus/darn/*` from
-DarNified, `menus/icons/map/map_icons_all.dds` from Map Marker Overhaul); the
-`darnui_settings` indirection is wired correctly (`hud_main_menu.xml` includes
-`darn/hudmainmenu_config.xml`, which defines that rect); DarNified's own files
-sit exactly where its archive puts them; `_cv` (show compass) is 1; and the
-guide gives no compass instruction. It is black in both instances, so it is not
-an install difference. That leaves the renderer -- ORC is the obvious suspect
-and the cheapest test is to disable it and launch. None is explained by the OOO version: the 1009 dropped files include
-**no** compass or HUD texture, and OOO's plugins are byte-identical between
-instances.
+Reported once, with both spells and weapons, and only at the gargoyle's death.
+What is known: OOO's `AbGargoyle`, `GargoyleCorrosion1` and
+`GargoyleMagicResist1` carry Reflect Damage (REDG) and Reflect Spell (RFLC),
+and OOO's plugins are byte-identical to the reference instance, so if it is
+anything it is OOO as designed rather than an install difference. Not yet
+reproduced deliberately; it may be a reflect killing a low-health character
+rather than a bug. Next step if it recurs: reproduce at full health, and check
+the death against the gargoyle's last hit.
 
 ## Deliberately different from the reference instance
 
