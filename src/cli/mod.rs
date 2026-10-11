@@ -49,7 +49,7 @@ pub enum Command {
     Diff(DiffArgs),
     /// Validate a source modlist without producing compiled output.
     Validate(ValidateArgs),
-    /// Export documentation or reports from a compiled modlist.
+    /// Render a modlist as a guide: JSON, or through an exporter's templates.
     Export(ExportArgs),
     /// Scan a source modlist and generate a tools.toml configuration template.
     SetupTools(SetupToolsArgs),
@@ -548,23 +548,24 @@ pub struct ValidateArgs {
     pub strict: bool,
 }
 
+/// Render a modlist as a guide, for a Nexus page, a website, or your own tools.
+///
+/// An exporter is a built-in name or a folder of templates; `json` writes the
+/// document every exporter reads, for rendering a list some other way.
 #[derive(Debug, Args)]
 pub struct ExportArgs {
-    /// Path to compiled modlist artifact.
+    /// The source modlist TOML. Its docs (and `docs_file`) supply the prose.
     pub input: PathBuf,
-    /// Export format.
-    #[arg(long, value_enum)]
-    pub format: ExportFormat,
-    /// Output file path.
+    /// Exporter: a built-in name, or a path to an exporter folder.
+    #[arg(long = "to", value_name = "EXPORTER", default_value = "json")]
+    pub exporter: String,
+    /// Where to write. A file for single-file exporters (stdout when omitted),
+    /// a directory for site exporters.
     #[arg(short, long)]
-    pub output: PathBuf,
-}
-
-#[derive(Debug, Copy, Clone, clap::ValueEnum)]
-pub enum ExportFormat {
-    Markdown,
-    Html,
-    Json,
+    pub output: Option<PathBuf>,
+    /// Describe one build: only the mods this plan selected, with its answers.
+    #[arg(long)]
+    pub plan: Option<PathBuf>,
 }
 
 #[derive(Debug, Args)]

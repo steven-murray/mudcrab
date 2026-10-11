@@ -1,5 +1,5 @@
 use crate::config::schema::{
-    ArchiveLayout, CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
+    ArchiveLayout, ArchiveSpec, CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
     ModAction, SourceModlist,
 };
 
@@ -21,48 +21,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                 archives: spec
                     .archives
                     .iter()
-                    .map(|archive| {
-                        if archive.path.is_some() && !archive.build.is_empty() {
-                            return Err(anyhow::anyhow!(
-                                "mod '{}': archive cannot have both 'path' and 'build'",
-                                id
-                            ));
-                        }
-                        if archive.layout == Some(ArchiveLayout::CustomDataFolder)
-                            && archive.data_folder.is_none()
-                        {
-                            return Err(anyhow::anyhow!(
-                                "mod '{}': layout = \"custom-data-folder\" requires data_folder \
-                                 to say where the data folder is",
-                                id
-                            ));
-                        }
-                        if archive.path.is_none() && archive.build.is_empty() {
-                            return Err(anyhow::anyhow!(
-                                "mod '{}': archive must have either 'path' or 'build'",
-                                id
-                            ));
-                        }
-                        Ok(CompiledArchive {
-                            condition: archive.condition.clone(),
-                            path: archive.path.clone(),
-                            file_name: archive
-                                .file_name
-                                .clone()
-                                .or_else(|| manual_file_name(archive.path.as_deref())),
-                            download_handler: archive.download_handler.clone(),
-                            layout: archive.layout,
-                            data_folder: archive.data_folder.clone(),
-                            target_subdir: archive.target_subdir.clone(),
-                            inner_archive: archive.inner_archive.clone(),
-                            bain_subpackages: archive.bain_subpackages.clone(),
-                            fomod_selections: archive.fomod_selections.clone(),
-                            build: archive.build.clone(),
-                            include: archive.include.clone(),
-                            exclude: archive.exclude.clone(),
-                            game_root_files: archive.game_root_files.clone(),
-                        })
-                    })
+                    .map(|archive| compile_archive(id, archive))
                     .collect::<anyhow::Result<Vec<_>>>()?,
                 condition: spec.condition.clone(),
                 files: spec.files.clone(),
@@ -78,13 +37,57 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         input_count: source.inputs.len(),
         mod_count: mods.len(),
         plugin_count: source.plugins.len(),
-        inputs: source.inputs,
+        inputs: source.inputs.clone().into_iter().collect(),
         actions,
         plugins: source.plugins,
         inactive_plugins: source.inactive_plugins,
         post_install_actions: source.post_install_actions,
         mo2_modlist_entries,
         mods,
+    })
+}
+
+/// One archive entry as the compiled modlist carries it.
+pub fn compile_archive(id: &str, archive: &ArchiveSpec) -> anyhow::Result<CompiledArchive> {
+    if archive.path.is_some() && !archive.build.is_empty() {
+        return Err(anyhow::anyhow!(
+            "mod '{}': archive cannot have both 'path' and 'build'",
+            id
+        ));
+    }
+    if archive.layout == Some(ArchiveLayout::CustomDataFolder)
+        && archive.data_folder.is_none()
+    {
+        return Err(anyhow::anyhow!(
+            "mod '{}': layout = \"custom-data-folder\" requires data_folder \
+             to say where the data folder is",
+            id
+        ));
+    }
+    if archive.path.is_none() && archive.build.is_empty() {
+        return Err(anyhow::anyhow!(
+            "mod '{}': archive must have either 'path' or 'build'",
+            id
+        ));
+    }
+    Ok(CompiledArchive {
+        condition: archive.condition.clone(),
+        path: archive.path.clone(),
+        file_name: archive
+            .file_name
+            .clone()
+            .or_else(|| manual_file_name(archive.path.as_deref())),
+        download_handler: archive.download_handler.clone(),
+        layout: archive.layout,
+        data_folder: archive.data_folder.clone(),
+        target_subdir: archive.target_subdir.clone(),
+        inner_archive: archive.inner_archive.clone(),
+        bain_subpackages: archive.bain_subpackages.clone(),
+        fomod_selections: archive.fomod_selections.clone(),
+        build: archive.build.clone(),
+        include: archive.include.clone(),
+        exclude: archive.exclude.clone(),
+        game_root_files: archive.game_root_files.clone(),
     })
 }
 

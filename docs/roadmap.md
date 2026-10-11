@@ -138,35 +138,39 @@ the first real choice that has them.
 
 ## Phase C — `export`: turn a modlist back into a guide
 
-`mudcrab export --format markdown|html|json` is a **command stub** that errors.
-Implementing it is the other half of the project's premise: a declarative
-modlist should be able to produce the human guide, so an author maintains one
-artefact instead of a TOML and a wiki page that drift apart.
+The other half of the project's premise: a declarative modlist should produce
+the human guide, so an author maintains one artefact instead of a TOML and a
+wiki page that drift apart.
 
-What the compiled modlist already carries: sections and their order, mod names,
-Nexus mod and file ids (so page links are derivable), archive layouts, FOMOD
-selections, actions, merges, the load order.
+### Design
 
-What a readable guide needs that the schema does **not** carry yet:
+- **One document is the contract.** `export` builds a versioned document --
+  sections nesting sections and mods in install order, prose attached, install
+  data also in words (Nexus links, installer choices, INI edits, conditions,
+  the load order). `--to json` writes it as is, for anyone rendering a list
+  their own way. All knowledge of how to *say* an install step lives in
+  `src/export/describe.rs`, once.
+- **Prose lives in `docs` tables** -- guide, section, mod -- inline or in a
+  `docs_file`. Markdown, converted per target. Unknown keys pass through to
+  templates: that is the extension point for content (per-section screenshots,
+  videos, difficulty ratings) that no built-in exporter anticipates.
+- **Exporters are template folders** (minijinja, i.e. Jinja2): an
+  `exporter.toml` (output mode, entry template, options with defaults, assets)
+  plus templates. Built-ins ship the same way inside the binary. Customising
+  one: `{% extends %}` it and override a block, or `--eject` a copy to edit.
+  Options from `--opt key=value` or the modlist's `[export.<name>]`.
+- **Images resolve per target**: a site exporter copies local `path`s in; the
+  Nexus exporter needs a `url` and says which images lack one.
+- **No executable plugin protocol**: the JSON document already gives that power.
 
-- **Prose.** A per-mod and per-section `description`/`note` field. Today the
-  reasoning lives in TOML comments, which the compiler discards. This is the
-  single biggest missing piece, and it is also the project's stated advantage
-  over Wabbajack — *the author's intent is not made clear* is the problem
-  statement in the readme. Comments cannot carry intent into an artefact.
-- **Attribution**: author, mod page URL, licence or permissions where a list
-  redistributes anything.
-- **Ordering and headings** good enough to read top to bottom, which the
-  section paths mostly give already.
+### Progress
 
-Suggested shape: a `[docs]` block per mod (`summary`, `why`, `manual_steps`),
-plus a template so a publisher can theme the HTML. `json` should be the same
-data, for anyone building their own renderer.
-
-A worthwhile acceptance test: export the MOFAM list and compare it, by eye,
-against the guide it was transcribed from.
-
----
+1. ~~Docs schema, `docs_file`, the document, `--to json`~~ -- done.
+2. Template engine, exporter folders, options, `--eject`; the `nexus` (BBCode)
+   exporter.
+3. `markdown` and `github-pages` exporters; image copying.
+4. MOFAM: import the guide's prose into a docs file, export it, and compare
+   against the published guide by eye.
 
 ## Phase D — User-facing documentation
 

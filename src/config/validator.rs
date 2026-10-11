@@ -123,6 +123,8 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
     }
     reject_condition_cycles(&mod_condition_refs)?;
 
+    validate_docs(modlist, &flattened_mods)?;
+
     // Plugins some merge with `hide_sources` swallows. Collected first because
     // the per-mod check below has to know about a merge declared further down
     // the file than the mod whose plugin it takes.
@@ -468,6 +470,41 @@ fn reject_condition_cycles(refs: &HashMap<&str, Vec<String>>) -> anyhow::Result<
     let mut finished = HashSet::new();
     for id in ids {
         visit(id, refs, &mut finished, &mut Vec::new())?;
+    }
+    Ok(())
+}
+
+/// Docs that name a section nobody declares, or a picture that is not there,
+/// would vanish from an export without a word.
+fn validate_docs(modlist: &SourceModlist, mods: &IndexMap<String, ModEntry>) -> anyhow::Result<()> {
+    let sections: HashSet<String> = mods
+        .values()
+        .flat_map(|spec| (1..=spec.section.len()).map(|depth| spec.section[..depth].join(" - ")))
+        .collect();
+    for name in modlist.sections.keys() {
+        if !sections.contains(name) {
+            anyhow::bail!(
+                "[sections.{name:?}] documents a section no mod is in (sections are named as MO2 \
+                 shows the separator, nested levels joined with \" - \")"
+            );
+        }
+    }
+
+    let documented = std::iter::once(("the guide's [docs]".to_string(), &modlist.docs))
+        .chain(modlist.sections.iter().map(|(name, docs)| (format!("section {name:?}"), docs)))
+        .chain(mods.iter().map(|(id, spec)| (format!("mod {id:?}"), &spec.docs)));
+    for (site, docs) in documented {
+        for image in &docs.images {
+            anyhow::ensure!(
+                image.path.is_some() || image.url.is_some(),
+                "{site}: an image needs a path, a url, or both"
+            );
+            if let (Some(path), Some(base)) = (&image.path, &modlist.base_dir)
+                && !base.join(path).is_file()
+            {
+                anyhow::bail!("{site}: image {path} does not exist (paths are relative to the modlist)");
+            }
+        }
     }
     Ok(())
 }

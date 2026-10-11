@@ -638,6 +638,31 @@ difference in the report. Mods are compared in parallel. Diffing a 704-mod, 40GB
 instance against itself -- the worst case, where every byte on both sides has to
 be read -- takes about 20 seconds.
 
+## export
+
+Render a modlist as a guide.
+
+```bash
+mudcrab export <modlist.toml> [--to json] [-o <file>] [--plan <plan.json>]
+```
+
+The prose comes from the modlist's `docs` tables (see
+[modlist-format.md](modlist-format.md#docs-prose-for-export)); the rest --
+sections, Nexus links, installer choices, INI edits, conditions, the load order
+-- comes from the install data, put into words.
+
+Without `--plan` the export describes the whole list: an optional mod appears
+with its condition as a reader would say it ("only if you answer yes to
+“Install Swearing Rats?”"). With `--plan` it describes one build: only the mods
+that plan selected, and the answers that chose them.
+
+`--to json` (the default) writes the document every exporter reads, to `-o` or
+stdout. It is the contract for rendering a list with your own tools:
+`document_version` changes only when a field changes meaning or disappears.
+
+Template exporters (`nexus`, `markdown`, `github-pages`, and your own) are not
+built yet; see [roadmap.md](roadmap.md), Phase C.
+
 ## setup-tools
 
 Scan a source modlist and generate a `tools.toml` configuration template for the

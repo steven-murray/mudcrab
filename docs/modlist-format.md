@@ -239,6 +239,72 @@ Because sources are hidden, the modlist's `plugins` list must contain the merge'
 along with: every source mod exists, no plugin is merged twice, and a merge mod
 declares no archives of its own.
 
+## Docs: prose for `export`
+
+`export` turns a modlist into a guide, and the prose comes from `docs` tables:
+one for the guide as a whole, one per section, one per mod. Text fields are
+Markdown; each exporter converts it for its target (BBCode for Nexus, HTML for
+a site).
+
+```toml
+[docs]                                    # the guide itself
+title = "My Oblivion List"
+summary = "A modern-looking Oblivion that stays true to the original."
+body = """
+Read the *Prologue* first...
+"""
+
+[sections."7 - CHARACTER AND NPCS"]       # named as MO2 shows the separator
+summary = "Faces, bodies and NPC behaviour."
+images = [{ path = "shots/npcs.png", url = "https://i.imgur.com/abc.png", caption = "Before and after" }]
+
+[[mods]]
+id = "Swearing Rats"
+docs.summary = "Rats that insult you."
+docs.body = "Optional: the guide says you may omit it."
+docs.links = [{ label = "Swearing Mudcrabs (Skyrim)", url = "https://..." }]
+```
+
+| Key | Meaning |
+|---|---|
+| `title` | What to show instead of the id or section name |
+| `summary` | One line |
+| `body` | Longer prose, Markdown |
+| `images` | `{ path, url, caption }`: a local `path` (relative to the modlist) for exporters that write a site, a `url` for ones pasted somewhere that cannot hold files, such as Nexus; give both and each takes what it can |
+| `links` | `{ label, url }` |
+
+Any other key is kept and handed to the exporter's templates unchanged, so a
+custom exporter can use fields no built-in one knows (`difficulty`, `video`,
+...).
+
+A nested section is named with its levels joined by `" - "`
+(`"OBSE PLUGINS - Core"`). `validate` rejects docs for a section no mod is in,
+and an image whose `path` does not exist.
+
+### Keeping prose in its own file
+
+A long list can keep its prose apart from its install data:
+
+```toml
+docs_file = "mofam.docs.toml"   # relative to the modlist
+```
+
+```toml
+# mofam.docs.toml
+[docs]
+summary = "..."
+
+[sections."7 - CHARACTER AND NPCS"]
+summary = "..."
+
+[mods."Swearing Rats"]
+summary = "..."
+```
+
+The file is merged in when the modlist is loaded. A mod id it names that the
+modlist does not have is an error, and so is documenting the same thing in both
+places.
+
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the roadmap, not in the

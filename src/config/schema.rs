@@ -1,3 +1,4 @@
+use crate::config::docs::Docs;
 use indexmap::IndexMap;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -11,8 +12,9 @@ pub struct SourceModlist {
     /// archive age.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub guide: Option<GuideProvenance>,
+    /// In declaration order, which is the order `export` presents them in.
     #[serde(default)]
-    pub inputs: HashMap<String, InputSpec>,
+    pub inputs: IndexMap<String, InputSpec>,
     #[serde(default)]
     pub ini: toml::Table,
     #[serde(default)]
@@ -32,6 +34,23 @@ pub struct SourceModlist {
     pub inactive_plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
     pub post_install_actions: Vec<PostInstallAction>,
+    /// The guide's own prose, for `export`. See [`crate::config::docs`].
+    #[serde(default)]
+    pub docs: Docs,
+    /// Per-section prose, keyed by the section's name as MO2 shows its
+    /// separator (`"OBSE PLUGINS - Core"` for a nested one).
+    #[serde(default)]
+    pub sections: IndexMap<String, Docs>,
+    /// A file holding docs for this list, relative to it; merged in at load.
+    #[serde(default)]
+    pub docs_file: Option<String>,
+    /// Option defaults per exporter, as `[export.<name>]`.
+    #[serde(default)]
+    pub export: toml::Table,
+    /// The directory the modlist was loaded from, which `docs_file` and image
+    /// paths are relative to. Set by the loader.
+    #[serde(skip)]
+    pub base_dir: Option<std::path::PathBuf>,
 }
 
 /// What `diff` needs to say whether an archive predates the guide being followed.
@@ -576,6 +595,9 @@ pub struct ModEntry {
     /// Paths may use `%GAME_DIR%`, which is expanded at install time.
     #[serde(default)]
     pub files: Vec<String>,
+    /// Prose for `export`. See [`crate::config::docs`].
+    #[serde(default)]
+    pub docs: Docs,
     #[serde(default)]
     pub actions: Vec<ConditionalAction>,
 }
