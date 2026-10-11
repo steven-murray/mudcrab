@@ -22,6 +22,7 @@ pub mod ini_set;
 pub mod ini_tweak;
 pub mod pack_bsa;
 pub mod qac;
+mod write_file;
 
 use crate::config::install::InstallSettings;
 use crate::config::schema::{ModAction, PersonalizedMod};
@@ -67,6 +68,7 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
         ModAction::ExtractBsa(spec) => extract_bsa::apply(spec, cx),
         ModAction::DeleteRecords(spec) => delete_records::apply(spec, cx),
         ModAction::DdsDecompress(spec) => dds_decompress::apply(spec, cx),
+        ModAction::WriteFile(spec) => write_file::apply(spec, cx),
     }
 }
 

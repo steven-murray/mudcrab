@@ -76,8 +76,39 @@ to renumbered records differ, and zMerge retains some masters mudcrab drops.
 **There is no `game-root` INI scope.** `scope = "game"` resolves to the MO2
 profile's copy of `Oblivion.ini` and never touches the game directory. A file
 that genuinely has to land in the game install root — an ENB config, say — needs
-`game_root_files` on an archive instead, which places the file but cannot edit
-one in place.
+`game_root_files` on an archive (or a `generated` mod's `write_file` under
+`root/`) instead, which places the file but cannot edit one in place.
+
+## Game-root files
+
+**They need the Root Builder MO2 plugin, which mudcrab does not install.**
+`game_root_files` stages files in the mod's own `root/` folder, and Root
+Builder copies them beside `Oblivion.exe` when MO2 launches the game and
+restores what was there when it exits. mudcrab never writes the game folder
+itself. Without Root Builder, `root/` just sits in the mod and the files never
+reach the game. Use copy mode (`copyfiles=**`); the author's link mode has a
+known bug with MO2 2.5.2 before Root Builder 5.0.5.
+
+**Several MO2 instances share one game folder.** Root Builder restores the game
+folder on exit, so each instance gets its own root files while it runs. A crash
+can leave them deployed until MO2 next starts and cleans up.
+
+## Linux / Proton
+
+Two fixes for DXVK on NVIDIA under Proton, each an `[inputs]` switch in MOFAM
+that defaults on and should be off on Windows:
+
+- **`decompress_dxt1_alpha`** — Oblivion's menus draw DXT1 punch-through alpha
+  as opaque black (DarNified UI's compass frame, map markers, inventory icons).
+  `dds_decompress` rewrites those textures as uncompressed BGRA; `mudcrab dds
+  audit` lists them. Found by reproducing on a near-vanilla profile with DarN
+  alone.
+- **`dxvk_report_amd_vendor`** — on an NVIDIA vendor id ORC copies the depth
+  buffer through NVAPI, which returns nothing under Proton: water vanishes and
+  every depth effect breaks. A `dxvk.conf` with `d3d9.customVendorId = 1002`
+  (deployed by Root Builder from the "DXVK Linux Config" mod) sends ORC down its
+  RESZ path. `ORC.log` line 6 says which path it took. Hiding NVAPI with a DLL
+  override does *not* work: ORC decides by vendor id.
 
 ## Layout detection
 

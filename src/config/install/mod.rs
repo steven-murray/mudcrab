@@ -16,7 +16,6 @@ pub struct InstallSettings {
     pub mo2_instance_dir: Option<PathBuf>,
     pub profile_name: String,
     pub game_dir: Option<PathBuf>,
-    pub game_root_dir: Option<PathBuf>,
     pub execute_actions: bool,
     pub dry_run: bool,
     pub tools: ToolsConfig,

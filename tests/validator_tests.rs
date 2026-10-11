@@ -523,3 +523,12 @@ default = "4k"
     let err = validate_src(src).expect_err("should fail");
     assert!(err.to_string().contains("\"4k\""), "{err}");
 }
+
+#[test]
+fn a_generated_mod_needs_actions_and_no_archives() {
+    let no_actions = "name = \"G\"\n\n[[mods]]\nid = \"g\"\ntype = \"generated\"\n";
+    assert!(validate_src(no_actions).unwrap_err().to_string().contains("no actions"));
+
+    let with_archive = "name = \"G\"\n\n[[mods]]\nid = \"g\"\ntype = \"generated\"\n\n[[mods.archives]]\npath = \"x.zip\"\n\n[[mods.actions]]\naction = \"write_file\"\npath = \"a\"\ncontent = \"b\"\n";
+    assert!(validate_src(with_archive).unwrap_err().to_string().contains("archives"));
+}

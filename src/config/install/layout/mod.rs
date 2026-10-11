@@ -27,6 +27,10 @@ use super::InstallSettings;
 /// The scratch reader is for the one layout that cannot decide from paths
 /// alone: FOMOD needs its `ModuleConfig.xml`, so that single entry comes out
 /// first and the rest still waits for the plan.
+/// The folder in a mod that the Root Builder MO2 plugin deploys to the game
+/// folder, beside `Oblivion.exe`. Lower case, like every folder mudcrab makes.
+pub(crate) const GAME_ROOT_FOLDER: &str = "root";
+
 pub(crate) fn with_planned_archive(
     source: &Path,
     target_root: &Path,
@@ -136,7 +140,8 @@ pub(crate) fn install_mod_archives(
 
     // An empty mod is the folder and nothing else. It still has to exist: MO2
     // only offers a mod as a destination for a tool's output once it is there.
-    if mod_entry.mod_type == Some(ModType::Empty) {
+    // A generated mod's actions fill it, after this.
+    if matches!(mod_entry.mod_type, Some(ModType::Empty | ModType::Generated)) {
         if !settings.dry_run {
             std::fs::create_dir_all(target_root).map_err(|err| {
                 anyhow::anyhow!("failed to create {}: {err}", target_root.display())
@@ -234,39 +239,37 @@ pub(crate) fn install_mod_archives(
             }
         }
 
-        // Game-root extraction pass: extract matching files to the game-root output folder.
-        // These files are also auto-excluded from the normal mod installation below.
+        // Game-root files go to the mod's own `root/`, where Root Builder
+        // picks them up. They are also excluded from the normal pass below.
         if !archive.game_root_files.is_empty() {
-            if let Some(game_root_dir) = &settings.game_root_dir {
-                let grf_filters = ArchiveFilters::new(&archive.game_root_files, &[])?;
-                if settings.dry_run {
-                    tracing::info!(
-                        mod_id = %mod_entry.id,
-                        source = %source.display(),
-                        game_root = %game_root_dir.display(),
-                        patterns = ?archive.game_root_files,
-                        "install dry-run game-root extract"
-                    );
-                } else {
-                    std::fs::create_dir_all(game_root_dir).map_err(|err| {
-                        anyhow::anyhow!(
-                            "failed to create game-root dir {}: {err}",
-                            game_root_dir.display()
-                        )
-                    })?;
-                    let extracted = extract_with_builtins(&source, game_root_dir, &grf_filters)?;
-                    tracing::info!(
-                        mod_id = %mod_entry.id,
-                        game_root = %game_root_dir.display(),
-                        extracted,
-                        "game-root files extracted"
+            let root_dir = target_root.join(GAME_ROOT_FOLDER);
+            let grf_filters = ArchiveFilters::new(&archive.game_root_files, &[])?;
+            if settings.dry_run {
+                tracing::info!(
+                    mod_id = %mod_entry.id,
+                    source = %source.display(),
+                    destination = %root_dir.display(),
+                    patterns = ?archive.game_root_files,
+                    "install dry-run game-root extract"
+                );
+            } else {
+                std::fs::create_dir_all(&root_dir).map_err(|err| {
+                    anyhow::anyhow!("failed to create {}: {err}", root_dir.display())
+                })?;
+                let extracted = extract_with_builtins(&source, &root_dir, &grf_filters)?;
+                if extracted == 0 {
+                    anyhow::bail!(
+                        "mod '{}': game_root_files {:?} matched nothing in {}",
+                        mod_entry.id,
+                        archive.game_root_files,
+                        source.display()
                     );
                 }
-            } else {
-                tracing::warn!(
+                tracing::info!(
                     mod_id = %mod_entry.id,
-                    patterns = ?archive.game_root_files,
-                    "archive has game_root_files but no game-root-dir is configured; game-root files will not be extracted"
+                    destination = %root_dir.display(),
+                    extracted,
+                    "game-root files staged for Root Builder"
                 );
             }
         }
