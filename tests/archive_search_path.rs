@@ -441,14 +441,15 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
     let all = Command::cargo_bin("mudcrab")
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
-        .args(["check", plan.to_str().unwrap()])
+        .args(["check", "-v", plan.to_str().unwrap()])
         .args(["--cache", cache.to_str().unwrap()])
         .args(["--archive-search-path", search_dir.to_str().unwrap()])
         .assert()
         .failure();
 
+    // -v mirrors the full log to stderr.
     let report = strip_ansi(
-        &String::from_utf8(all.get_output().stdout.clone()).expect("stdout should be utf-8"),
+        &String::from_utf8(all.get_output().stderr.clone()).expect("stderr should be utf-8"),
     );
     assert!(
         report.contains("mod_id=cached") && report.contains("availability=\"cached\""),

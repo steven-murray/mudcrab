@@ -88,9 +88,11 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     jobs.retain(|job| seen.insert((job.path, job.file_name)));
 
     use futures_util::stream::{self, StreamExt};
+    let bar = crate::ui::progress(jobs.len() as u64, "archives");
     let results: Vec<_> = stream::iter(jobs)
         .map(|job| {
             let client = &client;
+            let bar = bar.clone();
             async move {
                 let result = download_with_retry(
                     client,
@@ -100,6 +102,8 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
                     settings,
                 )
                 .await;
+                bar.inc(1);
+                bar.set_message(job.mod_id.to_string());
                 (job, result)
             }
         })
@@ -107,10 +111,15 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
         .collect()
         .await;
 
+    bar.finish_and_clear();
+    let mut fetched = 0usize;
     for (job, result) in results {
         match result {
             Ok(outcome) => {
                 downloaded += 1;
+                if matches!(outcome, DownloadOutcome::Downloaded(_)) {
+                    fetched += 1;
+                }
                 log_download_outcome(job.mod_id, job.path, &outcome);
             }
             Err(err) => errors.push(format!("mod '{}' {}: {err}", job.mod_id, job.label)),
@@ -120,6 +129,11 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     // should not be.
     errors.sort();
 
+    crate::ui::say(format!(
+        "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
+        settings.cache_dir.display(),
+        if errors.is_empty() { String::new() } else { format!("; {} failed", errors.len()) }
+    ));
     // Emitted before the bail, as in `check`: the run that fails is the run
     // whose summary is worth having, because it is the one naming dead links.
     tracing::info!(

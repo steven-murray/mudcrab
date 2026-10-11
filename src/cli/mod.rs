@@ -11,6 +11,14 @@ use std::path::PathBuf;
 pub struct Cli {
     #[command(subcommand)]
     pub command: Command,
+    /// Show the full log on the terminal instead of progress bars. The log
+    /// file is written either way.
+    #[arg(short, long, global = true)]
+    pub verbose: bool,
+    /// Write the full log here instead of the default
+    /// (~/.local/state/mudcrab/logs/<command>-<time>.log).
+    #[arg(long, global = true, value_name = "FILE")]
+    pub log_file: Option<PathBuf>,
 }
 
 #[derive(Debug, Subcommand)]

@@ -163,6 +163,14 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         );
     }
 
+    let bar = crate::ui::progress(
+        plan.mods
+            .iter()
+            .filter(|m| settings.filter.matches(&m.section, &m.id))
+            .count() as u64,
+        "installing",
+    );
+    let (mut changed, mut unchanged) = (0usize, 0usize);
     for mod_entry in &plan.mods {
         // Whatever happens to this mod below, this run now owns its record:
         // the copy the previous manifest holds must not also be carried
@@ -173,6 +181,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         // Not a mod folder at all: no manifest record, no profile entry.
         if mod_entry.mod_type == Some(crate::config::schema::ModType::Mo2Plugin) {
             if settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+                bar.inc(1);
                 mo2_plugin::install(mod_entry, settings, &active_plugins)?;
             }
             continue;
@@ -195,6 +204,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             );
             continue;
         }
+        bar.inc(1);
+        bar.set_message(mod_entry.id.clone());
 
         let mut mod_target = settings.mods_dir.join(safe_mod_dir_name(&mod_entry.id)?);
         let definition_hash = hash_personalized_mod(mod_entry)?;
@@ -222,6 +233,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         ) {
             let previous_extracted = previous.map(|entry| entry.extracted_files).unwrap_or(0);
             let mut actions_applied = previous.map(|entry| entry.actions_applied).unwrap_or(false);
+            unchanged += 1;
 
             tracing::info!(
                 mod_id = %mod_entry.id,
@@ -272,6 +284,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         }
 
         let status = if previous.is_some() { "updated" } else { "installed" };
+        changed += 1;
         tracing::info!(
             mod_id = %mod_entry.id,
             target = %mod_target.display(),
@@ -349,6 +362,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         }
     }
 
+    bar.finish_and_clear();
+
     // Merges run after every mod is on disk (they read other mods' plugins)
     // and before LOOT sorts, so LOOT sees the merged plugin rather than the
     // sources it just hid.
@@ -406,6 +421,19 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         }
     }
 
+    let merges = plan
+        .merges()
+        .filter(|(entry, _)| settings.filter.matches(&entry.section, &entry.id))
+        .count();
+    crate::ui::say(format!(
+        "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}{}",
+        if settings.dry_run { "Dry run: " } else { "" },
+        if merges > 0 { format!(", {merges} merge(s) checked") } else { String::new() },
+        match &settings.mo2_instance_dir {
+            Some(dir) if !settings.dry_run => format!("; MO2 profile '{}' in {} written", settings.profile_name, dir.display()),
+            _ => String::new(),
+        }
+    ));
     Ok(())
 }
 

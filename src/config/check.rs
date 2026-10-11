@@ -55,14 +55,19 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
     let mut archives_must_download = 0usize;
     let mut errors = Vec::new();
 
-    for mod_entry in &plan.mods {
-        if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
-            continue;
-        }
+    let in_scope = || {
+        plan.mods
+            .iter()
+            .filter(|m| settings.filter.matches(&m.section, &m.id))
+    };
+    let bar = crate::ui::progress(in_scope().map(|m| m.archives.len() as u64).sum(), "checking");
+    for mod_entry in in_scope() {
         mods_checked += 1;
+        bar.set_message(mod_entry.id.clone());
 
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             archives_checked += 1;
+            bar.inc(1);
 
             let availability = archive_availability(
                 mod_entry.id.as_str(),
@@ -105,8 +110,14 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
         }
     }
 
+    bar.finish_and_clear();
     // Emitted before the bail: the run that fails is exactly the run whose
     // summary the author needs, since it is the one that names a dead link.
+    crate::ui::say(format!(
+        "Checked {archives_checked} archive(s) in {mods_checked} mod(s): {archives_cached} in the \
+         downloads folder, {archives_local} in search paths, {archives_must_download} to download{}",
+        if errors.is_empty() { String::new() } else { format!("; {} problem(s)", errors.len()) }
+    ));
     tracing::info!(
         mods_checked,
         archives_checked,

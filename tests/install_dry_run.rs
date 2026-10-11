@@ -107,6 +107,7 @@ fn a_dry_run_reports_uncached_archives_instead_of_aborting() {
         .expect("binary")
         .args([
             "install",
+            "-v",
             plan.to_str().unwrap(),
             "--cache",
             dir.path().join("empty-cache").to_str().unwrap(),
@@ -118,5 +119,5 @@ fn a_dry_run_reports_uncached_archives_instead_of_aborting() {
         ])
         .assert()
         .success()
-        .stdout(predicates::str::contains("not in the downloads folder"));
+        .stderr(predicates::str::contains("not in the downloads folder"));
 }

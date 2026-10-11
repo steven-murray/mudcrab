@@ -26,6 +26,22 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         })?;
     }
 
+    let mut answers: Vec<String> = plan
+        .responses
+        .iter()
+        .map(|(key, value)| match value {
+            config::schema::InputValue::Bool(b) => format!("{key}={b}"),
+            config::schema::InputValue::Text(t) => format!("{key}={t}"),
+        })
+        .collect();
+    answers.sort();
+    let summary = format!(
+        "Plan: {} of {} mod(s) selected{} -> {}",
+        plan.selected_mods.len(),
+        plan.mod_order.len(),
+        if answers.is_empty() { String::new() } else { format!(" ({})", answers.join(", ")) },
+        args.output.display()
+    );
     let data = serde_json::to_string_pretty(&plan)
         .map_err(|err| anyhow::anyhow!("failed to serialize query output: {err}"))?;
     std::fs::write(&args.output, data)
@@ -37,6 +53,7 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         headless = args.headless,
         "query requested"
     );
+    crate::ui::say(summary);
 
     Ok(())
 }

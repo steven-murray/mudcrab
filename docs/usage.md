@@ -14,6 +14,18 @@ This guide describes the currently implemented command flow.
 `inspect` sits before all of this: it reads an archive and prints the modlist
 entry it wants, so step 1 can be written without extracting anything by hand.
 
+## Output and logs
+
+Each run writes its full log -- a line per mod and per archive -- to
+`~/.local/state/mudcrab/logs/<command>-<time>.log` (`%LOCALAPPDATA%\mudcrab\logs`
+on Windows; the newest 30 are kept). The terminal shows progress bars for the
+long phases, any warnings, and a short summary on stdout. A failed run prints
+the error and its causes, then `full log: <path>`.
+
+- `-v` / `--verbose` mirrors the full log to stderr instead of drawing bars.
+- `--log-file <FILE>` writes the log somewhere else.
+- `RUST_LOG` (e.g. `RUST_LOG=mudcrab=debug`) sets how much the log records.
+
 ## Commands
 
 ## add

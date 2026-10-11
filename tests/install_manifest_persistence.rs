@@ -113,7 +113,7 @@ file_name = "second.zip"
         Command::cargo_bin("mudcrab")
             .expect("binary should build")
             .env_remove("NEXUS_API_KEY")
-            .args(["install", plan.to_str().unwrap()])
+            .args(["install", "-v", plan.to_str().unwrap()])
             .args(["--cache", cache.to_str().unwrap()])
             .args(["--mods-dir", mods_dir.to_str().unwrap()])
             .args(["--game-dir", game_dir.to_str().unwrap()])
@@ -151,7 +151,7 @@ file_name = "second.zip"
 
     let assert = install(&["--archive-search-path", search_dir.to_str().unwrap()]).success();
     let report =
-        strip_ansi(&String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8 stdout"));
+        strip_ansi(&String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8 stderr"));
 
     assert!(
         report.contains("mod_id=first")

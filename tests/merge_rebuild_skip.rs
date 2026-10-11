@@ -73,6 +73,7 @@ impl Fixture {
         let assert = Command::cargo_bin("mudcrab")
             .expect("binary should build")
             .arg("install")
+            .arg("-v")
             .arg(&self.plan)
             .args(["--cache", self.cache.to_str().unwrap()])
             .args(["--mods-dir", self.mods_dir.to_str().unwrap()])
@@ -80,7 +81,8 @@ impl Fixture {
             .args(extra)
             .assert()
             .success();
-        strip_ansi(&String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8 stdout"))
+        // -v mirrors the full log to stderr.
+        strip_ansi(&String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8 stderr"))
     }
 
     fn merged_path(&self) -> PathBuf {
