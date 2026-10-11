@@ -464,6 +464,9 @@ fn an_mo2_plugin_goes_into_the_instances_plugins_folder_not_the_mod_list() {
     let instance = dir.path().join("instance");
     let game = dir.path().join("game");
     std::fs::create_dir_all(&game).unwrap();
+    // An MO2 install seeds the profile's INI from the game's. Without one
+    // here, install goes looking in this machine's Steam prefixes instead.
+    std::fs::write(game.join("Oblivion.ini"), "[Display]\n").unwrap();
 
     let run = |args: &[&std::ffi::OsStr]| {
         assert_cmd::Command::cargo_bin("mudcrab").unwrap().args(args).assert().success();
