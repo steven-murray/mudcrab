@@ -870,6 +870,10 @@ pub struct CompiledMod {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
+    /// Plugins this mod ships, from the source entry, so `query` can take a
+    /// left-out mod's plugins out of the load order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<String>,
     pub archives: Vec<CompiledArchive>,
     pub condition: Option<String>,
     #[serde(default)]

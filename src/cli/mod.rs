@@ -101,6 +101,14 @@ pub struct AddArgs {
     /// when not given.
     #[arg(long = "file-name", value_name = "ARCHIVE")]
     pub file_name: Option<String>,
+    /// The mod's `if`, for an optional mod, e.g. `swearing_rats` or
+    /// `mod:"Some Other Mod"`.
+    #[arg(long = "if", value_name = "CONDITION")]
+    pub condition: Option<String>,
+    /// A plugin the mod ships; repeat for several. Written into the entry
+    /// only: placing it in the load order is still the author's call.
+    #[arg(long = "plugin", value_name = "FILE")]
+    pub plugins: Vec<String>,
     /// When --section names a section the file does not have yet, start it
     /// immediately before this existing section instead of at end of file.
     /// Repeat for a nested path, as with --section.

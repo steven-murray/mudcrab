@@ -2,7 +2,7 @@ use crate::config::schema::{
     BainSubpackage, CompiledArchive, CompiledModlist, FomodSelection, InputSpec, InputType, InputValue, PersonalizedMod, PersonalizedPlan,
 };
 use crate::config::condition::Condition;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{self, Write};
 
 /// Answers given on the command line, as `key=value`, before any prompting.
@@ -86,6 +86,42 @@ pub fn build_plan(
         });
     }
 
+    // A left-out mod takes its plugins with it: the load order names only
+    // plugins something installs. A merge built from a left-out mod's plugin
+    // would fail later, at merge time, so it is refused here instead.
+    let mut left_out_plugins: HashSet<String> = HashSet::new();
+    for entry in compiled.mods.iter().filter(|entry| !included[entry.id.as_str()]) {
+        left_out_plugins.extend(entry.plugins.iter().map(|p| p.to_ascii_lowercase()));
+        if let Some(merge) = &entry.merge {
+            left_out_plugins.insert(merge.output.to_ascii_lowercase());
+        }
+    }
+    // ...unless an included mod ships the same plugin, as alternatives do.
+    for entry in compiled.mods.iter().filter(|entry| included[entry.id.as_str()]) {
+        for plugin in &entry.plugins {
+            left_out_plugins.remove(&plugin.to_ascii_lowercase());
+        }
+        if let Some(merge) = &entry.merge {
+            left_out_plugins.remove(&merge.output.to_ascii_lowercase());
+        }
+    }
+    for entry in compiled.mods.iter().filter(|entry| included[entry.id.as_str()]) {
+        let Some(merge) = &entry.merge else { continue };
+        if let Some(source) = merge.sources.iter().find(|source| !included.get(source.mod_id.as_str()).copied().unwrap_or(true)) {
+            anyhow::bail!(
+                "merge {} takes {} from mod {}, which is left out; give the merge `if = '{}'`, \
+                 or a second merge without it for when it is out",
+                entry.id,
+                source.plugin,
+                source.mod_id,
+                crate::config::condition::mod_term(&source.mod_id)
+            );
+        }
+    }
+    let keep = |plugin: &String| !left_out_plugins.contains(&plugin.to_ascii_lowercase());
+    let plugins = compiled.plugins.iter().filter(|p| keep(p)).cloned().collect();
+    let inactive_plugins = compiled.inactive_plugins.iter().filter(|p| keep(p)).cloned().collect();
+
     Ok(PersonalizedPlan {
         guide: compiled.guide.clone(),
         schema_version: compiled.schema_version,
@@ -97,8 +133,8 @@ pub fn build_plan(
         post_install_actions: compiled.post_install_actions.clone(),
         mo2_modlist_entries: compiled.mo2_modlist_entries.clone(),
         mods,
-        plugins: compiled.plugins.clone(),
-        inactive_plugins: compiled.inactive_plugins.clone(),
+        plugins,
+        inactive_plugins,
     })
 }
 

@@ -34,7 +34,7 @@ Add one `[[mods]]` block to a source modlist, in place.
 
 ```bash
 mudcrab add <modlist.toml> --from-oracle <ORACLE_MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
-mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--dry-run]
+mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--if <CONDITION>] [--dry-run]
 ```
 
 The edit is a line-based splice, not a parse-and-rewrite: every byte of the file
@@ -57,6 +57,11 @@ If the Oracle folder ships `.esp`/`.esm` files, they are listed on stderr. They
 are **not** added to the top-level `plugins` array and the block declares no
 `plugins` key -- putting a plugin at the wrong point in load order fails silently
 in game, so the position is yours to choose.
+
+`--plugin <FILE>` (repeatable) writes the block's `plugins` key, and `--if
+<CONDITION>` its `if`, for an optional mod. Neither touches the load order: the
+plugin still has to be placed in `plugins`, and the input declared, before the
+result validates -- which `add` checks, restoring the file if it does not.
 
 Safety:
 

@@ -279,3 +279,56 @@ fn conditions_that_leave_a_mod_with_no_archive_are_an_error() {
     let err = plan_for(&src, &[]).unwrap_err();
     assert!(err.contains("BAIN subpackage") && err.contains("manual:bain.7z"), "{err}");
 }
+
+const PLUGINS: &str = r#"
+name = "Plugins"
+plugins = ["Base.esp", "Rats.esp", "Merged.esp"]
+
+[inputs.rats]
+type = "bool"
+query = "Rats?"
+default = false
+
+[[mods]]
+id = "base"
+plugins = ["Base.esp"]
+
+[[mods.archives]]
+path = "manual:base.7z"
+
+[[mods]]
+id = "rats"
+if = "rats"
+plugins = ["Rats.esp"]
+
+[[mods.archives]]
+path = "manual:rats.7z"
+"#;
+
+#[test]
+fn a_left_out_mod_takes_its_plugins_out_of_the_load_order() {
+    let src = PLUGINS.replace(", \"Merged.esp\"", "");
+    let off = plan_for(&src, &[]).unwrap();
+    assert_eq!(off["plugins"], serde_json::json!(["Base.esp"]));
+    let on = plan_for(&src, &["--set", "rats=true"]).unwrap();
+    assert_eq!(on["plugins"], serde_json::json!(["Base.esp", "Rats.esp"]));
+}
+
+#[test]
+fn a_merge_using_a_left_out_mods_plugin_is_refused() {
+    // Merge sources leave the load order; the merged plugin takes their place.
+    let base = PLUGINS.replace("\"Base.esp\", \"Rats.esp\", ", "");
+    let src = format!(
+        "{base}\n[[mods]]\nid = \"merged\"\ntype = \"merge\"\n\n[mods.merge]\noutput = \"Merged.esp\"\n\
+         method = \"clobber\"\nsources = [{{ mod = \"base\", plugin = \"Base.esp\" }}, {{ mod = \"rats\", plugin = \"Rats.esp\" }}]\n"
+    );
+    let err = plan_for(&src, &[]).unwrap_err();
+    assert!(err.contains("merge merged takes Rats.esp from mod rats"), "{err}");
+
+    // Gated the same way, both go together, merged plugin included.
+    let gated = src.replace("id = \"merged\"", "id = \"merged\"\nif = \"mod:rats\"");
+    let off = plan_for(&gated, &[]).unwrap();
+    assert_eq!(off["plugins"], serde_json::json!([]));
+    let on = plan_for(&gated, &["--set", "rats=true"]).unwrap();
+    assert_eq!(on["plugins"], serde_json::json!(["Merged.esp"]));
+}

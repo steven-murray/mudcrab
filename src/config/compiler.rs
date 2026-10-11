@@ -17,6 +17,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                 mod_type: spec.mod_type,
                 merge: spec.merge.clone(),
                 dependencies: spec.dependencies.clone(),
+                plugins: spec.plugins.clone(),
                 archives: spec
                     .archives
                     .iter()

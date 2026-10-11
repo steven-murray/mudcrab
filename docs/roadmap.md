@@ -95,11 +95,12 @@ on Windows yet.
 
 ## Phase B — Optional mods, and inputs that earn their keep
 
-**Mostly done.** `[inputs]` take a declared `default` and `query` takes
-`--set`. Conditions sit on mods, actions, archives, FOMOD rows and BAIN
-subpackages, can ask about other mods, and `validate` rejects one naming an
-undeclared input or mod. MOFAM's first input, `decompress_dxt1_alpha`, gates
-ten `dds_decompress` actions. What is left:
+**Done**, apart from a MOFAM input that uses B2. `[inputs]` take a declared
+`default` and `query` takes `--set`. Conditions sit on mods, actions,
+archives, FOMOD rows and BAIN subpackages, can ask about other mods, and
+`validate` rejects one naming an undeclared input or mod. MOFAM has four
+inputs: `decompress_dxt1_alpha`, `dxvk_report_amd_vendor`, `enb` and
+`swearing_rats`.
 
 ### B1. ~~Conditions can ask about mods~~ — done
 
@@ -115,13 +116,23 @@ plan that leaves out a mod another included mod lists in `dependencies`.
 (`{ name = "...", if = "..." }`). `query` resolves them, so the plan --
 and `download`, `check` and `install` -- see only what applies.
 
-### B5. Prove it on MOFAM
+### B5. ~~Prove it on MOFAM~~ — done for mods; B2 waits for a real choice
 
-Swearing Rats is the natural first case: the guide itself says it may be
-omitted, and it is the one plugin our load order deliberately differs from the
-published `loadorder.txt` by. Turn that difference into an input with a default,
-and the list becomes self-describing where it is currently a footnote. A
-texture-resolution input across several sections would exercise B2.
+Swearing Rats is now the `swearing_rats` input (default on, as the guide has
+it): its plugin sits at its published position, so the load order now matches
+`loadorder.txt` entry for entry, and `query` takes it out of `plugins.txt` when
+the answer is no. With it off the plan is identical to the one before the
+input existed.
+
+Leaving a mod out needed two things beyond `query` choosing mods: a left-out
+mod's plugins leave the load order (unless an included mod ships the same
+name), and a merge that takes a plugin from a left-out mod is refused with the
+`if` that would fix it.
+
+B2 is exercised by tests but not yet by MOFAM. The guide fixes every
+resolution, and the obvious input -- texture resolution across sections --
+needs the alternative archives, which nobody has downloaded. It belongs with
+the first real choice that has them.
 
 ---
 

@@ -141,6 +141,8 @@ fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<N
     let mut new_mod = NewMod {
         id,
         section: args.sections.clone(),
+        condition: args.condition.clone(),
+        plugins: args.plugins.clone(),
         file_name,
         version: meta.version.clone(),
         non_nexus: args.manual,
@@ -211,6 +213,8 @@ fn from_nexus(spec: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
     Ok(NewMod {
         id,
         section: args.sections.clone(),
+        condition: args.condition.clone(),
+        plugins: args.plugins.clone(),
         path: Some(format!("nexus:oblivion/{mod_id}/{file_id}")),
         download_handler: Some("nexus".to_string()),
         file_name: args.file_name.clone(),

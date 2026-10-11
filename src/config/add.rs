@@ -22,6 +22,12 @@ pub struct NewMod {
     pub id: String,
     /// Section path, outermost first. Empty means emit no `section` key.
     pub section: Vec<String>,
+    /// The mod's `if`, when it is optional.
+    pub condition: Option<String>,
+    /// Plugins the mod ships. `add` never touches the load order: each still
+    /// has to be placed in `plugins` (or consumed by a merge), which `validate`
+    /// insists on.
+    pub plugins: Vec<String>,
     /// Archive descriptor, e.g. `nexus:oblivion/43752/1000029844`.
     pub path: Option<String>,
     pub download_handler: Option<String>,
@@ -113,6 +119,13 @@ pub fn render_block(new_mod: &NewMod) -> String {
             .collect::<Vec<_>>()
             .join(", ");
         lines.push(format!("section = [{joined}]"));
+    }
+    if let Some(condition) = &new_mod.condition {
+        lines.push(format!("if = {}", toml_string(condition)));
+    }
+    if !new_mod.plugins.is_empty() {
+        let joined = new_mod.plugins.iter().map(|p| toml_string(p)).collect::<Vec<_>>().join(", ");
+        lines.push(format!("plugins = [{joined}]"));
     }
 
     if new_mod.path.is_some() || new_mod.file_name.is_some() {
@@ -634,6 +647,25 @@ fn collect_plugins(current: &Path, root: &Path, found: &mut Vec<String>) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn renders_an_optional_mod_with_its_plugins() {
+        let block = super::render_block(&super::NewMod {
+            id: "Swearing Rats".to_string(),
+            section: vec!["31 - AUDIO".to_string()],
+            condition: Some("swearing_rats".to_string()),
+            plugins: vec!["Swearing Rats.esp".to_string()],
+            path: Some("nexus:oblivion/52661/1000033714".to_string()),
+            ..Default::default()
+        });
+        assert!(
+            block.starts_with(
+                "[[mods]]\nid = \"Swearing Rats\"\nsection = [\"31 - AUDIO\"]\n\
+                 if = \"swearing_rats\"\nplugins = [\"Swearing Rats.esp\"]\n\n[[mods.archives]]"
+            ),
+            "{block}"
+        );
+    }
+
     use super::*;
 
     fn before_section(name: &str) -> Placement {
@@ -793,6 +825,7 @@ mod tests {
             version: None,
             non_nexus: false,
             known_mod_id: None,
+            ..NewMod::default()
         };
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
@@ -818,6 +851,7 @@ mod tests {
             version: None,
             non_nexus: false,
             known_mod_id: None,
+            ..NewMod::default()
         };
 
         let err = plan_insertion_at(text, &mods, &new_mod, &before_section("9 - NOPE"))
@@ -840,6 +874,7 @@ mod tests {
             version: None,
             non_nexus: false,
             known_mod_id: None,
+            ..NewMod::default()
         };
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
