@@ -9,6 +9,30 @@ holding its prose). mudcrab reads it, downloads every archive it names,
 installs them into a Mod Organizer 2 instance exactly as the list describes,
 and sets up the load order. You end with MO2 ready to launch the game.
 
+## Why several steps, not one button
+
+If you are used to installing mods one at a time in MO2, five commands may
+seem like a lot. Each one finishes a different kind of work, and each leaves a
+file behind, so a problem shows up early and nothing is ever redone needlessly:
+
+- **`compile` checks the whole list before anything is downloaded.** A typo, a
+  reference to a mod that is not there, or a contradiction in the list's logic is reported
+  in seconds, not an hour into an install.
+- **`query` turns the list plus your answers into a plan**: one file saying
+  exactly what will be installed. Your choices live there, not in the list, so
+  changing your mind means re-running one quick step. The plan is also what to
+  attach if you report a problem.
+- **`download` is the slow, network-bound part**, kept apart so it can be
+  retried, done partly by hand, or done once for several installs. Everything
+  after it works offline.
+- **`check` confirms every archive is present and holds what the list
+  expects**, before a long install starts.
+- **`install` only acts.** It can be stopped and re-run, and only redoes what
+  changed.
+
+The commands run happily back to back, so a script or a shell history entry
+makes the whole thing one line after the first time.
+
 ## Before you start
 
 You need:
