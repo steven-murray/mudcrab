@@ -8,6 +8,8 @@
 > This whole install can be done automatically, from the same list, with [mudcrab](https://github.com/steven-murray/mudcrab).
 
 {% endif %}
+{% include "contents.md.j2" %}
+
 
 {% if doc.docs.summary %}
 *{{ doc.docs.summary | markup }}*
@@ -32,26 +34,10 @@
 {% endif %}
 {% set heading_base = 1 %}
 {% include "setup.md.j2" %}
-## Contents
-
-{% for entry in doc.entries if entry.kind == "section" %}
-{{ loop.index }}. [{{ entry.title }}]({{ entry.anchor }}.md){{ " — " ~ entry.docs.summary if entry.docs.summary }}
-{% endfor %}
-{% if options.load_order and doc.load_order %}
-
-[The load order](load-order.md)
-{% endif %}
-
 {# Mods outside any section have no page of their own. #}
 {% set heading_base = 1 %}
 {% for entry in doc.entries if entry.kind == "mod" %}
 {% include "entry.md.j2" %}
 
 {% endfor %}
-{% if doc.docs.footer %}
----
-
-{{ doc.docs.footer | markup }}
-
-{% endif %}
 {{ "{% endraw %}" }}

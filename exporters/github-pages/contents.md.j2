@@ -1,0 +1,13 @@
+{#- The site's table of contents: a page per top-level section, then the
+    guide's closing page and the load order. -#}
+## Contents
+
+{% for entry in doc.entries if entry.kind == "section" %}
+{{ loop.index }}. [{{ entry.title }}]({{ entry.anchor }}.md){{ " — " ~ entry.docs.summary if entry.docs.summary }}
+{% endfor %}
+{% if doc.docs.footer %}
+- [{{ doc.docs.footer_title or "After installing" }}](closing.md)
+{% endif %}
+{% if options.load_order and doc.load_order %}
+- [The load order](load-order.md)
+{% endif %}

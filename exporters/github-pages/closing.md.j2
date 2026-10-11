@@ -1,0 +1,16 @@
+{#- The guide's closing text (its `footer`), as a page of its own after the
+    last section. Nothing is written when the guide has none. -#}
+{% if doc.docs.footer %}
+{% set title = doc.docs.footer_title or "After installing" %}
+{% include "front-matter.j2" %}
+{{ "{% raw %}" }}
+# {{ title }}
+
+{{ doc.docs.footer | markup }}
+
+{% set sections = doc.entries | selectattr("kind", "equalto", "section") | list %}
+---
+
+{{ "← [" ~ (sections | last).title ~ "](" ~ (sections | last).anchor ~ ".md) · " if sections }}[Contents](index.md)
+{{ "{% endraw %}" }}
+{% endif %}

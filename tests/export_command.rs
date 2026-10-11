@@ -498,3 +498,27 @@ fn tools_and_game_settings_come_before_the_mods() {
         "a manual guide asks each question where it applies: {md}"
     );
 }
+
+#[test]
+fn a_guides_closing_text_is_a_page_of_its_own_when_there_is_one() {
+    let dir = tempdir().unwrap();
+    let site = dir.path().join("site");
+    let list = write_list(dir.path(), MODLIST, DOCS_FILE);
+    export_text(&list, &["--to", "github-pages", "-o", site.to_str().unwrap()]).unwrap();
+    assert!(!site.join("closing.md").exists(), "no footer, no page");
+
+    let with_footer = MODLIST.replace(
+        "[docs]\nsummary = \"A tiny list.\"",
+        "[docs]\nsummary = \"A tiny list.\"\nfooter = \"Thanks for playing.\"\nfooter_title = \"Epilogue\"",
+    );
+    assert_ne!(with_footer, MODLIST);
+    let site = dir.path().join("site2");
+    let list = write_list(dir.path(), &with_footer, DOCS_FILE);
+    export_text(&list, &["--to", "github-pages", "-o", site.to_str().unwrap()]).unwrap();
+    let closing = std::fs::read_to_string(site.join("closing.md")).unwrap();
+    assert!(closing.contains("# Epilogue\n\nThanks for playing."), "{closing}");
+    let index = std::fs::read_to_string(site.join("index.md")).unwrap();
+    assert!(index.contains("- [Epilogue](closing.md)") && !index.contains("Thanks for playing"), "{index}");
+    let contents = index.find("## Contents").unwrap();
+    assert!(contents < index.find("## Key").unwrap_or(usize::MAX), "contents come first: {index}");
+}

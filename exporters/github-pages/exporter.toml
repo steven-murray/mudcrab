@@ -21,6 +21,10 @@ output = "{{ section.anchor }}.md"
 for_each = "section"
 
 [[pages]]
+template = "closing.md.j2"
+output = "closing.md"
+
+[[pages]]
 template = "load-order.md.j2"
 output = "load-order.md"
 

@@ -11,7 +11,7 @@
 {% set next = sections[loop.index0 + 1] if loop.index0 + 1 < sections | length %}
 ---
 
-{{ "← [" ~ previous.title ~ "](" ~ previous.anchor ~ ".md) · " if previous }}[Contents](index.md){{ " · [" ~ next.title ~ "](" ~ next.anchor ~ ".md) →" if next }}
+{{ "← [" ~ previous.title ~ "](" ~ previous.anchor ~ ".md) · " if previous }}[Contents](index.md){{ " · [" ~ next.title ~ "](" ~ next.anchor ~ ".md) →" if next }}{{ " · [" ~ (doc.docs.footer_title or "After installing") ~ "](closing.md) →" if not next and doc.docs.footer }}
 {% endif %}
 {% endfor %}
 {{ "{% endraw %}" }}

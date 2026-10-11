@@ -356,6 +356,11 @@ impl Exporter {
                     )
                 })?;
                 for (path, text) in rendered {
+                    // A page with nothing to say (a closing page for a guide
+                    // with no closing text) is not written at all.
+                    if text.trim().is_empty() {
+                        continue;
+                    }
                     let path = path.ok_or_else(|| {
                         anyhow::anyhow!(
                             "exporter {}: a site page needs an `output` path",
