@@ -14,7 +14,8 @@
 
 use crate::archive::{self, ArchiveFilters, extract_with_builtins};
 use crate::config::install::is_plugin_file;
-use crate::config::install::layout::auto::is_expected_game_content_dir_name;
+use crate::config::install::layout::auto::{content_roots_below, detect_auto_root};
+use crate::config::install::layout::plan::{plan_data_folder, Listing};
 use crate::config::install::layout::fomod::{
     build_fomod_selection_map, child_elements, collect_fomod_entries, find_child_element,
     find_fomod_config,
@@ -146,7 +147,7 @@ pub fn inspect_archive(source: &Path, include_files: bool) -> anyhow::Result<Ins
         .to_string();
 
     let fomod_config = find_fomod_config(&paths);
-    let layout = guess_layout(&tree, fomod_config.as_deref());
+    let layout = guess_layout(&tree, &paths, fomod_config.as_deref());
 
     let fomod = match fomod_config {
         Some(config_path) => Some(inspect_fomod(source, &config_path)?),
@@ -232,31 +233,6 @@ impl ArchiveTree {
             .unwrap_or_default()
     }
 
-    fn all_dirs(&self) -> impl Iterator<Item = &String> {
-        self.dirs.keys().filter(|key| !key.is_empty())
-    }
-
-    fn has_child_dir_named(&self, parent: &str, name: &str) -> bool {
-        self.child_dirs(parent)
-            .iter()
-            .any(|child| eq_ci(child, name))
-    }
-
-    /// Does this directory look like a mod's data folder -- game content
-    /// directories or loose plugins sitting directly inside it?
-    fn is_content_root(&self, dir: &str) -> bool {
-        if self
-            .child_dirs(dir)
-            .iter()
-            .any(|name| is_expected_game_content_dir_name(name))
-        {
-            return true;
-        }
-        self.child_files(dir)
-            .iter()
-            .any(|name| is_plugin_file(Path::new(name)))
-    }
-
 }
 
 /// A BAIN subpackage directory: an ordering prefix, a separator, then a name.
@@ -279,7 +255,7 @@ fn is_numbered_subpackage(name: &str) -> bool {
     matches!(rest.next(), Some(' ' | '-' | '_')) && rest.next().is_some()
 }
 
-fn guess_layout(tree: &ArchiveTree, fomod_config: Option<&str>) -> LayoutGuess {
+fn guess_layout(tree: &ArchiveTree, paths: &[String], fomod_config: Option<&str>) -> LayoutGuess {
     if let Some(config_path) = fomod_config {
         return LayoutGuess::Fomod {
             config_path: config_path.to_string(),
@@ -287,7 +263,6 @@ fn guess_layout(tree: &ArchiveTree, fomod_config: Option<&str>) -> LayoutGuess {
     }
 
     let top_dirs = tree.child_dirs("");
-    let top_files = tree.child_files("");
 
     let (numbered, other): (Vec<String>, Vec<String>) = top_dirs
         .iter()
@@ -304,65 +279,47 @@ fn guess_layout(tree: &ArchiveTree, fomod_config: Option<&str>) -> LayoutGuess {
         };
     }
 
-    if tree.has_child_dir_named("", "Data") {
-        return LayoutGuess::Simple {
-            detail: "a top-level Data/ folder, which install finds on its own".to_string(),
-        };
-    }
-    if tree.is_content_root("") {
-        return LayoutGuess::Simple {
+    // From here the question is the one install answers, so install's code
+    // answers it: the same detection the archive will meet when it is installed
+    // with no layout declared. Two implementations agreed on every archive tried
+    // and were guaranteed to agree on none.
+    let listing = Listing::new(paths);
+    // No mod id: install's "folder named after the mod" shape is a lone
+    // wrapper folder, which the wrapper rule already unwraps by any name.
+    match detect_auto_root(&listing, "\u{0}", "this archive") {
+        Ok(root) if root.is_empty() => LayoutGuess::Simple {
             detail: "the archive root is already the data folder".to_string(),
-        };
-    }
-
-    // A single wrapper directory is unwrapped automatically, but only when it
-    // is the *only* thing at the top level -- that is the condition the auto
-    // layout applies, and guessing looser here would print a snippet that then
-    // fails at install time.
-    if top_files.is_empty()
-        && top_dirs.len() == 1
-        && (tree.is_content_root(&top_dirs[0]) || tree.has_child_dir_named(&top_dirs[0], "Data"))
-    {
-        return LayoutGuess::Simple {
-            detail: format!(
-                "a single wrapper folder '{}', which install unwraps on its own",
-                top_dirs[0]
-            ),
-        };
-    }
-
-    // Otherwise the data folder has to be named. Prefer the shallowest one;
-    // several at the same depth is genuinely ambiguous and is said so.
-    let mut candidates: Vec<String> = tree
-        .all_dirs()
-        .filter(|dir| tree.is_content_root(dir))
-        .cloned()
-        .collect();
-    candidates.sort_by_key(|dir| (dir.matches('/').count(), dir.len()));
-
-    let Some(shallowest_depth) = candidates.first().map(|dir| dir.matches('/').count()) else {
-        return LayoutGuess::Unknown {
-            detail: "no plugins and no recognisable game-content folders; run again with --files"
-                .to_string(),
-        };
-    };
-    let tied: Vec<String> = candidates
-        .into_iter()
-        .filter(|dir| dir.matches('/').count() == shallowest_depth)
-        .collect();
-
-    if tied.len() == 1 {
-        return LayoutGuess::CustomDataFolder {
-            data_folder: tied.into_iter().next().unwrap_or_default(),
-        };
-    }
-
-    LayoutGuess::Unknown {
-        detail: format!(
-            "several folders look like a data folder ({}); pick one for data_folder, or declare \
-             bain_subpackages if they are alternatives",
-            tied.join(", ")
-        ),
+        },
+        Ok(root) if eq_ci(&root, "Data") => LayoutGuess::Simple {
+            detail: "a top-level Data/ folder, which install finds on its own".to_string(),
+        },
+        Ok(root) => LayoutGuess::Simple {
+            detail: format!("'{root}', which install finds on its own"),
+        },
+        Err(install_says) => {
+            // Install will not take it as it stands. Suggest the shallowest
+            // folder holding content, if there is exactly one, and only after
+            // checking that install's own data_folder path accepts it.
+            let roots = content_roots_below(&listing, "");
+            let shallowest = roots.first().map(|dir| dir.matches('/').count());
+            let tied: Vec<&String> = roots
+                .iter()
+                .filter(|dir| Some(dir.matches('/').count()) == shallowest)
+                .collect();
+            match tied.as_slice() {
+                [only]
+                    if ArchiveFilters::new(&[], &[]).is_ok_and(|filters| {
+                        plan_data_folder(paths, Some(only), &filters, "this archive")
+                            .is_ok_and(|plan| !plan.is_empty())
+                    }) =>
+                {
+                    LayoutGuess::CustomDataFolder { data_folder: (*only).clone() }
+                }
+                _ => LayoutGuess::Unknown {
+                    detail: format!("install would refuse it: {install_says}"),
+                },
+            }
+        }
     }
 }
 
@@ -761,25 +718,23 @@ fn summarise(values: &[String], limit: usize) -> String {
 mod tests {
     use super::*;
 
-    fn tree(paths: &[&str]) -> ArchiveTree {
+    fn guess(paths: &[&str]) -> LayoutGuess {
         let owned: Vec<String> = paths.iter().map(|p| (*p).to_string()).collect();
-        ArchiveTree::from_paths(&owned)
+        guess_layout(&ArchiveTree::from_paths(&owned), &owned, None)
     }
 
     #[test]
     fn a_top_level_data_folder_needs_no_declaration() {
-        let tree = tree(&["Data/Meshes/foo.nif", "Data/Thing.esp"]);
-        assert!(matches!(
-            guess_layout(&tree, None),
+                assert!(matches!(
+            guess(&["Data/Meshes/foo.nif", "Data/Thing.esp"]),
             LayoutGuess::Simple { .. }
         ));
     }
 
     #[test]
     fn a_bare_content_root_needs_no_declaration() {
-        let tree = tree(&["Textures/foo.dds", "readme.txt"]);
-        assert!(matches!(
-            guess_layout(&tree, None),
+                assert!(matches!(
+            guess(&["Textures/foo.dds", "readme.txt"]),
             LayoutGuess::Simple { .. }
         ));
     }
@@ -787,8 +742,7 @@ mod tests {
     #[test]
     fn a_nested_data_folder_is_named() {
         // Two top-level entries, so the auto layout will not unwrap either.
-        let tree = tree(&["Docs/readme.txt", "Optional/Textures/foo.dds"]);
-        match guess_layout(&tree, None) {
+        match guess(&["Docs/readme.txt", "Optional/Textures/foo.dds"]) {
             LayoutGuess::CustomDataFolder { data_folder } => {
                 assert_eq!(data_folder, "Optional");
             }
@@ -798,12 +752,11 @@ mod tests {
 
     #[test]
     fn numbered_top_level_directories_are_bain_subpackages() {
-        let tree = tree(&[
+        match guess(&[
             "00 Core/Thing.esp",
             "01 Option/Textures/foo.dds",
             "02 Extra/readme.txt",
-        ]);
-        match guess_layout(&tree, None) {
+        ]) {
             LayoutGuess::Bain { subpackages, .. } => {
                 assert_eq!(subpackages, vec!["00 Core", "01 Option", "02 Extra"]);
             }
@@ -814,13 +767,28 @@ mod tests {
     #[test]
     fn a_single_numbered_folder_is_not_a_bain_package() {
         // One prefixed folder is a naming habit, not a package structure.
-        let tree = tree(&["00 Core/Meshes/foo.nif"]);
-        assert!(matches!(
-            guess_layout(&tree, None),
+                assert!(matches!(
+            guess(&["00 Core/Meshes/foo.nif"]),
             LayoutGuess::Simple { .. }
         ));
     }
 
+
+    #[test]
+    fn a_plugin_beside_a_data_folder_follows_the_plugin_as_install_does() {
+        // The old guess preferred Data/; install follows the plugin to the root.
+        match guess(&["Thing.esp", "Data/Textures/foo.dds"]) {
+            LayoutGuess::Simple { detail } => assert!(detail.contains("root"), "{detail}"),
+            other => panic!("expected the root, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_lone_folder_holding_the_plugin_is_unwrapped_whatever_it_is_called() {
+        // Install's "folder named after the mod" rule is a special case of
+        // this one, which is why inspect needs no mod id.
+        assert!(matches!(guess(&["Lost Spires/LostSpires.esp", "Lost Spires/Meshes/a.nif"]), LayoutGuess::Simple { .. }));
+    }
 
     #[test]
     fn toml_snippet_quotes_names_containing_quotes_and_backslashes() {

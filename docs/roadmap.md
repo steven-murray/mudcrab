@@ -32,11 +32,15 @@ hand" no longer hides the copy already on disk. Matching on content hash, or
 letting `file_name` be a set of alternates, would make it resolve by itself;
 neither is done.
 
-### A3. One implementation of "where is the content root"
+### A3. ~~One implementation of "where is the content root"~~ — done
 
-`install` uses the layout planner. `inspect` has a separate shallowest-root
-search. Porting `inspect` onto the planner is the fix — the planner exists so
-that one piece of code answers this.
+`inspect` now asks install's detection what it would do, instead of guessing
+with rules of its own. Install's own rule was tightened where `inspect`'s was
+better: a root with no content, with content in a folder below it, is now
+refused rather than installed one level too deep. Measured over MOFAM's 589
+archives with no declared layout, the change altered no decision. It did turn up
+one entry install would already have refused (Mythic Ghosts and Goblins, saved
+only by having been installed before that check existed), now declared.
 
 ### A4. ~~Tolerate out-of-range mod indices in merge sources~~ — already done
 

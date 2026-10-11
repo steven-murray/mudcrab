@@ -132,11 +132,12 @@ the new one, so a whole test ran against the wrong version.
 
 ## Layout detection
 
-**`inspect` and `install` decide an archive's content root by different code.**
-`install` uses the layout planner; `inspect` has its own shallowest-content-root
-search. They agree on every archive tried so far, and nothing guarantees they
-agree on the next one. If `inspect` suggests a layout that installs wrongly,
-this is why — set `data_folder` explicitly and report it.
+**With no `layout`, an archive installs only if its content root is
+unambiguous.** Install follows the plugins, unwraps a lone wrapper folder, takes
+a top-level `Data/`, or uses the root -- and refuses when game content sits in
+two places, or below a root that has none, rather than guess. `inspect` asks the
+same code, so its advice is what install will do; when install would refuse, it
+suggests a `data_folder` that install's own data-folder path accepts.
 
 ## Not implemented
 

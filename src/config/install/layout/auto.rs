@@ -74,6 +74,19 @@ pub(crate) fn detect_auto_root(
             } else if listing.has_dir("", "Data") {
                 AutoLayoutKind::Data
             } else {
+                // The root is the data folder only if the content is not
+                // somewhere deeper. `Docs/` beside `Optional/Textures/` used to
+                // install as `Data/Optional/Textures/...`, every file present
+                // and none where the game looks.
+                let deeper = content_roots_below(listing, "");
+                if !has_expected_content(listing, "") && !deeper.is_empty() {
+                    anyhow::bail!(
+                        "unsupported archive layout for {source_label}: no game content at the \
+                         archive root, but there is some in {}. Name the folder the game should \
+                         see with layout = \"custom-data-folder\" and data_folder = \"<folder>\".",
+                        deeper.join(", ")
+                    );
+                }
                 AutoLayoutKind::Root
             }
         }
@@ -123,7 +136,29 @@ fn find_child_name(listing: &Listing<'_>, prefix: &str, name: &str) -> String {
         .unwrap_or_else(|| name.to_string())
 }
 
-fn has_expected_content(listing: &Listing<'_>, prefix: &str) -> bool {
+/// Every folder below `prefix` that holds game content directly, shallowest
+/// first, ignoring anything already inside such a folder.
+pub(crate) fn content_roots_below(listing: &Listing<'_>, prefix: &str) -> Vec<String> {
+    let mut found = Vec::new();
+    let mut pending = vec![prefix.to_string()];
+    while let Some(dir) = pending.pop() {
+        for child in listing.children(&dir).dirs {
+            if is_expected_game_content_dir_name(&child) {
+                continue;
+            }
+            let path = join_under(&dir, &child);
+            if has_expected_content(listing, &path) {
+                found.push(path);
+            } else {
+                pending.push(path);
+            }
+        }
+    }
+    found.sort_by_key(|dir| (dir.matches('/').count(), dir.clone()));
+    found
+}
+
+pub(crate) fn has_expected_content(listing: &Listing<'_>, prefix: &str) -> bool {
     let children = listing.children(prefix);
     children
         .dirs
@@ -437,12 +472,14 @@ mod tests {
     fn two_top_level_folders_are_not_unwrapped_even_if_one_holds_data() {
         // Ambiguous: which one is the mod? Better to fail the guess and let the
         // entry say, than to silently pick one.
-        let root = resolve(
+        // It used to fall back to the root, installing `Option A/Data/...`
+        // one level too deep, which is the silent pick this test warns about.
+        let err = resolve(
             &["Option A/Data/meshes/x.nif", "Option B/readme.txt"],
             "Some Mod",
         )
-        .expect("resolve");
-        assert_eq!(root, ".", "no unwrap when there is more than one candidate");
+        .expect_err("ambiguous content root must be refused");
+        assert!(err.to_string().contains("Option A/Data"), "{err}");
     }
 }
 
@@ -478,9 +515,11 @@ mod wrapper_tests {
     #[test]
     fn the_descent_stops_where_the_shape_stops() {
         // A file beside the wrapper means this level carries content too.
-        let root = resolve(&["Wrapper/readme.txt", "Wrapper/Inner/meshes/x.nif"], "Mod")
-            .expect("resolve");
-        assert_eq!(root, "", "a loose file beside the folder ends the descent");
+        // ...and the root is then no data folder either: install refuses and
+        // names the folder, rather than putting meshes at Data/Wrapper/Inner.
+        let err = resolve(&["Wrapper/readme.txt", "Wrapper/Inner/meshes/x.nif"], "Mod")
+            .expect_err("content below a root with none must be named");
+        assert!(err.to_string().contains("Wrapper/Inner"), "{err}");
 
         // A lone content folder is content, at any depth. Unwrapping it would
         // install the *contents* of textures at the mod root.
@@ -561,5 +600,50 @@ mod rival_content_at_depth_tests {
         )
         .expect("one unambiguous wrapper");
         assert_eq!(root, "SomeMod [updated]");
+    }
+}
+
+/// Not a test: a measurement. Prints what auto layout decides for every
+/// archive in a plan that declares no layout, so a change to the rules can be
+/// diffed against the real modlist before it ships.
+///
+/// `MUDCRAB_AUDIT_PLAN=plan.json MUDCRAB_AUDIT_DOWNLOADS=<dir> cargo test --release
+///  --lib layout_audit -- --ignored --nocapture`
+#[cfg(test)]
+mod layout_audit {
+    use super::*;
+    use crate::config::archive_store::{find, ArchiveRef};
+    use crate::config::schema::PersonalizedPlan;
+
+    #[test]
+    #[ignore]
+    fn layout_audit() {
+        let (Ok(plan), Ok(downloads)) = (
+            std::env::var("MUDCRAB_AUDIT_PLAN"),
+            std::env::var("MUDCRAB_AUDIT_DOWNLOADS"),
+        ) else {
+            return;
+        };
+        let plan: PersonalizedPlan =
+            serde_json::from_str(&std::fs::read_to_string(plan).unwrap()).unwrap();
+        let downloads = std::path::PathBuf::from(downloads);
+        for entry in &plan.mods {
+            for (index, archive) in entry.archives.iter().enumerate() {
+                if archive.layout.is_some() || !archive.build.is_empty() || archive.data_folder.is_some() {
+                    continue;
+                }
+                let Some(path) = archive.path.as_deref() else { continue };
+                let Some(file) = find(&downloads, &[], &ArchiveRef::new(path, archive.file_name.as_deref())) else {
+                    println!("AUDIT\t{}\t{index}\tMISSING", entry.id);
+                    continue;
+                };
+                let paths = crate::archive::list_archive_paths(&file).unwrap_or_default();
+                let result = match detect_auto_root(&Listing::new(&paths), &entry.id, "archive") {
+                    Ok(root) => format!("root={root:?}"),
+                    Err(err) => format!("ERROR {}", err.to_string().replace('\n', " ")),
+                };
+                println!("AUDIT\t{}\t{index}\t{result}", entry.id);
+            }
+        }
     }
 }
