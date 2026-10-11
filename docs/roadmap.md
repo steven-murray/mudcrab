@@ -177,10 +177,12 @@ wiki page that drift apart.
    kept beside the row before), every Part on its section, banners included.
    The guide's own install paragraphs are dropped where mudcrab's instructions
    say the same thing.
-5. **Left:** read the export against the published guide, Part by Part
-   (reviewed up to Part 7). Each pass so far has found something --
-   in `describe.rs`'s wording, or a real bug in the list (a missing INI edit,
-   fonts installed into the wrong mod).
+5. ~~Read the export against the published guide, Part by Part~~ -- done
+   (2026-10-11), every Part through the epilogue. The passes found wording to
+   fix in `describe.rs` and real bugs in the list (a missing INI edit, fonts
+   installed into the wrong mod), all fixed.
+
+Phase C is **done**.
 
 How an export of MOFAM differs from the guide, on purpose:
 
