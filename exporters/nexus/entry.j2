@@ -1,6 +1,8 @@
 {#- One entry of a section: another section, or a mod. `number` counts mods. -#}
 {% if entry.kind == "section" %}
 {% with section = entry %}{% include "section.j2" %}{% endwith %}
+{% elif entry.kind == "revisit" %}
+{% with revisit = entry %}{% include "revisit.j2" %}{% endwith %}
 {% else %}
 {% with mod = entry %}{% include "mod.j2" %}{% endwith %}
 {% endif %}

@@ -1,0 +1,9 @@
+{% import "macros.md.j2" as m %}
+{% import "symbols.j2" as sym %}
+{{ m.hashes((depth or 0) + heading_base + 1) }} {{ sym.symbols.revisit }} Back to {{ revisit.title }}
+
+*Installed earlier{{ " (" ~ revisit.section ~ ")" if revisit.section }}; these steps need the mods installed since.*
+
+{% for step in revisit.steps %}
+- {{ sym.symbols[step.kind] }} {{ step.text | markup }}{{ " *(" ~ sym.symbols.optional ~ " only if " ~ step.condition.text ~ ")*" if step.condition }}
+{% endfor %}

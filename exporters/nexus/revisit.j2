@@ -1,0 +1,10 @@
+{% import "symbols.j2" as sym %}
+{{ sym.symbols.revisit }} [b]Back to {{ revisit.title }}[/b]
+
+[i]Installed earlier{{ " (" ~ revisit.section ~ ")" if revisit.section }}; these steps need the mods installed since.[/i]
+
+[list]
+{% for step in revisit.steps %}
+[*]{{ sym.symbols[step.kind] }} {{ step.text | markup }}{{ " [i](" ~ sym.symbols.optional ~ " only if " ~ step.condition.text ~ ")[/i]" if step.condition }}
+{% endfor %}
+[/list]

@@ -253,7 +253,7 @@ fn report_plugins(mod_id: &str, mod_dir: &Path) {
 
 /// Write via a temp file next to the target, then rename, so an interrupted
 /// write cannot leave a half-written modlist behind.
-fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
+pub(crate) fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
     let mut temp = path.as_os_str().to_os_string();
     temp.push(format!(".mudcrab-add-{}.tmp", std::process::id()));
     let temp = PathBuf::from(temp);
@@ -267,7 +267,7 @@ fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
     })
 }
 
-fn reload_and_validate(path: &Path) -> anyhow::Result<()> {
+pub(crate) fn reload_and_validate(path: &Path) -> anyhow::Result<()> {
     let reloaded = config::loader::load_modlist(path)?;
     config::validator::validate(&reloaded).map(|_| ())
 }

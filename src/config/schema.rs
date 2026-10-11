@@ -390,6 +390,13 @@ pub struct FilePruneAction {
     /// carve-out cannot quietly outlive the reason for it.
     #[serde(default)]
     pub except: Vec<String>,
+    /// Delete everything in the mod *except* these files and folders -- the
+    /// guide's "keep only X and Y", said the way it says it rather than as the
+    /// list of everything else. Exclusive with the other fields. Each entry
+    /// must exist, so a folder that stops shipping is an error, not a mod
+    /// quietly reduced to nothing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keep: Vec<String>,
 }
 
 /// Write a file the modlist itself authors into the mod's staged folder.

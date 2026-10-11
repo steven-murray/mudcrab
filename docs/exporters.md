@@ -95,6 +95,10 @@ The document's outline:
 - A step: `action`, `kind`, `text`, `code` (literal text to go with it),
   `condition`, `raw`.
 - `doc.kinds`: every kind the guide uses, for a key.
+- An entry of kind `"revisit"`: steps of a mod installed earlier that need
+  mods installed since (a `conflicts_with` naming a later mod). It carries the
+  mod's `id`, `title`, `mod_anchor`, `section` and `steps`, and sits right
+  after the last mod those steps need.
 - `doc.tools`: Mod Organizer 2 plugins (`type = "mo2-plugin"`), to set up
   before any mod and not part of `entries`.
 - `doc.game_settings`: the list's own `[ini]` settings, as steps.

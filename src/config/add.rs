@@ -196,6 +196,18 @@ pub fn plan_insertion_at(
     new_mod: &NewMod,
     placement: &Placement,
 ) -> anyhow::Result<Insertion> {
+    splice_block(text, mods, &new_mod.section, &render_block(new_mod), placement)
+}
+
+/// Splice `block` (a whole `[[mods]]` entry, with any comments of its own)
+/// into `text` where a mod in `section` belongs, honouring `placement`.
+fn splice_block(
+    text: &str,
+    mods: &[ModEntry],
+    section: &[String],
+    block: &str,
+    placement: &Placement,
+) -> anyhow::Result<Insertion> {
     let kinds = classify_lines(text);
 
     let mod_headers: Vec<usize> = kinds
@@ -233,12 +245,12 @@ pub fn plan_insertion_at(
         None => None,
     };
 
-    let target = if new_mod.section.is_empty() {
+    let target = if section.is_empty() {
         None
     } else {
         mods.iter()
             .enumerate()
-            .rfind(|(_, entry)| section_eq(&entry.section, &new_mod.section))
+            .rfind(|(_, entry)| section_eq(&entry.section, section))
             .map(|(index, _)| index)
     };
 
@@ -279,7 +291,7 @@ pub fn plan_insertion_at(
                 .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
                 .map(|offset| start + 1 + offset)
                 .unwrap_or(kinds.len());
-            (boundary, Anchor::AfterSection(new_mod.section.clone()))
+            (boundary, Anchor::AfterSection(section.to_vec()))
         }
         (None, None, None) => (kinds.len(), Anchor::EndOfFile),
     };
@@ -293,7 +305,7 @@ pub fn plan_insertion_at(
         back_up_to_content(&kinds, boundary, boundary < kinds.len())
     };
 
-    let block = render_block(new_mod);
+    let block = block.trim_end_matches(['\n', '\r']).to_string();
     let carriage = if text.contains("\r\n") { "\r" } else { "" };
 
     let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
@@ -308,6 +320,82 @@ pub fn plan_insertion_at(
         block,
         new_text: lines.join("\n"),
     })
+}
+
+/// Move an existing mod's block -- its own comments, its archives and actions,
+/// any trailing note -- to `section`, placed as `add` would place a new one.
+/// The block's `section =` line is rewritten; nothing else in it changes.
+pub fn plan_move(
+    text: &str,
+    mods: &[ModEntry],
+    id: &str,
+    section: &[String],
+    placement: &Placement,
+) -> anyhow::Result<Insertion> {
+    let kinds = classify_lines(text);
+    let headers: Vec<usize> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| **kind == LineKind::ModHeader)
+        .map(|(index, _)| index)
+        .collect();
+    anyhow::ensure!(
+        headers.len() == mods.len(),
+        "line scan found {} `[[mods]]` headers but the parsed modlist has {} mods; \
+         refusing to edit a file this tool cannot read reliably",
+        headers.len(),
+        mods.len()
+    );
+    let index = mods
+        .iter()
+        .position(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the modlist has no mod with id '{id}'"))?;
+    if placement.before_mod.as_deref().is_some_and(|m| m.eq_ignore_ascii_case(id)) {
+        anyhow::bail!("cannot move '{id}' before itself");
+    }
+
+    // The block runs from its own comment run to wherever the next block's
+    // comment run starts.
+    let mut start = headers[index];
+    while start > 0 && kinds[start - 1] == LineKind::Comment {
+        start -= 1;
+    }
+    let next = kinds[headers[index] + 1..]
+        .iter()
+        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
+        .map(|offset| headers[index] + 1 + offset);
+    let end = match next {
+        Some(next) => back_up_to_content(&kinds, next, true),
+        None => back_up_to_content(&kinds, kinds.len(), false),
+    };
+
+    let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let mut block: Vec<String> = lines[start..end].to_vec();
+    let new_section = format!(
+        "section = [{}]",
+        section.iter().map(|level| toml_string(level)).collect::<Vec<_>>().join(", ")
+    );
+    let carriage = if text.contains("\r\n") { "\r" } else { "" };
+    match block.iter().position(|line| line.trim_start().starts_with("section =")) {
+        Some(at) => block[at] = format!("{new_section}{carriage}"),
+        None => {
+            let header = block.iter().position(|line| line.trim() == "[[mods]]").expect("block has its header");
+            block.insert(header + 2, format!("{new_section}{carriage}"));
+        }
+    }
+    // Take the block out, with the blank line that separated it from the one
+    // before, so the gap does not double up.
+    let cut_from = if start > 0 && kinds[start - 1] == LineKind::Blank { start - 1 } else { start };
+    lines.drain(cut_from..end);
+    let without = lines.join("\n");
+
+    let remaining: Vec<ModEntry> = mods.iter().filter(|entry| entry.id != id).cloned().collect();
+    let block = block
+        .iter()
+        .map(|line| line.trim_end_matches('\r'))
+        .collect::<Vec<_>>()
+        .join("\n");
+    splice_block(&without, &remaining, section, &block, placement)
 }
 
 /// Walk back from a block boundary to the last line that belongs to the block.
@@ -959,5 +1047,33 @@ mod tests {
         let err = plan_insertion_at(text, &mods, &new_mod, &before_mod("nope"))
             .expect_err("should refuse rather than fall back to the section default");
         assert!(err.to_string().contains("no mod with that id"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod move_tests {
+    use super::*;
+
+    const TEXT: &str = "name = \"x\"\n\n[[mods]]\nid = \"a\"\nsection = [\"One\"]\n\n# b needs its patch\n[[mods]]\nid = \"b\"\nsection = [\"One\"]\n\n[[mods.archives]]\npath = \"manual:b.7z\"\n# oracle version 1\n\n[[mods]]\nid = \"c\"\nsection = [\"Two\"]\n";
+
+    fn mods() -> Vec<ModEntry> {
+        toml::from_str::<crate::config::schema::SourceModlist>(TEXT).unwrap().mods
+    }
+
+    #[test]
+    fn a_block_moves_with_its_comments_and_trailing_note() {
+        let plan = plan_move(TEXT, &mods(), "b", &["Two".to_string()], &Placement::default()).unwrap();
+        assert_eq!(
+            plan.new_text,
+            "name = \"x\"\n\n[[mods]]\nid = \"a\"\nsection = [\"One\"]\n\n[[mods]]\nid = \"c\"\nsection = [\"Two\"]\n\n# b needs its patch\n[[mods]]\nid = \"b\"\nsection = [\"Two\"]\n\n[[mods.archives]]\npath = \"manual:b.7z\"\n# oracle version 1\n"
+        );
+    }
+
+    #[test]
+    fn a_block_moves_before_a_named_mod() {
+        let placement = Placement { before_mod: Some("a".into()), before_section: None };
+        let plan = plan_move(TEXT, &mods(), "c", &["One".to_string()], &placement).unwrap();
+        assert!(plan.new_text.starts_with("name = \"x\"\n\n[[mods]]\nid = \"c\"\nsection = [\"One\"]\n\n[[mods]]\nid = \"a\""), "{}", plan.new_text);
+        assert!(plan_move(TEXT, &mods(), "c", &[], &Placement { before_mod: Some("c".into()), before_section: None }).is_err());
     }
 }

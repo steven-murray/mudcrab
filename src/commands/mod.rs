@@ -1,4 +1,5 @@
 pub mod add;
+pub mod move_mod;
 mod bsa;
 mod dds;
 mod downloads;
@@ -68,6 +69,7 @@ pub fn resolve_downloads_dir(
 pub async fn execute(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Add(args) => add::run(args).await,
+        Command::Move(args) => move_mod::run(args),
         Command::Compile(args) => compile::run(args).await,
         Command::Conflicts(args) => conflicts::run(args).await,
         Command::Query(args) => query::run(args).await,

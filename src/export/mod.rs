@@ -84,6 +84,23 @@ pub struct PlanDoc {
 pub enum Entry {
     Section(Box<Section>),
     Mod(Box<ModDoc>),
+    /// Steps for a mod installed earlier that cannot be done until now, because
+    /// they act on mods installed since -- "delete the files it shares with X"
+    /// when X comes later. Placed straight after the last mod they need.
+    Revisit(Box<RevisitDoc>),
+}
+
+#[derive(Debug, Serialize)]
+pub struct RevisitDoc {
+    /// The mod being returned to.
+    pub id: String,
+    pub title: String,
+    /// The mod's own entry, for a link back.
+    pub mod_anchor: String,
+    /// Where the mod was installed.
+    pub section: Option<String>,
+    pub anchor: String,
+    pub steps: Vec<StepDoc>,
 }
 
 #[derive(Debug, Serialize)]
@@ -237,7 +254,17 @@ pub fn build_document(
     let mut open: Vec<Section> = Vec::new();
     let mut mod_count = 0;
 
-    for entry in &modlist.mods {
+    // Install order, to tell which mods a step's `conflicts_with` names are
+    // still to come.
+    let position: HashMap<&str, usize> = modlist
+        .mods
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.id.as_str(), i))
+        .collect();
+    // Revisits waiting for the mod they come after.
+    let mut pending: HashMap<String, Vec<RevisitDoc>> = HashMap::new();
+    for (index, entry) in modlist.mods.iter().enumerate() {
         let planned_mod = match &planned {
             Some(planned) => match planned.get(entry.id.as_str()) {
                 Some(found) => Some(*found),
@@ -281,16 +308,52 @@ pub fn build_document(
             });
         }
 
-        let doc = mod_doc(modlist, entry, planned_mod, &mut anchors, archives)?;
+        let mut doc = mod_doc(modlist, entry, planned_mod, &mut anchors, archives)?;
         mod_count += 1;
-        match open.last_mut() {
-            Some(section) => section.entries.push(Entry::Mod(Box::new(doc))),
-            None => root.push(Entry::Mod(Box::new(doc))),
+        // The first step that needs a later mod, and everything after it
+        // (order matters: a pack after the prune it follows), wait for the last
+        // mod those steps need.
+        let needs_later = |step: &StepDoc| -> Option<usize> {
+            step_partners(&step.raw)
+                .iter()
+                .filter_map(|m| position.get(m.as_str()).copied())
+                .filter(|&at| at > index)
+                .max()
+        };
+        if let Some(split) = doc.steps.iter().position(|s| needs_later(s).is_some()) {
+            let deferred: Vec<StepDoc> = doc.steps.drain(split..).collect();
+            let last = deferred
+                .iter()
+                .filter_map(needs_later)
+                .max()
+                .expect("one step needs a later mod");
+            pending
+                .entry(modlist.mods[last].id.clone())
+                .or_default()
+                .push(RevisitDoc {
+                    id: doc.id.clone(),
+                    title: doc.title.clone(),
+                    mod_anchor: doc.anchor.clone(),
+                    section: open.last().map(|s| s.name.clone()),
+                    anchor: anchors.make(&format!("{} revisit", doc.id)),
+                    steps: deferred,
+                });
         }
+        let revisits = pending.remove(entry.id.as_str()).unwrap_or_default();
+        let container = match open.last_mut() {
+            Some(section) => &mut section.entries,
+            None => &mut root,
+        };
+        container.push(Entry::Mod(Box::new(doc)));
+        container.extend(revisits.into_iter().map(|r| Entry::Revisit(Box::new(r))));
     }
     while !open.is_empty() {
         close_section(&mut open, &mut root);
     }
+    // A revisit whose mod a plan left out still has steps to do: at the end.
+    let mut leftover: Vec<RevisitDoc> = pending.into_values().flatten().collect();
+    leftover.sort_by(|a, b| a.anchor.cmp(&b.anchor));
+    root.extend(leftover.into_iter().map(|r| Entry::Revisit(Box::new(r))));
 
     let game_settings: Vec<StepDoc> =
         crate::config::compiler::compile_top_level_actions(&modlist.ini)
@@ -347,9 +410,22 @@ fn collect_kinds(entries: &[Entry]) -> Vec<String> {
         match entry {
             Entry::Section(section) => out.extend(collect_kinds(&section.entries)),
             Entry::Mod(m) => out.extend(mod_kinds(m)),
+            Entry::Revisit(r) => {
+                out.push("revisit".to_string());
+                out.extend(r.steps.iter().map(|s| s.kind.clone()));
+            }
         }
     }
     out
+}
+
+/// The mods a step acts on besides its own.
+fn step_partners(action: &ModAction) -> &[String] {
+    match action {
+        ModAction::FilePrune(prune) => &prune.conflicts_with,
+        ModAction::FileHide(hide) => &hide.conflicts_with,
+        _ => &[],
+    }
 }
 
 fn mod_kinds(m: &ModDoc) -> Vec<String> {

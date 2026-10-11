@@ -79,6 +79,18 @@ mudcrab add mofam.toml \
   --mod "Blockhead" --section "OBSE PLUGINS" --dry-run
 ```
 
+## move
+
+Move a mod's block to another section, or before another mod, keeping its
+comments, archives and actions; only its `section` line changes.
+
+```bash
+mudcrab move <modlist.toml> --mod "<mod id>" [--section "<name>"]... [--before-mod "<mod id>"] [--dry-run]
+```
+
+As with `add`, the file is validated after the move and restored if it no
+longer validates.
+
 ## compile
 
 Validate and compile a source modlist.
@@ -386,6 +398,17 @@ action = "ini_comment"
 file = "QZ Easy Menus.ini"
 format = "set-to"
 key = "EasyMenu.iAltExitKey"
+```
+
+### file_prune: keep
+
+`keep` is the other way round: delete everything in the mod *except* the named
+files and folders -- a guide's "keep only X and Y". Each must exist.
+
+```toml
+[[mods.actions]]
+action = "file_prune"
+keep = ["Dagger_Data.esm", "meshes/dag/architecture", "textures/dag"]
 ```
 
 ### ini_tweak

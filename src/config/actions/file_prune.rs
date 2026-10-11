@@ -15,6 +15,20 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
         anyhow::bail!("{}: file_prune is only valid as a per-mod action", cx.owner);
     };
 
+    if !action.keep.is_empty() {
+        anyhow::ensure!(
+            action.paths.is_empty() && action.conflicts_with.is_empty() && action.except.is_empty(),
+            "{}: file_prune `keep` says what survives; it cannot be combined with paths, \
+             conflicts_with or except",
+            cx.owner
+        );
+        if cx.settings.dry_run {
+            tracing::info!(owner = cx.owner, keep = ?action.keep, "install dry-run file_prune keep");
+            return Ok(());
+        }
+        return keep_only(mod_target, &action.keep, cx.owner);
+    }
+
     // An empty pattern list would compile to a glob set that matches
     // everything, which would delete the entire staged mod.
     if action.paths.is_empty() && action.conflicts_with.is_empty() {
@@ -172,6 +186,66 @@ pub(super) fn apply(action: &FilePruneAction, cx: &ActionCx<'_>) -> anyhow::Resu
     Ok(())
 }
 
+/// Delete every file under `root` that is not, or is not inside, one of
+/// `keep` (compared case-insensitively), then the folders left empty.
+fn keep_only(root: &Path, keep: &[String], owner: &str) -> anyhow::Result<()> {
+    let keep: Vec<String> = keep.iter().map(|path| normalize_except(path)).collect();
+    let mut used = vec![false; keep.len()];
+    let mut deleted = 0usize;
+    let mut files = Vec::new();
+    collect_files(root, &mut files)?;
+    for file in files {
+        let relative = file
+            .strip_prefix(root)
+            .map_err(|err| anyhow::anyhow!("{err}"))?
+            .to_string_lossy()
+            .replace('\\', "/")
+            .to_ascii_lowercase();
+        // MO2's own bookkeeping is not mod content.
+        if relative == "meta.ini" {
+            continue;
+        }
+        let hit = keep
+            .iter()
+            .position(|k| relative == *k || relative.starts_with(&format!("{k}/")));
+        match hit {
+            Some(index) => used[index] = true,
+            None => {
+                std::fs::remove_file(&file)
+                    .map_err(|err| anyhow::anyhow!("failed to delete {}: {err}", file.display()))?;
+                deleted += 1;
+            }
+        }
+    }
+    let missing: Vec<&String> = keep
+        .iter()
+        .zip(&used)
+        .filter(|(_, used)| !**used)
+        .map(|(k, _)| k)
+        .collect();
+    anyhow::ensure!(
+        missing.is_empty(),
+        "{owner}: file_prune keeps {missing:?}, which the mod does not have"
+    );
+    remove_empty_dirs(root)?;
+    tracing::info!(owner, deleted, kept = ?keep, "file_prune kept only the named files and folders");
+    Ok(())
+}
+
+fn collect_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) -> anyhow::Result<()> {
+    for entry in std::fs::read_dir(dir)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", dir.display()))?
+    {
+        let path = entry?.path();
+        if path.is_dir() {
+            collect_files(&path, out)?;
+        } else {
+            out.push(path);
+        }
+    }
+    Ok(())
+}
+
 /// Spelling an `except` entry is compared in: `/`-separated and lowercased,
 /// matching the case-insensitive way patterns are matched against the tree.
 fn normalize_except(path: &str) -> String {
@@ -197,8 +271,11 @@ fn exceptions_the_patterns_select(
         .flat_map(|pattern| expand_directory_pattern(pattern))
         .collect();
     let selection = ArchiveFilters::new_for_staged_tree(&expanded, &[])?;
-    let excepted: std::collections::BTreeSet<String> =
-        action.except.iter().map(|path| normalize_except(path)).collect();
+    let excepted: std::collections::BTreeSet<String> = action
+        .except
+        .iter()
+        .map(|path| normalize_except(path))
+        .collect();
 
     Ok(
         crate::config::install::layout::bain::list_relative_paths(mod_target)?
@@ -269,9 +346,7 @@ fn reject_escaping_pattern(owner: &str, pattern: &str) -> anyhow::Result<()> {
         anyhow::bail!("{owner}: file_prune pattern '{pattern}' must be relative");
     }
     if normalized.split('/').any(|segment| segment == "..") {
-        anyhow::bail!(
-            "{owner}: file_prune pattern '{pattern}' must stay inside the mod folder"
-        );
+        anyhow::bail!("{owner}: file_prune pattern '{pattern}' must stay inside the mod folder");
     }
     Ok(())
 }
@@ -303,9 +378,8 @@ fn prune(
             if prune(&path, root, filters, deleted)? {
                 // The directory is empty now, so the loose folder a pack
                 // replaced does not linger.
-                std::fs::remove_dir(&path).map_err(|err| {
-                    anyhow::anyhow!("failed to remove {}: {err}", path.display())
-                })?;
+                std::fs::remove_dir(&path)
+                    .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", path.display()))?;
             } else {
                 remaining += 1;
             }
@@ -315,7 +389,10 @@ fn prune(
         let relative = path
             .strip_prefix(root)
             .map_err(|err| {
-                anyhow::anyhow!("failed to compute relative path for {}: {err}", path.display())
+                anyhow::anyhow!(
+                    "failed to compute relative path for {}: {err}",
+                    path.display()
+                )
             })?
             .to_string_lossy()
             .replace('\\', "/");
@@ -341,6 +418,7 @@ mod except_tests {
 
     fn action(paths: &[&str], except: &[&str]) -> FilePruneAction {
         FilePruneAction {
+            keep: Vec::new(),
             paths: paths.iter().map(ToString::to_string).collect(),
             conflicts_with: Vec::new(),
             under: None,
@@ -380,7 +458,10 @@ mod except_tests {
             subject.join("DispMiscPatch_Keep.esp").exists(),
             "the carve-out survives"
         );
-        assert!(subject.join("meshes/x.nif").exists(), "untouched by the pattern");
+        assert!(
+            subject.join("meshes/x.nif").exists(),
+            "untouched by the pattern"
+        );
     }
 
     /// The invariant `conflicts_with` already holds, extended to patterns: an
@@ -480,6 +561,7 @@ mod except_across_selectors_tests {
         };
 
         let action = FilePruneAction {
+            keep: Vec::new(),
             paths: vec!["*.esp".to_string()],
             conflicts_with: vec!["Partner".to_string()],
             under: None,
@@ -491,8 +573,14 @@ mod except_across_selectors_tests {
             subject.join("shared.esp").exists(),
             "the carve-out was deleted by the selector that did not claim it"
         );
-        assert!(!subject.join("other.esp").exists(), "reached by both, not excepted");
-        assert!(!subject.join("mine.esp").exists(), "reached by the pattern alone");
+        assert!(
+            !subject.join("other.esp").exists(),
+            "reached by both, not excepted"
+        );
+        assert!(
+            !subject.join("mine.esp").exists(),
+            "reached by the pattern alone"
+        );
     }
 
     /// And an exception that neither selector reaches is still an error, which
@@ -512,6 +600,7 @@ mod except_across_selectors_tests {
         };
 
         let action = FilePruneAction {
+            keep: Vec::new(),
             paths: vec!["*.nif".to_string()],
             conflicts_with: vec!["Partner".to_string()],
             under: None,
@@ -519,5 +608,42 @@ mod except_across_selectors_tests {
         };
         let err = apply(&action, &cx).expect_err("nothing selects nowhere.dds");
         assert!(err.to_string().contains("nowhere.dds"), "{err}");
+    }
+}
+
+#[cfg(test)]
+mod keep_tests {
+    #[test]
+    fn keeps_only_the_named_files_and_folders() {
+        let dir = tempfile::tempdir().unwrap();
+        let root = dir.path();
+        for path in [
+            "Dagger_Data.esm",
+            "Dagger_Data.esp",
+            "meshes/dag/architecture/a.nif",
+            "meshes/dag/sky/b.nif",
+            "meta.ini",
+        ] {
+            let path = root.join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, b"x").unwrap();
+        }
+        super::keep_only(
+            root,
+            &["Dagger_Data.esm".into(), "Meshes/dag/Architecture".into()],
+            "t",
+        )
+        .unwrap();
+        assert!(root.join("Dagger_Data.esm").is_file());
+        assert!(root.join("meshes/dag/architecture/a.nif").is_file());
+        assert!(!root.join("Dagger_Data.esp").exists());
+        assert!(
+            !root.join("meshes/dag/sky").exists(),
+            "emptied folders go too"
+        );
+        assert!(root.join("meta.ini").is_file());
+
+        let err = super::keep_only(root, &["textures".into()], "t").unwrap_err();
+        assert!(err.to_string().contains("does not have"), "{err}");
     }
 }

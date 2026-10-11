@@ -228,9 +228,15 @@ pub fn archive_instructions(
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
+            let last = code(levels.last().expect("split yields one"));
+            let drag = if what.starts_with("the archive's") {
+                "all of the archive's original files and folders".to_string()
+            } else {
+                what.clone()
+            };
             format!(
                 "Manual install: {what} belong{} in a new {} folder. In MO2's installer, right-click \
-                 and *Create directory* {steps}, then drag {them} in.",
+                 and *Create directory* {steps}, then drag {drag} into {last}.",
                 if them == "it" { "s" } else { "" },
                 code(&format!("{subdir}/"))
             )
@@ -269,7 +275,11 @@ pub fn archive_instructions(
 
 /// Files below `data_folder` (all files, without one), relative to it.
 fn content_paths(paths: &[String], data_folder: Option<&str>) -> Vec<String> {
-    let prefix = data_folder.map(|f| format!("{}/", f.trim_matches('/').to_ascii_lowercase()));
+    // Without a data folder, paths are given as MO2's installer shows them:
+    // it opens a top-level `Data` (or an archive's only folder) by itself, so
+    // a reader never sees that level.
+    let folder = data_folder.map(str::to_string).or_else(|| mo2_root(paths));
+    let prefix = folder.map(|f| format!("{}/", f.trim_matches('/').to_ascii_lowercase()));
     paths
         .iter()
         .filter_map(|path| match &prefix {
@@ -345,6 +355,24 @@ fn glob_words(patterns: &[String]) -> String {
         .join(", ")
 }
 
+/// The folder MO2's installer opens by itself, if any: a top-level `Data`, or
+/// the archive's only top-level entry when that is a folder.
+fn mo2_root(paths: &[String]) -> Option<String> {
+    let tops: std::collections::BTreeSet<&str> = paths
+        .iter()
+        .filter_map(|p| p.split('/').next())
+        .filter(|t| !t.is_empty())
+        .collect();
+    if let Some(data) = tops.iter().find(|t| t.eq_ignore_ascii_case("data")) {
+        return Some((*data).to_string());
+    }
+    let only = (tops.len() == 1).then(|| *tops.iter().next().expect("one"))?;
+    paths
+        .iter()
+        .all(|p| p.contains('/'))
+        .then(|| only.to_string())
+}
+
 /// Whether MO2's installer would take `folder` as the data folder by itself:
 /// it is the archive's only top-level entry, which MO2 steps into, or it is a
 /// top-level `Data`.
@@ -394,7 +422,7 @@ pub fn action_kind(action: &ModAction) -> &'static str {
         ModAction::PackBsa(_) => "bsa",
         ModAction::CreateDummyPlugin(_) => "plugin",
         ModAction::FilePrune(_) => "delete",
-        ModAction::FileHide(_) => "hide",
+        ModAction::FileHide(_) => "delete",
         ModAction::FileMove(_) => "move",
         ModAction::ExtractBsa(_) => "extract",
         ModAction::DeleteRecords(_) => "records",
@@ -455,6 +483,10 @@ pub fn action(action: &ModAction) -> Step {
             "Create an empty plugin, {}, so the game loads the archive of the same name.",
             code(&dummy.output)
         )),
+        ModAction::FilePrune(prune) if !prune.keep.is_empty() => plain(format!(
+            "Delete everything in the mod except {}.",
+            code_list(&prune.keep)
+        )),
         ModAction::FilePrune(prune) => plain(selection_step(
             "Delete",
             &prune.paths,
@@ -462,17 +494,20 @@ pub fn action(action: &ModAction) -> Step {
             prune.under.as_deref(),
             &prune.except,
         )),
-        ModAction::FileHide(hide) => plain(format!(
-            "{} (MO2: rename to `.mohidden`).",
-            selection_step(
-                "Hide",
+        // mudcrab hides (MO2's `.mohidden`) so the archive stays intact, but
+        // to the game the two are the same, and "delete" is one instruction
+        // where "hide or delete" is a choice the reader has to make.
+        ModAction::FileHide(hide) => Step {
+            kind: "delete",
+            text: selection_step(
+                "Delete",
                 &hide.paths,
                 &hide.conflicts_with,
                 hide.under.as_deref(),
-                &hide.except
-            )
-            .trim_end_matches('.')
-        )),
+                &hide.except,
+            ),
+            code: None,
+        },
         ModAction::FileMove(file_move) => plain(format!(
             "Move {} to {}.",
             code(&file_move.from),
@@ -536,7 +571,14 @@ fn selection_step(
     } else {
         format!(", except {}", code_list(except))
     };
-    format!("{verb} {}{except}.", what.join(" and "))
+    let how = if conflicts_with.is_empty() {
+        String::new()
+    } else {
+        " In MO2, open this mod's Conflicts tab: they are the files it lists against those mods, \
+         whichever side wins."
+            .to_string()
+    };
+    format!("{verb} {}{except}.{how}", what.join(" and "))
 }
 
 #[cfg(test)]
@@ -605,6 +647,20 @@ mod tests {
     }
 
     #[test]
+    fn paths_are_given_as_mo2_shows_them() {
+        let oco = archive(|a| a.exclude = vec!["**/Oblivion_Character_Overhaul.esp".into()]);
+        let listing: Vec<String> = vec![
+            "Data/Oblivion_Character_Overhaul.esp".into(),
+            "Data/meshes/x.nif".into(),
+            "readme.txt".into(),
+        ];
+        assert_eq!(
+            texts(&oco, Some(&listing)),
+            ["Leave out `Oblivion_Character_Overhaul.esp`."]
+        );
+    }
+
+    #[test]
     fn a_wildcard_stays_a_pattern_in_words() {
         let esps = archive(|a| a.exclude = vec!["**/*.esp".into(), "*.txt".into()]);
         let listing: Vec<String> = vec!["a.esp".into(), "b/c.esp".into(), "readme.txt".into()];
@@ -643,7 +699,7 @@ mod tests {
             texts(&dll, Some(&listing)),
             [
                 "Manual install: `FractionalMagicDamage.dll` belongs in a new `OBSE/Plugins/` folder. In MO2's \
-              installer, right-click and *Create directory* `OBSE`, then `Plugins` inside it, then drag it in."
+              installer, right-click and *Create directory* `OBSE`, then `Plugins` inside it, then drag `FractionalMagicDamage.dll` into `Plugins`."
             ]
         );
     }

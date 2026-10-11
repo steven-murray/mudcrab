@@ -2,7 +2,7 @@
     means. Override this file to change them; `doc.kinds` says which a guide
     uses, so the key lists only those. -#}
 {% set symbols = {
-  "page": "🌐", "download": "⬇️", "manual": "✋", "optional": "❓", "merge": "🔗", "combine": "➕",
+  "page": "🌐", "download": "⬇️", "manual": "✋", "optional": "❓", "merge": "🔗", "combine": "➕", "revisit": "↩️",
   "inner_archive": "🪆", "bain": "📋", "fomod": "🧙", "data_folder": "📁", "subdir": "🗂️",
   "include": "✅", "exclude": "🚫", "game_root": "🎮", "mo2_plugin": "🧰",
   "ini": "⚙️", "qac": "🧹", "bsa": "📦", "plugin": "🧩", "delete": "🗑️", "hide": "🙈",
@@ -11,7 +11,7 @@
 {#- The order the key lists them in: getting the files, installing them,
     then what to do afterwards. -#}
 {% set order = [
-  "page", "download", "manual", "combine", "optional", "merge",
+  "page", "download", "manual", "combine", "optional", "merge", "revisit",
   "mo2_plugin", "inner_archive", "bain", "fomod", "data_folder", "subdir", "include", "exclude", "game_root",
   "ini", "qac", "bsa", "plugin", "delete", "hide", "move", "extract", "records", "texture", "write",
 ] %}
@@ -20,6 +20,7 @@
   "download": "the file to download (its entry on the Nexus files tab)",
   "manual": "a file to download by hand, from wherever the author hosts it",
   "combine": "several downloads that make one mod: install them into the same mod, in order, later ones overwriting earlier",
+  "revisit": "back to a mod installed earlier, for steps that need mods installed since",
   "optional": "optional: depends on an answer to one of the choices above",
   "merge": "a plugin merged from other mods' plugins",
   "inner_archive": "the archive holds another archive; install that",

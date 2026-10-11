@@ -25,6 +25,8 @@ pub struct Cli {
 pub enum Command {
     /// Add a mod to a source modlist, preserving its comments and formatting.
     Add(AddArgs),
+    /// Move a mod to another section or position, comments and all.
+    Move(MoveArgs),
     /// Validate and compile a source modlist into a machine-friendly artifact.
     Compile(CompileArgs),
     /// Resolve interactive inputs into a personalized install plan.
@@ -75,6 +77,31 @@ pub enum Command {
 /// The modlist is edited in place by line-based splice, never by re-emitting
 /// parsed TOML: these files carry their reasoning in comments and a
 /// parse-and-rewrite would delete all of it.
+/// Move a mod's block within a source modlist: to another section, or before
+/// another mod. Its comments, archives and actions go with it; only its
+/// `section` line changes. Validated afterwards, and undone if that fails.
+#[derive(Debug, Args)]
+pub struct MoveArgs {
+    /// Path to the source modlist TOML to edit in place.
+    pub input: PathBuf,
+    /// The mod to move.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// The section to move it to; repeat for a nested path. Defaults to the
+    /// section it is in.
+    #[arg(long = "section", value_name = "NAME")]
+    pub sections: Vec<String>,
+    /// Put it directly before this mod rather than at the end of the section.
+    #[arg(long = "before-mod", value_name = "MOD_ID")]
+    pub before_mod: Option<String>,
+    /// When the section does not exist yet, start it before this one.
+    #[arg(long = "before-section", value_name = "NAME")]
+    pub before_sections: Vec<String>,
+    /// Print where it would go, and change nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct AddArgs {
     /// Path to the source modlist TOML to edit in place.
