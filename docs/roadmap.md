@@ -168,23 +168,31 @@ wiki page that drift apart.
 1. ~~Docs schema, `docs_file`, the document, `--to json`~~ -- done.
 2. ~~Template engine, exporter folders, options, `--eject`; the `nexus` (BBCode)
    exporter~~ -- done; see [exporters.md](exporters.md).
-3. ~~`markdown` and `github-pages` exporters; image copying~~ -- done. The
-   site has not been through a real Jekyll build yet.
-4. ~~MOFAM: import the guide's prose into a docs file~~ -- done: 637 of the
-   guide's 655 rows land on a mod (the rest are tools, empty mods and merges,
+3. ~~`markdown` and `github-pages` exporters; image copying~~ -- done, and the
+   site checked in a real Jekyll build: a landing page, the key and the setup
+   on pages of their own, a page per section, the closing text, the load
+   order, and every page in a sidebar (Just the Docs).
+4. ~~MOFAM: import the guide's prose into a docs file~~ -- done: 662 of the
+   guide's 673 rows land on a mod (the rest are tools, empty mods and merges,
    kept beside the row before), every Part on its section, banners included.
-   **Left:** compare the export against the published guide by eye.
+   The guide's own install paragraphs are dropped where mudcrab's instructions
+   say the same thing.
+5. **Left:** read the export against the published guide, Part by Part
+   (reviewed up to Part 7). Each pass so far has found something --
+   in `describe.rs`'s wording, or a real bug in the list (a missing INI edit,
+   fonts installed into the wrong mod).
 
-Known differences an export of MOFAM shows, not bugs in `export`:
+How an export of MOFAM differs from the guide, on purpose:
 
-- **Order is install order, not the guide's.** A few mods sit in MO2 under a
-  section other than their Part's (Part 24's armours among Part 9, two merges
-  after Part 26a), so those sections appear twice.
-- **Instructions appear twice**: the guide's own words, then mudcrab's reading
-  of the install data. `--opt steps=false` leaves out the second.
-- **The transcription lost some formatting** (stray emphasis around lists):
-  a fresh conversion of the page's HTML would do better than
-  the transcription.
+- **Order is install order.** Steps that need a later mod (Part 24's armours'
+  conflict rules, installed among Part 9) appear where that mod is in, as a
+  "↩️ Back to ..." entry.
+- **Merges sit with the mods they merge**, not all together in Part 36, so the
+  plugin count stays low as the install goes and the game can be play-tested
+  part by part. The guide's Part 36 how-to is part of the setup, with a note saying
+  so.
+- **The transcription lost some formatting** (stray emphasis around lists): a
+  fresh conversion of the page's HTML would do better.
 
 ## Phase D — User-facing documentation
 
