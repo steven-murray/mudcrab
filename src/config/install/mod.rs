@@ -35,6 +35,7 @@ pub mod index;
 pub mod layout;
 pub mod manifest;
 pub mod merge;
+mod mo2_plugin;
 pub mod stage;
 
 use layout::install_mod_archives;
@@ -168,6 +169,14 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         // forward, or a mod that is cleared and then fails to extract would
         // stay recorded as installed and never be retried.
         carried_forward.retain(|entry| entry.id != mod_entry.id);
+
+        // Not a mod folder at all: no manifest record, no profile entry.
+        if mod_entry.mod_type == Some(crate::config::schema::ModType::Mo2Plugin) {
+            if settings.filter.matches(&mod_entry.section, &mod_entry.id) {
+                mo2_plugin::install(mod_entry, settings, &active_plugins)?;
+            }
+            continue;
+        }
 
         if !settings.filter.matches(&mod_entry.section, &mod_entry.id) {
             // A filtered run narrows what is installed; it does not uninstall

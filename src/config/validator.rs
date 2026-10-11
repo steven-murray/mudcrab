@@ -245,6 +245,33 @@ fn validate_merges(
             );
         }
 
+        // `simple` copies the archive root as-is, so a `data_folder` beside it
+        // is silently ignored -- and the content lands one folder too deep.
+        for archive in &spec.archives {
+            if archive.layout == Some(crate::config::schema::ArchiveLayout::Simple)
+                && archive.data_folder.is_some()
+            {
+                anyhow::bail!(
+                    "mod {mod_id}: layout = \"simple\" ignores data_folder; use \
+                     layout = \"custom-data-folder\" to install from a subfolder"
+                );
+            }
+        }
+
+        // An MO2 plugin is what its archive holds, put in `plugins/`: nothing
+        // there loads plugins, and actions assume a mod folder.
+        if spec.mod_type == Some(ModType::Mo2Plugin)
+            && (spec.archives.is_empty()
+                || !spec.files.is_empty()
+                || !spec.plugins.is_empty()
+                || !spec.actions.is_empty())
+        {
+            anyhow::bail!(
+                "mod {mod_id} has type = \"mo2-plugin\": it needs archives, and takes no files, \
+                 plugins or actions"
+            );
+        }
+
         // A generated mod is exactly what its actions write.
         if spec.mod_type == Some(ModType::Generated) {
             if !spec.archives.is_empty() || !spec.files.is_empty() {

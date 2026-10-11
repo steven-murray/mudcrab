@@ -81,12 +81,15 @@ that genuinely has to land in the game install root — an ENB config, say — n
 
 ## Game-root files
 
-**They need the Root Builder MO2 plugin, which mudcrab does not install.**
-`game_root_files` stages files in the mod's own `root/` folder, and Root
-Builder copies them beside `Oblivion.exe` when MO2 launches the game and
-restores what was there when it exits. mudcrab never writes the game folder
-itself. Without Root Builder, `root/` just sits in the mod and the files never
-reach the game. Use copy mode (`copyfiles=**`); the author's link mode has a
+**They need the Root Builder MO2 plugin.** `game_root_files` stages files in
+the mod's own `root/` folder, and Root Builder copies them beside `Oblivion.exe`
+when MO2 launches the game and restores what was there when it exits. mudcrab
+never writes the game folder itself. A list installs Root Builder as a
+`type = "mo2-plugin"` entry, as MOFAM does; without it, `root/` just sits in the
+mod and the files never reach the game.
+
+**Root Builder cannot be downloaded through the Nexus API** without a premium
+account, like any Nexus file. Put the archive in an `--archive-search-path`. Use copy mode (`copyfiles=**`); the author's link mode has a
 known bug with MO2 2.5.2 before Root Builder 5.0.5.
 
 **Several MO2 instances share one game folder.** Root Builder restores the game

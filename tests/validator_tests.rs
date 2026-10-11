@@ -532,3 +532,18 @@ fn a_generated_mod_needs_actions_and_no_archives() {
     let with_archive = "name = \"G\"\n\n[[mods]]\nid = \"g\"\ntype = \"generated\"\n\n[[mods.archives]]\npath = \"x.zip\"\n\n[[mods.actions]]\naction = \"write_file\"\npath = \"a\"\ncontent = \"b\"\n";
     assert!(validate_src(with_archive).unwrap_err().to_string().contains("archives"));
 }
+
+#[test]
+fn an_mo2_plugin_needs_an_archive_and_takes_no_actions() {
+    let no_archive = "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n";
+    assert!(validate_src(no_archive).unwrap_err().to_string().contains("mo2-plugin"));
+
+    let ok = "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n\n[[mods.archives]]\npath = \"x.zip\"\nlayout = \"custom-data-folder\"\ndata_folder = \"rootbuilder\"\n";
+    validate_src(ok).expect("should validate");
+}
+
+#[test]
+fn a_simple_layout_with_a_data_folder_is_rejected() {
+    let src = "name = \"S\"\n\n[[mods]]\nid = \"m\"\n\n[[mods.archives]]\npath = \"x.zip\"\nlayout = \"simple\"\ndata_folder = \"sub\"\n";
+    assert!(validate_src(src).unwrap_err().to_string().contains("custom-data-folder"));
+}
