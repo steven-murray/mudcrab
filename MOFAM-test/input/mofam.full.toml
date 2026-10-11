@@ -1286,26 +1286,52 @@ path = "nexus:oblivion/35969/85640"
 layout = "bain"
 bain_subpackages = ["00 Core", "01 Elven Map"]
 
+# The guide says only "apply" these. They already exist in `Dynamic Map
+# base.ini` (as 3/2/4), which is where the Oracle sets them; written to
+# `Dynamic Map.ini` they were new keys appended after the map definitions.
 [[mods.actions]]
 action = "ini_set"
-file = "Ini/Dynamic Map.ini"
+file = "Ini/Dynamic Map base.ini"
 format = "set-to"
 key = "tnoDM.zoomIn"
 value = "264"
 
 [[mods.actions]]
 action = "ini_set"
-file = "Ini/Dynamic Map.ini"
+file = "Ini/Dynamic Map base.ini"
 format = "set-to"
 key = "tnoDM.zoomOut"
 value = "265"
 
 [[mods.actions]]
 action = "ini_set"
-file = "Ini/Dynamic Map.ini"
+file = "Ini/Dynamic Map base.ini"
 format = "set-to"
 key = "tnoDM.zoomReset"
 value = "258"
+
+# Guide row 9 (Shivering Isles Map HD): "add the 13 stated lines in the
+# description page to the bottom of Dynamic Map.ini". Here rather than on that
+# mod because the file is this mod's. Text as in the Oracle.
+[[mods.actions]]
+action = "ini_append_block"
+file = "Ini/Dynamic Map.ini"
+block = """
+
+set tnoDM.mod to sv_Construct "Oblivion.esm"
+set tnoDM.fid to sv_Construct "009F18"
+set tnoDM.img to sv_Construct "tes4semap.dds"
+; set tnoDM.x_offset to 0
+; set tnoDM.y_offset to 0
+; set tnoDM.zoom to 1
+set tnoDM.nw_x to -32
+set tnoDM.nw_y to 31
+set tnoDM.se_x to 31
+set tnoDM.se_y to -31
+set tnoDM.w to 4096
+set tnoDM.h to 4096
+SetStage tnoDM 10
+"""
 
 # DEVIATION (not in the guide): DXT1 punch-through alpha renders as opaque
 # black in menus on DXVK/NVIDIA under Proton; see `mudcrab dds audit`.
