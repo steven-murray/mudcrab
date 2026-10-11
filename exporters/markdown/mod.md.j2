@@ -9,6 +9,10 @@
 {{ mod.docs.summary | markup }}
 
 {% endif %}
+{% if mod.docs.body %}
+{{ mod.docs.body | markup }}
+
+{% endif %}
 {% set lines = [] %}
 {% for archive in mod.archives %}
 {% if options.files and (archive.file_name or archive.condition) %}
@@ -33,10 +37,6 @@ After installing:
   ```
 {% endif %}
 {% endfor %}
-
-{% endif %}
-{% if mod.docs.body %}
-{{ mod.docs.body | markup }}
 
 {% endif %}
 {{ m.images(mod.docs, "mod " ~ mod.id) }}

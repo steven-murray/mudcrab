@@ -30,6 +30,11 @@ pub struct Docs {
     /// Longer prose: instructions, caveats, the author's reasoning. Markdown.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub body: Option<String>,
+    /// Prose that belongs after the contents rather than before them: for the
+    /// guide, closing notes and credits; for a section, steps to take once its
+    /// mods are installed. Markdown.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub footer: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub images: Vec<DocImage>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

@@ -4,6 +4,9 @@
 {% if mod.docs.summary %}
 {{ mod.docs.summary | markup }}
 {% endif %}
+{% if mod.docs.body %}
+{{ mod.docs.body | markup }}
+{% endif %}
 {% if options.files or options.steps %}
 {% for archive in mod.archives %}
 {% if options.files and (archive.file_name or archive.condition) %}
@@ -29,8 +32,5 @@ File: {% if archive.nexus %}[url={{ archive.nexus.file_url }}]{{ archive.file_na
 {% endif %}
 {% endfor %}
 [/list]
-{% endif %}
-{% if mod.docs.body %}
-{{ mod.docs.body | markup }}
 {% endif %}
 {{ m.images(mod.docs, "mod " ~ mod.id) }}

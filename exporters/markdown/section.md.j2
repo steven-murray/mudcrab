@@ -18,3 +18,7 @@
 {% include "entry.md.j2" %}
 
 {% endfor %}
+{% if section.docs.footer %}
+{{ section.docs.footer | markup }}
+
+{% endif %}

@@ -95,7 +95,7 @@ The document's outline:
 - A step: `action`, `text`, `code` (literal text to go with it), `condition`,
   `raw`.
 
-`docs` anywhere has `title`, `summary`, `body`, `images`, `links`, and any other
+`docs` anywhere has `title`, `summary`, `body`, `footer`, `images`, `links`, and any other
 key the author added: a custom exporter is free to use fields only its own
 lists have.
 

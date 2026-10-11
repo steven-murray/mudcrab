@@ -30,6 +30,12 @@
 {% include "entry.md.j2" %}
 
 {% endfor %}
+{% if doc.docs.footer %}
+---
+
+{{ doc.docs.footer | markup }}
+
+{% endif %}
 {% if options.load_order and doc.load_order %}
 ## Load order
 

@@ -170,8 +170,21 @@ wiki page that drift apart.
    exporter~~ -- done; see [exporters.md](exporters.md).
 3. ~~`markdown` and `github-pages` exporters; image copying~~ -- done. The
    site has not been through a real Jekyll build yet.
-4. MOFAM: import the guide's prose into a docs file, export it, and compare
-   against the published guide by eye.
+4. ~~MOFAM: import the guide's prose into a docs file~~ -- done: 637 of the
+   guide's 655 rows land on a mod (the rest are tools, empty mods and merges,
+   kept beside the row before), every Part on its section, banners included.
+   **Left:** compare the export against the published guide by eye.
+
+Known differences an export of MOFAM shows, not bugs in `export`:
+
+- **Order is install order, not the guide's.** A few mods sit in MO2 under a
+  section other than their Part's (Part 24's armours among Part 9, two merges
+  after Part 26a), so those sections appear twice.
+- **Instructions appear twice**: the guide's own words, then mudcrab's reading
+  of the install data. `--opt steps=false` leaves out the second.
+- **The transcription lost some formatting** (stray emphasis around lists):
+  a fresh conversion of the page's HTML would do better than
+  `mofam-source.md`.
 
 ## Phase D — User-facing documentation
 

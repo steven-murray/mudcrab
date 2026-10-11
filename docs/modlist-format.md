@@ -270,6 +270,7 @@ docs.links = [{ label = "Swearing Mudcrabs (Skyrim)", url = "https://..." }]
 | `title` | What to show instead of the id or section name |
 | `summary` | One line |
 | `body` | Longer prose, Markdown |
+| `footer` | Prose after the contents: the guide's closing notes and credits, or a section's steps once its mods are in |
 | `images` | `{ path, url, caption }`: a local `path` (relative to the modlist) for exporters that write a site, a `url` for ones pasted somewhere that cannot hold files, such as Nexus; give both and each takes what it can |
 | `links` | `{ label, url }` |
 

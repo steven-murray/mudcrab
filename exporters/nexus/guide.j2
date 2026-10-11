@@ -30,6 +30,11 @@
 {% include "entry.j2" %}
 
 {% endfor %}
+{% if doc.docs.footer %}
+[line]
+{{ doc.docs.footer | markup }}
+
+{% endif %}
 {% if options.load_order and doc.load_order %}
 [line]
 [size=5][b]Load order[/b][/size]
