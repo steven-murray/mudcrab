@@ -301,7 +301,7 @@ fn enclosing_section(lines: &[String], index: usize) -> Option<&str> {
 /// final newline, and adding one made a file we changed one value in differ
 /// from the reference by two bytes. Harmless to the game and pure noise in a
 /// report, which is the sort of thing that trains people to skim the report.
-fn write_ini_lines(
+pub(super) fn write_ini_lines(
     path: &Path,
     lines: &[String],
     newline: &str,
@@ -480,7 +480,7 @@ fn dominant_spacing(lines: &[String], format: IniSetFormat) -> bool {
     spaced > tight
 }
 
-fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bool {
+pub(super) fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bool {
     let trimmed = line.trim_start();
     if trimmed.starts_with('#') || trimmed.starts_with(';') {
         return false;

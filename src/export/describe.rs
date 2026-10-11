@@ -112,6 +112,7 @@ pub struct Instruction {
 pub fn archive_instructions(
     archive: &CompiledArchive,
     listing: Option<&[String]>,
+    wizard: Option<&crate::config::bain_wizard::Wizard>,
 ) -> Vec<Instruction> {
     let mut out = Vec::new();
     let mut push = |kind: &'static str, text: String| out.push(Instruction { kind, text });
@@ -124,12 +125,26 @@ pub fn archive_instructions(
             ),
         );
     }
-    if !archive.bain_subpackages.is_empty() {
-        let names: Vec<String> = archive
-            .bain_subpackages
-            .iter()
-            .map(|s| s.name().to_string())
-            .collect();
+    let names: Vec<String> = archive
+        .bain_subpackages
+        .iter()
+        .map(|s| s.name().to_string())
+        .collect();
+    // The archive's own wizard says it the way a person clicks it.
+    let answers = wizard.and_then(|w| w.explain(&names));
+    if let Some(answers) = &answers {
+        for (question, chosen) in answers {
+            let chosen = chosen
+                .iter()
+                .map(|c| format!("“{c}”"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            push(
+                "bain",
+                format!("In the BAIN wizard, at “{question}”, choose {chosen}."),
+            );
+        }
+    } else if !archive.bain_subpackages.is_empty() {
         push(
             "bain",
             format!("In the BAIN installer, select {}.", code_list(&names)),
@@ -271,7 +286,16 @@ fn content_paths(paths: &[String], data_folder: Option<&str>) -> Vec<String> {
 /// The files the patterns pick out (`keep` = include semantics), if few
 /// enough to list; a reader is better off with a pattern than with forty
 /// names.
+///
+/// A pattern naming one file wherever it is (`**/x.dll`) is always better as
+/// its path. A wildcard (`*.esp`) says what it means more plainly than a list
+/// of the files it matches, unless it matches only one or two.
 fn matching(content: &[String], patterns: &[String], keep: bool) -> Option<Vec<String>> {
+    let wildcard = patterns.iter().any(|p| {
+        p.rsplit('/')
+            .next()
+            .is_some_and(|name| name.contains(['*', '?', '[']))
+    });
     let filters = if keep {
         crate::archive::ArchiveFilters::new(patterns, &[]).ok()?
     } else {
@@ -282,19 +306,40 @@ fn matching(content: &[String], patterns: &[String], keep: bool) -> Option<Vec<S
         .filter(|path| filters.should_extract(path) == keep)
         .cloned()
         .collect();
-    (!hits.is_empty() && hits.len() <= 8).then_some(hits)
+    let limit = if wildcard { 2 } else { 8 };
+    (!hits.is_empty() && hits.len() <= limit).then_some(hits)
 }
 
 /// Globs as words: `**/x.dll` is "`x.dll`, wherever it is in the archive",
-/// which is what it means and easier to act on than the pattern.
+/// and `*.esp` "every `.esp` file", which is what they mean and easier to act
+/// on than the pattern.
 fn glob_words(patterns: &[String]) -> String {
     patterns
         .iter()
-        .map(|pattern| match pattern.strip_prefix("**/") {
-            Some(rest) if !rest.contains(['*', '?', '[']) => {
-                format!("{} (wherever it is in the archive)", code(rest))
+        .map(|pattern| {
+            let (anywhere, name) = match pattern.strip_prefix("**/") {
+                Some(rest) => (true, rest),
+                None => (false, pattern.as_str()),
+            };
+            if name.contains('/') {
+                return code(pattern);
             }
-            _ => code(pattern),
+            let place = if anywhere {
+                ", wherever it is in the archive"
+            } else {
+                ""
+            };
+            match name.strip_prefix('*') {
+                Some(ext) if ext.starts_with('.') && !ext.contains(['*', '?', '[']) => {
+                    format!(
+                        "every {} file{}",
+                        code(ext),
+                        if anywhere { " in the archive" } else { "" }
+                    )
+                }
+                _ if !name.contains(['*', '?', '[']) => format!("{}{place}", code(name)),
+                _ => code(pattern),
+            }
         })
         .collect::<Vec<_>>()
         .join(", ")
@@ -341,7 +386,10 @@ pub struct Step {
 /// The kind of an action, as [`Instruction::kind`].
 pub fn action_kind(action: &ModAction) -> &'static str {
     match action {
-        ModAction::IniSet(_) | ModAction::IniTweak(_) | ModAction::IniAppendBlock(_) => "ini",
+        ModAction::IniSet(_)
+        | ModAction::IniTweak(_)
+        | ModAction::IniAppendBlock(_)
+        | ModAction::IniComment(_) => "ini",
         ModAction::Qac(_) => "qac",
         ModAction::PackBsa(_) => "bsa",
         ModAction::CreateDummyPlugin(_) => "plugin",
@@ -384,6 +432,11 @@ pub fn action(action: &ModAction) -> Step {
             code(&tweak.file),
             code(&tweak.key),
             value(&tweak.value.to_string())
+        )),
+        ModAction::IniComment(comment) => plain(format!(
+            "In {}, comment out the {} line (put `;` at its start).",
+            code(&comment.file),
+            code(&comment.key)
         )),
         ModAction::IniAppendBlock(block) => Step {
             kind,
@@ -519,7 +572,7 @@ mod tests {
     }
 
     fn texts(archive: &CompiledArchive, listing: Option<&[String]>) -> Vec<String> {
-        archive_instructions(archive, listing)
+        archive_instructions(archive, listing, None)
             .into_iter()
             .map(|i| i.text)
             .collect()
@@ -545,9 +598,19 @@ mod tests {
         let without = texts(&excluding, None);
         assert!(
             without.contains(
-                &"Leave out `AddActorValues_CS.dll` (wherever it is in the archive).".to_string()
+                &"Leave out `AddActorValues_CS.dll`, wherever it is in the archive.".to_string()
             ),
             "{without:?}"
+        );
+    }
+
+    #[test]
+    fn a_wildcard_stays_a_pattern_in_words() {
+        let esps = archive(|a| a.exclude = vec!["**/*.esp".into(), "*.txt".into()]);
+        let listing: Vec<String> = vec!["a.esp".into(), "b/c.esp".into(), "readme.txt".into()];
+        assert_eq!(
+            texts(&esps, Some(&listing)),
+            ["Leave out every `.esp` file in the archive, every `.txt` file."]
         );
     }
 

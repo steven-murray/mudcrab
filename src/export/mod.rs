@@ -473,12 +473,17 @@ fn mod_doc(
                     ),
                 }]
             } else {
-                let listing = lookup.and_then(|lookup| list_archive(lookup, &archive));
-                describe::archive_instructions(&archive, listing.as_deref())
+                let (listing, wizard) = match lookup {
+                    Some(lookup) => inspect_archive(lookup, &archive),
+                    None => (None, None),
+                };
+                describe::archive_instructions(&archive, listing.as_deref(), wizard.as_ref())
             },
             raw: archive,
         });
     }
+
+    let archive_docs = merge_repeated_downloads(archive_docs);
 
     let mut steps = Vec::new();
     for (action, condition) in actions {
@@ -543,18 +548,137 @@ fn mod_doc(
     })
 }
 
-/// The archive's entries, if it can be found and read; `None` otherwise,
-/// which only costs the reader some precision.
-fn list_archive(lookup: &Archives<'_>, archive: &CompiledArchive) -> Option<Vec<String>> {
-    if archive.inner_archive.is_some() {
-        return None;
+/// One download used several times -- different folders of the same archive,
+/// layered into one mod -- is one download to a reader. mudcrab installs it
+/// as separate archive entries because that states the layering exactly; a
+/// person does it in MO2's installer by moving folders before installing.
+fn merge_repeated_downloads(archives: Vec<ArchiveDoc>) -> Vec<ArchiveDoc> {
+    let mut out: Vec<ArchiveDoc> = Vec::new();
+    let mut parts: Vec<Vec<ArchiveDoc>> = Vec::new();
+    for archive in archives {
+        match out
+            .iter()
+            .position(|a| a.path.is_some() && a.path == archive.path)
+        {
+            Some(i) => parts[i].push(archive),
+            None => {
+                parts.push(Vec::new());
+                out.push(archive);
+            }
+        }
     }
-    let source = archive.path.as_deref()?;
+    for (first, rest) in out.iter_mut().zip(parts) {
+        if rest.is_empty() {
+            continue;
+        }
+        let folders: Vec<Option<String>> = std::iter::once(first.raw.data_folder.clone())
+            .chain(rest.iter().map(|a| a.raw.data_folder.clone()))
+            .collect();
+        let instruction = if let Some(folders) =
+            folders.iter().cloned().collect::<Option<Vec<String>>>()
+        {
+            let base = &folders[0];
+            let later = folders[1..]
+                .iter()
+                .map(|f| format!("`{f}`"))
+                .collect::<Vec<_>>()
+                .join(", then ");
+            describe::Instruction {
+                kind: "data_folder",
+                text: format!(
+                    "Manual install: this mod is made from {} folders of the archive. In MO2's installer, \
+                     drag the contents of {later} into `{base}` (replacing files), then right-click `{base}` \
+                     and choose *Set data directory*.",
+                    folders.len()
+                ),
+            }
+        } else {
+            describe::Instruction {
+                kind: "combine",
+                text: format!(
+                    "This mod uses the same download {} times, each install into the same mod:",
+                    rest.len() + 1
+                ),
+            }
+        };
+        let mut instructions = vec![instruction];
+        if folders.iter().any(Option::is_none) {
+            instructions.append(&mut first.instructions);
+            for part in rest {
+                instructions.extend(part.instructions);
+            }
+        } else {
+            // The folder choice is said above; keep what else each part does.
+            instructions.extend(
+                first
+                    .instructions
+                    .drain(..)
+                    .filter(|i| i.kind != "data_folder"),
+            );
+            for part in rest {
+                instructions.extend(
+                    part.instructions
+                        .into_iter()
+                        .filter(|i| i.kind != "data_folder"),
+                );
+            }
+        }
+        first.instructions = instructions;
+    }
+    out
+}
+
+/// What export can learn from an archive at hand: its entries, and its BAIN
+/// wizard if it has one and the entry uses BAIN. Either is `None` when the
+/// archive cannot be found or read, which only costs the reader precision.
+fn inspect_archive(
+    lookup: &Archives<'_>,
+    archive: &CompiledArchive,
+) -> (
+    Option<Vec<String>>,
+    Option<crate::config::bain_wizard::Wizard>,
+) {
+    if archive.inner_archive.is_some() {
+        return (None, None);
+    }
+    let Some(source) = archive.path.as_deref() else {
+        return (None, None);
+    };
     let reference =
         crate::config::archive_store::ArchiveRef::new(source, archive.file_name.as_deref());
-    let path =
-        crate::config::archive_store::find(lookup.downloads, lookup.search_paths, &reference)?;
-    crate::archive::list_archive_paths(&path).ok()
+    let Some(path) =
+        crate::config::archive_store::find(lookup.downloads, lookup.search_paths, &reference)
+    else {
+        return (None, None);
+    };
+    let Ok(listing) = crate::archive::list_archive_paths(&path) else {
+        return (None, None);
+    };
+    let wizard = if archive.bain_subpackages.is_empty() {
+        None
+    } else {
+        listing
+            .iter()
+            .find(|entry| entry.eq_ignore_ascii_case("wizard.txt"))
+            .and_then(|entry| {
+                let bytes = crate::archive::read_entry(&path, entry, &scratch_dir()).ok()?;
+                Some(crate::config::bain_wizard::parse(&String::from_utf8_lossy(
+                    &bytes,
+                )))
+            })
+    };
+    (Some(listing), wizard)
+}
+
+/// Somewhere on disk to pull a single file out of an archive: the user's
+/// cache, never `/tmp`, which is often RAM.
+fn scratch_dir() -> std::path::PathBuf {
+    std::env::var_os("XDG_CACHE_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".cache")))
+        .unwrap_or_else(std::env::temp_dir)
+        .join("mudcrab")
+        .join(format!("export-{}", std::process::id()))
 }
 
 fn archive_source(archive: &CompiledArchive) -> String {

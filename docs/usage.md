@@ -373,6 +373,21 @@ nobody typed; a file that ended without a final newline still ends without one.
 The file must already exist. Appending to a file the mod does not ship means
 the path is wrong, and a file created this way would never be read.
 
+### ini_comment
+
+Comment out a setting in an INI the mod ships, so the script falls back to its
+own default -- what a guide means by "comment out `set X` by adding a
+semi-colon". Every active line setting `key` gets a leading `;`; finding none
+is an error.
+
+```toml
+[[mods.actions]]
+action = "ini_comment"
+file = "QZ Easy Menus.ini"
+format = "set-to"
+key = "EasyMenu.iAltExitKey"
+```
+
 ### ini_tweak
 
 ```toml

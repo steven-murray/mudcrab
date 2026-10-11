@@ -164,6 +164,7 @@ pub enum ModAction {
     IniSet(IniSetAction),
     IniAppendBlock(IniAppendBlockAction),
     IniTweak(IniTweakAction),
+    IniComment(IniCommentAction),
     Qac(QacAction),
     PackBsa(PackBsaAction),
     CreateDummyPlugin(CreateDummyPluginAction),
@@ -191,6 +192,7 @@ impl ModAction {
             // The rest write only into the staged folder.
             ModAction::IniAppendBlock(_)
             | ModAction::IniTweak(_)
+            | ModAction::IniComment(_)
             | ModAction::Qac(_)
             | ModAction::PackBsa(_)
             | ModAction::CreateDummyPlugin(_)
@@ -210,6 +212,7 @@ impl ModAction {
             ModAction::IniSet(_) => "ini_set",
             ModAction::IniAppendBlock(_) => "ini_append_block",
             ModAction::IniTweak(_) => "ini_tweak",
+            ModAction::IniComment(_) => "ini_comment",
             ModAction::Qac(_) => "qac",
             ModAction::PackBsa(_) => "pack_bsa",
             ModAction::CreateDummyPlugin(_) => "create_dummy_plugin",
@@ -278,6 +281,19 @@ pub struct IniTweakAction {
     pub file: String,
     pub key: String,
     pub value: IniValue,
+    #[serde(default)]
+    pub format: IniSetFormat,
+}
+
+/// Comment out a setting's line in an INI the mod ships, so the script falls
+/// back to its own default. Every active line setting `key` is commented; none
+/// is an error.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct IniCommentAction {
+    /// Relative to the mod's staged data folder.
+    pub file: String,
+    pub key: String,
     #[serde(default)]
     pub format: IniSetFormat,
 }

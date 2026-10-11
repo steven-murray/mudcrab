@@ -18,6 +18,7 @@ pub mod file_hide;
 pub mod file_move;
 pub mod file_prune;
 pub mod ini_append_block;
+mod ini_comment;
 pub mod ini_set;
 pub mod ini_tweak;
 pub mod pack_bsa;
@@ -59,6 +60,7 @@ fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
         ModAction::IniSet(spec) => ini_set::apply(spec, cx),
         ModAction::IniAppendBlock(spec) => ini_append_block::apply(spec, cx),
         ModAction::IniTweak(spec) => ini_tweak::apply(spec, cx),
+        ModAction::IniComment(spec) => ini_comment::apply(spec, cx),
         ModAction::Qac(spec) => qac::apply(spec, cx),
         ModAction::PackBsa(spec) => pack_bsa::apply(spec, cx),
         ModAction::CreateDummyPlugin(spec) => create_dummy_plugin::apply(spec, cx),

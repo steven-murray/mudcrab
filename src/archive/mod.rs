@@ -359,6 +359,33 @@ pub fn extract_entries(
     )
 }
 
+/// Read one entry's bytes -- a BAIN `wizard.txt`, a readme -- by extracting
+/// just that entry into `scratch` and removing it again.
+///
+/// Unlike [`extract_entries`] this never falls back to extracting everything:
+/// reading one small file is not worth writing out a multi-gigabyte archive,
+/// so a format that cannot do it selectively is an error instead.
+pub fn read_entry(source: &Path, entry: &str, scratch: &Path) -> anyhow::Result<Vec<u8>> {
+    let wanted = BTreeSet::from([entry.to_string()]);
+    std::fs::create_dir_all(scratch)
+        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", scratch.display()))?;
+    let result = (|| {
+        let filters = ArchiveFilters::for_entries(&wanted);
+        let native = [&ZipExtractor as &dyn ArchiveExtractor, &TarGzExtractor, &TarExtractor];
+        if let Some(extractor) = native.into_iter().find(|e| e.can_handle(source)) {
+            extractor.extract(source, scratch, &filters)?;
+        } else if SystemArchiveExtractor.can_handle(source) {
+            system_extract_entries(source, scratch, &wanted)?;
+        } else {
+            anyhow::bail!("unsupported archive format for {}", source.display());
+        }
+        std::fs::read(scratch.join(entry))
+            .map_err(|err| anyhow::anyhow!("{entry} was not extracted from {}: {err}", source.display()))
+    })();
+    let _ = std::fs::remove_dir_all(scratch);
+    result
+}
+
 /// Ask 7z for a named subset, straight into `target_root`.
 ///
 /// 7z only. `bsdtar` reads its `-T` member list as fnmatch patterns, so
