@@ -196,3 +196,59 @@ pub fn parse(data: &[u8]) -> Result<Bsa<'_>, BsaError> {
         }),
     })
 }
+
+/// Every path in a BSA on disk, `folder\file`, reading only its directory --
+/// the header, folder and file records, and names -- never the file data. A
+/// sweep over a whole install lists gigabytes of archives this way in the time
+/// it takes to read a few kilobytes of each.
+pub fn list_paths(path: &std::path::Path) -> Result<Vec<String>, BsaError> {
+    use std::io::Read;
+
+    let mut file = std::fs::File::open(path).map_err(|source| BsaError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    let mut header = [0u8; HEADER_LEN];
+    file.read_exact(&mut header)
+        .map_err(|_| BsaError::NotAnArchive)?;
+    if &header[0..4] != b"BSA\0" {
+        return Err(BsaError::NotAnArchive);
+    }
+    let field = |i: usize| u32::from_le_bytes(header[i..i + 4].try_into().unwrap()) as usize;
+    let version = field(4) as u32;
+    if version != VERSION_OBLIVION {
+        return Err(BsaError::UnsupportedVersion { version });
+    }
+    let (folder_count, file_count) = (field(16), field(20));
+    let (folder_names, file_names) = (field(24), field(28));
+    // Folder records, then per folder a length byte, its name and its file
+    // records, then the file names.
+    let directory = folder_count * 16 + folder_count + folder_names + file_count * 16 + file_names;
+    let mut rest = vec![0u8; directory];
+    file.read_exact(&mut rest)
+        .map_err(|_| BsaError::Truncated { offset: HEADER_LEN })?;
+
+    let mut cursor = Cursor { data: &rest, at: 0 };
+    let mut counts = Vec::with_capacity(folder_count);
+    for _ in 0..folder_count {
+        let _hash = cursor.u64()?;
+        counts.push(cursor.u32()? as usize);
+        let _offset = cursor.u32()?;
+    }
+    let mut folders = Vec::with_capacity(folder_count);
+    for &count in &counts {
+        let length = cursor.u8()? as usize;
+        let raw = cursor.take(length)?;
+        folders.push(String::from_utf8_lossy(&raw[..length.saturating_sub(1)]).into_owned());
+        cursor.take(count * 16)?;
+    }
+    let mut out = Vec::with_capacity(file_count);
+    for (folder, count) in folders.iter().zip(counts) {
+        for _ in 0..count {
+            let name = cursor.zstring()?;
+            // As `File::path_in` spells it.
+            out.push(format!("{folder}\\{name}"));
+        }
+    }
+    Ok(out)
+}

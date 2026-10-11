@@ -84,9 +84,14 @@ fn from_installed_folder(dir: &Path) -> anyhow::Result<StagedPaths> {
             continue;
         }
         if is_bsa(&relative) {
-            let bytes = std::fs::read(dir.join(&relative))
-                .map_err(|err| anyhow::anyhow!("failed to read {relative}: {err}"))?;
-            out.extend(bsa_paths(&bytes, &relative)?);
+            // The directory only: a texture BSA can be gigabytes.
+            let paths = crate::bsa::reader::list_paths(&dir.join(&relative))
+                .map_err(|err| anyhow::anyhow!("failed to read BSA {relative}: {err}"))?;
+            out.extend(
+                paths
+                    .iter()
+                    .map(|path| path.replace('\\', "/").to_lowercase()),
+            );
             continue;
         }
         out.insert(relative.to_lowercase());
@@ -291,6 +296,15 @@ mod tests {
 
         assert_eq!(
             bsa_paths(&bytes, "test.bsa").expect("read"),
+            ["textures/architecture/wall01.dds"]
+        );
+
+        // An installed BSA is listed from its directory alone, the same way.
+        let installed = tempfile::tempdir().expect("tempdir");
+        std::fs::write(installed.path().join("Packed.bsa"), &bytes).expect("write");
+        let paths = from_installed_folder(installed.path()).expect("walk");
+        assert_eq!(
+            paths.visible.into_iter().collect::<Vec<_>>(),
             ["textures/architecture/wall01.dds"]
         );
     }

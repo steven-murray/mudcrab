@@ -256,8 +256,10 @@ The four mods above needed nothing more. Real lists usually do:
   `[[mods.actions]]` entries, run in order;
   see [modlist-format.md](modlist-format.md#actions).
 - **Conflicts.** When two mods provide the same file, MO2's order decides.
-  `mudcrab conflicts` lists exactly which files a mod shares with the others,
-  and `file_prune` with `conflicts_with` removes them from one side.
+  After an install, `mudcrab conflicts` with no `--mod` sweeps the list and
+  names every mod that shares files, with how many it wins and loses and to
+  whom; `--mod <id> --with <other>` then lists the files themselves, and
+  `file_prune` with `conflicts_with` removes them from one side.
 - **Merged plugins** keep the plugin count down: a `type = "merge"` entry
   names the source plugins, and `install` builds the merged one
   (`mudcrab new-merge` drafts the sources from a list of plugin names);

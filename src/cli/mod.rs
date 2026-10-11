@@ -445,13 +445,19 @@ pub struct ConflictsArgs {
     /// Installation directory holding the mod folders.
     #[arg(long)]
     pub mods_dir: PathBuf,
-    /// The mod whose files are in question.
+    /// The mod whose files are in question. Without it, the whole list is
+    /// swept: every installed mod that shares files with another, how many it
+    /// wins and loses, and to which mods.
     #[arg(long = "mod")]
-    pub mod_id: String,
+    pub mod_id: Option<String>,
     /// Mods to compare against. With none, every file the mod provides is
     /// listed instead.
-    #[arg(long = "with")]
+    #[arg(long = "with", requires = "mod_id")]
     pub with: Vec<String>,
+    /// In a sweep, report only these mods (they are still compared against
+    /// the whole list).
+    #[command(flatten)]
+    pub filter: FilterArgs,
     /// Restrict the comparison to one subtree, e.g. `textures/`.
     #[arg(long)]
     pub under: Option<String>,

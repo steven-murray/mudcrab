@@ -596,6 +596,36 @@ matters -- it is how a dead link is found before a later section depends on it.
 `check` only reports: it never links a search-path archive into the downloads
 folder.
 
+## conflicts
+
+Which installed mods provide the same files, and which wins. Reads the mod
+folders (and the contents of their BSAs, from each BSA's directory alone), in
+the plan's order: a later mod wins, as in MO2.
+
+```bash
+mudcrab conflicts --plan <plan.json> --mods-dir <mods> [--section <name>]... [--only <mod id>]...
+mudcrab conflicts --plan <plan.json> --mods-dir <mods> --mod <mod id> [--with <mod id>]... [--under <folder>]
+```
+
+Without `--mod`, the whole list is swept. Every mod sharing files with another
+is listed with how many it wins and loses, and to which mods (the five with
+most in common first):
+
+```text
+Unofficial Oblivion DLC Patches - UODP  [UNOFFICIAL PATCHES]
+  wins 1 file over: Unofficial Oblivion Patch - UOP (1)
+  loses 48 files to: T4UT - Menus Repolished (27), DLC Upscaled Textures (DLCUT) (12), ...
+```
+
+That is the overview to start from: it shows which pairs to look at.
+`--section` and `--only` narrow the report, not the comparison.
+
+With `--mod`, one mod's files are listed -- all of them, or with `--with` only
+those the named mods also provide, optionally `--under` one folder. That is
+exactly the set `file_prune` with `conflicts_with` acts on, so a row can be
+checked before it is written. A mod not yet installed is read from its
+archives, which needs the downloads folder.
+
 ## inspect
 
 Read an archive and print what its `[[mods.archives]]` block has to say. Takes
