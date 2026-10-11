@@ -211,9 +211,14 @@ Needed:
    `tools.toml` where the other commands look; a free Nexus account's 403 now
    says which page to download from by hand; and Enter takes a choice's
    default in `query`.
-2. **Authoring guide** — writing a modlist from scratch: `inspect` an archive,
-   `add` a mod, layouts, actions, sections, the compile/query/download/install
-   loop. Worked example, small but real.
+2. ~~**Authoring guide**~~ — done: [authoring.md](authoring.md), built from a
+   real run of four MOFAM mods. The run found the authoring loop's dead ends,
+   fixed in the commands: `add --archive` writes an entry from the archive
+   itself; `add --plugin` places the plugin with `--load-after`/`--load-last`
+   (before, a new plugin always failed validation); `inspect` and `add` read
+   the source from the download's `.meta`; `add --nexus` fills the file name
+   from Nexus; a plain `--mods-dir` install no longer demands a game folder,
+   and a relative one no longer sends extraction to the system temp dir.
 3. **Format reference** — [modlist-format.md](modlist-format.md) covers the
    shape; it needs to stay in step with the schema, and every field wants a
    one-line "when you need this".

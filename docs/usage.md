@@ -33,9 +33,20 @@ the error and its causes, then `full log: <path>`.
 Add one `[[mods]]` block to a source modlist, in place.
 
 ```bash
+mudcrab add <modlist.toml> --archive <archive> --id "<mod id>" --section "<name>" [--nexus <modid>/<fileid> | --manual] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
+mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --from-oracle <ORACLE_MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
-mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--if <CONDITION>] [--dry-run]
 ```
+
+[authoring.md](authoring.md) walks through using it on a new list.
+
+`--archive` writes the archive entry from the archive itself, as `inspect`
+reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
+`--manual` for `manual:<file name>`), the file name, the layout, each FOMOD
+group's default option and every BAIN subpackage. It notes what is left to
+decide -- FOMOD options, alternative BAIN packages, plugins in the archive not
+given with `--plugin`. `--nexus` alone writes the source, and, with
+`NEXUS_API_KEY` set, the file name from Nexus's list of the mod's files.
 
 The edit is a line-based splice, not a parse-and-rewrite: every byte of the file
 outside the inserted block -- comments, blank lines, tab indentation, key order --
@@ -59,9 +70,11 @@ are **not** added to the top-level `plugins` array and the block declares no
 in game, so the position is yours to choose.
 
 `--plugin <FILE>` (repeatable) writes the block's `plugins` key, and `--if
-<CONDITION>` its `if`, for an optional mod. Neither touches the load order: the
-plugin still has to be placed in `plugins`, and the input declared, before the
-result validates -- which `add` checks, restoring the file if it does not.
+<CONDITION>` its `if`, for an optional mod (the input has to be declared
+first). A plugin the top-level `plugins` load order does not list yet goes
+where `--load-after <PLUGIN>` or `--load-last` says; with neither, `add` stops
+before writing, rather than guess a position. A new list with no `plugins`
+array gets one.
 
 Safety:
 
@@ -569,6 +582,9 @@ folder.
 Read an archive and print what its `[[mods.archives]]` block has to say. Takes
 an archive path rather than a plan, so it can be run on a download before the
 modlist mentions it. Nothing is written and the archive is only ever read from.
+When MO2 (or mudcrab) downloaded the archive, the `.meta` beside it supplies
+the `path`; otherwise the snippet leaves the Nexus ids as placeholders.
+`add --archive` writes the same entry into a list directly.
 
 ```bash
 mudcrab inspect <ARCHIVE_PATH> [--files] [--format text|json]
