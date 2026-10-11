@@ -112,7 +112,9 @@ fn build_index(dir: &Path) -> DirIndex {
         if name.to_ascii_lowercase().ends_with(".meta") {
             metas.push(entry.path());
         } else if !is_sidecar(&name) {
-            index.by_name.insert(name.to_ascii_lowercase(), entry.path());
+            index
+                .by_name
+                .insert(name.to_ascii_lowercase(), entry.path());
         }
     }
     for meta_path in metas {
@@ -125,7 +127,10 @@ fn build_index(dir: &Path) -> DirIndex {
         };
         let meta = parse_meta(&text);
         if let Some(url) = meta.get("url").filter(|url| !url.is_empty()) {
-            index.by_url.entry(url.clone()).or_insert_with(|| archive.clone());
+            index
+                .by_url
+                .entry(url.clone())
+                .or_insert_with(|| archive.clone());
         }
         if let (Some(mod_id), Some(file_id)) = (meta.get("modid"), meta.get("fileid"))
             && mod_id != "0"
@@ -164,7 +169,9 @@ fn indexes() -> &'static Mutex<HashMap<PathBuf, DirIndex>> {
 
 fn lookup_in(dir: &Path, archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<PathBuf> {
     if let Some((game, mod_id, file_id)) = archive.nexus_ids()
-        && let Some(candidates) = index.by_nexus.get(&(mod_id.to_string(), file_id.to_string()))
+        && let Some(candidates) = index
+            .by_nexus
+            .get(&(mod_id.to_string(), file_id.to_string()))
     {
         let wanted_game = mo2_game_name(game);
         let mut matching: Vec<&PathBuf> = candidates
@@ -187,14 +194,14 @@ fn lookup_in(dir: &Path, archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<P
                 .iter()
                 .find(|path| crate::archive::list_archive_paths(path).is_ok())
         {
-                if matching.first() != Some(good) {
-                    tracing::warn!(
-                        chosen = %good.display(),
-                        skipped = ?matching.iter().take_while(|p| *p != good).map(|p| p.display().to_string()).collect::<Vec<_>>(),
-                        "several archives claim the same Nexus file; using the first that opens"
-                    );
-                }
-                return Some((*good).clone());
+            if matching.first() != Some(good) {
+                tracing::warn!(
+                    chosen = %good.display(),
+                    skipped = ?matching.iter().take_while(|p| *p != good).map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                    "several archives claim the same Nexus file; using the first that opens"
+                );
+            }
+            return Some((*good).clone());
         }
         if let Some(path) = matching.first() {
             return Some((*path).clone());
@@ -218,7 +225,9 @@ fn lookup_in(dir: &Path, archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<P
 
 /// Find `archive` in one folder, without writing anything.
 fn find_in(dir: &Path, archive: &ArchiveRef<'_>) -> Option<PathBuf> {
-    let mut indexes = indexes().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut indexes = indexes()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     if let Some(index) = indexes.get(dir)
         && let Some(found) = lookup_in(dir, archive, index)
     {
@@ -232,7 +241,9 @@ fn find_in(dir: &Path, archive: &ArchiveRef<'_>) -> Option<PathBuf> {
 
 /// Forget a folder's index after writing to it.
 fn invalidate(dir: &Path) {
-    let mut indexes = indexes().lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut indexes = indexes()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     indexes.remove(dir);
 }
 
@@ -246,7 +257,11 @@ pub enum Found {
 }
 
 /// Find an archive in the downloads folder, then the search paths. Read-only.
-pub fn locate(downloads: &Path, search_paths: &[PathBuf], archive: &ArchiveRef<'_>) -> Option<Found> {
+pub fn locate(
+    downloads: &Path,
+    search_paths: &[PathBuf],
+    archive: &ArchiveRef<'_>,
+) -> Option<Found> {
     if let Some(path) = find_in(downloads, archive) {
         return Some(Found::Downloads(path));
     }
@@ -259,7 +274,11 @@ pub fn locate(downloads: &Path, search_paths: &[PathBuf], archive: &ArchiveRef<'
 
 /// Find an archive's path, in the downloads folder or a search path, without
 /// writing anything. For commands that only read.
-pub fn find(downloads: &Path, search_paths: &[PathBuf], archive: &ArchiveRef<'_>) -> Option<PathBuf> {
+pub fn find(
+    downloads: &Path,
+    search_paths: &[PathBuf],
+    archive: &ArchiveRef<'_>,
+) -> Option<PathBuf> {
     locate(downloads, search_paths, archive).map(|found| match found {
         Found::Downloads(path) | Found::SearchPath(path) => path,
     })
@@ -276,8 +295,9 @@ pub fn resolve(
         None => Ok(None),
         Some(Found::Downloads(path)) => {
             if let Some(newer) = superseded_by(&path, downloads, search_paths) {
-                std::fs::remove_file(&path)
-                    .map_err(|err| anyhow::anyhow!("failed to replace {}: {err}", path.display()))?;
+                std::fs::remove_file(&path).map_err(|err| {
+                    anyhow::anyhow!("failed to replace {}: {err}", path.display())
+                })?;
                 link_or_copy(&newer, &path)?;
                 invalidate(downloads);
             }
@@ -428,7 +448,8 @@ pub fn fill_meta(archive_path: &Path, archive: &ArchiveRef<'_>) -> anyhow::Resul
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
     for (key, value) in keys {
         let found = lines.iter().position(|line| {
-            line.split_once('=').is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
+            line.split_once('=')
+                .is_some_and(|(k, _)| k.trim().eq_ignore_ascii_case(key))
         });
         let assignment = format!("{key}={value}");
         match found {
@@ -444,7 +465,8 @@ pub fn fill_meta(archive_path: &Path, archive: &ArchiveRef<'_>) -> anyhow::Resul
     }
     let mut out = lines.join(newline);
     out.push_str(newline);
-    std::fs::write(&path, out).map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
+    std::fs::write(&path, out)
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
 }
 
 /// Record that something was written into `dir`, so the next lookup sees it.
@@ -501,7 +523,10 @@ mod tests {
             "[General]\ngameName=Oblivion\nmodID=47810\nfileID=1000018329\n",
         );
         let wanted = ArchiveRef::new("nexus:oblivion/47810/1000018329", None);
-        assert_eq!(locate(dir.path(), &[], &wanted), Some(Found::Downloads(archive)));
+        assert_eq!(
+            locate(dir.path(), &[], &wanted),
+            Some(Found::Downloads(archive))
+        );
 
         let wrong_game = ArchiveRef::new("nexus:skyrimspecialedition/47810/1000018329", None);
         assert_eq!(locate(dir.path(), &[], &wrong_game), None);
@@ -515,15 +540,22 @@ mod tests {
         let broken = touch(dir.path(), "1_Mod-1-9.zip", "not really a zip");
         let good = dir.path().join("Mod-1-9.zip");
         let mut zip = zip::ZipWriter::new(std::fs::File::create(&good).unwrap());
-        zip.start_file("a.txt", zip::write::FileOptions::<()>::default()).unwrap();
+        zip.start_file("a.txt", zip::write::FileOptions::<()>::default())
+            .unwrap();
         zip.write_all(b"x").unwrap();
         zip.finish().unwrap();
         for archive in [&broken, &good] {
-            touch(dir.path(), &format!("{}.meta", archive.file_name().unwrap().to_string_lossy()),
-                "[General]\ngameName=Oblivion\nmodID=1\nfileID=9\n");
+            touch(
+                dir.path(),
+                &format!("{}.meta", archive.file_name().unwrap().to_string_lossy()),
+                "[General]\ngameName=Oblivion\nmodID=1\nfileID=9\n",
+            );
         }
         let wanted = ArchiveRef::new("nexus:oblivion/1/9", None);
-        assert_eq!(locate(dir.path(), &[], &wanted), Some(Found::Downloads(good)));
+        assert_eq!(
+            locate(dir.path(), &[], &wanted),
+            Some(Found::Downloads(good))
+        );
     }
 
     #[test]
@@ -531,7 +563,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let archive = touch(dir.path(), "WACv_1beta.7z", "x");
         let wanted = ArchiveRef::new("manual:wacv_1BETA.7z", None);
-        assert_eq!(locate(dir.path(), &[], &wanted), Some(Found::Downloads(archive)));
+        assert_eq!(
+            locate(dir.path(), &[], &wanted),
+            Some(Found::Downloads(archive))
+        );
     }
 
     #[test]
@@ -563,7 +598,10 @@ mod tests {
         let wanted = ArchiveRef::new("manual:late.zip", None);
         assert_eq!(locate(dir.path(), &[], &wanted), None);
         let archive = touch(dir.path(), "late.zip", "x");
-        assert_eq!(locate(dir.path(), &[], &wanted), Some(Found::Downloads(archive)));
+        assert_eq!(
+            locate(dir.path(), &[], &wanted),
+            Some(Found::Downloads(archive))
+        );
     }
 
     #[test]
@@ -573,7 +611,10 @@ mod tests {
         let source = ArchiveRef::new("https://example.com/start/218291?referer=x", None);
         write_meta(&archive, &source).unwrap();
         note_written(dir.path());
-        assert_eq!(locate(dir.path(), &[], &source), Some(Found::Downloads(archive)));
+        assert_eq!(
+            locate(dir.path(), &[], &source),
+            Some(Found::Downloads(archive))
+        );
     }
 
     #[test]
@@ -583,6 +624,9 @@ mod tests {
         let source = ArchiveRef::new("nexus:oblivion/5/9", None);
         write_meta(&archive, &source).unwrap();
         note_written(dir.path());
-        assert_eq!(locate(dir.path(), &[], &source), Some(Found::Downloads(archive)));
+        assert_eq!(
+            locate(dir.path(), &[], &source),
+            Some(Found::Downloads(archive))
+        );
     }
 }

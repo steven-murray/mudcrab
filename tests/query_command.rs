@@ -28,7 +28,18 @@ fn try_headless_plan(fixture: &std::path::Path, extra: &[&str]) -> Result<Value,
     let compiled = dir.path().join("compiled.json");
     let query_out = dir.path().join("plan.json");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("compile")
         .arg(fixture)
@@ -36,7 +47,18 @@ fn try_headless_plan(fixture: &std::path::Path, extra: &[&str]) -> Result<Value,
         .arg(&compiled)
         .assert()
         .success();
-    let out = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let out = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -50,8 +72,10 @@ fn try_headless_plan(fixture: &std::path::Path, extra: &[&str]) -> Result<Value,
         return Err(String::from_utf8_lossy(&out.stderr).into_owned());
     }
 
-    Ok(serde_json::from_str(&std::fs::read_to_string(&query_out).expect("plan written"))
-        .expect("plan should be valid json"))
+    Ok(
+        serde_json::from_str(&std::fs::read_to_string(&query_out).expect("plan written"))
+            .expect("plan should be valid json"),
+    )
 }
 
 /// A mod gated on an input, a mod gated on that mod, and an action gated on
@@ -92,11 +116,21 @@ content = "x"
 "#;
 
 fn selected(plan: &Value) -> Vec<&str> {
-    plan["selected_mods"].as_array().unwrap().iter().map(|v| v.as_str().unwrap()).collect()
+    plan["selected_mods"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect()
 }
 
 fn ui_actions(plan: &Value) -> usize {
-    plan["mods"].as_array().unwrap().iter().find(|m| m["id"] == "ui").unwrap()["actions"]
+    plan["mods"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == "ui")
+        .unwrap()["actions"]
         .as_array()
         .unwrap()
         .len()
@@ -125,7 +159,6 @@ fn a_dependency_left_out_by_its_condition_is_an_error() {
     assert!(err.contains("if = 'mod:\"hd pack\"'"), "{err}");
 }
 
-
 #[test]
 fn set_overrides_the_declared_default() {
     let plan = headless_plan(&["--set", "use_hd_textures=true"]);
@@ -147,7 +180,19 @@ fn query_headless_writes_personalized_plan() {
     let game_dir = dir.path().join("game");
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
-    let mut compile_cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
+    let mut compile_cmd = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
+        .expect("binary should build");
     compile_cmd
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -157,7 +202,19 @@ fn query_headless_writes_personalized_plan() {
         .assert()
         .success();
 
-    let mut query_cmd = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
+    let mut query_cmd = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
+        .expect("binary should build");
     query_cmd
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -231,7 +288,12 @@ bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
 "#;
 
 fn mod_entry<'a>(plan: &'a Value, id: &str) -> &'a Value {
-    plan["mods"].as_array().unwrap().iter().find(|m| m["id"] == id).unwrap()
+    plan["mods"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|m| m["id"] == id)
+        .unwrap()
 }
 
 #[test]
@@ -249,7 +311,13 @@ fn one_answer_reaches_archives_fomod_rows_and_bain_subpackages() {
     );
 
     let high = plan_for(ARCHIVE_CONDITIONS, &["--set", "res=2k"]).unwrap();
-    assert_eq!(mod_entry(&high, "textures")["archives"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        mod_entry(&high, "textures")["archives"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
     assert_eq!(
         mod_entry(&high, "fomod mod")["archives"][0]["fomod_selections"][0]["options"][0],
         "2K"
@@ -272,12 +340,21 @@ fn conditions_that_leave_a_mod_with_no_archive_are_an_error() {
     );
     assert_ne!(src, ARCHIVE_CONDITIONS);
     let err = plan_for(&src, &[]).unwrap_err();
-    assert!(err.contains("mod textures") && err.contains("on the mod instead"), "{err}");
+    assert!(
+        err.contains("mod textures") && err.contains("on the mod instead"),
+        "{err}"
+    );
 
-    let src = ARCHIVE_CONDITIONS.replace("[\"00 Core\", ", "[{ name = \"00 Core\", if = \"res == 2k\" }, ");
+    let src = ARCHIVE_CONDITIONS.replace(
+        "[\"00 Core\", ",
+        "[{ name = \"00 Core\", if = \"res == 2k\" }, ",
+    );
     assert_ne!(src, ARCHIVE_CONDITIONS);
     let err = plan_for(&src, &[]).unwrap_err();
-    assert!(err.contains("BAIN subpackage") && err.contains("manual:bain.7z"), "{err}");
+    assert!(
+        err.contains("BAIN subpackage") && err.contains("manual:bain.7z"),
+        "{err}"
+    );
 }
 
 const PLUGINS: &str = r#"
@@ -323,7 +400,10 @@ fn a_merge_using_a_left_out_mods_plugin_is_refused() {
          method = \"clobber\"\nsources = [{{ mod = \"base\", plugin = \"Base.esp\" }}, {{ mod = \"rats\", plugin = \"Rats.esp\" }}]\n"
     );
     let err = plan_for(&src, &[]).unwrap_err();
-    assert!(err.contains("merge merged takes Rats.esp from mod rats"), "{err}");
+    assert!(
+        err.contains("merge merged takes Rats.esp from mod rats"),
+        "{err}"
+    );
 
     // Gated the same way, both go together, merged plugin included.
     let gated = src.replace("id = \"merged\"", "id = \"merged\"\nif = \"mod:rats\"");

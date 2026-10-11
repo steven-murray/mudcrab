@@ -1,8 +1,8 @@
 //! Serialise a plugin back to bytes.
 
-use super::group::{Entry, Group};
-use super::record::{write_fields, Record, FLAG_COMPRESSED};
 use super::Plugin;
+use super::group::{Entry, Group};
+use super::record::{FLAG_COMPRESSED, Record, write_fields};
 
 pub fn write(plugin: &Plugin) -> Vec<u8> {
     let mut out = Vec::new();
@@ -71,11 +71,15 @@ fn write_group(group: &Group, out: &mut Vec<u8>) {
 }
 
 fn deflate(input: &[u8]) -> Vec<u8> {
-    use flate2::write::ZlibEncoder;
     use flate2::Compression;
+    use flate2::write::ZlibEncoder;
     use std::io::Write;
 
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
-    encoder.write_all(input).expect("writing to a Vec cannot fail");
-    encoder.finish().expect("finishing a Vec encoder cannot fail")
+    encoder
+        .write_all(input)
+        .expect("writing to a Vec cannot fail");
+    encoder
+        .finish()
+        .expect("finishing a Vec encoder cannot fail")
 }

@@ -21,7 +21,7 @@
 use super::InstallSettings;
 use crate::archive::ArchiveFilters;
 use crate::config::archive_store::{self, ArchiveRef};
-use crate::config::install::layout::{self, bain::list_relative_paths, EntryReader};
+use crate::config::install::layout::{self, EntryReader, bain::list_relative_paths};
 use crate::config::schema::{ModType, PersonalizedMod};
 use crate::util::fs::staging_dir_for;
 use std::collections::{BTreeSet, HashSet};
@@ -123,14 +123,14 @@ fn from_plan(
             &settings.archive_search_paths,
             &ArchiveRef::new(path, archive.file_name.as_deref()),
         )
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "cannot predict the files mod '{}' contributes: archive {} is not in the \
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "cannot predict the files mod '{}' contributes: archive {} is not in the \
                      downloads folder. Run `mudcrab download` first.",
-                    mod_entry.id,
-                    archive_index
-                )
-            })?;
+                mod_entry.id,
+                archive_index
+            )
+        })?;
 
         // `game_root_files` land outside the mod folder, so they are not part
         // of what this mod contributes to the VFS -- and install excludes them
@@ -260,11 +260,7 @@ fn bsa_paths(bytes: &[u8], label: &str) -> anyhow::Result<Vec<String>> {
         .collect())
 }
 
-fn bsa_paths_from_archive(
-    source: &Path,
-    entry: &str,
-    label: &str,
-) -> anyhow::Result<Vec<String>> {
+fn bsa_paths_from_archive(source: &Path, entry: &str, label: &str) -> anyhow::Result<Vec<String>> {
     let scratch = staging_dir_for(source)?;
     let result = (|| -> anyhow::Result<Vec<String>> {
         let reader = EntryReader::new(source, scratch.clone());
@@ -307,9 +303,15 @@ mod tests {
         std::fs::write(dir.path().join("meshes/b.nif.mohidden"), b"NIF").expect("write");
 
         let paths = from_installed_folder(dir.path()).expect("walk");
-        assert_eq!(paths.visible.into_iter().collect::<Vec<_>>(), ["meshes/a.nif"]);
+        assert_eq!(
+            paths.visible.into_iter().collect::<Vec<_>>(),
+            ["meshes/a.nif"]
+        );
         // Hidden is not the same as absent: the caller needs to be able to say
         // "already hidden" rather than "does not conflict".
-        assert_eq!(paths.hidden.into_iter().collect::<Vec<_>>(), ["meshes/b.nif"]);
+        assert_eq!(
+            paths.hidden.into_iter().collect::<Vec<_>>(),
+            ["meshes/b.nif"]
+        );
     }
 }

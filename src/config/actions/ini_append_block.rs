@@ -50,7 +50,9 @@ pub(super) fn apply(action: &IniAppendBlockAction, cx: &ActionCx<'_>) -> anyhow:
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AppendOutcome {
-    Appended { lines: usize },
+    Appended {
+        lines: usize,
+    },
     /// The block is already there. Installs are re-run often enough that an
     /// append which is not idempotent would grow the file every time.
     AlreadyPresent,
@@ -104,9 +106,7 @@ pub(crate) fn append_block(path: &Path, block: &str) -> anyhow::Result<AppendOut
     }
 
     std::fs::write(path, out)?;
-    Ok(AppendOutcome::Appended {
-        lines: lines.len(),
-    })
+    Ok(AppendOutcome::Appended { lines: lines.len() })
 }
 
 #[cfg(test)]

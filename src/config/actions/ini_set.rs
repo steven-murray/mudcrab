@@ -204,7 +204,11 @@ pub(crate) fn apply_ini_set_in_section(
     // Rewriting them with LF changes every line of a file we were asked to
     // change one value in -- harmless to Oblivion, which reads both, but it
     // makes each INI we touch differ from the Oracle for no reason.
-    let newline = if original.contains("\r\n") { "\r\n" } else { "\n" };
+    let newline = if original.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let trailing_newline = original.ends_with('\n');
     let mut lines: Vec<String> = original.lines().map(ToString::to_string).collect();
 
@@ -279,8 +283,9 @@ pub(crate) fn apply_ini_set_in_section(
             // difference in a file we were only asked to change one number in.
             // Appending a *new* key still uses the file's dominant style,
             // because there is no original line to preserve.
-            lines[index] = replace_value_in_place(&lines[index], key, value, format, aligned, spaced)
-                .unwrap_or_else(|| rendered.clone());
+            lines[index] =
+                replace_value_in_place(&lines[index], key, value, format, aligned, spaced)
+                    .unwrap_or_else(|| rendered.clone());
         }
         IniSetOutcome::Replaced
     };
@@ -291,7 +296,10 @@ pub(crate) fn apply_ini_set_in_section(
 
 /// The `[Section]` a line sits under, for error messages.
 fn enclosing_section(lines: &[String], index: usize) -> Option<&str> {
-    lines[..index].iter().rev().find_map(|line| section_header(line))
+    lines[..index]
+        .iter()
+        .rev()
+        .find_map(|line| section_header(line))
 }
 
 /// Write the lines back, keeping the file's own line ending *and* whether it
@@ -345,7 +353,11 @@ fn replace_value_in_place(
     // file it is the author's column and removing it would rewrite every line
     // we touch; in a tight file it is an anomaly -- very likely one an earlier
     // version of mudcrab introduced -- and repairing it is the point.
-    let lhs = if aligned { lhs.to_string() } else { key.to_string() };
+    let lhs = if aligned {
+        lhs.to_string()
+    } else {
+        key.to_string()
+    };
     // The space *after* the `=` is the half Oblivion reads literally, so it
     // comes from the whole file's habit rather than from this one line -- which
     // is how a line an earlier version wrote as `Key = Value` still gets
@@ -367,11 +379,14 @@ fn replace_set_to_value(line: &str, key: &str, value: &str) -> Option<String> {
     // the line, so this does not depend on `is_ini_key_line` having filtered
     // the line first. Two parsers of one syntax that agree only because of call
     // order is the kind of coupling this file has been bitten by before.
-    let key_at = line.match_indices(key).find(|(at, _)| {
-        let before_ok = line[..*at].ends_with(char::is_whitespace);
-        let after = &line[at + key.len()..];
-        before_ok && after.starts_with(char::is_whitespace)
-    })?.0;
+    let key_at = line
+        .match_indices(key)
+        .find(|(at, _)| {
+            let before_ok = line[..*at].ends_with(char::is_whitespace);
+            let after = &line[at + key.len()..];
+            before_ok && after.starts_with(char::is_whitespace)
+        })?
+        .0;
     let after_key = &line[key_at + key.len()..];
 
     // The `to` separator, with whatever whitespace surrounds it.
@@ -536,8 +551,12 @@ mod set_to_tests {
     #[test]
     fn a_plain_line_survives_too() {
         assert_eq!(
-            replace_set_to_value("set almQ.bDisableREHEShader to 0", "almQ.bDisableREHEShader", "1")
-                .as_deref(),
+            replace_set_to_value(
+                "set almQ.bDisableREHEShader to 0",
+                "almQ.bDisableREHEShader",
+                "1"
+            )
+            .as_deref(),
             Some("set almQ.bDisableREHEShader to 1")
         );
     }
@@ -551,7 +570,7 @@ mod set_to_tests {
 
 #[cfg(test)]
 mod trailing_newline_tests {
-    use super::{apply_ini_set, IniSetFormat};
+    use super::{IniSetFormat, apply_ini_set};
 
     #[test]
     fn a_file_without_a_final_newline_does_not_gain_one() {
@@ -577,13 +596,18 @@ mod trailing_newline_tests {
 
         apply_ini_set(&path, "a.b", "1", IniSetFormat::SetTo).expect("ini_set");
 
-        assert_eq!(std::fs::read_to_string(&path).expect("read"), "set a.b to 1\n");
+        assert_eq!(
+            std::fs::read_to_string(&path).expect("read"),
+            "set a.b to 1\n"
+        );
     }
 }
 
 #[cfg(test)]
 mod outcome_tests {
-    use super::{apply_ini_set, apply_ini_set_in_section, replace_set_to_value, IniSetFormat, IniSetOutcome};
+    use super::{
+        IniSetFormat, IniSetOutcome, apply_ini_set, apply_ini_set_in_section, replace_set_to_value,
+    };
 
     #[test]
     fn each_kind_of_edit_reports_itself() {

@@ -1,5 +1,5 @@
 use crate::cli::IdentifyArgs;
-use crate::config::identify::{identify, write_meta_sidecar, Method};
+use crate::config::identify::{Method, identify, write_meta_sidecar};
 
 pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
     let api_key = std::env::var("NEXUS_API_KEY").map_err(|_| {

@@ -116,8 +116,19 @@ const OMOD_CONVERSION_DIR: &str = "omod conversion data";
 /// where a `.png` is an asset rather than a screenshot.
 fn is_in_game_content_folder(relative_path: &str) -> bool {
     const CONTENT_DIRS: &[&str] = &[
-        "meshes", "textures", "sound", "menus", "ini", "video", "obse", "shaders", "facegen",
-        "trees", "distantlod", "music", "lodsettings",
+        "meshes",
+        "textures",
+        "sound",
+        "menus",
+        "ini",
+        "video",
+        "obse",
+        "shaders",
+        "facegen",
+        "trees",
+        "distantlod",
+        "music",
+        "lodsettings",
     ];
 
     relative_path
@@ -147,8 +158,10 @@ fn is_documentation(relative_path: &str) -> bool {
     // whole mod, and `Dagger_Data` puts `.bmp` skies under `textures/dag/sky/`.
     // Judging those by extension would drop real differences from the report in
     // silence, which is the failure this rule exists to avoid rather than cause.
-    if matches!(extension, "gif" | "jpg" | "jpeg" | "png" | "bmp" | "webp" | "url")
-        && !is_in_game_content_folder(relative_path)
+    if matches!(
+        extension,
+        "gif" | "jpg" | "jpeg" | "png" | "bmp" | "webp" | "url"
+    ) && !is_in_game_content_folder(relative_path)
     {
         return true;
     }
@@ -158,15 +171,25 @@ fn is_documentation(relative_path: &str) -> bool {
     // on a file the game would never load. `textures/menus/license.dds` is a
     // texture, and treating it as a readme would drop a real difference on the
     // floor, which is the one failure mode this whole report exists to avoid.
-    if !matches!(extension, "txt" | "rtf" | "doc" | "docx" | "pdf" | "htm" | "html" | "md" | "")
-    {
+    if !matches!(
+        extension,
+        "txt" | "rtf" | "doc" | "docx" | "pdf" | "htm" | "html" | "md" | ""
+    ) {
         return false;
     }
 
     let stem = name.rsplit_once('.').map(|(stem, _)| stem).unwrap_or(&name);
-    ["readme", "readme_", "read me", "credits", "licence", "license", "changelog"]
-        .iter()
-        .any(|marker| stem.contains(marker))
+    [
+        "readme",
+        "readme_",
+        "read me",
+        "credits",
+        "licence",
+        "license",
+        "changelog",
+    ]
+    .iter()
+    .any(|marker| stem.contains(marker))
 }
 
 /// MO2 keeps its list separators as empty mod folders. They carry no files, so
@@ -550,9 +573,9 @@ fn union_candidates(
             Some(path) => file_name_of(path, &key),
             // The Oracle's folder name is not ours to report an aliased mod
             // under, so the plan's spelling stands in when our tree has none.
-            None if oracle_name.is_some() => {
-                entry.map(|entry| entry.id.clone()).unwrap_or_else(|| key.clone())
-            }
+            None if oracle_name.is_some() => entry
+                .map(|entry| entry.id.clone())
+                .unwrap_or_else(|| key.clone()),
             None => oracle_path
                 .map(|path| file_name_of(path, &key))
                 .unwrap_or_else(|| key.clone()),
@@ -570,7 +593,9 @@ fn union_candidates(
             section,
             ours: ours_path.cloned(),
             oracle: oracle_path.cloned(),
-            plan_file_names: entry.map(|entry| entry.file_names.clone()).unwrap_or_default(),
+            plan_file_names: entry
+                .map(|entry| entry.file_names.clone())
+                .unwrap_or_default(),
             era,
         });
     }
@@ -625,7 +650,7 @@ fn compare_in_parallel(candidates: &[Candidate]) -> Vec<ModDiff> {
                     .expect("diff collector should not be poisoned")
                     .extend(local);
             });
-    bar.finish_and_clear();
+            bar.finish_and_clear();
         }
     });
 
@@ -657,7 +682,11 @@ fn compare_mod(candidate: &Candidate) -> ModDiff {
     };
 
     if let Some(oracle_dir) = &candidate.oracle {
-        diff.version = Some(read_version_info(oracle_dir, &candidate.plan_file_names, candidate.era));
+        diff.version = Some(read_version_info(
+            oracle_dir,
+            &candidate.plan_file_names,
+            candidate.era,
+        ));
     }
 
     // Nothing is read for a mod that exists on only one side: there is no
@@ -743,7 +772,10 @@ fn collect_files(
     files: &mut BTreeMap<String, FileEntry>,
 ) -> anyhow::Result<()> {
     if depth > MAX_DEPTH {
-        anyhow::bail!("directory nesting exceeded {MAX_DEPTH} levels at {}", current.display());
+        anyhow::bail!(
+            "directory nesting exceeded {MAX_DEPTH} levels at {}",
+            current.display()
+        );
     }
 
     let entries = std::fs::read_dir(current)
@@ -755,7 +787,10 @@ fn collect_files(
     children.sort();
 
     for path in children {
-        let Some(name) = path.file_name().map(|name| name.to_string_lossy().into_owned()) else {
+        let Some(name) = path
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned())
+        else {
             continue;
         };
 
@@ -788,7 +823,9 @@ fn collect_files(
         }
         let key = comparison_key(&display);
 
-        let hidden = display.split('/').any(|segment| strip_hidden_suffix(segment) != segment);
+        let hidden = display
+            .split('/')
+            .any(|segment| strip_hidden_suffix(segment) != segment);
 
         files.entry(key).or_insert(FileEntry {
             display,
@@ -887,13 +924,15 @@ fn compare_files(ours: &FileEntry, oracle: &FileEntry) -> Result<Option<ContentD
 /// real extension is one component further in.
 fn visible_name(path: &Path) -> Option<String> {
     let name = path.file_name()?.to_str()?;
-    Some(match name
-        .to_ascii_lowercase()
-        .strip_suffix(crate::config::mo2::MO2_HIDDEN_SUFFIX)
-    {
-        Some(_) => name[..name.len() - crate::config::mo2::MO2_HIDDEN_SUFFIX.len()].to_string(),
-        None => name.to_string(),
-    })
+    Some(
+        match name
+            .to_ascii_lowercase()
+            .strip_suffix(crate::config::mo2::MO2_HIDDEN_SUFFIX)
+        {
+            Some(_) => name[..name.len() - crate::config::mo2::MO2_HIDDEN_SUFFIX.len()].to_string(),
+            None => name.to_string(),
+        },
+    )
 }
 
 /// What kind of file is this, and what does that let us say about the difference?
@@ -961,10 +1000,7 @@ fn describe_bsa_difference(ours: &Path, oracle: &Path) -> Option<String> {
 
     let mut parts = Vec::new();
     if only_ours + only_oracle + changed == 0 {
-        parts.push(format!(
-            "same {} files, same payloads",
-            ours_index.len()
-        ));
+        parts.push(format!("same {} files, same payloads", ours_index.len()));
     } else {
         if only_ours > 0 {
             parts.push(format!("{only_ours} only in ours"));
@@ -1108,12 +1144,28 @@ fn describe_plugin_difference(ours: &Path, oracle: &Path) -> Option<String> {
                 if extra.is_empty() {
                     String::new()
                 } else {
-                    format!("; only ours: {}", extra.iter().copied().cloned().collect::<Vec<_>>().join(", "))
+                    format!(
+                        "; only ours: {}",
+                        extra
+                            .iter()
+                            .copied()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 },
                 if missing.is_empty() {
                     String::new()
                 } else {
-                    format!("; only oracle: {}", missing.iter().copied().cloned().collect::<Vec<_>>().join(", "))
+                    format!(
+                        "; only oracle: {}",
+                        missing
+                            .iter()
+                            .copied()
+                            .cloned()
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
                 },
             ));
         }
@@ -1242,7 +1294,10 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
             .to_ascii_lowercase()
     };
 
-    let Some(prefix) = sanitise(oracle).strip_suffix(&sanitise(plan)).map(str::to_string) else {
+    let Some(prefix) = sanitise(oracle)
+        .strip_suffix(&sanitise(plan))
+        .map(str::to_string)
+    else {
         return false;
     };
     let Some(prefix) = prefix.strip_suffix('_') else {
@@ -1253,7 +1308,6 @@ fn names_the_same_archive(plan: &str, oracle: &str) -> bool {
         .split('_')
         .any(|part| !part.is_empty() && part.chars().all(|c| c.is_ascii_digit()))
 }
-
 
 /// Date the Oracle's archive, to decide whether the guide could have meant it.
 ///
@@ -1288,7 +1342,9 @@ pub fn classify_guide_age(
                 .to_string(),
         };
     };
-    let name = installation_file.map(str::trim).filter(|name| !name.is_empty());
+    let name = installation_file
+        .map(str::trim)
+        .filter(|name| !name.is_empty());
 
     // `nexusLastModified` on a mod that did not come from Nexus is not a date
     // for the file -- it is when MO2 wrote the entry. Part 10's WAC is the case
@@ -1370,7 +1426,6 @@ fn classify_timestamp(timestamp: i64, era: GuideEra) -> GuideAge {
     }
 }
 
-
 fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
     // The last `-` separated field, cut at its first non-digit. This survives
     // multi-part extensions (`...-1647873144.7z.001`) without special-casing
@@ -1382,7 +1437,9 @@ fn parse_trailing_timestamp(file_name: &str) -> Option<i64> {
     }
 
     let value: i64 = digits.parse().ok()?;
-    (TIMESTAMP_MIN..=TIMESTAMP_MAX).contains(&value).then_some(value)
+    (TIMESTAMP_MIN..=TIMESTAMP_MAX)
+        .contains(&value)
+        .then_some(value)
 }
 
 /// Render a Unix timestamp as `YYYY-MM-DD` (UTC).
@@ -1638,7 +1695,11 @@ fn render_mod(out: &mut String, diff: &ModDiff) {
             out.push_str(&format!(
                 "        {}  (hidden in {})\n",
                 entry.path,
-                if entry.hidden_in_ours { "ours" } else { "the Oracle" }
+                if entry.hidden_in_ours {
+                    "ours"
+                } else {
+                    "the Oracle"
+                }
             ));
         }
         render_overflow(out, diff.hidden_differs.len());
@@ -1653,7 +1714,10 @@ fn render_mod(out: &mut String, diff: &ModDiff) {
         out.push_str(&format!(
             "      archive mismatch: plan has '{}', Oracle installed '{}'\n",
             version.plan_file_name.as_deref().unwrap_or("<unset>"),
-            version.oracle_installation_file.as_deref().unwrap_or("<unset>"),
+            version
+                .oracle_installation_file
+                .as_deref()
+                .unwrap_or("<unset>"),
         ));
     }
 
@@ -1728,7 +1792,10 @@ fn render_version_notes(out: &mut String, report: &DiffReport) {
                 .unwrap_or_default()
         ));
         for diff in &post_guide {
-            let version = diff.version.as_ref().expect("post-guide implies version info");
+            let version = diff
+                .version
+                .as_ref()
+                .expect("post-guide implies version info");
             let GuideAge::PostGuide { date, .. } = &version.guide_age else {
                 continue;
             };
@@ -1736,7 +1803,10 @@ fn render_version_notes(out: &mut String, report: &DiffReport) {
                 "    ! {}  dated {}  ({}){}\n",
                 diff.id,
                 date,
-                version.oracle_installation_file.as_deref().unwrap_or("<unset>"),
+                version
+                    .oracle_installation_file
+                    .as_deref()
+                    .unwrap_or("<unset>"),
                 version
                     .oracle_version
                     .as_deref()
@@ -1802,8 +1872,14 @@ mod tests {
             Some(1_647_873_144)
         );
         // A bare Nexus mod id is not a timestamp.
-        assert_eq!(parse_trailing_timestamp("Anvil Morning Glory-19039.7z"), None);
-        assert_eq!(parse_trailing_timestamp("DarNified UI 132 FOMOD - Merged.7z"), None);
+        assert_eq!(
+            parse_trailing_timestamp("Anvil Morning Glory-19039.7z"),
+            None
+        );
+        assert_eq!(
+            parse_trailing_timestamp("DarNified UI 132 FOMOD - Merged.7z"),
+            None
+        );
         assert_eq!(parse_trailing_timestamp(""), None);
     }
 
@@ -1817,14 +1893,26 @@ mod tests {
     #[test]
     fn guide_age_splits_on_the_march_2025_cutoff() {
         assert_eq!(
-            classify_guide_age(Some("Better Fort Aurus-50682-1-1-1647873144.7z"), None, Some(50682), Some(MODERN_FILE_ID), MOFAM),
+            classify_guide_age(
+                Some("Better Fort Aurus-50682-1-1-1647873144.7z"),
+                None,
+                Some(50682),
+                Some(MODERN_FILE_ID),
+                MOFAM
+            ),
             GuideAge::PreGuide {
                 timestamp: 1_647_873_144,
                 date: "2022-03-21".to_string()
             }
         );
         assert_eq!(
-            classify_guide_age(Some("Newer Mod-1234-2-0-1750000000.7z"), None, Some(1234), Some(MODERN_FILE_ID), MOFAM),
+            classify_guide_age(
+                Some("Newer Mod-1234-2-0-1750000000.7z"),
+                None,
+                Some(1234),
+                Some(MODERN_FILE_ID),
+                MOFAM
+            ),
             GuideAge::PostGuide {
                 timestamp: 1_750_000_000,
                 date: "2025-06-15".to_string()
@@ -1833,15 +1921,30 @@ mod tests {
         // A filename with no timestamp used to be unanswerable. The file id
         // answers it now, which is the point of the boundary.
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory-19039.7z"), None, Some(19039), Some(MODERN_FILE_ID), MOFAM),
+            classify_guide_age(
+                Some("Anvil Morning Glory-19039.7z"),
+                None,
+                Some(19039),
+                Some(MODERN_FILE_ID),
+                MOFAM
+            ),
             GuideAge::PreGuide { .. }
         ));
         // With neither a timestamp nor a file id there is still nothing to go on.
         assert!(matches!(
-            classify_guide_age(Some("Anvil Morning Glory.7z"), None, Some(19039), Some(0), MOFAM),
+            classify_guide_age(
+                Some("Anvil Morning Glory.7z"),
+                None,
+                Some(19039),
+                Some(0),
+                MOFAM
+            ),
             GuideAge::Unknown { .. }
         ));
-        assert!(matches!(classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID), MOFAM), GuideAge::Unknown { .. }));
+        assert!(matches!(
+            classify_guide_age(None, None, Some(1), Some(MODERN_FILE_ID), MOFAM),
+            GuideAge::Unknown { .. }
+        ));
     }
 
     fn compare_trees(ours: &Path, oracle: &Path) -> ModDiff {
@@ -1883,7 +1986,10 @@ mod tests {
         assert_eq!(diff.hidden_differs.len(), 1);
         assert_eq!(diff.hidden_differs[0].path, "textures/khajiit/head.dds");
         assert!(diff.hidden_differs[0].hidden_in_ours);
-        assert!(!diff.is_identical(), "a hidden-state mismatch is a difference");
+        assert!(
+            !diff.is_identical(),
+            "a hidden-state mismatch is a difference"
+        );
     }
 
     #[test]
@@ -1893,7 +1999,10 @@ mod tests {
         let oracle = temp.path().join("oracle");
 
         write_file(&ours.join("textures/nuska/hair.mohidden/grey.dds"), b"same");
-        write_file(&oracle.join("textures/nuska/hair.mohidden/grey.dds"), b"same");
+        write_file(
+            &oracle.join("textures/nuska/hair.mohidden/grey.dds"),
+            b"same",
+        );
 
         let diff = compare_trees(&ours, &oracle);
 
@@ -1906,10 +2015,22 @@ mod tests {
         // A hand-installed mod has no `installationFile`, and MO2's
         // `nexusLastModified` is then just when the folder was written. Reading
         // it would date a 2019 archive to today and flag it POST-GUIDE.
-        let age = classify_guide_age(None, Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID), MOFAM);
+        let age = classify_guide_age(
+            None,
+            Some("2026-08-16T20:43:11Z"),
+            Some(1),
+            Some(MODERN_FILE_ID),
+            MOFAM,
+        );
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
 
-        let age = classify_guide_age(Some("   "), Some("2026-08-16T20:43:11Z"), Some(1), Some(MODERN_FILE_ID), MOFAM);
+        let age = classify_guide_age(
+            Some("   "),
+            Some("2026-08-16T20:43:11Z"),
+            Some(1),
+            Some(MODERN_FILE_ID),
+            MOFAM,
+        );
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
     }
 
@@ -1919,10 +2040,18 @@ mod tests {
         // modid=0. MO2 still wrote nexusLastModified=2026-01-25 -- the day it
         // was installed here, not the day the file was published -- and reading
         // it flagged a fifteen-year-old archive as newer than the guide.
-        let age = classify_guide_age(Some("WACv_1beta.7z"), Some("2026-01-25T20:19:46Z"), Some(0), Some(0), MOFAM);
+        let age = classify_guide_age(
+            Some("WACv_1beta.7z"),
+            Some("2026-01-25T20:19:46Z"),
+            Some(0),
+            Some(0),
+            MOFAM,
+        );
         assert!(matches!(age, GuideAge::Unknown { .. }), "{age:?}");
         match age {
-            GuideAge::Unknown { reason } => assert!(reason.contains("no recorded Nexus file"), "{reason}"),
+            GuideAge::Unknown { reason } => {
+                assert!(reason.contains("no recorded Nexus file"), "{reason}")
+            }
             other => panic!("expected Unknown, got {other:?}"),
         }
 
@@ -1999,7 +2128,10 @@ mod tests {
             "shaders/orc/fog/Fog.ini",
             "Maskar's Oblivion Overhaul for spawns.ini",
         ] {
-            assert!(!is_documentation(content), "should not be documentation: {content}");
+            assert!(
+                !is_documentation(content),
+                "should not be documentation: {content}"
+            );
         }
     }
 
@@ -2056,7 +2188,10 @@ mod archive_name_tests {
         assert!(!names_the_same_archive("Ships.rar", "Old_Ships.rar"));
         assert!(!names_the_same_archive("Core.7z", "T4UT_Core.7z"));
         // Still matched when the index really is there.
-        assert!(names_the_same_archive("Metal.7z", "Ayleid Ruins_0_manual_Metal.7z"));
+        assert!(names_the_same_archive(
+            "Metal.7z",
+            "Ayleid Ruins_0_manual_Metal.7z"
+        ));
         // The cache sanitises apostrophes and spaces, so the plan name has to be
         // sanitised the same way to be found inside the cache name.
         assert!(names_the_same_archive(
@@ -2076,7 +2211,7 @@ mod file_id_age_tests {
         published: 1_740_787_200,
         file_id: Some(1_000_040_999),
     });
-    use super::{classify_guide_age, GuideAge, GuideEra};
+    use super::{GuideAge, GuideEra, classify_guide_age};
 
     #[test]
     fn a_file_id_outweighs_a_download_stamped_meta_ini() {
@@ -2123,10 +2258,22 @@ mod file_id_age_tests {
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
 
         // And the boundary itself: the smallest post-guide id observed.
-        let age = classify_guide_age(Some("Sneak Vignette.7z"), None, Some(1), Some(1000040999), MOFAM);
+        let age = classify_guide_age(
+            Some("Sneak Vignette.7z"),
+            None,
+            Some(1),
+            Some(1000040999),
+            MOFAM,
+        );
         assert!(matches!(age, GuideAge::PostGuide { .. }), "{age:?}");
         // ...against the largest pre-guide id observed.
-        let age = classify_guide_age(Some("Better dungeons.7z"), None, Some(1), Some(1000040927), MOFAM);
+        let age = classify_guide_age(
+            Some("Better dungeons.7z"),
+            None,
+            Some(1),
+            Some(1000040927),
+            MOFAM,
+        );
         assert!(matches!(age, GuideAge::PreGuide { .. }), "{age:?}");
     }
 
@@ -2158,7 +2305,7 @@ mod file_id_provenance_tests {
         published: 1_740_787_200,
         file_id: Some(1_000_040_999),
     });
-    use super::{classify_guide_age, GuideAge, GuideEra};
+    use super::{GuideAge, GuideEra, classify_guide_age};
 
     #[test]
     fn a_file_id_without_a_mod_id_behind_it_proves_nothing() {

@@ -101,7 +101,11 @@ impl ArchiveFilters {
             return false;
         }
 
-        let include_match = self.include.as_ref().map(|set| set.is_match(path)).unwrap_or(true);
+        let include_match = self
+            .include
+            .as_ref()
+            .map(|set| set.is_match(path))
+            .unwrap_or(true);
         if !include_match {
             return false;
         }
@@ -162,13 +166,17 @@ impl ArchiveExtractor for ZipExtractor {
     ) -> anyhow::Result<usize> {
         let file = std::fs::File::open(source)
             .map_err(|err| anyhow::anyhow!("failed to open {}: {err}", source.display()))?;
-        let mut zip = ZipArchive::new(file)
-            .map_err(|err| anyhow::anyhow!("failed to read zip archive {}: {err}", source.display()))?;
+        let mut zip = ZipArchive::new(file).map_err(|err| {
+            anyhow::anyhow!("failed to read zip archive {}: {err}", source.display())
+        })?;
 
         let mut extracted = 0usize;
         for idx in 0..zip.len() {
             let mut entry = zip.by_index(idx).map_err(|err| {
-                anyhow::anyhow!("failed to read zip entry {idx} from {}: {err}", source.display())
+                anyhow::anyhow!(
+                    "failed to read zip entry {idx} from {}: {err}",
+                    source.display()
+                )
             })?;
 
             let Some(entry_path) = entry.enclosed_name().map(|p| p.to_path_buf()) else {
@@ -190,12 +198,14 @@ impl ArchiveExtractor for ZipExtractor {
             }
 
             if let Some(parent) = destination.parent() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
+                std::fs::create_dir_all(parent).map_err(|err| {
+                    anyhow::anyhow!("failed to create {}: {err}", parent.display())
+                })?;
             }
 
-            let mut out = std::fs::File::create(&destination)
-                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", destination.display()))?;
+            let mut out = std::fs::File::create(&destination).map_err(|err| {
+                anyhow::anyhow!("failed to create {}: {err}", destination.display())
+            })?;
             std::io::copy(&mut entry, &mut out).map_err(|err| {
                 anyhow::anyhow!(
                     "failed to extract zip entry to {}: {err}",
@@ -269,15 +279,24 @@ fn extract_tar_entries<R: Read>(
     let mut extracted = 0usize;
 
     for entry_result in archive.entries().map_err(|err| {
-        anyhow::anyhow!("failed to iterate tar entries in {}: {err}", source.display())
+        anyhow::anyhow!(
+            "failed to iterate tar entries in {}: {err}",
+            source.display()
+        )
     })? {
-        let mut entry = entry_result
-            .map_err(|err| anyhow::anyhow!("failed reading tar entry in {}: {err}", source.display()))?;
+        let mut entry = entry_result.map_err(|err| {
+            anyhow::anyhow!("failed reading tar entry in {}: {err}", source.display())
+        })?;
 
-        let entry_path: PathBuf = entry.path().map_err(|err| {
-            anyhow::anyhow!("failed to resolve tar entry path in {}: {err}", source.display())
-        })?
-        .to_path_buf();
+        let entry_path: PathBuf = entry
+            .path()
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to resolve tar entry path in {}: {err}",
+                    source.display()
+                )
+            })?
+            .to_path_buf();
 
         let normalized = normalize_archive_path(&entry_path)?;
         if normalized.is_empty() || !filters.should_extract(&normalized) {
@@ -371,7 +390,11 @@ pub fn read_entry(source: &Path, entry: &str, scratch: &Path) -> anyhow::Result<
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", scratch.display()))?;
     let result = (|| {
         let filters = ArchiveFilters::for_entries(&wanted);
-        let native = [&ZipExtractor as &dyn ArchiveExtractor, &TarGzExtractor, &TarExtractor];
+        let native = [
+            &ZipExtractor as &dyn ArchiveExtractor,
+            &TarGzExtractor,
+            &TarExtractor,
+        ];
         if let Some(extractor) = native.into_iter().find(|e| e.can_handle(source)) {
             extractor.extract(source, scratch, &filters)?;
         } else if SystemArchiveExtractor.can_handle(source) {
@@ -379,8 +402,9 @@ pub fn read_entry(source: &Path, entry: &str, scratch: &Path) -> anyhow::Result<
         } else {
             anyhow::bail!("unsupported archive format for {}", source.display());
         }
-        std::fs::read(scratch.join(entry))
-            .map_err(|err| anyhow::anyhow!("{entry} was not extracted from {}: {err}", source.display()))
+        std::fs::read(scratch.join(entry)).map_err(|err| {
+            anyhow::anyhow!("{entry} was not extracted from {}: {err}", source.display())
+        })
     })();
     let _ = std::fs::remove_dir_all(scratch);
     result
@@ -430,7 +454,13 @@ fn system_extract_entries(
 
         let status = Command::new("7z")
             .args([
-                "x", src, &format!("-o{dst}"), "-y", "-spd", "-scsUTF-8", &list_arg,
+                "x",
+                src,
+                &format!("-o{dst}"),
+                "-y",
+                "-spd",
+                "-scsUTF-8",
+                &list_arg,
             ])
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
@@ -477,12 +507,16 @@ pub fn list_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
     if name.ends_with(".zip") || probe_magic(source, &[0x50, 0x4B, 0x03, 0x04]) {
         let file = std::fs::File::open(source)
             .map_err(|err| anyhow::anyhow!("failed to open {}: {err}", source.display()))?;
-        let mut zip = ZipArchive::new(file)
-            .map_err(|err| anyhow::anyhow!("failed to read zip archive {}: {err}", source.display()))?;
+        let mut zip = ZipArchive::new(file).map_err(|err| {
+            anyhow::anyhow!("failed to read zip archive {}: {err}", source.display())
+        })?;
         let mut out = Vec::with_capacity(zip.len());
         for idx in 0..zip.len() {
             let entry = zip.by_index(idx).map_err(|err| {
-                anyhow::anyhow!("failed to read zip entry {idx} from {}: {err}", source.display())
+                anyhow::anyhow!(
+                    "failed to read zip entry {idx} from {}: {err}",
+                    source.display()
+                )
             })?;
             if entry.is_dir() {
                 continue;
@@ -530,18 +564,31 @@ pub fn list_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
     )
 }
 
-fn list_tar_paths<R: Read>(mut archive: TarArchive<R>, source: &Path) -> anyhow::Result<Vec<String>> {
+fn list_tar_paths<R: Read>(
+    mut archive: TarArchive<R>,
+    source: &Path,
+) -> anyhow::Result<Vec<String>> {
     let mut out = Vec::new();
     for entry_result in archive.entries().map_err(|err| {
-        anyhow::anyhow!("failed to iterate tar entries in {}: {err}", source.display())
+        anyhow::anyhow!(
+            "failed to iterate tar entries in {}: {err}",
+            source.display()
+        )
     })? {
-        let entry = entry_result
-            .map_err(|err| anyhow::anyhow!("failed to read tar entry in {}: {err}", source.display()))?;
+        let entry = entry_result.map_err(|err| {
+            anyhow::anyhow!("failed to read tar entry in {}: {err}", source.display())
+        })?;
         if entry.header().entry_type().is_dir() {
             continue;
         }
-        let entry_path: PathBuf = entry.path()
-            .map_err(|err| anyhow::anyhow!("failed to read tar entry path in {}: {err}", source.display()))?
+        let entry_path: PathBuf = entry
+            .path()
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to read tar entry path in {}: {err}",
+                    source.display()
+                )
+            })?
             .to_path_buf();
         let normalized = normalize_archive_path(&entry_path)?;
         if !normalized.is_empty() {
@@ -757,9 +804,10 @@ fn probe_magic(source: &Path, magic: &[u8]) -> bool {
         return false;
     };
     let mut buf = vec![0u8; magic.len()];
-    file.read_exact(&mut buf).map(|_| buf == magic).unwrap_or(false)
+    file.read_exact(&mut buf)
+        .map(|_| buf == magic)
+        .unwrap_or(false)
 }
-
 
 fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     let src = source
@@ -812,11 +860,9 @@ fn compile_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
         builder.add(glob);
     }
 
-    Ok(Some(
-        builder
-            .build()
-            .map_err(|err| anyhow::anyhow!("failed to build globset: {err}"))?,
-    ))
+    Ok(Some(builder.build().map_err(|err| {
+        anyhow::anyhow!("failed to build globset: {err}")
+    })?))
 }
 
 fn compile_staged_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>> {
@@ -834,11 +880,9 @@ fn compile_staged_globset(patterns: &[String]) -> anyhow::Result<Option<GlobSet>
         builder.add(glob);
     }
 
-    Ok(Some(
-        builder
-            .build()
-            .map_err(|err| anyhow::anyhow!("failed to build globset: {err}"))?,
-    ))
+    Ok(Some(builder.build().map_err(|err| {
+        anyhow::anyhow!("failed to build globset: {err}")
+    })?))
 }
 
 fn lower_name(source: &Path) -> String {

@@ -15,13 +15,12 @@
 use crate::archive::{self, ArchiveFilters, extract_with_builtins};
 use crate::config::install::is_plugin_file;
 use crate::config::install::layout::auto::{content_roots_below, detect_auto_root};
-use crate::config::install::layout::plan::{plan_data_folder, Listing};
 use crate::config::install::layout::fomod::{
-    build_fomod_selection_map, child_elements, collect_fomod_entries, find_child_element,
-    find_fomod_config,
-    fomod_dependencies_match, fomod_option_type, read_xml_text, select_fomod_options,
-    FomodInstallEntry, FomodOptionType,
+    FomodInstallEntry, FomodOptionType, build_fomod_selection_map, child_elements,
+    collect_fomod_entries, find_child_element, find_fomod_config, fomod_dependencies_match,
+    fomod_option_type, read_xml_text, select_fomod_options,
 };
+use crate::config::install::layout::plan::{Listing, plan_data_folder};
 use crate::util::fs::{eq_ci, staging_dir_for};
 use roxmltree::Document;
 use serde::Serialize;
@@ -232,7 +231,6 @@ impl ArchiveTree {
             .map(|set| set.iter().cloned().collect())
             .unwrap_or_default()
     }
-
 }
 
 /// A BAIN subpackage directory: an ordering prefix, a separator, then a name.
@@ -313,7 +311,9 @@ fn guess_layout(tree: &ArchiveTree, paths: &[String], fomod_config: Option<&str>
                             .is_ok_and(|plan| !plan.is_empty())
                     }) =>
                 {
-                    LayoutGuess::CustomDataFolder { data_folder: (*only).clone() }
+                    LayoutGuess::CustomDataFolder {
+                        data_folder: (*only).clone(),
+                    }
                 }
                 _ => LayoutGuess::Unknown {
                     detail: format!("install would refuse it: {install_says}"),
@@ -332,8 +332,9 @@ fn guess_layout(tree: &ArchiveTree, paths: &[String], fomod_config: Option<&str>
 /// fail to compile or match the wrong thing.
 fn extract_single_entry(source: &Path, entry_path: &str) -> anyhow::Result<String> {
     let staging = staging_dir_for(Path::new("inspect"))?;
-    std::fs::create_dir_all(&staging)
-        .map_err(|err| anyhow::anyhow!("failed to create staging dir {}: {err}", staging.display()))?;
+    std::fs::create_dir_all(&staging).map_err(|err| {
+        anyhow::anyhow!("failed to create staging dir {}: {err}", staging.display())
+    })?;
 
     let include = vec![globset::escape(entry_path)];
     let result = ArchiveFilters::new(&include, &[])
@@ -386,13 +387,13 @@ fn inspect_fomod(source: &Path, config_path: &str) -> anyhow::Result<FomodReport
             let step_name = step.attribute("name").unwrap_or("").to_string();
             let visible_node = find_child_element(step, "visible");
             let conditional = visible_node.is_some();
-            let visible = match visible_node.and_then(|node| find_child_element(node, "dependencies"))
-            {
-                Some(deps) => {
-                    fomod_dependencies_match(deps, &active_plugins, &flags).unwrap_or(false)
-                }
-                None => true,
-            };
+            let visible =
+                match visible_node.and_then(|node| find_child_element(node, "dependencies")) {
+                    Some(deps) => {
+                        fomod_dependencies_match(deps, &active_plugins, &flags).unwrap_or(false)
+                    }
+                    None => true,
+                };
 
             let mut groups = Vec::new();
             for file_groups in child_elements(step, "optionalFileGroups") {
@@ -725,7 +726,7 @@ mod tests {
 
     #[test]
     fn a_top_level_data_folder_needs_no_declaration() {
-                assert!(matches!(
+        assert!(matches!(
             guess(&["Data/Meshes/foo.nif", "Data/Thing.esp"]),
             LayoutGuess::Simple { .. }
         ));
@@ -733,7 +734,7 @@ mod tests {
 
     #[test]
     fn a_bare_content_root_needs_no_declaration() {
-                assert!(matches!(
+        assert!(matches!(
             guess(&["Textures/foo.dds", "readme.txt"]),
             LayoutGuess::Simple { .. }
         ));
@@ -767,12 +768,11 @@ mod tests {
     #[test]
     fn a_single_numbered_folder_is_not_a_bain_package() {
         // One prefixed folder is a naming habit, not a package structure.
-                assert!(matches!(
+        assert!(matches!(
             guess(&["00 Core/Meshes/foo.nif"]),
             LayoutGuess::Simple { .. }
         ));
     }
-
 
     #[test]
     fn a_plugin_beside_a_data_folder_follows_the_plugin_as_install_does() {
@@ -787,7 +787,10 @@ mod tests {
     fn a_lone_folder_holding_the_plugin_is_unwrapped_whatever_it_is_called() {
         // Install's "folder named after the mod" rule is a special case of
         // this one, which is why inspect needs no mod id.
-        assert!(matches!(guess(&["Lost Spires/LostSpires.esp", "Lost Spires/Meshes/a.nif"]), LayoutGuess::Simple { .. }));
+        assert!(matches!(
+            guess(&["Lost Spires/LostSpires.esp", "Lost Spires/Meshes/a.nif"]),
+            LayoutGuess::Simple { .. }
+        ));
     }
 
     #[test]
@@ -796,7 +799,10 @@ mod tests {
             data_folder: "Odd\"Name\\Here".to_string(),
         };
         let snippet = render_toml_snippet("Mod-1-0.7z", &layout, None);
-        assert!(snippet.contains(r#"data_folder = "Odd\"Name\\Here""#), "{snippet}");
+        assert!(
+            snippet.contains(r#"data_folder = "Odd\"Name\\Here""#),
+            "{snippet}"
+        );
     }
 }
 
@@ -883,10 +889,7 @@ pub fn render_bsa_text(report: &BsaReport) -> String {
         report.folder_count,
         plural(report.folder_count, "folder", "folders"),
     ));
-    out.push_str(&format!(
-        "payload: {} bytes stored\n",
-        report.stored_bytes
-    ));
+    out.push_str(&format!("payload: {} bytes stored\n", report.stored_bytes));
     out.push_str(&format!(
         "flags:   archive 0x{:08x}, file 0x{:08x}\n",
         report.archive_flags, report.file_flags

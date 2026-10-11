@@ -91,7 +91,10 @@ fn check_merge(slug: &str) {
                 .filter(|(old, new)| got.get(old) != Some(new))
                 .take(5)
                 .map(|(old, new)| {
-                    format!("{old:06X}: expected {new:06X}, got {:06X}", allocation.map(plugin, *old))
+                    format!(
+                        "{old:06X}: expected {new:06X}, got {:06X}",
+                        allocation.map(plugin, *old)
+                    )
                 })
                 .collect();
             panic!(
@@ -109,7 +112,10 @@ fn check_merge(slug: &str) {
         .map(|(p, _)| p.as_str().to_ascii_lowercase())
         .collect();
     for plugin in expected.keys() {
-        assert!(listed.contains(plugin), "{slug}: unexpected plugin {plugin}");
+        assert!(
+            listed.contains(plugin),
+            "{slug}: unexpected plugin {plugin}"
+        );
     }
 }
 

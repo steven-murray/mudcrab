@@ -33,8 +33,8 @@ pub fn zstring(text: &str) -> Vec<u8> {
 pub fn record(sig: &[u8; 4], form_id: u32, flags: u32, fields: &[Vec<u8>]) -> Vec<u8> {
     let body: Vec<u8> = fields.concat();
     let body = if flags & FLAG_COMPRESSED != 0 {
-        use flate2::write::ZlibEncoder;
         use flate2::Compression;
+        use flate2::write::ZlibEncoder;
         use std::io::Write;
         let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
         encoder.write_all(&body).unwrap();

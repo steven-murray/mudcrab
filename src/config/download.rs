@@ -28,7 +28,10 @@ enum DownloadOutcome {
     Downloaded(PathBuf),
 }
 
-pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) -> anyhow::Result<()> {
+pub async fn download_all(
+    plan: &PersonalizedPlan,
+    settings: &DownloadSettings,
+) -> anyhow::Result<()> {
     std::fs::create_dir_all(&settings.cache_dir).map_err(|err| {
         anyhow::anyhow!(
             "failed to create cache directory {}: {err}",
@@ -94,14 +97,9 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
             let client = &client;
             let bar = bar.clone();
             async move {
-                let result = download_with_retry(
-                    client,
-                    job.path,
-                    job.file_name,
-                    job.handler,
-                    settings,
-                )
-                .await;
+                let result =
+                    download_with_retry(client, job.path, job.file_name, job.handler, settings)
+                        .await;
                 bar.inc(1);
                 bar.set_message(job.mod_id.to_string());
                 (job, result)
@@ -132,7 +130,11 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
     crate::ui::say(format!(
         "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
         settings.cache_dir.display(),
-        if errors.is_empty() { String::new() } else { format!("; {} failed", errors.len()) }
+        if errors.is_empty() {
+            String::new()
+        } else {
+            format!("; {} failed", errors.len())
+        }
     ));
     // Emitted before the bail, as in `check`: the run that fails is the run
     // whose summary is worth having, because it is the one naming dead links.
@@ -146,10 +148,7 @@ pub async fn download_all(plan: &PersonalizedPlan, settings: &DownloadSettings) 
 
     if !errors.is_empty() {
         let joined = errors.join("\n");
-        anyhow::bail!(
-            "download failed for {} archive(s):\n{joined}",
-            errors.len()
-        );
+        anyhow::bail!("download failed for {} archive(s):\n{joined}", errors.len());
     }
 
     Ok(())
@@ -179,7 +178,9 @@ async fn download_with_retry(
     let downloads = &settings.cache_dir;
     let archive = ArchiveRef::new(path, file_name);
 
-    if let Some(found) = archive_store::resolve(downloads, &settings.archive_search_paths, &archive)? {
+    if let Some(found) =
+        archive_store::resolve(downloads, &settings.archive_search_paths, &archive)?
+    {
         return Ok(DownloadOutcome::Cached(found));
     }
 
@@ -266,9 +267,11 @@ async fn download_with_retry(
 
 fn has_archive_extension(name: &str) -> bool {
     let lower = name.to_ascii_lowercase();
-    [".7z", ".zip", ".rar", ".tar.gz", ".gz", ".tar", ".esp", ".esm", ".bsa"]
-        .iter()
-        .any(|ext| lower.ends_with(ext))
+    [
+        ".7z", ".zip", ".rar", ".tar.gz", ".gz", ".tar", ".esp", ".esm", ".bsa",
+    ]
+    .iter()
+    .any(|ext| lower.ends_with(ext))
 }
 
 /// A filesystem-safe token for a source, for the scratch file only.
@@ -405,7 +408,11 @@ fn copy_local(source: &str, destination: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn download_http(client: &Client, url: &str, destination: &Path) -> anyhow::Result<Option<String>> {
+async fn download_http(
+    client: &Client,
+    url: &str,
+    destination: &Path,
+) -> anyhow::Result<Option<String>> {
     let response = client
         .get(url)
         .send()
@@ -514,7 +521,11 @@ fn filename_from_content_disposition(value: &str) -> Option<String> {
 /// the archive's name in a folder MO2 shows the user.
 fn sanitize_filename_component(value: &str) -> Option<String> {
     let decoded = percent_decode(value);
-    let basename = decoded.rsplit(['/', '\\']).next().unwrap_or(&decoded).trim();
+    let basename = decoded
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or(&decoded)
+        .trim();
     if basename.is_empty()
         || basename == "."
         || basename == ".."
@@ -601,7 +612,8 @@ pub async fn nexus_file_names(
     let mod_id: u64 = mod_id
         .parse()
         .map_err(|_| anyhow::anyhow!("nexus mod id {mod_id} is not a number"))?;
-    let files = crate::config::identify::nexus_files(client, api_base, api_key, game, mod_id).await?;
+    let files =
+        crate::config::identify::nexus_files(client, api_base, api_key, game, mod_id).await?;
     Ok(files
         .into_iter()
         .filter_map(|file| Some((file.file_id.to_string(), file.file_name?)))
@@ -615,9 +627,9 @@ struct NexusDownloadLink {
 }
 
 fn parse_nexus_spec(source: &str) -> anyhow::Result<(&str, &str, &str)> {
-    let value = source
-        .strip_prefix("nexus:")
-        .ok_or_else(|| anyhow::anyhow!("invalid nexus source, expected nexus:<game>/<mod_id>/<file_id>"))?;
+    let value = source.strip_prefix("nexus:").ok_or_else(|| {
+        anyhow::anyhow!("invalid nexus source, expected nexus:<game>/<mod_id>/<file_id>")
+    })?;
     let mut parts = value.split('/');
     let game = parts
         .next()
@@ -679,8 +691,8 @@ mod tests {
 
     #[test]
     fn parses_nexus_spec() {
-        let (game, mod_id, file_id) = parse_nexus_spec("nexus:skyrimspecialedition/1234/5678")
-            .expect("source should parse");
+        let (game, mod_id, file_id) =
+            parse_nexus_spec("nexus:skyrimspecialedition/1234/5678").expect("source should parse");
 
         assert_eq!(game, "skyrimspecialedition");
         assert_eq!(mod_id, "1234");
@@ -705,7 +717,13 @@ mod tests {
             exclude: vec![],
             game_root_files: vec![],
         };
-        assert_eq!(resolve_handler(explicit.path.as_deref().unwrap_or_default(), explicit.download_handler.as_deref()), "nexus");
+        assert_eq!(
+            resolve_handler(
+                explicit.path.as_deref().unwrap_or_default(),
+                explicit.download_handler.as_deref()
+            ),
+            "nexus"
+        );
 
         let scheme = CompiledArchive {
             condition: None,
@@ -723,7 +741,13 @@ mod tests {
             exclude: vec![],
             game_root_files: vec![],
         };
-        assert_eq!(resolve_handler(scheme.path.as_deref().unwrap_or_default(), scheme.download_handler.as_deref()), "nexus");
+        assert_eq!(
+            resolve_handler(
+                scheme.path.as_deref().unwrap_or_default(),
+                scheme.download_handler.as_deref()
+            ),
+            "nexus"
+        );
     }
 
     #[test]
@@ -764,7 +788,10 @@ mod tests {
         // The file name, not the descriptor: it is what the user has to go and
         // find, and it is what lookup matches on.
         assert!(message.contains("WACv_1beta.7z"), "{message}");
-        assert!(message.contains(&searched.display().to_string()), "{message}");
+        assert!(
+            message.contains(&searched.display().to_string()),
+            "{message}"
+        );
         // No retry wrapper -- a hand-fetched file will not appear on attempt 2.
         assert!(!message.contains("attempt(s)"), "{message}");
     }
@@ -861,14 +888,20 @@ mod tests {
         let meta = std::fs::read_to_string(temp.path().join("archive.bin.meta"))
             .expect("a .meta should be written beside it");
         assert!(meta.contains("gameName=SkyrimSE"), "{meta}");
-        assert!(meta.contains("modID=1234") && meta.contains("fileID=5678"), "{meta}");
+        assert!(
+            meta.contains("modID=1234") && meta.contains("fileID=5678"),
+            "{meta}"
+        );
         let leftovers: Vec<_> = std::fs::read_dir(temp.path())
             .unwrap()
             .filter_map(Result::ok)
             .map(|entry| entry.file_name().to_string_lossy().into_owned())
             .filter(|name| name != "archive.bin" && name != "archive.bin.meta")
             .collect();
-        assert!(leftovers.is_empty(), "no scratch files left behind: {leftovers:?}");
+        assert!(
+            leftovers.is_empty(),
+            "no scratch files left behind: {leftovers:?}"
+        );
 
         // A second run finds it by its ids and does not fetch again.
         download_all(&plan, &settings)

@@ -165,14 +165,24 @@ fn round_trips_an_xxxx_overflow_field() {
                 b"LAND",
                 0x0100_0801,
                 0,
-                &[esp::field(b"EDID", &esp::zstring("l")), esp::field(b"VNML", &big)],
+                &[
+                    esp::field(b"EDID", &esp::zstring("l")),
+                    esp::field(b"VNML", &big),
+                ],
             )],
         )],
     );
 
     let plugin = assert_round_trips("xxxx overflow", &bytes);
     assert_eq!(
-        plugin.records().next().unwrap().field(b"VNML").unwrap().data.len(),
+        plugin
+            .records()
+            .next()
+            .unwrap()
+            .field(b"VNML")
+            .unwrap()
+            .data
+            .len(),
         big.len()
     );
 }
@@ -256,7 +266,12 @@ fn rejects_a_truncated_plugin() {
         &[esp::group(
             *b"STAT",
             0,
-            &[esp::record(b"STAT", 0x0100_0801, 0, &[esp::field(b"EDID", b"abc\0")])],
+            &[esp::record(
+                b"STAT",
+                0x0100_0801,
+                0,
+                &[esp::field(b"EDID", b"abc\0")],
+            )],
         )],
     );
     assert!(Plugin::parse(&bytes[..bytes.len() - 4]).is_err());

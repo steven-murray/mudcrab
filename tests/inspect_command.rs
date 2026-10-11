@@ -27,7 +27,18 @@ fn make_zip(path: &Path, entries: &[(&str, &[u8])]) {
 }
 
 fn inspect(archive: &Path, extra: &[&str]) -> String {
-    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let assert = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("inspect")
         .arg(archive)
@@ -163,7 +174,12 @@ fn inspect_lists_bain_subpackages_for_a_numbered_archive() {
 
     assert!(report.contains("layout guess: BAIN"), "{report}");
     assert!(report.contains("layout = \"bain\""), "{report}");
-    for subpackage in ["00 Core", "01a ESP Vanilla", "01b ESP Filtered", "02 Golden"] {
+    for subpackage in [
+        "00 Core",
+        "01a ESP Vanilla",
+        "01b ESP Filtered",
+        "02 Golden",
+    ] {
         assert!(
             report.contains(&format!("\"{subpackage}\",")),
             "{subpackage} should appear in the bain_subpackages snippet:\n{report}"
@@ -191,7 +207,10 @@ fn inspect_guesses_a_plain_archive_needs_nothing_declared() {
 
     let report = inspect(&archive, &[]);
 
-    assert!(report.contains("layout guess: plain data folder"), "{report}");
+    assert!(
+        report.contains("layout guess: plain data folder"),
+        "{report}"
+    );
     assert!(
         report.contains("no layout, data_folder or target_subdir needed"),
         "{report}"
@@ -219,7 +238,10 @@ fn inspect_names_a_data_folder_the_auto_layout_would_not_find() {
 
     let report = inspect(&archive, &[]);
 
-    assert!(report.contains("layout guess: nested data folder"), "{report}");
+    assert!(
+        report.contains("layout guess: nested data folder"),
+        "{report}"
+    );
     assert!(
         report.contains("data_folder = \"Install This\""),
         "{report}"
@@ -300,7 +322,18 @@ fn json_format_carries_the_same_findings_structured() {
 #[test]
 fn inspect_refuses_a_path_that_is_not_an_archive() {
     let dir = tempdir().expect("temp dir should be created");
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("inspect")
         .arg(dir.path().join("nope.zip"))

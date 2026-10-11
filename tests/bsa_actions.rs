@@ -6,7 +6,7 @@
 //! iterating the declared list rather than from any machinery of their own.
 
 use mudcrab::bsa::Bsa;
-use mudcrab::config::actions::{apply_all, ActionCx};
+use mudcrab::config::actions::{ActionCx, apply_all};
 use mudcrab::config::install::InstallSettings;
 use mudcrab::config::schema::{
     CreateDummyPluginAction, ExtractBsaAction, FileHideAction, FileMoveAction, FilePruneAction,
@@ -184,7 +184,13 @@ fn pack_bsa_does_not_pack_the_archive_into_itself() {
 fn pack_bsa_refuses_a_path_escaping_the_mod_folder() {
     let (dir, target) = staged_mod();
     let err = run(&[pack("../escaped.bsa", &[], &[])], dir.path(), &target).unwrap_err();
-    assert!(err.to_string().contains("escaped.bsa") || err.chain().any(|c| c.to_string().contains("invalid relative path")), "{err:#}");
+    assert!(
+        err.to_string().contains("escaped.bsa")
+            || err
+                .chain()
+                .any(|c| c.to_string().contains("invalid relative path")),
+        "{err:#}"
+    );
     assert!(!dir.path().join("mods/escaped.bsa").exists());
 }
 
@@ -256,7 +262,11 @@ fn create_dummy_plugin_writes_a_valid_empty_plugin() {
 fn create_dummy_plugin_refuses_a_path_escaping_the_mod_folder() {
     let (dir, target) = staged_mod();
     let err = run(&[dummy("../escaped.esp")], dir.path(), &target).unwrap_err();
-    assert!(err.chain().any(|c| c.to_string().contains("invalid relative path")), "{err:#}");
+    assert!(
+        err.chain()
+            .any(|c| c.to_string().contains("invalid relative path")),
+        "{err:#}"
+    );
     assert!(!dir.path().join("mods/escaped.esp").exists());
 }
 
@@ -267,7 +277,10 @@ fn file_prune_deletes_only_matching_paths() {
     let (dir, target) = staged_mod();
     run(&[prune(&["meshes/**"])], dir.path(), &target).expect("prune");
 
-    assert!(!target.join("meshes").exists(), "emptied folders are removed");
+    assert!(
+        !target.join("meshes").exists(),
+        "emptied folders are removed"
+    );
     assert!(target.join("textures/rocks/rock01.dds").exists());
     assert!(target.join("sound/fx/thud.wav").exists());
     assert!(target.join("readme.txt").exists());
@@ -276,8 +289,12 @@ fn file_prune_deletes_only_matching_paths() {
 #[test]
 fn file_prune_removes_folders_left_empty() {
     let (dir, target) = staged_mod();
-    run(&[prune(&["**/*.nif", "**/*.dds", "**/*.wav"])], dir.path(), &target)
-        .expect("prune");
+    run(
+        &[prune(&["**/*.nif", "**/*.dds", "**/*.wav"])],
+        dir.path(),
+        &target,
+    )
+    .expect("prune");
 
     // Nested empties are cleaned all the way up, not just the leaf.
     assert!(!target.join("meshes").exists());
@@ -294,9 +311,18 @@ fn file_prune_treats_a_bare_directory_name_as_the_whole_folder() {
     let (dir, target) = staged_mod();
     run(&[prune(&["meshes", "textures"])], dir.path(), &target).expect("prune");
 
-    assert!(!target.join("meshes").exists(), "the meshes folder should be gone");
-    assert!(!target.join("textures").exists(), "the textures folder should be gone");
-    assert!(target.join("sound/fx/thud.wav").exists(), "unrelated folders survive");
+    assert!(
+        !target.join("meshes").exists(),
+        "the meshes folder should be gone"
+    );
+    assert!(
+        !target.join("textures").exists(),
+        "the textures folder should be gone"
+    );
+    assert!(
+        target.join("sound/fx/thud.wav").exists(),
+        "unrelated folders survive"
+    );
     assert!(target.join("readme.txt").exists());
 }
 
@@ -313,7 +339,10 @@ fn file_prune_matches_a_folder_whose_case_staging_has_already_folded() {
     run(&[prune(&["NoMushroomStalks"])], dir.path(), &target).expect("prune");
 
     assert!(!target.join("nomushroomstalks").exists());
-    assert!(target.join("readme.txt").exists(), "unrelated files survive");
+    assert!(
+        target.join("readme.txt").exists(),
+        "unrelated files survive"
+    );
 
     // And the reverse direction: a lowercase pattern against a folder that
     // kept its capitals, as a mod-supplied path can.
@@ -337,14 +366,22 @@ fn file_prune_star_does_not_reach_into_subfolders() {
 
     run(&[prune(&["textures/rocks/*.dds"])], dir.path(), &target).expect("prune");
 
-    assert!(!target.join("textures/rocks/loose01.dds").exists(), "direct children go");
+    assert!(
+        !target.join("textures/rocks/loose01.dds").exists(),
+        "direct children go"
+    );
     assert!(
         target.join("textures/rocks/underwater/keep.dds").exists(),
         "a file one level deeper is not a direct child and must survive"
     );
 
     // `**` still crosses, which is what a bare folder name expands to.
-    run(&[prune(&["textures/rocks/underwater"])], dir.path(), &target).expect("prune");
+    run(
+        &[prune(&["textures/rocks/underwater"])],
+        dir.path(),
+        &target,
+    )
+    .expect("prune");
     assert!(!target.join("textures/rocks/underwater").exists());
 }
 
@@ -367,8 +404,14 @@ fn file_prune_fails_when_a_pattern_matches_nothing() {
         .expect_err("a pattern matching nothing should fail");
 
     let message = format!("{err:#}");
-    assert!(message.contains("'Meshes'"), "the failing pattern must be named: {message}");
-    assert!(!message.contains("'meshes'"), "the matching pattern must not be: {message}");
+    assert!(
+        message.contains("'Meshes'"),
+        "the failing pattern must be named: {message}"
+    );
+    assert!(
+        !message.contains("'meshes'"),
+        "the matching pattern must not be: {message}"
+    );
 }
 
 #[test]
@@ -387,7 +430,10 @@ fn file_prune_refuses_traversal_patterns() {
         );
     }
 
-    assert!(sibling.join("victim.esp").exists(), "nothing outside was touched");
+    assert!(
+        sibling.join("victim.esp").exists(),
+        "nothing outside was touched"
+    );
     assert!(target.join("meshes/rocks/rock01.nif").exists());
 }
 
@@ -479,10 +525,7 @@ fn pruning_before_packing_leaves_an_archive_without_the_pruned_files() {
     // outcome rather than the actions coincidentally doing the right thing.
     let (dir, target) = staged_mod();
     run(
-        &[
-            prune(&["meshes/**"]),
-            pack("Example.bsa", &[], &[]),
-        ],
+        &[prune(&["meshes/**"]), pack("Example.bsa", &[], &[])],
         dir.path(),
         &target,
     )
@@ -513,8 +556,8 @@ fn all_three_are_only_valid_as_per_mod_actions() {
         let err = apply_all(
             std::slice::from_ref(&action),
             &ActionCx {
-            plan_mods: &[],
-            active_plugins: &Default::default(),
+                plan_mods: &[],
+                active_plugins: &Default::default(),
                 owner: "plan",
                 settings: &settings,
                 mod_target: None,
@@ -586,8 +629,12 @@ fn file_hide_fails_when_a_path_is_not_there() {
     // means the archive changed or the entry has a typo, and either way the
     // install would keep a file it was told to remove.
     let (dir, target) = staged_mod();
-    let err = run(&[hide(&["meshes/rocks", "meshes/nope"])], dir.path(), &target)
-        .expect_err("a missing path should fail");
+    let err = run(
+        &[hide(&["meshes/rocks", "meshes/nope"])],
+        dir.path(),
+        &target,
+    )
+    .expect_err("a missing path should fail");
 
     let message = format!("{err:#}");
     assert!(message.contains("'meshes/nope'"), "{message}");
@@ -599,7 +646,8 @@ fn file_hide_refuses_a_path_escaping_the_mod_folder() {
     let (dir, target) = staged_mod();
     let err = run(&[hide(&["../escaped"])], dir.path(), &target).unwrap_err();
     assert!(
-        err.chain().any(|c| c.to_string().contains("invalid relative path")),
+        err.chain()
+            .any(|c| c.to_string().contains("invalid relative path")),
         "{err:#}"
     );
 }
@@ -675,7 +723,12 @@ fn extract_bsa_unpacks_and_removes_the_archive() {
 #[test]
 fn extract_bsa_can_keep_the_archive() {
     let (dir, target) = staged_mod();
-    run(&[pack("Example.bsa", &["meshes/**"], &[])], dir.path(), &target).expect("pack");
+    run(
+        &[pack("Example.bsa", &["meshes/**"], &[])],
+        dir.path(),
+        &target,
+    )
+    .expect("pack");
     run(&[extract("Example.bsa", true)], dir.path(), &target).expect("extract");
 
     assert!(target.join("Example.bsa").exists());
@@ -687,10 +740,7 @@ fn extract_bsa_round_trips_through_pack_bsa() {
     // This is Part 9's OOO voice files in miniature.
     let (dir, target) = staged_mod();
     run(
-        &[
-            pack("Example.bsa", &["meshes/**"], &[]),
-            prune(&["meshes"]),
-        ],
+        &[pack("Example.bsa", &["meshes/**"], &[]), prune(&["meshes"])],
         dir.path(),
         &target,
     )
@@ -728,7 +778,10 @@ fn extract_bsa_round_trips_through_pack_bsa() {
 fn extract_bsa_fails_when_the_archive_is_not_there() {
     let (dir, target) = staged_mod();
     let err = run(&[extract("Missing.bsa", false)], dir.path(), &target).unwrap_err();
-    assert!(format!("{err:#}").contains("found no archive at"), "{err:#}");
+    assert!(
+        format!("{err:#}").contains("found no archive at"),
+        "{err:#}"
+    );
 }
 
 // --- file_move --------------------------------------------------------------
@@ -768,8 +821,16 @@ fn file_move_matches_the_source_case_insensitively() {
 #[test]
 fn file_move_fails_when_the_source_is_not_there() {
     let (dir, target) = staged_mod();
-    let err = run(&[moves("nope.esp", "optional/nope.esp")], dir.path(), &target).unwrap_err();
-    assert!(format!("{err:#}").contains("found no 'nope.esp'"), "{err:#}");
+    let err = run(
+        &[moves("nope.esp", "optional/nope.esp")],
+        dir.path(),
+        &target,
+    )
+    .unwrap_err();
+    assert!(
+        format!("{err:#}").contains("found no 'nope.esp'"),
+        "{err:#}"
+    );
 }
 
 #[test]
@@ -782,7 +843,10 @@ fn pack_bsa_can_delete_exactly_what_it_packed() {
     run(&[pack_and_prune("Example.bsa")], dir.path(), &target).expect("pack");
 
     assert!(target.join("Example.bsa").is_file());
-    assert!(!target.join("meshes").exists(), "packed folders should be gone");
+    assert!(
+        !target.join("meshes").exists(),
+        "packed folders should be gone"
+    );
     assert!(!target.join("textures").exists());
     assert!(!target.join("sound").exists());
     assert!(
@@ -807,7 +871,10 @@ fn pack_bsa_prune_leaves_anything_it_did_not_pack() {
     .expect("pack");
 
     assert!(!target.join("meshes").exists(), "packed");
-    assert!(target.join("textures/rocks/rock01.dds").is_file(), "not packed");
+    assert!(
+        target.join("textures/rocks/rock01.dds").is_file(),
+        "not packed"
+    );
     assert!(target.join("sound/fx/thud.wav").is_file(), "not packed");
 }
 
@@ -845,7 +912,10 @@ fn pack_bsa_prune_deletes_regardless_of_how_the_tree_is_cased() {
 
     run(&[pack_and_prune("Example.bsa")], dir.path(), &target).expect("pack");
 
-    assert!(!target.join("Sound").exists(), "mixed-case folders must go too");
+    assert!(
+        !target.join("Sound").exists(),
+        "mixed-case folders must go too"
+    );
     assert!(!target.join("MESHES").exists());
     assert!(target.join("Example.bsa").is_file());
 }

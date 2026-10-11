@@ -59,7 +59,10 @@ fn empty_plugin() -> Plugin {
     let fields = vec![
         Subrecord::new(b"HEDR", hedr),
         Subrecord::new(b"CNAM", zstring("mudcrab")),
-        Subrecord::new(b"SNAM", zstring("Dummy plugin so Oblivion loads the matching BSA")),
+        Subrecord::new(
+            b"SNAM",
+            zstring("Dummy plugin so Oblivion loads the matching BSA"),
+        ),
         Subrecord::new(b"MAST", zstring(master.as_str())),
         Subrecord::new(b"DATA", 0u64.to_le_bytes().to_vec()),
     ];

@@ -293,12 +293,11 @@ impl<'a> Bsa<'a> {
     pub fn extract_to(&self, destination: &Path) -> Result<usize, BsaError> {
         let mut written = 0usize;
         for (folder, file) in self.files() {
-            let relative = crate::util::fs::normalize_relative_path(
-                &file.path_in(folder).replace('\\', "/"),
-            )
-            .map_err(|_| BsaError::UnsafePath {
-                path: file.path_in(folder),
-            })?;
+            let relative =
+                crate::util::fs::normalize_relative_path(&file.path_in(folder).replace('\\', "/"))
+                    .map_err(|_| BsaError::UnsafePath {
+                        path: file.path_in(folder),
+                    })?;
 
             let target = destination.join(relative);
             if let Some(parent) = target.parent() {

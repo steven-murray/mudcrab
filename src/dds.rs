@@ -65,7 +65,10 @@ pub fn parse(data: &[u8]) -> anyhow::Result<Kind<'_>> {
     let width = u32_at(data, 16);
     let pf_flags = u32_at(data, 80);
     if pf_flags & DDPF_FOURCC == 0 {
-        return Ok(Kind::Other(format!("uncompressed {}-bit", u32_at(data, 88))));
+        return Ok(Kind::Other(format!(
+            "uncompressed {}-bit",
+            u32_at(data, 88)
+        )));
     }
     let fourcc = &data[84..88];
     if fourcc != b"DXT1" {
@@ -193,8 +196,18 @@ fn header(width: u32, height: u32, mip_count: u32) -> Vec<u8> {
         width * 4, // pitch
         0,         // depth
         if mip_count > 1 { mip_count } else { 0 },
-        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // reserved1[11]
-        32,                              // pixel format size
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,  // reserved1[11]
+        32, // pixel format size
         DDPF_RGB | DDPF_ALPHAPIXELS,
         0,
         32,
@@ -203,7 +216,10 @@ fn header(width: u32, height: u32, mip_count: u32) -> Vec<u8> {
         0x0000_00ff, // blue
         0xff00_0000, // alpha
         caps,
-        0, 0, 0, 0, // caps2..4, reserved2
+        0,
+        0,
+        0,
+        0, // caps2..4, reserved2
     ];
     let mut out = Vec::with_capacity(HEADER_LEN);
     out.extend_from_slice(b"DDS ");
@@ -226,7 +242,11 @@ pub fn find_textures(root: &Path) -> anyhow::Result<Vec<std::path::PathBuf>> {
             let entry = entry?;
             let path = entry.path();
             if entry.file_type()?.is_dir() {
-                if !path.to_string_lossy().to_ascii_lowercase().ends_with(".mohidden") {
+                if !path
+                    .to_string_lossy()
+                    .to_ascii_lowercase()
+                    .ends_with(".mohidden")
+                {
                     pending.push(path);
                 }
             } else if path
@@ -278,7 +298,9 @@ mod tests {
     #[test]
     fn decodes_punch_through_texels_to_zero_alpha() {
         let file = dxt1(4, 4, 1, &TRANSPARENT);
-        let Kind::Dxt1(texture) = parse(&file).unwrap() else { panic!() };
+        let Kind::Dxt1(texture) = parse(&file).unwrap() else {
+            panic!()
+        };
         assert!(texture.has_transparency());
         let out = texture.to_bgra_dds();
         assert_eq!(out.len(), HEADER_LEN + 4 * 4 * 4);
@@ -289,7 +311,9 @@ mod tests {
     #[test]
     fn opaque_texture_reports_no_transparency_and_decodes_bgra() {
         let file = dxt1(4, 4, 1, &OPAQUE_RED);
-        let Kind::Dxt1(texture) = parse(&file).unwrap() else { panic!() };
+        let Kind::Dxt1(texture) = parse(&file).unwrap() else {
+            panic!()
+        };
         assert!(!texture.has_transparency());
         let out = texture.to_bgra_dds();
         assert_eq!(&out[HEADER_LEN..HEADER_LEN + 4], &[0, 0, 255, 255]);
@@ -303,7 +327,9 @@ mod tests {
             blocks.extend_from_slice(&block);
         }
         let file = dxt1(8, 4, 3, &blocks);
-        let Kind::Dxt1(texture) = parse(&file).unwrap() else { panic!() };
+        let Kind::Dxt1(texture) = parse(&file).unwrap() else {
+            panic!()
+        };
         let out = texture.to_bgra_dds();
         assert_eq!(out.len(), HEADER_LEN + (8 * 4 + 4 * 2 + 2) * 4);
         assert_eq!(u32_at(&out, 28), 3);

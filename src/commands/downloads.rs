@@ -35,12 +35,22 @@ async fn nexus_names(
     let mut by_mod: HashMap<(String, String), HashMap<String, String>> = HashMap::new();
     let mut out = HashMap::new();
     for source in wanted {
-        let Some((game, mod_id, file_id)) = crate::config::archive_store::ArchiveRef::new(&source, None).nexus_ids() else {
+        let Some((game, mod_id, file_id)) =
+            crate::config::archive_store::ArchiveRef::new(&source, None).nexus_ids()
+        else {
             continue;
         };
         let key_pair = (game.to_string(), mod_id.to_string());
         if !by_mod.contains_key(&key_pair) {
-            match crate::config::download::nexus_file_names(&client, base.as_deref(), &key, game, mod_id).await {
+            match crate::config::download::nexus_file_names(
+                &client,
+                base.as_deref(),
+                &key,
+                game,
+                mod_id,
+            )
+            .await
+            {
                 Ok(files) => {
                     by_mod.insert(key_pair.clone(), files);
                 }
@@ -91,10 +101,17 @@ async fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
                 println!("rename   {}  ->  {}", name(derived), name(real));
             }
             Step::Conflict { derived, real } => {
-                println!("CONFLICT {}  ({} is a different file; left alone)", name(derived), name(real));
+                println!(
+                    "CONFLICT {}  ({} is a different file; left alone)",
+                    name(derived),
+                    name(real)
+                );
             }
             Step::Unknown { derived } => {
-                println!("unknown  {}  (no real name recorded; left alone)", name(derived));
+                println!(
+                    "unknown  {}  (no real name recorded; left alone)",
+                    name(derived)
+                );
             }
             Step::WriteMeta { archive, source } => {
                 metas += 1;

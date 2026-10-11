@@ -26,7 +26,11 @@ pub fn running_in(instance: &Path) -> Vec<u32> {
         };
         let mut pids = Vec::new();
         for entry in entries.flatten() {
-            let Some(pid) = entry.file_name().to_str().and_then(|n| n.parse::<u32>().ok()) else {
+            let Some(pid) = entry
+                .file_name()
+                .to_str()
+                .and_then(|n| n.parse::<u32>().ok())
+            else {
                 continue;
             };
             if let Ok(cmdline) = std::fs::read(entry.path().join("cmdline"))
@@ -58,16 +62,18 @@ fn cmdline_runs_instance(cmdline: &[u8], instance: &Path) -> bool {
         .and_then(as_unix_path)
         .is_some_and(|path| {
             let path = normalise(&path.to_string_lossy());
-            path.rsplit_once('/').is_some_and(|(dir, exe)| {
-                exe == "modorganizer.exe" && dir == instance
-            })
+            path.rsplit_once('/')
+                .is_some_and(|(dir, exe)| exe == "modorganizer.exe" && dir == instance)
         })
 }
 
 /// `Z:\home\x` -> `/home/x`; a Unix path as-is; anything else (another drive,
 /// a bare name) is not something this can place.
 fn as_unix_path(arg: &str) -> Option<PathBuf> {
-    if let Some(rest) = arg.strip_prefix("Z:\\").or_else(|| arg.strip_prefix("z:\\")) {
+    if let Some(rest) = arg
+        .strip_prefix("Z:\\")
+        .or_else(|| arg.strip_prefix("z:\\"))
+    {
         return Some(PathBuf::from(format!("/{}", rest.replace('\\', "/"))));
     }
     arg.starts_with('/').then(|| PathBuf::from(arg))
@@ -107,7 +113,8 @@ mod tests {
         let grep = b"pgrep\0-f\0ModOrganizer.exe\0";
         assert!(!cmdline_runs_instance(grep, Path::new(INSTANCE)));
         // Steam's wrapper names MO2 as an argument, not as itself.
-        let wrapper = b"c:\\windows\\system32\\steam.exe\0/home/u/Games/MudCrab Test/ModOrganizer.exe\0";
+        let wrapper =
+            b"c:\\windows\\system32\\steam.exe\0/home/u/Games/MudCrab Test/ModOrganizer.exe\0";
         assert!(!cmdline_runs_instance(wrapper, Path::new(INSTANCE)));
     }
 }

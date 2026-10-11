@@ -1,8 +1,10 @@
 //! Automatic layout detection for archives that declare no explicit layout.
 
+use super::plan::{
+    Children, LayoutPlan, Listing, folded_destination, is_plugin_name, strip_dir_prefix,
+};
 use crate::archive::ArchiveFilters;
 use crate::util::fs::eq_ci;
-use super::plan::{folded_destination, is_plugin_name, strip_dir_prefix, Children, LayoutPlan, Listing};
 
 // ---------------------------------------------------------------------------
 // Listing-based detection.
@@ -31,7 +33,8 @@ pub(crate) fn detect_auto_root(
             // the mod page. That is exactly what the wrapper descent below
             // resolves, and it was previously unreachable whenever an archive
             // contained a plugin at all.
-            if let Some(wrapper) = detect_content_wrapper(listing, source_label, &listing.children(""))?
+            if let Some(wrapper) =
+                detect_content_wrapper(listing, source_label, &listing.children(""))?
                 && plugins
                     .iter()
                     .all(|path| strip_dir_prefix(path, &wrapper).is_some())
@@ -67,7 +70,8 @@ pub(crate) fn detect_auto_root(
             if let Some(wrapper) = detect_content_wrapper(listing, source_label, &top)? {
                 return Ok(wrapper);
             }
-            if top.files.is_empty() && top.dirs.len() == 1 && listing.has_dir(&top.dirs[0], "Data") {
+            if top.files.is_empty() && top.dirs.len() == 1 && listing.has_dir(&top.dirs[0], "Data")
+            {
                 AutoLayoutKind::WrapperData
             } else if top.files.is_empty() && top.dirs.len() == 1 && eq_ci(&top.dirs[0], mod_id) {
                 AutoLayoutKind::Mod
@@ -353,20 +357,11 @@ pub(crate) enum AutoLayoutKind {
     WrapperData,
 }
 
-
-
-
 pub(crate) fn is_expected_game_content_dir_name(name: &str) -> bool {
     // Only include actual game-content folders, not container folders like Data.
     // Data/ wrappers are handled separately by detect_expected_content_wrapper_root.
     const EXPECTED_DIRS: &[&str] = &[
-        "meshes",
-        "textures",
-        "sound",
-        "menus",
-        "ini",
-        "video",
-        "obse",
+        "meshes", "textures", "sound", "menus", "ini", "video", "obse",
     ];
 
     EXPECTED_DIRS.iter().any(|expected| eq_ci(name, expected))
@@ -405,7 +400,6 @@ pub(crate) fn format_layout(layout: AutoLayoutKind, mod_id: &str) -> String {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,7 +409,11 @@ mod tests {
     fn resolve(files: &[&str], mod_id: &str) -> anyhow::Result<String> {
         let paths: Vec<String> = files.iter().map(ToString::to_string).collect();
         let root = detect_auto_root(&Listing::new(&paths), mod_id, "archive.7z")?;
-        Ok(if root.is_empty() { ".".to_string() } else { root })
+        Ok(if root.is_empty() {
+            ".".to_string()
+        } else {
+            root
+        })
     }
 
     #[test]
@@ -433,7 +431,10 @@ mod tests {
                 &["MOO - Hill Giant Eye Fix/Data/Meshes/moo/hillgiant/giant.nif"][..],
                 "Hill Giant Eye Fix - Loreless Creatures - MOO",
             ),
-            (&["patch/Data/Textures/characters/x.dds"][..], "Warpaints patch"),
+            (
+                &["patch/Data/Textures/characters/x.dds"][..],
+                "Warpaints patch",
+            ),
         ] {
             let root = resolve(files, mod_id).expect("should resolve");
             let expected = format!("{}/Data", files[0].split('/').next().unwrap());
@@ -539,7 +540,10 @@ mod wrapper_tests {
         let message = err.to_string();
         assert!(message.contains("Wrapper/A"), "{message}");
         assert!(message.contains("Wrapper/B"), "{message}");
-        assert!(message.contains("multiple sibling directories"), "{message}");
+        assert!(
+            message.contains("multiple sibling directories"),
+            "{message}"
+        );
 
         // The root-level version of the same shape, which has always errored
         // and had no test.
@@ -612,7 +616,7 @@ mod rival_content_at_depth_tests {
 #[cfg(test)]
 mod layout_audit {
     use super::*;
-    use crate::config::archive_store::{find, ArchiveRef};
+    use crate::config::archive_store::{ArchiveRef, find};
     use crate::config::schema::PersonalizedPlan;
 
     #[test]
@@ -629,11 +633,20 @@ mod layout_audit {
         let downloads = std::path::PathBuf::from(downloads);
         for entry in &plan.mods {
             for (index, archive) in entry.archives.iter().enumerate() {
-                if archive.layout.is_some() || !archive.build.is_empty() || archive.data_folder.is_some() {
+                if archive.layout.is_some()
+                    || !archive.build.is_empty()
+                    || archive.data_folder.is_some()
+                {
                     continue;
                 }
-                let Some(path) = archive.path.as_deref() else { continue };
-                let Some(file) = find(&downloads, &[], &ArchiveRef::new(path, archive.file_name.as_deref())) else {
+                let Some(path) = archive.path.as_deref() else {
+                    continue;
+                };
+                let Some(file) = find(
+                    &downloads,
+                    &[],
+                    &ArchiveRef::new(path, archive.file_name.as_deref()),
+                ) else {
                     println!("AUDIT\t{}\t{index}\tMISSING", entry.id);
                     continue;
                 };

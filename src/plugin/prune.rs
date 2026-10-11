@@ -9,9 +9,9 @@
 //! WRLD by its own. Deleting the record alone leaves the children behind,
 //! parented to a record that no longer exists, so both go together.
 
+use super::Plugin;
 use super::formid::FormId;
 use super::group::{Entry, GroupType};
-use super::Plugin;
 
 /// What to take out.
 #[derive(Debug, Default, Clone)]
@@ -166,7 +166,10 @@ mod tests {
     #[test]
     fn a_top_level_group_goes_with_everything_in_it() {
         let mut plugin = plugin(vec![
-            group(GroupType::TopLevel(*b"FLOR"), vec![record(b"FLOR", 0x0100_8520)]),
+            group(
+                GroupType::TopLevel(*b"FLOR"),
+                vec![record(b"FLOR", 0x0100_8520)],
+            ),
             group(
                 GroupType::TopLevel(*b"WRLD"),
                 vec![
@@ -186,7 +189,10 @@ mod tests {
 
         assert_eq!(report.groups, vec![*b"WRLD"]);
         assert_eq!(plugin.records().count(), 1, "only the FLOR record survives");
-        assert_eq!(report.entries_removed, 4, "group, record, child group, cell");
+        assert_eq!(
+            report.entries_removed, 4,
+            "group, record, child group, cell"
+        );
     }
 
     /// A CELL and the GRUP holding its references are separate entries. Taking
@@ -212,7 +218,11 @@ mod tests {
 
         assert_eq!(report.form_ids, vec![FormId(0x0100_0001)]);
         let left: Vec<u32> = plugin.records().map(|record| record.form_id.0).collect();
-        assert_eq!(left, vec![0x0100_0003], "the cell, its group and its ref all go");
+        assert_eq!(
+            left,
+            vec![0x0100_0003],
+            "the cell, its group and its ref all go"
+        );
     }
 
     /// Part 26b row 12's shape: the guide says "delete Block -11, 2", and the

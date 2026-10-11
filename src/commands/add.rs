@@ -1,7 +1,7 @@
 use crate::cli::AddArgs;
 use crate::config;
 use crate::config::add::{
-    find_plugins, parse_meta_ini, plan_insertion_at, NewMod, OracleMeta, Placement,
+    NewMod, OracleMeta, Placement, find_plugins, parse_meta_ini, plan_insertion_at,
 };
 use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
@@ -110,9 +110,10 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
 fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
     match (&args.from_oracle, &args.nexus) {
         (Some(oracle_dir), None) => {
-            let folder = args.mod_folder.as_ref().ok_or_else(|| {
-                anyhow::anyhow!("--from-oracle requires --mod <mod folder name>")
-            })?;
+            let folder = args
+                .mod_folder
+                .as_ref()
+                .ok_or_else(|| anyhow::anyhow!("--from-oracle requires --mod <mod folder name>"))?;
             let mod_dir = oracle_dir.join(folder);
             let new_mod = from_oracle(&mod_dir, folder, args)?;
             Ok((new_mod, Some(mod_dir)))
@@ -121,15 +122,16 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
         (None, None) => anyhow::bail!(
             "give a source: --from-oracle <ORACLE_MODS_DIR> --mod <folder>, or --nexus <modid>/<fileid>"
         ),
-        (Some(_), Some(_)) => unreachable!("clap declares --from-oracle and --nexus as conflicting"),
+        (Some(_), Some(_)) => {
+            unreachable!("clap declares --from-oracle and --nexus as conflicting")
+        }
     }
 }
 
 fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
     let meta_path = mod_dir.join("meta.ini");
-    let text = std::fs::read_to_string(&meta_path).map_err(|err| {
-        anyhow::anyhow!("failed to read {}: {err}", meta_path.display())
-    })?;
+    let text = std::fs::read_to_string(&meta_path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", meta_path.display()))?;
     let meta = parse_meta_ini(&text);
 
     let id = args.id.clone().unwrap_or_else(|| folder.to_string());
@@ -175,10 +177,15 @@ fn from_oracle(mod_dir: &Path, folder: &str, args: &AddArgs) -> anyhow::Result<N
 }
 
 enum NexusSource {
-    Nexus { mod_id: u64, file_id: u64 },
+    Nexus {
+        mod_id: u64,
+        file_id: u64,
+    },
     /// `modid=0`: MO2's marker for a mod installed from somewhere else.
     NotNexus,
-    MissingFileId { mod_id: u64 },
+    MissingFileId {
+        mod_id: u64,
+    },
 }
 
 fn nexus_ids(meta: &OracleMeta) -> NexusSource {

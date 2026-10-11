@@ -1,20 +1,20 @@
 pub mod add;
-pub mod move_mod;
 mod bsa;
-mod dds;
-mod downloads;
 pub mod check;
 pub mod compile;
 pub mod conflicts;
+mod dds;
 pub mod diff;
 pub mod download;
+mod downloads;
 pub mod export;
 pub mod identify;
-pub mod nexus_files;
 pub mod inspect;
 pub mod install;
 pub mod merge;
+pub mod move_mod;
 mod new_merge;
+pub mod nexus_files;
 pub mod query;
 pub mod setup_tools;
 pub mod unhide_merges;
@@ -61,9 +61,7 @@ pub fn resolve_downloads_dir(
     if let Some(instance) = mo2_instance {
         return Ok(instance.join("downloads"));
     }
-    anyhow::bail!(
-        "no downloads folder: pass --downloads <DIR>, or set downloads_dir in tools.toml"
-    )
+    anyhow::bail!("no downloads folder: pass --downloads <DIR>, or set downloads_dir in tools.toml")
 }
 
 pub async fn execute(cli: Cli) -> anyhow::Result<()> {

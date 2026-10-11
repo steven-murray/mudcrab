@@ -27,7 +27,11 @@ fn collect_plugins(root: &Path, out: &mut Vec<PathBuf>) {
             collect_plugins(&path, out);
             continue;
         }
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_ascii_lowercase();
         let name = name.strip_suffix(".mohidden").unwrap_or(&name);
         if name.ends_with(".esp") || name.ends_with(".esm") {
             out.push(path);
@@ -45,7 +49,11 @@ fn round_trips_every_real_plugin_byte_for_byte() {
     let mut paths = Vec::new();
     collect_plugins(&mods, &mut paths);
     paths.sort();
-    assert!(!paths.is_empty(), "found no plugins under {}", mods.display());
+    assert!(
+        !paths.is_empty(),
+        "found no plugins under {}",
+        mods.display()
+    );
 
     let mut checked = 0usize;
     let mut compressed_records = 0usize;

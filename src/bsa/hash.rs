@@ -21,7 +21,13 @@ const MULTIPLIER: u32 = 0x0001_003F;
 /// Lowercase and switch to the backslash separator the format stores.
 fn normalize(name: &str) -> String {
     name.chars()
-        .map(|c| if c == '/' { '\\' } else { c.to_ascii_lowercase() })
+        .map(|c| {
+            if c == '/' {
+                '\\'
+            } else {
+                c.to_ascii_lowercase()
+            }
+        })
         .collect()
 }
 

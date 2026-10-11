@@ -15,7 +15,10 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
                  the profile back when it exits, which would undo this install. \
                  (--ignore-running-mo2 overrides this.)",
                 instance.display(),
-                pids.iter().map(u32::to_string).collect::<Vec<_>>().join(", ")
+                pids.iter()
+                    .map(u32::to_string)
+                    .collect::<Vec<_>>()
+                    .join(", ")
             );
         }
     }

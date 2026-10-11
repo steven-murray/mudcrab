@@ -1,11 +1,8 @@
 use crate::config::filter::ModFilter;
-use crate::config::schema::
-    {PersonalizedPlan, PostInstallAction};
-use crate::config::mo2::{
-    export_mo2_instance, prepare_mo2_profile,
-};
-use crate::config::tools::loot::run_loot_sort;
+use crate::config::mo2::{export_mo2_instance, prepare_mo2_profile};
+use crate::config::schema::{PersonalizedPlan, PostInstallAction};
 use crate::config::tools::ToolsConfig;
+use crate::config::tools::loot::run_loot_sort;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
@@ -40,8 +37,8 @@ pub mod stage;
 
 use layout::install_mod_archives;
 use manifest::{
-    get_install_manifest_path, hash_personalized_mod, load_install_manifest,
-    relative_path_to_mod, should_skip_mod_install, BuiltMerge, InstallManifest, InstalledMod,
+    BuiltMerge, InstallManifest, InstalledMod, get_install_manifest_path, hash_personalized_mod,
+    load_install_manifest, relative_path_to_mod, should_skip_mod_install,
 };
 use merge::HiddenPlugin;
 pub(crate) use stage::is_plugin_file;
@@ -211,7 +208,6 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         let definition_hash = hash_personalized_mod(mod_entry)?;
         let previous = previous_by_id.get(&mod_entry.id);
 
-
         // If this mod was previously installed, use its stored installed_path (in case it was renamed).
         if let Some(prev) = previous
             && !prev.installed_path.is_empty()
@@ -221,7 +217,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         // Handle mod conflicts: if another mod target exists but belongs to a different profile
         // with a different version, rename current profile's target to avoid collision.
         if !settings.dry_run {
-            mod_target = handle_mod_conflict(&mod_target, &mod_entry.id, &definition_hash, settings)?;
+            mod_target =
+                handle_mod_conflict(&mod_target, &mod_entry.id, &definition_hash, settings)?;
         }
 
         if should_skip_mod_install(
@@ -261,15 +258,15 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
 
             if settings.execute_actions && !pending.is_empty() && !settings.dry_run {
                 crate::config::actions::apply_all(
-                &pending,
-                &crate::config::actions::ActionCx {
-                    owner: &mod_entry.id,
-                    settings,
-                    mod_target: Some(&mod_target),
-                    plan_mods: &plan.mods,
-                    active_plugins: &active_plugins,
-                },
-            )?;
+                    &pending,
+                    &crate::config::actions::ActionCx {
+                        owner: &mod_entry.id,
+                        settings,
+                        mod_target: Some(&mod_target),
+                        plan_mods: &plan.mods,
+                        active_plugins: &active_plugins,
+                    },
+                )?;
                 actions_applied = true;
             }
 
@@ -278,12 +275,16 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                 definition_hash,
                 extracted_files: previous_extracted,
                 actions_applied,
-                            installed_path: relative_path_to_mod(&mod_target, &settings.mods_dir),
+                installed_path: relative_path_to_mod(&mod_target, &settings.mods_dir),
             });
             continue;
         }
 
-        let status = if previous.is_some() { "updated" } else { "installed" };
+        let status = if previous.is_some() {
+            "updated"
+        } else {
+            "installed"
+        };
         changed += 1;
         tracing::info!(
             mod_id = %mod_entry.id,
@@ -308,7 +309,8 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             clear_install_target(&mod_target)?;
         }
 
-        let extracted_files = install_mod_archives(mod_entry, settings, &mod_target, &active_plugins)?;
+        let extracted_files =
+            install_mod_archives(mod_entry, settings, &mod_target, &active_plugins)?;
         let mut actions_applied = false;
         if settings.execute_actions && !settings.dry_run {
             crate::config::actions::apply_all(
@@ -343,7 +345,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             id: mod_entry.id.clone(),
             definition_hash,
             extracted_files,
-                        installed_path: relative_path_to_mod(&mod_target, &settings.mods_dir),
+            installed_path: relative_path_to_mod(&mod_target, &settings.mods_dir),
             actions_applied,
         });
 
@@ -401,7 +403,12 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         let export_scope: Option<HashSet<String>> = if settings.filter.is_empty() {
             None
         } else {
-            Some(installed_mods.iter().map(|entry| entry.id.clone()).collect())
+            Some(
+                installed_mods
+                    .iter()
+                    .map(|entry| entry.id.clone())
+                    .collect(),
+            )
         };
 
         write_install_manifest(
@@ -428,9 +435,17 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     crate::ui::say(format!(
         "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}{}",
         if settings.dry_run { "Dry run: " } else { "" },
-        if merges > 0 { format!(", {merges} merge(s) checked") } else { String::new() },
+        if merges > 0 {
+            format!(", {merges} merge(s) checked")
+        } else {
+            String::new()
+        },
         match &settings.mo2_instance_dir {
-            Some(dir) if !settings.dry_run => format!("; MO2 profile '{}' in {} written", settings.profile_name, dir.display()),
+            Some(dir) if !settings.dry_run => format!(
+                "; MO2 profile '{}' in {} written",
+                settings.profile_name,
+                dir.display()
+            ),
             _ => String::new(),
         }
     ));
@@ -482,12 +497,12 @@ fn clear_install_target(mod_target: &Path) -> anyhow::Result<()> {
 }
 
 /// Handle mod conflicts when installing to a shared mods/ directory used by multiple profiles.
-/// 
+///
 /// When a mod name conflicts with an existing mod that (1) exists on disk and (2) is owned by
 /// another profile and (3) has a different definition hash, we rename the current profile's mod
 /// by appending ` - <profilename>` to its folder name. This preserves all other profiles' state
 /// and only modifies the current profile's manifest, which stores the renamed path.
-/// 
+///
 /// Returns the actual target path that should be used for this installation.
 fn handle_mod_conflict(
     intended_target: &Path,
@@ -520,7 +535,10 @@ fn handle_mod_conflict(
     // Conflict detected: different profile owns it with different version.
     // Rename *this* profile's target folder to avoid overwriting the other profile's mod.
     let parent = intended_target.parent().ok_or_else(|| {
-        anyhow::anyhow!("mod target has no parent directory: {}", intended_target.display())
+        anyhow::anyhow!(
+            "mod target has no parent directory: {}",
+            intended_target.display()
+        )
     })?;
     let renamed_target = parent.join(format!("{} - {}", mod_id, settings.profile_name));
 
@@ -548,10 +566,13 @@ fn handle_mod_conflict(
 }
 
 /// Scan the profiles/ directory to find which profile currently claims ownership of a mod.
-/// 
+///
 /// Returns `Some((profile_name, definition_hash))` if found, `None` if not found or if
 /// the current profile already owns it or if ownership cannot be determined.
-fn find_mod_owner_profile(mods_dir: &Path, mod_id: &str) -> anyhow::Result<Option<(String, String)>> {
+fn find_mod_owner_profile(
+    mods_dir: &Path,
+    mod_id: &str,
+) -> anyhow::Result<Option<(String, String)>> {
     let mo2_root = mods_dir.parent().and_then(|p| p.parent());
     let Some(mo2_root) = mo2_root else {
         // Not an MO2 setup; no other profiles to check
@@ -563,11 +584,14 @@ fn find_mod_owner_profile(mods_dir: &Path, mod_id: &str) -> anyhow::Result<Optio
         return Ok(None);
     }
 
-    for profile_entry in std::fs::read_dir(&profiles_dir)
-        .map_err(|err| anyhow::anyhow!("failed to scan profiles dir {}: {err}", profiles_dir.display()))?
-    {
-        let entry = profile_entry
-            .map_err(|err| anyhow::anyhow!("failed to read profile entry: {err}"))?;
+    for profile_entry in std::fs::read_dir(&profiles_dir).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to scan profiles dir {}: {err}",
+            profiles_dir.display()
+        )
+    })? {
+        let entry =
+            profile_entry.map_err(|err| anyhow::anyhow!("failed to read profile entry: {err}"))?;
         let profile_path = entry.path();
         if !profile_path.is_dir() {
             continue;
@@ -605,7 +629,10 @@ fn find_mod_owner_profile(mods_dir: &Path, mod_id: &str) -> anyhow::Result<Optio
     Ok(None)
 }
 
-fn run_post_install_actions(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
+fn run_post_install_actions(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+) -> anyhow::Result<()> {
     for action in &plan.post_install_actions {
         match action {
             PostInstallAction::LootSort => run_loot_sort(plan, settings)?,
@@ -634,19 +661,20 @@ mod tests {
             "36 - zMERGED PLUGINS",
             "OOO - KotN Patch",
         ] {
-            assert!(safe_mod_dir_name(ok).is_ok(), "mod id {ok:?} should be accepted");
+            assert!(
+                safe_mod_dir_name(ok).is_ok(),
+                "mod id {ok:?} should be accepted"
+            );
         }
     }
-    use super::{
-        hash_personalized_mod, should_skip_mod_install, InstalledMod,
-    };
     use super::layout::extract_archive;
+    use super::{InstalledMod, hash_personalized_mod, should_skip_mod_install};
     use crate::config::actions::ini_set::apply_ini_set;
-    use crate::config::tools::loot::find_unlisted_plugins;
     use crate::config::schema::{
         ArchiveLayout, CompiledArchive, FomodSelection, IniSetFormat, ModAction, PersonalizedMod,
         QacAction,
     };
+    use crate::config::tools::loot::find_unlisted_plugins;
     use std::collections::HashSet;
     use tempfile::tempdir;
     use zip::write::SimpleFileOptions;
@@ -691,10 +719,7 @@ mod tests {
 
         let unlisted = find_unlisted_plugins(&declared, &discovered);
 
-        assert_eq!(
-            unlisted,
-            vec!["Oblivion Citadel Door Fix.esp".to_string(),]
-        );
+        assert_eq!(unlisted, vec!["Oblivion Citadel Door Fix.esp".to_string(),]);
     }
 
     #[test]
@@ -736,10 +761,16 @@ mod tests {
             definition_hash: hash.clone(),
             extracted_files: 1,
             actions_applied: true,
-                    installed_path: String::new(),
+            installed_path: String::new(),
         };
 
-        assert!(should_skip_mod_install(&mod_target, &hash, Some(&previous), false, false));
+        assert!(should_skip_mod_install(
+            &mod_target,
+            &hash,
+            Some(&previous),
+            false,
+            false
+        ));
 
         let different_hash = "deadbeef".to_string();
         assert!(!should_skip_mod_install(
@@ -759,12 +790,24 @@ mod tests {
             false
         ));
 
-        assert!(!should_skip_mod_install(&mod_target, &hash, Some(&previous), true, false));
+        assert!(!should_skip_mod_install(
+            &mod_target,
+            &hash,
+            Some(&previous),
+            true,
+            false
+        ));
 
         // --force reinstalls a mod the fingerprint says is settled. The
         // fingerprint covers the plan, not the installer, so it cannot see a
         // change in what an action does.
-        assert!(!should_skip_mod_install(&mod_target, &hash, Some(&previous), false, true));
+        assert!(!should_skip_mod_install(
+            &mod_target,
+            &hash,
+            Some(&previous),
+            false,
+            true
+        ));
     }
 
     #[test]
@@ -773,7 +816,8 @@ mod tests {
         let ini_path = temp.path().join("example.ini");
         std::fs::write(&ini_path, "foo = 1\n").expect("write ini");
 
-        apply_ini_set(&ini_path, "foo", "2", IniSetFormat::Standard).expect("ini_set should succeed");
+        apply_ini_set(&ini_path, "foo", "2", IniSetFormat::Standard)
+            .expect("ini_set should succeed");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
         assert_eq!(content, "foo = 2\n", "a wholly spaced file stays spaced");
@@ -792,7 +836,10 @@ mod tests {
         let err = apply_ini_set(&ini_path, "Amount", "5", IniSetFormat::Standard)
             .expect_err("two matches with no section is not answerable");
         let message = err.to_string();
-        assert!(message.contains("World") && message.contains("Interior"), "{message}");
+        assert!(
+            message.contains("World") && message.contains("Interior"),
+            "{message}"
+        );
         assert!(message.contains("section ="), "{message}");
         assert_eq!(
             std::fs::read_to_string(&ini_path).expect("read ini"),
@@ -801,8 +848,14 @@ mod tests {
         );
 
         // Naming the section resolves it, and only that section moves.
-        apply_ini_set_in_section(&ini_path, Some("Interior"), "Amount", "5", IniSetFormat::Standard)
-            .expect("naming the section is unambiguous");
+        apply_ini_set_in_section(
+            &ini_path,
+            Some("Interior"),
+            "Amount",
+            "5",
+            IniSetFormat::Standard,
+        )
+        .expect("naming the section is unambiguous");
         assert_eq!(
             std::fs::read_to_string(&ini_path).expect("read ini"),
             "[World]\nAmount=10\n\n[Interior]\nAmount=5\n"
@@ -817,8 +870,11 @@ mod tests {
 
         let temp = tempdir().expect("tempdir");
         let ini_path = temp.path().join("Oblivion.ini");
-        std::fs::write(&ini_path, "[Grass]\niMinGrassSize=80\n\n[Display]\nbFull=1\n")
-            .expect("write ini");
+        std::fs::write(
+            &ini_path,
+            "[Grass]\niMinGrassSize=80\n\n[Display]\nbFull=1\n",
+        )
+        .expect("write ini");
 
         apply_ini_set_in_section(
             &ini_path,
@@ -877,8 +933,14 @@ mod tests {
         .expect("write ini");
 
         for section in ["World", "Interior"] {
-            apply_ini_set_in_section(&ini_path, Some(section), "Amount", "0.0", IniSetFormat::Standard)
-                .expect("ini_set");
+            apply_ini_set_in_section(
+                &ini_path,
+                Some(section),
+                "Amount",
+                "0.0",
+                IniSetFormat::Standard,
+            )
+            .expect("ini_set");
         }
 
         assert_eq!(
@@ -898,8 +960,14 @@ mod tests {
         let temp = tempdir().expect("tempdir");
         let crlf = temp.path().join("Fog.ini");
         std::fs::write(&crlf, "[World]\r\nAmount        =0.5\r\n").expect("write");
-        apply_ini_set_in_section(&crlf, Some("World"), "Amount", "0.0", IniSetFormat::Standard)
-            .expect("ini_set");
+        apply_ini_set_in_section(
+            &crlf,
+            Some("World"),
+            "Amount",
+            "0.0",
+            IniSetFormat::Standard,
+        )
+        .expect("ini_set");
         assert_eq!(
             std::fs::read_to_string(&crlf).expect("read"),
             "[World]\r\nAmount        =0.0\r\n"
@@ -923,8 +991,11 @@ mod tests {
     fn ini_set_without_a_section_still_edits_an_unambiguous_key() {
         let temp = tempdir().expect("tempdir");
         let ini_path = temp.path().join("Oblivion.ini");
-        std::fs::write(&ini_path, "[Display]\nbFull=1\n\n[Grass]\niMinGrassSize=80\n")
-            .expect("write ini");
+        std::fs::write(
+            &ini_path,
+            "[Display]\nbFull=1\n\n[Grass]\niMinGrassSize=80\n",
+        )
+        .expect("write ini");
 
         apply_ini_set(&ini_path, "iMinGrassSize", "60", IniSetFormat::Standard).expect("ini_set");
 
@@ -977,12 +1048,23 @@ mod tests {
         )
         .expect("write ini");
 
-        apply_ini_set(&ini_path, "SFontFile_2", "Data\\Fonts\\New.fnt", IniSetFormat::Standard)
-            .expect("ini_set");
+        apply_ini_set(
+            &ini_path,
+            "SFontFile_2",
+            "Data\\Fonts\\New.fnt",
+            IniSetFormat::Standard,
+        )
+        .expect("ini_set");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
-        assert!(content.contains("SFontFile_2=Data\\Fonts\\New.fnt"), "{content}");
-        assert!(!content.contains(" = "), "the spaced form should be gone:\n{content}");
+        assert!(
+            content.contains("SFontFile_2=Data\\Fonts\\New.fnt"),
+            "{content}"
+        );
+        assert!(
+            !content.contains(" = "),
+            "the spaced form should be gone:\n{content}"
+        );
     }
 
     #[test]
@@ -1019,8 +1101,13 @@ mod tests {
         std::fs::write(&ini_path, "set   zzzMigckQ.bBetterSkillup    to    1\n")
             .expect("write ini");
 
-        apply_ini_set(&ini_path, "zzzMigckQ.bBetterSkillup", "0", IniSetFormat::SetTo)
-            .expect("ini_set should succeed");
+        apply_ini_set(
+            &ini_path,
+            "zzzMigckQ.bBetterSkillup",
+            "0",
+            IniSetFormat::SetTo,
+        )
+        .expect("ini_set should succeed");
 
         // This used to normalise the line to `set key to 0`. Part 23's
         // `Dynamic Oblivion Combat.ini` is tab-aligned into columns and
@@ -1041,13 +1128,17 @@ mod tests {
         )
         .expect("write ini");
 
-        apply_ini_set(&ini_path, "dcvars.ini_NPCdodgePercent", "50", IniSetFormat::SetTo)
-            .expect("ini_set should succeed");
+        apply_ini_set(
+            &ini_path,
+            "dcvars.ini_NPCdodgePercent",
+            "50",
+            IniSetFormat::SetTo,
+        )
+        .expect("ini_set should succeed");
 
         let content = std::fs::read_to_string(&ini_path).expect("read ini");
         assert_eq!(
-            content,
-            "set dcvars.ini_NPCdodgePercent\t\tto\t50\t;Default 90\n",
+            content, "set dcvars.ini_NPCdodgePercent\t\tto\t50\t;Default 90\n",
             "the author's note about the default is not ours to delete"
         );
     }
@@ -1100,8 +1191,15 @@ mod tests {
         let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
         let active_plugins = HashSet::new();
 
-        let extracted = extract_archive(&archive_path, &target_root, "Example", &archive, &filters, &active_plugins)
-            .expect("extract should succeed");
+        let extracted = extract_archive(
+            &archive_path,
+            &target_root,
+            "Example",
+            &archive,
+            &filters,
+            &active_plugins,
+        )
+        .expect("extract should succeed");
 
         assert_eq!(extracted, 3);
         assert!(target_root.join("plugin1.esp").exists());
@@ -1155,7 +1253,10 @@ mod tests {
             bain_subpackages: Vec::new(),
             fomod_selections: Vec::new(),
             build: Vec::new(),
-            include: vec!["Waalx Animals & Creatures.esm".to_string(), "WAC.bsa".to_string()],
+            include: vec![
+                "Waalx Animals & Creatures.esm".to_string(),
+                "WAC.bsa".to_string(),
+            ],
             exclude: Vec::new(),
             game_root_files: Vec::new(),
         };
@@ -1182,7 +1283,10 @@ mod tests {
         // Same archive, same filters, no declared layout: detection runs and
         // refuses. This is the assertion that makes the fix load-bearing --
         // before it, `simple` took this branch too.
-        let detected = CompiledArchive { layout: None, ..simple };
+        let detected = CompiledArchive {
+            layout: None,
+            ..simple
+        };
         let err = extract_archive(
             &archive_path,
             &temp.path().join("out-auto"),
@@ -1210,10 +1314,12 @@ mod tests {
 
         zip.start_file("readme.txt", options).expect("readme");
         std::io::Write::write_all(&mut zip, b"docs").expect("write readme");
-        zip.start_file("obmm_BSA_settings.jpg", options).expect("jpg");
+        zip.start_file("obmm_BSA_settings.jpg", options)
+            .expect("jpg");
         std::io::Write::write_all(&mut zip, b"jpg").expect("write jpg");
         zip.add_directory("Data/", options).expect("data dir");
-        zip.start_file("Data/textures/rock.dds", options).expect("texture");
+        zip.start_file("Data/textures/rock.dds", options)
+            .expect("texture");
         std::io::Write::write_all(&mut zip, b"tex").expect("write texture");
         zip.finish().expect("finish zip");
 
@@ -1247,7 +1353,10 @@ mod tests {
         .expect("extract");
 
         assert_eq!(extracted, 3, "the texture plus both loose files");
-        assert!(target_root.join("textures/rock.dds").exists(), "Data/ is still unwrapped");
+        assert!(
+            target_root.join("textures/rock.dds").exists(),
+            "Data/ is still unwrapped"
+        );
         assert!(target_root.join("readme.txt").exists());
         assert!(target_root.join("obmm_BSA_settings.jpg").exists());
         // The skipped level's *name* must not reappear as a folder.
@@ -1266,9 +1375,11 @@ mod tests {
         let mut zip = zip::ZipWriter::new(file);
         let options = SimpleFileOptions::default();
 
-        zip.start_file("Data/textures/keep.dds", options).expect("keep");
+        zip.start_file("Data/textures/keep.dds", options)
+            .expect("keep");
         std::io::Write::write_all(&mut zip, b"keep").expect("write keep");
-        zip.start_file("Screenshots/preview.png", options).expect("skip");
+        zip.start_file("Screenshots/preview.png", options)
+            .expect("skip");
         std::io::Write::write_all(&mut zip, b"skip").expect("write skip");
         zip.start_file("licence.txt", options).expect("licence");
         std::io::Write::write_all(&mut zip, b"lic").expect("write licence");
@@ -1293,12 +1404,25 @@ mod tests {
         };
         let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
 
-        extract_archive(&archive_path, &target_root, "Example", &archive, &filters, &HashSet::new())
-            .expect("extract");
+        extract_archive(
+            &archive_path,
+            &target_root,
+            "Example",
+            &archive,
+            &filters,
+            &HashSet::new(),
+        )
+        .expect("extract");
 
         assert!(target_root.join("textures/keep.dds").exists());
-        assert!(target_root.join("licence.txt").exists(), "loose files come across");
-        assert!(!target_root.join("preview.png").exists(), "a sibling directory does not");
+        assert!(
+            target_root.join("licence.txt").exists(),
+            "loose files come across"
+        );
+        assert!(
+            !target_root.join("preview.png").exists(),
+            "a sibling directory does not"
+        );
         assert!(!target_root.join("Screenshots").exists());
         assert!(!target_root.join("screenshots").exists());
     }
@@ -1341,8 +1465,15 @@ mod tests {
         let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
         let active_plugins = HashSet::new();
 
-        let extracted = extract_archive(&archive_path, &target_root, "Example", &archive, &filters, &active_plugins)
-            .expect("extract should succeed");
+        let extracted = extract_archive(
+            &archive_path,
+            &target_root,
+            "Example",
+            &archive,
+            &filters,
+            &active_plugins,
+        )
+        .expect("extract should succeed");
 
         assert_eq!(extracted, 1);
         assert!(target_root.join("MindYourHead.esp").exists());
@@ -1356,7 +1487,8 @@ mod tests {
         let mut zip = zip::ZipWriter::new(file);
         let options = SimpleFileOptions::default();
 
-        zip.add_directory("Example FOMOD/fomod/", options).expect("fomod dir");
+        zip.add_directory("Example FOMOD/fomod/", options)
+            .expect("fomod dir");
         zip.start_file("Example FOMOD/fomod/ModuleConfig.xml", options)
             .expect("module config");
         std::io::Write::write_all(
@@ -1405,13 +1537,17 @@ mod tests {
 </config>"#,
         )
         .expect("write module config");
-        zip.start_file("Example FOMOD/base.txt", options).expect("base");
+        zip.start_file("Example FOMOD/base.txt", options)
+            .expect("base");
         std::io::Write::write_all(&mut zip, b"base").expect("write base");
-        zip.start_file("Example FOMOD/normal.txt", options).expect("normal");
+        zip.start_file("Example FOMOD/normal.txt", options)
+            .expect("normal");
         std::io::Write::write_all(&mut zip, b"normal").expect("write normal");
-        zip.start_file("Example FOMOD/large.txt", options).expect("large");
+        zip.start_file("Example FOMOD/large.txt", options)
+            .expect("large");
         std::io::Write::write_all(&mut zip, b"large").expect("write large");
-        zip.start_file("Example FOMOD/Docs/readme.txt", options).expect("readme");
+        zip.start_file("Example FOMOD/Docs/readme.txt", options)
+            .expect("readme");
         std::io::Write::write_all(&mut zip, b"docs").expect("write docs");
         zip.finish().expect("finish zip");
 
@@ -1448,13 +1584,25 @@ mod tests {
         let filters = crate::archive::ArchiveFilters::new(&[], &[]).expect("filters");
         let active_plugins = HashSet::new();
 
-        let extracted = extract_archive(&archive_path, &target_root, "Example", &archive, &filters, &active_plugins)
-            .expect("extract should succeed");
+        let extracted = extract_archive(
+            &archive_path,
+            &target_root,
+            "Example",
+            &archive,
+            &filters,
+            &active_plugins,
+        )
+        .expect("extract should succeed");
 
         assert_eq!(extracted, 2);
-        assert_eq!(std::fs::read_to_string(target_root.join("base.txt")).expect("base read"), "base");
-        assert_eq!(std::fs::read_to_string(target_root.join("font.txt")).expect("font read"), "large");
+        assert_eq!(
+            std::fs::read_to_string(target_root.join("base.txt")).expect("base read"),
+            "base"
+        );
+        assert_eq!(
+            std::fs::read_to_string(target_root.join("font.txt")).expect("font read"),
+            "large"
+        );
         assert!(!target_root.join("docs/readme.txt").exists());
     }
 }
-

@@ -136,10 +136,15 @@ fn sweep_one_root(root: &Path, max_age: std::time::Duration) -> usize {
     for entry in entries.flatten() {
         let name = entry.file_name();
         let Some(name) = name.to_str() else { continue };
-        if !STAGING_PREFIXES.iter().any(|prefix| name.starts_with(prefix)) {
+        if !STAGING_PREFIXES
+            .iter()
+            .any(|prefix| name.starts_with(prefix))
+        {
             continue;
         }
-        let Ok(metadata) = entry.metadata() else { continue };
+        let Ok(metadata) = entry.metadata() else {
+            continue;
+        };
         if !metadata.is_dir() {
             continue;
         }
@@ -261,13 +266,15 @@ pub fn link_or_copy(source: &Path, destination: &Path) -> anyhow::Result<()> {
 
     match std::fs::hard_link(source, destination) {
         Ok(()) => Ok(()),
-        Err(_) => std::fs::copy(source, destination).map(|_| ()).map_err(|err| {
-            anyhow::anyhow!(
-                "failed to stage {} to {}: {err}",
-                source.display(),
-                destination.display()
-            )
-        }),
+        Err(_) => std::fs::copy(source, destination)
+            .map(|_| ())
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to stage {} to {}: {err}",
+                    source.display(),
+                    destination.display()
+                )
+            }),
     }
 }
 
@@ -382,7 +389,14 @@ pub fn copy_filtered_tree_with_case(
     case: DirCase,
 ) -> anyhow::Result<usize> {
     let mut copied = 0usize;
-    copy_tree_recursive(source_root, source_root, destination_root, filters, case, &mut copied)?;
+    copy_tree_recursive(
+        source_root,
+        source_root,
+        destination_root,
+        filters,
+        case,
+        &mut copied,
+    )?;
     Ok(copied)
 }
 
@@ -496,7 +510,8 @@ mod tests {
         // folder along with the asset directories, and the copy then lands
         // somewhere that does not exist. Callers must fold the relative part and
         // join it, never fold the joined result.
-        let folded = lowercase_dir_components(Path::new("/tmp/MyInstance/Mods/Example/Textures/a.dds"));
+        let folded =
+            lowercase_dir_components(Path::new("/tmp/MyInstance/Mods/Example/Textures/a.dds"));
         assert_eq!(
             folded,
             PathBuf::from("/tmp/myinstance/mods/example/textures/a.dds"),
@@ -549,17 +564,32 @@ mod tests {
     #[test]
     fn staging_falls_back_to_temp_without_an_instance_path() {
         let staging = staging_dir_for(Path::new("inspect")).expect("staging dir");
-        assert!(staging.starts_with(std::env::temp_dir()), "{}", staging.display());
+        assert!(
+            staging.starts_with(std::env::temp_dir()),
+            "{}",
+            staging.display()
+        );
     }
 
     #[test]
     fn staging_dir_includes_pid_and_is_unique() {
         let a = staging_dir_for(Path::new("/tmp/Some Mod")).unwrap();
         let b = staging_dir_for(Path::new("/tmp/Some Mod")).unwrap();
-        assert_ne!(a, b, "two staging dirs in quick succession must not collide");
-        assert!(a.to_string_lossy().contains(&std::process::id().to_string()));
+        assert_ne!(
+            a, b,
+            "two staging dirs in quick succession must not collide"
+        );
+        assert!(
+            a.to_string_lossy()
+                .contains(&std::process::id().to_string())
+        );
         // non-alphanumerics in the mod name are sanitised
-        assert!(a.file_name().unwrap().to_string_lossy().contains("Some_Mod"));
+        assert!(
+            a.file_name()
+                .unwrap()
+                .to_string_lossy()
+                .contains("Some_Mod")
+        );
     }
 
     #[test]

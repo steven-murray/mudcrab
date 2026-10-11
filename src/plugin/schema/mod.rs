@@ -275,9 +275,7 @@ pub fn form_id_offsets(
         FieldKind::Custom(CustomKind::Condition) => {
             ctda::form_id_offsets(record_sig, data, form_id)?
         }
-        FieldKind::Custom(CustomKind::PackageLocation) => {
-            package_offsets(data, &[0, 1], 4)
-        }
+        FieldKind::Custom(CustomKind::PackageLocation) => package_offsets(data, &[0, 1], 4),
         FieldKind::Custom(CustomKind::PackageTarget) => package_offsets(data, &[0, 1], 4),
     })
 }
@@ -320,10 +318,7 @@ pub fn map_form_ids(
 }
 
 /// Read every FormID in `record` without modifying it.
-pub fn visit_form_ids(
-    record: &Record,
-    mut f: impl FnMut(FormId),
-) -> Result<(), SchemaError> {
+pub fn visit_form_ids(record: &Record, mut f: impl FnMut(FormId)) -> Result<(), SchemaError> {
     for field in record.fields() {
         for offset in form_id_offsets(
             record.signature,
@@ -416,8 +411,7 @@ mod tests {
             (b"SCPT", b"SCRV"),
         ];
         for (rec, field) in traps {
-            let offsets =
-                form_id_offsets(**rec, **field, &[0xAA; 4], FormId(0x0100_0801)).unwrap();
+            let offsets = form_id_offsets(**rec, **field, &[0xAA; 4], FormId(0x0100_0801)).unwrap();
             assert!(
                 offsets.is_empty(),
                 "{}/{} must not be treated as a FormID",
@@ -437,8 +431,7 @@ mod tests {
             (b"SCPT", b"SCRO", 0),
         ];
         for (rec, field, at) in cases {
-            let offsets =
-                form_id_offsets(**rec, **field, &[0xAA; 4], FormId(0x0100_0801)).unwrap();
+            let offsets = form_id_offsets(**rec, **field, &[0xAA; 4], FormId(0x0100_0801)).unwrap();
             assert_eq!(offsets, vec![*at], "{}", String::from_utf8_lossy(*field));
         }
     }

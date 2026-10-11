@@ -42,7 +42,13 @@ pub enum Step {
 fn legacy_names(plan: &PersonalizedPlan) -> HashMap<String, (String, Option<String>)> {
     fn sanitize(tail: &str) -> String {
         tail.chars()
-            .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' { c } else { '_' })
+            .map(|c| {
+                if c.is_ascii_alphanumeric() || c == '.' || c == '_' || c == '-' {
+                    c
+                } else {
+                    '_'
+                }
+            })
             .collect()
     }
     fn tail(source: &str) -> &str {
@@ -54,13 +60,22 @@ fn legacy_names(plan: &PersonalizedPlan) -> HashMap<String, (String, Option<Stri
         for (index, archive) in entry.archives.iter().enumerate() {
             if let Some(path) = archive.path.as_deref() {
                 let name = format!("{}_{}_{}", entry.id, index, sanitize(tail(path)));
-                out.insert(name.to_ascii_lowercase(), (path.to_string(), archive.file_name.clone()));
+                out.insert(
+                    name.to_ascii_lowercase(),
+                    (path.to_string(), archive.file_name.clone()),
+                );
             }
             for (layer_index, layer) in archive.build.iter().enumerate() {
                 let safe_id: String = entry
                     .id
                     .chars()
-                    .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+                    .map(|c| {
+                        if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                            c
+                        } else {
+                            '_'
+                        }
+                    })
                     .collect();
                 let name = format!(
                     "{safe_id}_{index}_layer{layer_index}_{}",
@@ -123,7 +138,10 @@ fn valid_name(name: &str) -> Option<&str> {
 fn is_derived(real: &str, derived: &str) -> bool {
     let real = real.to_ascii_lowercase();
     let derived = derived.to_ascii_lowercase();
-    real == derived || derived.rsplit_once('.').is_some_and(|(stem, _)| real == stem)
+    real == derived
+        || derived
+            .rsplit_once('.')
+            .is_some_and(|(stem, _)| real == stem)
 }
 
 /// The archive extension a name ends in, if any.
@@ -151,7 +169,9 @@ pub fn unnamed_sources(dir: &Path, plan: &PersonalizedPlan) -> anyhow::Result<Ve
         if file_name.as_deref().and_then(valid_name).is_some() {
             continue;
         }
-        let stem = name.rsplit_once('.').map_or(name.as_str(), |(stem, _)| stem);
+        let stem = name
+            .rsplit_once('.')
+            .map_or(name.as_str(), |(stem, _)| stem);
         let recorded = [format!("{name}.orig-name"), format!("{stem}.orig-name")]
             .iter()
             .filter_map(|sidecar| std::fs::read_to_string(dir.join(sidecar)).ok())
@@ -187,7 +207,8 @@ fn looks_derived(name: &str) -> bool {
         let digits = rest.chars().take_while(|c| c.is_ascii_digit()).count();
         digits > 0
             && bytes.get(i + 1 + digits) == Some(&b'_')
-            && (rest[digits + 1..].starts_with("manual_") || rest[digits + 1..].starts_with("layer"))
+            && (rest[digits + 1..].starts_with("manual_")
+                || rest[digits + 1..].starts_with("layer"))
     })
 }
 
@@ -227,7 +248,9 @@ pub fn plan_tidy(
                         && !other.ends_with(".meta")
                 });
             if !has_archive {
-                steps.push(Step::DeleteSidecar { sidecar: dir.join(name) });
+                steps.push(Step::DeleteSidecar {
+                    sidecar: dir.join(name),
+                });
             }
             continue;
         }
@@ -237,17 +260,23 @@ pub fn plan_tidy(
         if let Some(archive) = name.strip_suffix(".meta") {
             // A .meta left behind by a derived name that is gone.
             if !present.contains(archive) && source_of(archive, &legacy).is_some() {
-                steps.push(Step::DeleteSidecar { sidecar: dir.join(name) });
+                steps.push(Step::DeleteSidecar {
+                    sidecar: dir.join(name),
+                });
             }
             continue;
         }
 
         let path = dir.join(name);
         let sidecar_name = |base: &str| format!("{base}.orig-name");
-        let sidecar = [name.as_str(), name.rsplit_once('.').map_or(name.as_str(), |(stem, _)| stem)]
-            .into_iter()
-            .map(sidecar_name)
-            .find(|candidate| present.contains(candidate));
+        let sidecar = [
+            name.as_str(),
+            name.rsplit_once('.')
+                .map_or(name.as_str(), |(stem, _)| stem),
+        ]
+        .into_iter()
+        .map(sidecar_name)
+        .find(|candidate| present.contains(candidate));
         let source = source_of(name, &legacy);
         if sidecar.is_none() && source.is_none() {
             // An ordinary, real-named archive. It may still want a `.meta`.
@@ -259,14 +288,26 @@ pub fn plan_tidy(
             .and_then(|s| std::fs::read_to_string(dir.join(s)).ok())
             .and_then(|text| valid_name(&text).map(str::to_string))
             .filter(|real| !is_derived(real, name))
-            .or_else(|| source.and_then(|(_, file_name)| file_name.as_deref()).and_then(valid_name).map(str::to_string))
-            .or_else(|| source.and_then(|(src, _)| known_names.get(src)).and_then(|n| valid_name(n)).map(str::to_string))
+            .or_else(|| {
+                source
+                    .and_then(|(_, file_name)| file_name.as_deref())
+                    .and_then(valid_name)
+                    .map(str::to_string)
+            })
+            .or_else(|| {
+                source
+                    .and_then(|(src, _)| known_names.get(src))
+                    .and_then(|n| valid_name(n))
+                    .map(str::to_string)
+            })
             // Never lose the extension: MO2 lists archives by it.
-            .map(|real| match (archive_extension(&real), archive_extension(name)) {
-                (None, Some(ext)) => format!("{real}{ext}"),
-                (None, None) => format!("{real}{}", archive_store::detect_archive_ext(&path)),
-                _ => real,
-            });
+            .map(
+                |real| match (archive_extension(&real), archive_extension(name)) {
+                    (None, Some(ext)) => format!("{real}{ext}"),
+                    (None, None) => format!("{real}{}", archive_store::detect_archive_ext(&path)),
+                    _ => real,
+                },
+            );
 
         // Never leave an archive without an extension (MO2 lists archives by
         // it): failing everything else, the file's own magic bytes say.
@@ -278,7 +319,9 @@ pub fn plan_tidy(
             (!ext.is_empty()).then(|| format!("{name}{ext}"))
         });
         let Some(real) = real else {
-            steps.push(Step::Unknown { derived: path.clone() });
+            steps.push(Step::Unknown {
+                derived: path.clone(),
+            });
             if let Some((src, _)) = source {
                 sourced.push((path, src.clone()));
             }
@@ -291,19 +334,34 @@ pub fn plan_tidy(
             None
         } else if let Some(first) = claimed.get(&lower) {
             Some(if same_file(&path, first) {
-                Step::Delete { derived: path.clone(), real: real_path.clone() }
+                Step::Delete {
+                    derived: path.clone(),
+                    real: real_path.clone(),
+                }
             } else {
-                Step::Conflict { derived: path.clone(), real: real_path.clone() }
+                Step::Conflict {
+                    derived: path.clone(),
+                    real: real_path.clone(),
+                }
             })
         } else if real_path.exists() {
             Some(if same_file(&path, &real_path) {
-                Step::Delete { derived: path.clone(), real: real_path.clone() }
+                Step::Delete {
+                    derived: path.clone(),
+                    real: real_path.clone(),
+                }
             } else {
-                Step::Conflict { derived: path.clone(), real: real_path.clone() }
+                Step::Conflict {
+                    derived: path.clone(),
+                    real: real_path.clone(),
+                }
             })
         } else {
             claimed.insert(lower, path.clone());
-            Some(Step::Rename { derived: path.clone(), real: real_path.clone() })
+            Some(Step::Rename {
+                derived: path.clone(),
+                real: real_path.clone(),
+            })
         };
         let settled = !matches!(step, Some(Step::Conflict { .. }));
         if let Some(step) = step {
@@ -320,7 +378,10 @@ pub fn plan_tidy(
     let handled: std::collections::HashSet<PathBuf> = steps
         .iter()
         .filter_map(|step| match step {
-            Step::Delete { derived, .. } | Step::Rename { derived, .. } | Step::Conflict { derived, .. } | Step::Unknown { derived } => Some(derived.clone()),
+            Step::Delete { derived, .. }
+            | Step::Rename { derived, .. }
+            | Step::Conflict { derived, .. }
+            | Step::Unknown { derived } => Some(derived.clone()),
             _ => None,
         })
         .collect();
@@ -340,17 +401,24 @@ pub fn plan_tidy(
             continue;
         }
         let Ok(meta) = path.metadata() else { continue };
-        if let Some(twin) = by_size
-            .get(&meta.len())
-            .and_then(|same_size| same_size.iter().find(|candidate| same_file(&path, candidate)))
-        {
-            steps.push(Step::Delete { derived: path, real: twin.clone() });
+        if let Some(twin) = by_size.get(&meta.len()).and_then(|same_size| {
+            same_size
+                .iter()
+                .find(|candidate| same_file(&path, candidate))
+        }) {
+            steps.push(Step::Delete {
+                derived: path,
+                real: twin.clone(),
+            });
         } else if archive_extension(name).is_none() {
             // Unique, so kept -- but with an extension, or MO2 never lists it.
             let ext = archive_store::detect_archive_ext(&path);
             let renamed = dir.join(format!("{name}{ext}"));
             if !ext.is_empty() && !renamed.exists() {
-                steps.push(Step::Rename { derived: path, real: renamed });
+                steps.push(Step::Rename {
+                    derived: path,
+                    real: renamed,
+                });
             }
         }
     }
@@ -363,7 +431,9 @@ pub fn plan_tidy(
             Step::Rename { derived, real } if *real == archive && archive_store::meta_path(derived).is_file()));
         let already = moved_with_rename
             || archive_store::meta_is_informative(&archive)
-            || steps.iter().any(|s| matches!(s, Step::WriteMeta { archive: a, .. } if *a == archive));
+            || steps
+                .iter()
+                .any(|s| matches!(s, Step::WriteMeta { archive: a, .. } if *a == archive));
         if is_meta_worthy && !already {
             steps.push(Step::WriteMeta { archive, source });
         }
@@ -380,7 +450,10 @@ pub fn apply(steps: &[Step]) -> anyhow::Result<()> {
     let remove_sidecars = |derived: &Path| -> anyhow::Result<()> {
         let name = derived.to_string_lossy();
         let stem = derived.with_extension("");
-        for sidecar in [format!("{name}.orig-name"), format!("{}.orig-name", stem.display())] {
+        for sidecar in [
+            format!("{name}.orig-name"),
+            format!("{}.orig-name", stem.display()),
+        ] {
             let sidecar = PathBuf::from(sidecar);
             if sidecar.is_file() {
                 remove(&sidecar)?;
@@ -408,11 +481,18 @@ pub fn apply(steps: &[Step]) -> anyhow::Result<()> {
             }
             Step::Rename { derived, real } => {
                 std::fs::rename(derived, real).map_err(|err| {
-                    anyhow::anyhow!("failed to rename {} to {}: {err}", derived.display(), real.display())
+                    anyhow::anyhow!(
+                        "failed to rename {} to {}: {err}",
+                        derived.display(),
+                        real.display()
+                    )
                 })?;
                 remove_sidecars(derived)?;
                 // A .meta follows its archive, unless the new name has one.
-                let (old_meta, new_meta) = (archive_store::meta_path(derived), archive_store::meta_path(real));
+                let (old_meta, new_meta) = (
+                    archive_store::meta_path(derived),
+                    archive_store::meta_path(real),
+                );
                 if old_meta.is_file() {
                     if new_meta.exists() {
                         remove(&old_meta)?;
@@ -495,7 +575,10 @@ mod tests {
         write(dir.path(), "xobse_0_77.zip", b"x");
         write(dir.path(), "xobse_0_77.orig-name", b"xobse_0_77");
         let steps = plan_tidy(dir.path(), None, &HashMap::new()).unwrap();
-        assert!(matches!(steps.as_slice(), [Step::Unknown { .. }]), "{steps:?}");
+        assert!(
+            matches!(steps.as_slice(), [Step::Unknown { .. }]),
+            "{steps:?}"
+        );
     }
 
     #[test]
@@ -512,10 +595,16 @@ mod tests {
                 "target_subdir": null, "include": [], "exclude": []}]}]
         }))
         .unwrap();
-        let names = HashMap::from([("nexus:oblivion/1/9".to_string(), "Solo Mod-1-2-3".to_string())]);
+        let names = HashMap::from([(
+            "nexus:oblivion/1/9".to_string(),
+            "Solo Mod-1-2-3".to_string(),
+        )]);
         let steps = plan_tidy(d, Some(&plan), &names).unwrap();
         assert!(
-            steps.contains(&Step::Rename { derived: d.join("solo_0_9.7z"), real: d.join("Solo Mod-1-2-3.7z") }),
+            steps.contains(&Step::Rename {
+                derived: d.join("solo_0_9.7z"),
+                real: d.join("Solo Mod-1-2-3.7z")
+            }),
             "{steps:?}"
         );
     }
@@ -528,7 +617,13 @@ mod tests {
         write(d, "solo_0_9.orig-name", b"solo_0_9");
         write(d, "solo_0_9.meta", b"[General]\nmodID=1\nfileID=9\n");
         let steps = plan_tidy(d, None, &HashMap::new()).unwrap();
-        assert!(steps.contains(&Step::Rename { derived: d.join("solo_0_9"), real: d.join("solo_0_9.zip") }), "{steps:?}");
+        assert!(
+            steps.contains(&Step::Rename {
+                derived: d.join("solo_0_9"),
+                real: d.join("solo_0_9.zip")
+            }),
+            "{steps:?}"
+        );
         apply(&steps).unwrap();
         assert!(d.join("solo_0_9.zip").is_file() && d.join("solo_0_9.zip.meta").is_file());
         assert!(!d.join("solo_0_9.meta").exists());
@@ -536,10 +631,20 @@ mod tests {
 
     #[test]
     fn derived_shapes_are_recognised_and_real_names_are_not() {
-        for derived in ["Add Actor Values_0_88252", "mod_1_1000012318.7z", "Hesu_0_manual_Hesu_Mods.7z", "D_0_layer1_34632.7z"] {
+        for derived in [
+            "Add Actor Values_0_88252",
+            "mod_1_1000012318.7z",
+            "Hesu_0_manual_Hesu_Mods.7z",
+            "D_0_layer1_34632.7z",
+        ] {
             assert!(looks_derived(derived), "{derived}");
         }
-        for real in ["Better Letters Version 1_3-5392-1-3.zip", "1_Better Letters.zip", "WACv_1beta.7z", "Mod-1-2-3.7z"] {
+        for real in [
+            "Better Letters Version 1_3-5392-1-3.zip",
+            "1_Better Letters.zip",
+            "WACv_1beta.7z",
+            "Mod-1-2-3.7z",
+        ] {
             assert!(!looks_derived(real), "{real}");
         }
     }
@@ -552,7 +657,13 @@ mod tests {
         write(d, "Old Id_0_88252", b"same bytes");
         write(d, "Other Old Id_0_99", b"different");
         let steps = plan_tidy(d, None, &HashMap::new()).unwrap();
-        assert_eq!(steps, [Step::Delete { derived: d.join("Old Id_0_88252"), real: d.join("Real Mod-1-2-3.rar") }]);
+        assert_eq!(
+            steps,
+            [Step::Delete {
+                derived: d.join("Old Id_0_88252"),
+                real: d.join("Real Mod-1-2-3.rar")
+            }]
+        );
     }
 
     #[test]
@@ -562,8 +673,16 @@ mod tests {
         let real = write(d, "Real-1.zip", b"same");
         std::fs::hard_link(&real, d.join("mod_0_210177.zip")).unwrap();
         write(d, "mod_0_210177.zip.orig-name", b"Real-1.zip");
-        write(d, "mod_0_210177.zip.meta", b"[General]\ngameName=SkyrimSE\nmodID=50129\nfileID=210177\n");
-        write(d, "Real-1.zip.meta", b"[General]\ngameName=Oblivion\nmodID=3\nfileID=0\n");
+        write(
+            d,
+            "mod_0_210177.zip.meta",
+            b"[General]\ngameName=SkyrimSE\nmodID=50129\nfileID=210177\n",
+        );
+        write(
+            d,
+            "Real-1.zip.meta",
+            b"[General]\ngameName=Oblivion\nmodID=3\nfileID=0\n",
+        );
         apply(&plan_tidy(d, None, &HashMap::new()).unwrap()).unwrap();
         let meta = std::fs::read_to_string(d.join("Real-1.zip.meta")).unwrap();
         assert!(meta.contains("fileID=210177"), "{meta}");

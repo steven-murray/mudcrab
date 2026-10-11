@@ -93,12 +93,7 @@ fn tweak_path(mod_target: &Path, file: &str) -> PathBuf {
     mod_target.join(TWEAKS_DIR).join(file)
 }
 
-fn create_tweak(
-    path: &Path,
-    key: &str,
-    value: &str,
-    format: IniSetFormat,
-) -> anyhow::Result<()> {
+fn create_tweak(path: &Path, key: &str, value: &str, format: IniSetFormat) -> anyhow::Result<()> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)?;
     }

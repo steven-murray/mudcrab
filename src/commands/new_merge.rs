@@ -85,7 +85,11 @@ pub async fn run(args: NewMergeArgs) -> anyhow::Result<()> {
         anyhow::bail!(
             "{} is not in {}: {}.\nA plugin absent from the load order is not active, so merging \
              it would change nothing in game.",
-            if missing.len() == 1 { "a source plugin" } else { "some source plugins" },
+            if missing.len() == 1 {
+                "a source plugin"
+            } else {
+                "some source plugins"
+            },
             load_order_path.display(),
             missing.join(", ")
         );

@@ -13,7 +13,7 @@ use assert_cmd::Command;
 use mudcrab::plugin::{FormId, Plugin};
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use zip::write::FileOptions;
 
 /// A source plugin with one STAT record, named so the winner is identifiable.
@@ -69,7 +69,18 @@ impl Fixture {
     }
 
     fn install(&self) {
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary should build")
             .arg("install")
             .arg(&self.plan)
@@ -171,7 +182,18 @@ sources = [
     let cache = root.join("cache");
     let instance = root.join("mo2-instance");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("compile")
         .arg(&modlist)
@@ -180,7 +202,18 @@ sources = [
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -190,7 +223,18 @@ sources = [
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("download")
         .arg(&plan)
@@ -256,11 +300,13 @@ fn a_declared_merge_installs_hides_its_sources_and_can_be_undone() {
     );
 
     // The zMerge-shaped sidecar, which the manual verification loop diffs.
-    assert!(mods_dir
-        .join("Merged Plugins")
-        .join("merge - Merged Plugins")
-        .join("map.json")
-        .exists());
+    assert!(
+        mods_dir
+            .join("Merged Plugins")
+            .join("merge - Merged Plugins")
+            .join("map.json")
+            .exists()
+    );
 
     // --- sources are hidden, not disabled --------------------------------
     for (mod_id, plugin) in [
@@ -269,7 +315,10 @@ fn a_declared_merge_installs_hides_its_sources_and_can_be_undone() {
         ("Gamma", "Gamma.esp"),
     ] {
         assert!(
-            mods_dir.join(mod_id).join(format!("{plugin}.mohidden")).exists(),
+            mods_dir
+                .join(mod_id)
+                .join(format!("{plugin}.mohidden"))
+                .exists(),
             "{plugin} should be hidden"
         );
         assert!(
@@ -307,12 +356,26 @@ fn a_declared_merge_installs_hides_its_sources_and_can_be_undone() {
     let before = std::fs::read(&merged_path).expect("read merged");
     fixture.install();
     let after = std::fs::read(&merged_path).expect("re-read merged");
-    assert_eq!(before, after, "second install should reproduce the same bytes");
+    assert_eq!(
+        before, after,
+        "second install should reproduce the same bytes"
+    );
     assert!(mods_dir.join("Alpha").join("Alpha.esp.mohidden").exists());
     assert!(!mods_dir.join("Alpha").join("Alpha.esp").exists());
 
     // --- and it can all be undone ----------------------------------------
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("unhide-merges")
         .arg("--mo2-instance-dir")
@@ -332,7 +395,10 @@ fn a_declared_merge_installs_hides_its_sources_and_can_be_undone() {
             "{plugin} should be restored"
         );
         assert!(
-            !mods_dir.join(mod_id).join(format!("{plugin}.mohidden")).exists(),
+            !mods_dir
+                .join(mod_id)
+                .join(format!("{plugin}.mohidden"))
+                .exists(),
             "{plugin}.mohidden should be gone"
         );
     }

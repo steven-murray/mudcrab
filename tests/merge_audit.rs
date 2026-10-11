@@ -16,7 +16,7 @@ mod esp;
 use mudcrab::merge::{self, MergeRequest, MergeSource};
 use mudcrab::plugin::PluginName;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 /// A plugin with one script: `refs` become SCRO entries, `bytecode` the SCDA.
 fn scripted_plugin(form_id: u32, refs: &[u32], bytecode: &[u8]) -> Vec<u8> {
@@ -117,7 +117,10 @@ fn a_script_embedding_a_renumbered_form_id_is_refused() {
         .to_string();
 
     assert!(err.contains("compiled script bytecode"), "{err}");
-    assert!(err.contains("byte offset 4"), "the offset locates it: {err}");
+    assert!(
+        err.contains("byte offset 4"),
+        "the offset locates it: {err}"
+    );
     assert!(
         err.contains("merge-engine.md"),
         "the refusal must cite the evidence it overturns: {err}"

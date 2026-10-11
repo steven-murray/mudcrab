@@ -85,18 +85,56 @@ value = "1"
     let compiled = root.join("compiled.json");
     let plan = root.join("plan.json");
     let run = |args: &[&str]| {
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary builds")
             .args(args)
             .assert()
             .success();
     };
-    run(&["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()]);
-    run(&["query", compiled.to_str().unwrap(), "--output", plan.to_str().unwrap(), "--headless"]);
-    run(&["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()]);
+    run(&[
+        "compile",
+        modlist.to_str().unwrap(),
+        "--output",
+        compiled.to_str().unwrap(),
+    ]);
+    run(&[
+        "query",
+        compiled.to_str().unwrap(),
+        "--output",
+        plan.to_str().unwrap(),
+        "--headless",
+    ]);
+    run(&[
+        "download",
+        plan.to_str().unwrap(),
+        "--cache",
+        cache.to_str().unwrap(),
+    ]);
 
     let install = || {
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary builds")
             .args(["install", plan.to_str().unwrap()])
             .args(["--cache", cache.to_str().unwrap()])

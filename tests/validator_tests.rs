@@ -244,9 +244,7 @@ fn rejects_merge_mod_that_also_declares_archives() {
     let source = load_modlist(&path).expect("modlist should parse");
     let err = validate(&source).expect_err("validation should fail");
 
-    assert!(err
-        .to_string()
-        .contains("also declares archives or files"));
+    assert!(err.to_string().contains("also declares archives or files"));
 }
 
 #[test]
@@ -269,7 +267,10 @@ fn rejects_merge_output_missing_from_load_order() {
 
     let msg = err.to_string();
     assert!(msg.contains("produces"), "{msg}");
-    assert!(msg.contains("missing from the global plugins load order"), "{msg}");
+    assert!(
+        msg.contains("missing from the global plugins load order"),
+        "{msg}"
+    );
 }
 
 #[test]
@@ -309,9 +310,10 @@ fn rejects_merge_source_plugin_still_in_global_load_order() {
     let source = load_modlist(&path).expect("modlist should parse");
     let err = validate(&source).expect_err("validation should fail");
 
-    assert!(err
-        .to_string()
-        .contains("still in the global plugins load order"));
+    assert!(
+        err.to_string()
+            .contains("still in the global plugins load order")
+    );
 }
 
 #[test]
@@ -369,10 +371,7 @@ fn warns_about_a_load_order_over_the_plugin_limit() {
     let plugins: Vec<String> = (0..256).map(|n| format!("  \"mod{n:03}.esp\",")).collect();
     std::fs::write(
         &path,
-        format!(
-            "name = \"X\"\n\nplugins = [\n{}\n]\n",
-            plugins.join("\n")
-        ),
+        format!("name = \"X\"\n\nplugins = [\n{}\n]\n", plugins.join("\n")),
     )
     .expect("fixture should be written");
 
@@ -497,8 +496,9 @@ fn rejects_an_action_condition_naming_an_undeclared_input() {
 
 #[test]
 fn rejects_a_mod_condition_naming_an_undeclared_input() {
-    let err = validate_src(&OPTIONAL_ACTION.replace("id = \"ui\"", "id = \"ui\"\nif = \"nope == x\""))
-        .expect_err("should fail");
+    let err =
+        validate_src(&OPTIONAL_ACTION.replace("id = \"ui\"", "id = \"ui\"\nif = \"nope == x\""))
+            .expect_err("should fail");
     assert!(err.to_string().contains("'nope'"), "{err}");
 }
 
@@ -527,16 +527,31 @@ default = "4k"
 #[test]
 fn a_generated_mod_needs_actions_and_no_archives() {
     let no_actions = "name = \"G\"\n\n[[mods]]\nid = \"g\"\ntype = \"generated\"\n";
-    assert!(validate_src(no_actions).unwrap_err().to_string().contains("no actions"));
+    assert!(
+        validate_src(no_actions)
+            .unwrap_err()
+            .to_string()
+            .contains("no actions")
+    );
 
     let with_archive = "name = \"G\"\n\n[[mods]]\nid = \"g\"\ntype = \"generated\"\n\n[[mods.archives]]\npath = \"x.zip\"\n\n[[mods.actions]]\naction = \"write_file\"\npath = \"a\"\ncontent = \"b\"\n";
-    assert!(validate_src(with_archive).unwrap_err().to_string().contains("archives"));
+    assert!(
+        validate_src(with_archive)
+            .unwrap_err()
+            .to_string()
+            .contains("archives")
+    );
 }
 
 #[test]
 fn an_mo2_plugin_needs_an_archive_and_takes_no_actions() {
     let no_archive = "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n";
-    assert!(validate_src(no_archive).unwrap_err().to_string().contains("mo2-plugin"));
+    assert!(
+        validate_src(no_archive)
+            .unwrap_err()
+            .to_string()
+            .contains("mo2-plugin")
+    );
 
     let ok = "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n\n[[mods.archives]]\npath = \"x.zip\"\nlayout = \"custom-data-folder\"\ndata_folder = \"rootbuilder\"\n";
     validate_src(ok).expect("should validate");
@@ -545,7 +560,12 @@ fn an_mo2_plugin_needs_an_archive_and_takes_no_actions() {
 #[test]
 fn a_simple_layout_with_a_data_folder_is_rejected() {
     let src = "name = \"S\"\n\n[[mods]]\nid = \"m\"\n\n[[mods.archives]]\npath = \"x.zip\"\nlayout = \"simple\"\ndata_folder = \"sub\"\n";
-    assert!(validate_src(src).unwrap_err().to_string().contains("custom-data-folder"));
+    assert!(
+        validate_src(src)
+            .unwrap_err()
+            .to_string()
+            .contains("custom-data-folder")
+    );
 }
 
 const MOD_CONDITION: &str = r#"
@@ -568,13 +588,15 @@ fn accepts_a_condition_naming_another_mod() {
 
 #[test]
 fn rejects_a_condition_naming_an_unknown_mod() {
-    let err = validate_src(&MOD_CONDITION.replace("mod:base", "mod:bsae")).expect_err("should fail");
+    let err =
+        validate_src(&MOD_CONDITION.replace("mod:base", "mod:bsae")).expect_err("should fail");
     assert!(err.to_string().contains("'bsae'"), "{err}");
 }
 
 #[test]
 fn rejects_a_mod_condition_asking_about_itself() {
-    let err = validate_src(&MOD_CONDITION.replace("mod:base", "!mod:patch")).expect_err("should fail");
+    let err =
+        validate_src(&MOD_CONDITION.replace("mod:base", "!mod:patch")).expect_err("should fail");
     assert!(err.to_string().contains("the mod itself"), "{err}");
 }
 
@@ -599,7 +621,8 @@ fn an_action_may_ask_about_its_own_mod() {
 
 #[test]
 fn rejects_a_malformed_condition() {
-    let err = validate_src(&MOD_CONDITION.replace("mod:base", "Some Mod")).expect_err("should fail");
+    let err =
+        validate_src(&MOD_CONDITION.replace("mod:base", "Some Mod")).expect_err("should fail");
     assert!(format!("{err:#}").contains("mod:\"Some Mod\""), "{err:#}");
 }
 
@@ -640,7 +663,10 @@ fn accepts_conditions_on_archives_fomod_rows_and_bain_subpackages() {
 fn rejects_undeclared_inputs_in_archive_level_conditions() {
     for (from, site) in [
         ("{ name = \"01 HD\", if = \"hd\" }", "BAIN subpackage 01 HD"),
-        ("if = \"hd\"\npath = \"manual:m-hd.7z\"", "archive manual:m-hd.7z"),
+        (
+            "if = \"hd\"\npath = \"manual:m-hd.7z\"",
+            "archive manual:m-hd.7z",
+        ),
         ("if = \"hd\"\nstep", "FOMOD selection S / G"),
     ] {
         let src = ARCHIVE_CONDITION.replacen(from, &from.replacen("\"hd\"", "\"hdd\"", 1), 1);

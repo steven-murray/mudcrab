@@ -42,7 +42,10 @@ impl LayoutPlan {
         Self {
             files: settled
                 .into_iter()
-                .map(|(destination, source)| PlannedFile { source, destination })
+                .map(|(destination, source)| PlannedFile {
+                    source,
+                    destination,
+                })
                 .collect(),
         }
     }
@@ -156,16 +159,28 @@ mod tests {
 
     #[test]
     fn destinations_fold_directories_but_not_file_names() {
-        assert_eq!(folded_destination("Textures/Architecture/A.dds"), "textures/architecture/A.dds");
+        assert_eq!(
+            folded_destination("Textures/Architecture/A.dds"),
+            "textures/architecture/A.dds"
+        );
         assert_eq!(folded_destination("Readme.txt"), "Readme.txt");
-        assert_eq!(folded_destination(r"Meshes\Weapons\Sword.nif"), "meshes/weapons/Sword.nif");
+        assert_eq!(
+            folded_destination(r"Meshes\Weapons\Sword.nif"),
+            "meshes/weapons/Sword.nif"
+        );
     }
 
     #[test]
     fn prefix_stripping_respects_directory_boundaries() {
-        assert_eq!(strip_dir_prefix("Data/textures/a.dds", "Data").as_deref(), Some("textures/a.dds"));
+        assert_eq!(
+            strip_dir_prefix("Data/textures/a.dds", "Data").as_deref(),
+            Some("textures/a.dds")
+        );
         // Case-insensitive, as Windows-authored archives require.
-        assert_eq!(strip_dir_prefix("data/textures/a.dds", "Data").as_deref(), Some("textures/a.dds"));
+        assert_eq!(
+            strip_dir_prefix("data/textures/a.dds", "Data").as_deref(),
+            Some("textures/a.dds")
+        );
         assert_eq!(strip_dir_prefix("Data/a", "data/").as_deref(), Some("a"));
         // `Database` is not under `Data`.
         assert_eq!(strip_dir_prefix("Database/a.dds", "Data"), None);
@@ -177,9 +192,18 @@ mod tests {
     #[test]
     fn a_plan_is_sorted_and_lets_the_last_writer_to_a_destination_win() {
         let plan = LayoutPlan::from_pairs([
-            ("01 Second/textures/a.dds".to_string(), "textures/a.dds".to_string()),
-            ("00 First/textures/a.dds".to_string(), "textures/a.dds".to_string()),
-            ("00 First/meshes/b.nif".to_string(), "meshes/b.nif".to_string()),
+            (
+                "01 Second/textures/a.dds".to_string(),
+                "textures/a.dds".to_string(),
+            ),
+            (
+                "00 First/textures/a.dds".to_string(),
+                "textures/a.dds".to_string(),
+            ),
+            (
+                "00 First/meshes/b.nif".to_string(),
+                "meshes/b.nif".to_string(),
+            ),
         ]);
 
         assert_eq!(plan.len(), 2, "one destination, one winner");
@@ -190,7 +214,10 @@ mod tests {
         );
         // BTreeMap insertion order decides: the later pair overwrote the earlier.
         assert_eq!(
-            plan.files.iter().find(|f| f.destination == "textures/a.dds").map(|f| f.source.as_str()),
+            plan.files
+                .iter()
+                .find(|f| f.destination == "textures/a.dds")
+                .map(|f| f.source.as_str()),
             Some("00 First/textures/a.dds")
         );
     }
@@ -241,12 +268,20 @@ impl<'a> Listing<'a> {
         for rest in self.under(prefix) {
             match rest.split_once('/') {
                 Some((dir, _)) => {
-                    if !children.dirs.iter().any(|seen| seen.eq_ignore_ascii_case(dir)) {
+                    if !children
+                        .dirs
+                        .iter()
+                        .any(|seen| seen.eq_ignore_ascii_case(dir))
+                    {
                         children.dirs.push(dir.to_string());
                     }
                 }
                 None => {
-                    if !children.files.iter().any(|seen| seen.eq_ignore_ascii_case(&rest)) {
+                    if !children
+                        .files
+                        .iter()
+                        .any(|seen| seen.eq_ignore_ascii_case(&rest))
+                    {
                         children.files.push(rest);
                     }
                 }

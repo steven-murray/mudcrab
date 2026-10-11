@@ -7,7 +7,7 @@
 #[path = "support/bsa.rs"]
 mod bsa_support;
 
-use bsa_support::{archive, file, file_with_compression, DataOrder, FLAG_COMPRESSED};
+use bsa_support::{DataOrder, FLAG_COMPRESSED, archive, file, file_with_compression};
 use mudcrab::bsa::Bsa;
 
 fn assert_round_trips<'a>(label: &str, bytes: &'a [u8]) -> Bsa<'a> {
@@ -55,7 +55,10 @@ fn round_trips_several_folders() {
     let bytes = archive(
         0,
         &[
-            ("textures\\menus\\icons", vec![file("icon.dds", b"DDS ....")]),
+            (
+                "textures\\menus\\icons",
+                vec![file("icon.dds", b"DDS ....")],
+            ),
             (
                 "meshes\\architecture",
                 vec![file("wall.nif", b"WALL"), file("door.nif", b"DOOR")],
@@ -82,7 +85,11 @@ fn round_trips_several_folders() {
         copy
     };
     hashes.dedup();
-    assert_eq!(parsed.folders.len(), hashes.len(), "duplicate folder hashes");
+    assert_eq!(
+        parsed.folders.len(),
+        hashes.len(),
+        "duplicate folder hashes"
+    );
     assert_eq!(
         parsed
             .folders
@@ -147,7 +154,10 @@ fn round_trips_per_file_compression_overrides() {
         .files()
         .find(|(_, f)| f.name == "goblin.nif")
         .expect("goblin.nif");
-    assert!(goblin.compressed, "the differs bit must flip compression on");
+    assert!(
+        goblin.compressed,
+        "the differs bit must flip compression on"
+    );
     assert_eq!(
         goblin.data(&goblin.path_in(folder)).unwrap().as_ref(),
         payload.as_slice()
@@ -217,7 +227,10 @@ fn round_trips_deduplicated_payloads() {
         } else {
             b"SHARED NORMAL MAP"
         };
-        assert_eq!(entry.data(&entry.path_in(folder)).unwrap().as_ref(), expected);
+        assert_eq!(
+            entry.data(&entry.path_in(folder)).unwrap().as_ref(),
+            expected
+        );
     }
 }
 
@@ -230,7 +243,10 @@ fn round_trips_interstitial_bytes_no_record_points_at() {
         0,
         &[(
             "textures\\menus",
-            vec![file("iconarrow1.dds", b"DDS 1234"), file("iconarrow2.dds", b"DDS 5678")],
+            vec![
+                file("iconarrow1.dds", b"DDS 1234"),
+                file("iconarrow2.dds", b"DDS 5678"),
+            ],
         )],
         DataOrder::LengthPrefixed,
     );
@@ -271,7 +287,10 @@ fn round_trips_a_deeply_nested_folder() {
     // The folder name contains a '.', which must not be treated as an
     // extension when hashing.
     let parsed = assert_round_trips("nested voice folder", &bytes);
-    assert_eq!(parsed.folders[0].name, "sound\\voice\\molapi.esp\\breton\\m");
+    assert_eq!(
+        parsed.folders[0].name,
+        "sound\\voice\\molapi.esp\\breton\\m"
+    );
 }
 
 #[test]
@@ -357,8 +376,7 @@ fn packing_applies_include_and_exclude_globs() {
     std::fs::write(source.path().join("meshes/keep.nif"), b"keep").unwrap();
     std::fs::write(source.path().join("textures/skip.dds"), b"skip").unwrap();
 
-    let filters =
-        mudcrab::archive::ArchiveFilters::new(&["meshes/**".to_string()], &[]).unwrap();
+    let filters = mudcrab::archive::ArchiveFilters::new(&["meshes/**".to_string()], &[]).unwrap();
     let built = Bsa::from_directory(source.path(), &filters).expect("pack");
     assert_eq!(
         built.paths().collect::<Vec<_>>(),
@@ -420,7 +438,10 @@ fn rejects_an_unsupported_version() {
 
     let err = Bsa::parse(&bytes).unwrap_err();
     let message = err.to_string();
-    assert!(message.contains("104") && message.contains("103"), "{message}");
+    assert!(
+        message.contains("104") && message.contains("103"),
+        "{message}"
+    );
 }
 
 #[test]
@@ -487,7 +508,12 @@ fn packing_stores_a_repeated_payload_once() {
     parsed.extract_to(extracted.path()).expect("extract");
     for race in ["argonian", "breton"] {
         assert_eq!(
-            std::fs::read(extracted.path().join(format!("sound/voice/{race}/line.mp3"))).unwrap(),
+            std::fs::read(
+                extracted
+                    .path()
+                    .join(format!("sound/voice/{race}/line.mp3"))
+            )
+            .unwrap(),
             shared,
             "{race} lost its line"
         );

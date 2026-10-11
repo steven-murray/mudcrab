@@ -1,12 +1,10 @@
 //! Orchestrate a merge: load, allocate, rewrite, clobber, assemble, write.
 
-use super::alloc::{allocate, Allocation};
+use super::alloc::{Allocation, allocate};
 use super::assemble::Collected;
 use super::masters::{self, MasterError};
-use super::rewrite::{rewrite_entries, RewriteError, Remapper};
-use crate::plugin::{
-    FormId, Plugin, PluginError, PluginName, Record, Subrecord,
-};
+use super::rewrite::{Remapper, RewriteError, rewrite_entries};
+use crate::plugin::{FormId, Plugin, PluginError, PluginName, Record, Subrecord};
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 

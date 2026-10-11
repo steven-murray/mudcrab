@@ -1,5 +1,7 @@
 use crate::config::condition::Condition;
-use crate::config::schema::{BainSubpackage, InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist};
+use crate::config::schema::{
+    BainSubpackage, InputType, InputValue, ModAction, ModEntry, ModType, SourceModlist,
+};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
@@ -89,16 +91,31 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
                             })
                         }
                     }))
-                    .chain(archive.bain_subpackages.iter().filter_map(move |subpackage| {
-                        let BainSubpackage::Conditional { name, condition } = subpackage else {
-                            return None;
-                        };
-                        Some((condition, format!("the BAIN subpackage {name} of {label}"), false))
-                    }))
+                    .chain(
+                        archive
+                            .bain_subpackages
+                            .iter()
+                            .filter_map(move |subpackage| {
+                                let BainSubpackage::Conditional { name, condition } = subpackage
+                                else {
+                                    return None;
+                                };
+                                Some((
+                                    condition,
+                                    format!("the BAIN subpackage {name} of {label}"),
+                                    false,
+                                ))
+                            }),
+                    )
             }));
         for (expr, site, gates_mod) in conditions {
-            let condition = Condition::parse(expr).map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err:#}"))?;
-            if let Some(input) = condition.inputs().into_iter().find(|i| !modlist.inputs.contains_key(*i)) {
+            let condition = Condition::parse(expr)
+                .map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err:#}"))?;
+            if let Some(input) = condition
+                .inputs()
+                .into_iter()
+                .find(|i| !modlist.inputs.contains_key(*i))
+            {
                 anyhow::bail!(
                     "mod {mod_id}: {site} asks about input '{input}', which [inputs] does not declare"
                 );
@@ -347,7 +364,10 @@ fn validate_merges(
         }
 
         if !is_plugin_filename(&merge.output) {
-            anyhow::bail!("merge {mod_id} has invalid output filename {}", merge.output);
+            anyhow::bail!(
+                "merge {mod_id} has invalid output filename {}",
+                merge.output
+            );
         }
         if !in_load_order(&merge.output) {
             anyhow::bail!(
@@ -454,7 +474,10 @@ fn reject_condition_cycles(refs: &HashMap<&str, Vec<String>>) -> anyhow::Result<
         if let Some(at) = stack.iter().position(|seen| *seen == id) {
             let mut cycle = stack[at..].to_vec();
             cycle.push(id);
-            anyhow::bail!("mod conditions depend on each other: {}", cycle.join(" -> "));
+            anyhow::bail!(
+                "mod conditions depend on each other: {}",
+                cycle.join(" -> ")
+            );
         }
         stack.push(id);
         for other in refs.get(id).into_iter().flatten() {
@@ -491,8 +514,16 @@ fn validate_docs(modlist: &SourceModlist, mods: &IndexMap<String, ModEntry>) -> 
     }
 
     let documented = std::iter::once(("the guide's [docs]".to_string(), &modlist.docs))
-        .chain(modlist.sections.iter().map(|(name, docs)| (format!("section {name:?}"), docs)))
-        .chain(mods.iter().map(|(id, spec)| (format!("mod {id:?}"), &spec.docs)));
+        .chain(
+            modlist
+                .sections
+                .iter()
+                .map(|(name, docs)| (format!("section {name:?}"), docs)),
+        )
+        .chain(
+            mods.iter()
+                .map(|(id, spec)| (format!("mod {id:?}"), &spec.docs)),
+        );
     for (site, docs) in documented {
         for image in &docs.images {
             anyhow::ensure!(
@@ -502,7 +533,9 @@ fn validate_docs(modlist: &SourceModlist, mods: &IndexMap<String, ModEntry>) -> 
             if let (Some(path), Some(base)) = (&image.path, &modlist.base_dir)
                 && !base.join(path).is_file()
             {
-                anyhow::bail!("{site}: image {path} does not exist (paths are relative to the modlist)");
+                anyhow::bail!(
+                    "{site}: image {path} does not exist (paths are relative to the modlist)"
+                );
             }
         }
     }

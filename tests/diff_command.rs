@@ -67,7 +67,19 @@ impl Fixture {
     }
 
     fn diff(&self) -> Command {
-        let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
+        let mut command = Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
+            .expect("binary should build");
         command
             .arg("diff")
             // The full report, and a failing exit on any difference: what
@@ -117,7 +129,11 @@ fn aliased_plan_mod(id: &str, oracle_name: &str, section: &[&str]) -> String {
 fn identical_trees_report_no_differences_and_exit_zero() {
     let fixture = Fixture::new();
     for root in [fixture.ours(), fixture.oracle()] {
-        write(&root, "Blockhead/obse/plugins/Blockhead.dll", "binary payload");
+        write(
+            &root,
+            "Blockhead/obse/plugins/Blockhead.dll",
+            "binary payload",
+        );
         write(&root, "Blockhead/readme.txt", "read me");
         write(&root, "Fast Exit/obse/plugins/FastExit.dll", "exit payload");
     }
@@ -129,7 +145,13 @@ fn identical_trees_report_no_differences_and_exit_zero() {
         "[General]\nmodid=43752\nversion=11.1.0.0\ninstallationFile=Blockhead-43752-11-1-1640043918.7z\n",
     );
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("report should be utf-8");
 
     assert!(
@@ -137,7 +159,10 @@ fn identical_trees_report_no_differences_and_exit_zero() {
         "unexpected report:\n{text}"
     );
     // An identical section is a couple of lines, not a file listing.
-    assert!(!text.contains("content differs"), "unexpected report:\n{text}");
+    assert!(
+        !text.contains("content differs"),
+        "unexpected report:\n{text}"
+    );
     assert!(!text.contains("only in"), "unexpected report:\n{text}");
 }
 
@@ -145,8 +170,16 @@ fn identical_trees_report_no_differences_and_exit_zero() {
 fn a_file_that_differs_only_in_content_is_detected() {
     let fixture = Fixture::new();
     // Same size, different bytes: nothing but reading them can tell these apart.
-    write(&fixture.ours(), "Blockhead/data/config.ini", "bLoadModded=1");
-    write(&fixture.oracle(), "Blockhead/data/config.ini", "bLoadModded=0");
+    write(
+        &fixture.ours(),
+        "Blockhead/data/config.ini",
+        "bLoadModded=1",
+    );
+    write(
+        &fixture.oracle(),
+        "Blockhead/data/config.ini",
+        "bLoadModded=0",
+    );
 
     let assert = fixture.diff().assert().failure();
     let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
@@ -195,7 +228,11 @@ fn files_present_on_one_side_only_are_reported_on_that_side() {
     write(&fixture.ours(), "Blockhead/shared.txt", "same");
     write(&fixture.oracle(), "Blockhead/shared.txt", "same");
     write(&fixture.ours(), "Blockhead/extra-of-ours.txt", "ours");
-    write(&fixture.oracle(), "Blockhead/textures/only-theirs.dds", "theirs");
+    write(
+        &fixture.oracle(),
+        "Blockhead/textures/only-theirs.dds",
+        "theirs",
+    );
 
     let assert = fixture.diff().assert().failure();
     let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
@@ -238,10 +275,24 @@ fn paths_are_matched_case_insensitively_and_across_separators() {
     let fixture = Fixture::new();
     // These trees come from Windows-authored archives: the same file routinely
     // arrives with different capitalisation on each side.
-    write(&fixture.ours(), "Blockhead/Textures/Armor/Foo.DDS", "texture");
-    write(&fixture.oracle(), "Blockhead/textures/armor/foo.dds", "texture");
+    write(
+        &fixture.ours(),
+        "Blockhead/Textures/Armor/Foo.DDS",
+        "texture",
+    );
+    write(
+        &fixture.oracle(),
+        "Blockhead/textures/armor/foo.dds",
+        "texture",
+    );
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(
@@ -264,7 +315,13 @@ fn a_mohidden_plugin_is_the_same_file_but_not_the_same_state() {
         "plugin bytes",
     );
 
-    let output = fixture.diff().assert().failure().get_output().stdout.clone();
+    let output = fixture
+        .diff()
+        .assert()
+        .failure()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(
@@ -299,7 +356,13 @@ fn a_file_hidden_the_same_way_on_both_sides_is_identical() {
         "texture bytes",
     );
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(
@@ -339,11 +402,21 @@ fn meta_ini_is_ignored_at_the_mod_root() {
 #[test]
 fn mo2_separator_folders_are_not_treated_as_mods() {
     let fixture = Fixture::new();
-    write(&fixture.oracle(), "1 - MASTERS_separator/meta.ini", "[General]\n");
+    write(
+        &fixture.oracle(),
+        "1 - MASTERS_separator/meta.ini",
+        "[General]\n",
+    );
     write(&fixture.ours(), "Blockhead/readme.txt", "read me");
     write(&fixture.oracle(), "Blockhead/readme.txt", "read me");
 
-    let output = fixture.diff().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
     assert!(
@@ -366,11 +439,23 @@ fn a_post_guide_archive_timestamp_is_flagged_without_gating_the_run() {
 
     // The files reproduce the Oracle, so the run is clean; the drift is a note
     // about the reference's own archive, not a fault in our copy of it.
-    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff_against_guide()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
-    assert!(text.contains("version notes:"), "unexpected report:\n{text}");
-    assert!(text.contains("POST-GUIDE (1)"), "unexpected report:\n{text}");
+    assert!(
+        text.contains("version notes:"),
+        "unexpected report:\n{text}"
+    );
+    assert!(
+        text.contains("POST-GUIDE (1)"),
+        "unexpected report:\n{text}"
+    );
     assert!(
         text.contains("! Newer Mod  dated 2025-06-15"),
         "unexpected report:\n{text}"
@@ -390,10 +475,19 @@ fn a_pre_guide_archive_timestamp_produces_no_version_note() {
         "[General]\nmodid=50682\ninstallationFile=Better Fort Aurus-50682-1-1-1647873144.7z\n",
     );
 
-    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff_against_guide()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
-    assert!(!text.contains("version notes:"), "unexpected report:\n{text}");
+    assert!(
+        !text.contains("version notes:"),
+        "unexpected report:\n{text}"
+    );
     assert!(!text.contains("POST-GUIDE"), "unexpected report:\n{text}");
 }
 
@@ -409,10 +503,19 @@ fn an_unparseable_archive_name_is_reported_as_unknown_rather_than_assumed_fine()
         "[General]\nmodid=19039\ninstallationFile=Anvil Morning Glory-19039.7z\n",
     );
 
-    let output = fixture.diff_against_guide().assert().success().get_output().stdout.clone();
+    let output = fixture
+        .diff_against_guide()
+        .assert()
+        .success()
+        .get_output()
+        .stdout
+        .clone();
     let text = String::from_utf8(output).expect("utf-8");
 
-    assert!(text.contains("UNKNOWN AGE (1)"), "unexpected report:\n{text}");
+    assert!(
+        text.contains("UNKNOWN AGE (1)"),
+        "unexpected report:\n{text}"
+    );
     assert!(
         text.contains("? Anvil Morning Glory  no Unix timestamp in 'Anvil Morning Glory-19039.7z'"),
         "unexpected report:\n{text}"
@@ -488,7 +591,10 @@ fn section_filtering_narrows_the_run_to_the_planned_section() {
         text.contains("1 compared, 1 identical, 0 differing"),
         "unexpected report:\n{text}"
     );
-    assert!(text.contains("[OBSE PLUGINS]"), "unexpected report:\n{text}");
+    assert!(
+        text.contains("[OBSE PLUGINS]"),
+        "unexpected report:\n{text}"
+    );
     assert!(!text.contains("Fort Aurus"), "unexpected report:\n{text}");
 
     // The whole-tree run over the same fixture does see the broken mod, which
@@ -501,7 +607,11 @@ fn section_filtering_narrows_the_run_to_the_planned_section() {
 /// One file matches and one differs, so a run that matched them up has
 /// something to say beyond "both sides exist".
 fn write_aliased_pair(fixture: &Fixture) {
-    write(&fixture.ours(), "Cleaned DLC Masters/shared.esp", "plugin bytes");
+    write(
+        &fixture.ours(),
+        "Cleaned DLC Masters/shared.esp",
+        "plugin bytes",
+    );
     write(&fixture.oracle(), "Clean ESM/shared.esp", "plugin bytes");
     write(&fixture.ours(), "Cleaned DLC Masters/notes.txt", "ours");
     write(&fixture.oracle(), "Clean ESM/notes.txt", "theirs");
@@ -572,7 +682,10 @@ fn without_an_oracle_name_the_same_pair_is_a_missing_and_an_extra() {
     );
     // No file was read for either side, so the real difference stays buried --
     // which is the whole reason `oracle_name` exists.
-    assert!(!text.contains("content differs"), "unexpected report:\n{text}");
+    assert!(
+        !text.contains("content differs"),
+        "unexpected report:\n{text}"
+    );
 }
 
 #[test]
@@ -648,8 +761,16 @@ fn section_filtering_without_a_plan_is_refused_rather_than_matching_nothing() {
 #[test]
 fn json_format_carries_the_same_findings_structured() {
     let fixture = Fixture::new();
-    write(&fixture.ours(), "Blockhead/data/config.ini", "bLoadModded=1");
-    write(&fixture.oracle(), "Blockhead/data/config.ini", "bLoadModded=0");
+    write(
+        &fixture.ours(),
+        "Blockhead/data/config.ini",
+        "bLoadModded=1",
+    );
+    write(
+        &fixture.oracle(),
+        "Blockhead/data/config.ini",
+        "bLoadModded=0",
+    );
     write(&fixture.oracle(), "Blockhead/extra.txt", "theirs");
     write(
         &fixture.oracle(),
@@ -664,8 +785,7 @@ fn json_format_carries_the_same_findings_structured() {
         .assert()
         .failure();
     let text = String::from_utf8(assert.get_output().stdout.clone()).expect("utf-8");
-    let report: serde_json::Value =
-        serde_json::from_str(&text).expect("json report should parse");
+    let report: serde_json::Value = serde_json::from_str(&text).expect("json report should parse");
 
     assert_eq!(report["summary"]["mods_compared"], 1);
     assert_eq!(report["summary"]["differing"], 1);
@@ -816,8 +936,18 @@ fn a_differing_plugin_reports_records_and_masters_even_when_hidden() {
     let fixture = Fixture::new();
     fixture.write_plan(&plan_mod("thing", &["s"], None));
 
-    let shared = esp::record(b"WEAP", 0x0100_0001, 0, &[esp::field(b"EDID", &esp::zstring("a"))]);
-    let extra = esp::record(b"WEAP", 0x0100_0002, 0, &[esp::field(b"EDID", &esp::zstring("b"))]);
+    let shared = esp::record(
+        b"WEAP",
+        0x0100_0001,
+        0,
+        &[esp::field(b"EDID", &esp::zstring("a"))],
+    );
+    let extra = esp::record(
+        b"WEAP",
+        0x0100_0002,
+        0,
+        &[esp::field(b"EDID", &esp::zstring("b"))],
+    );
 
     let ours_dir = fixture.ours().join("thing");
     let oracle_dir = fixture.oracle().join("thing");

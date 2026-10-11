@@ -1,6 +1,6 @@
 use crate::config::docs::Docs;
 use indexmap::IndexMap;
-use serde::{de, Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Deserialize)]
@@ -582,7 +582,7 @@ impl<'de> Deserialize<'de> for IniValue {
                 return Err(D::Error::custom(format!(
                     "ini value must be a string, number or boolean, got {}",
                     other.type_str()
-                )))
+                )));
             }
         }))
     }

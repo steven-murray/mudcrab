@@ -1,6 +1,6 @@
 use crate::config::schema::{
-    ArchiveLayout, ArchiveSpec, CompiledArchive, CompiledMod, CompiledModlist, IniScope, IniSetAction, IniSetFormat, IniValue,
-    ModAction, SourceModlist,
+    ArchiveLayout, ArchiveSpec, CompiledArchive, CompiledMod, CompiledModlist, IniScope,
+    IniSetAction, IniSetFormat, IniValue, ModAction, SourceModlist,
 };
 
 pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
@@ -55,9 +55,7 @@ pub fn compile_archive(id: &str, archive: &ArchiveSpec) -> anyhow::Result<Compil
             id
         ));
     }
-    if archive.layout == Some(ArchiveLayout::CustomDataFolder)
-        && archive.data_folder.is_none()
-    {
+    if archive.layout == Some(ArchiveLayout::CustomDataFolder) && archive.data_folder.is_none() {
         return Err(anyhow::anyhow!(
             "mod '{}': layout = \"custom-data-folder\" requires data_folder \
              to say where the data folder is",
@@ -136,7 +134,11 @@ fn ini_value_to_string(value: &toml::Value) -> String {
         toml::Value::Integer(number) => number.to_string(),
         toml::Value::Float(number) => number.to_string(),
         toml::Value::Boolean(flag) => {
-            if *flag { "1".to_string() } else { "0".to_string() }
+            if *flag {
+                "1".to_string()
+            } else {
+                "0".to_string()
+            }
         }
         other => other.to_string(),
     }
@@ -163,7 +165,10 @@ mod tests {
     fn no_other_scheme_guesses_a_file_name() {
         // A Nexus descriptor is ids; the real filename carries a slug and a
         // timestamp that cannot be derived from them.
-        assert_eq!(manual_file_name(Some("nexus:oblivion/52874/1000036033")), None);
+        assert_eq!(
+            manual_file_name(Some("nexus:oblivion/52874/1000036033")),
+            None
+        );
         // The last segment of a URL is a plausible guess, and a guess that is
         // wrong looks exactly like an archive nobody has downloaded.
         assert_eq!(manual_file_name(Some("https://example.com/x.7z")), None);

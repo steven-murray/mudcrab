@@ -3,7 +3,7 @@ use mudcrab::config::loader::load_modlist;
 use mudcrab::config::validator::validate;
 use predicates::prelude::PredicateBooleanExt;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 
 /// A modlist deliberately full of the things a parse-and-reemit would destroy:
 /// a header comment, a comment inside a multi-line array, tab indentation,
@@ -54,7 +54,19 @@ fn fixture() -> (TempDir, PathBuf) {
 }
 
 fn add(path: &Path) -> Command {
-    let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
+    let mut command = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
+        .expect("binary should build");
     command.arg("add").arg(path);
     command
 }
@@ -76,11 +88,7 @@ fn assert_pure_insertion(original: &str, updated: &str) {
     let old = original.as_bytes();
     let new = updated.as_bytes();
 
-    let prefix = old
-        .iter()
-        .zip(new)
-        .take_while(|(a, b)| a == b)
-        .count();
+    let prefix = old.iter().zip(new).take_while(|(a, b)| a == b).count();
     let suffix = old
         .iter()
         .rev()
@@ -217,7 +225,9 @@ fn refuses_a_duplicate_mod_id() {
         .args(["--nexus", "9/10", "--id", "Beta", "--section", "CORE"])
         .assert()
         .failure()
-        .stderr(predicates::str::contains("already contains a mod with id 'Beta'"));
+        .stderr(predicates::str::contains(
+            "already contains a mod with id 'Beta'",
+        ));
 
     assert_eq!(
         std::fs::read_to_string(&path).expect("modlist should be readable"),
@@ -291,7 +301,11 @@ fn from_oracle_id_can_be_overridden() {
         .assert()
         .success();
 
-    assert!(mod_ids(&path).iter().any(|entry| entry == "Blockhead (OBSE)"));
+    assert!(
+        mod_ids(&path)
+            .iter()
+            .any(|entry| entry == "Blockhead (OBSE)")
+    );
 }
 
 #[test]
@@ -381,11 +395,11 @@ fn dry_run_prints_the_block_and_writes_nothing() {
         .arg("--dry-run")
         .assert()
         .success()
-        .stdout(predicates::str::contains("after the last mod in section CORE"))
-        .stdout(predicates::str::contains("id = \"Delta\""))
         .stdout(predicates::str::contains(
-            "path = \"nexus:oblivion/9/10\"",
-        ));
+            "after the last mod in section CORE",
+        ))
+        .stdout(predicates::str::contains("id = \"Delta\""))
+        .stdout(predicates::str::contains("path = \"nexus:oblivion/9/10\""));
 
     assert_eq!(
         std::fs::read_to_string(&path).expect("modlist should be readable"),

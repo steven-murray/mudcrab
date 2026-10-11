@@ -9,7 +9,7 @@
 use assert_cmd::Command;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use zip::write::FileOptions;
 
 /// One mod's archive: a plugin plus a marker file, enough to tell installs apart.
@@ -22,7 +22,8 @@ fn write_mod_archive(path: &Path, plugin_name: &str) {
         .expect("plugin entry");
     zip.write_all(b"TES4").expect("plugin bytes");
 
-    zip.start_file("Data/marker.txt", options).expect("marker entry");
+    zip.start_file("Data/marker.txt", options)
+        .expect("marker entry");
     zip.write_all(plugin_name.as_bytes()).expect("marker bytes");
 
     zip.finish().expect("finalize zip");
@@ -59,7 +60,12 @@ impl Fixture {
             .as_array()
             .expect("installed_mods should be an array")
             .iter()
-            .map(|entry| entry["id"].as_str().expect("id should be a string").to_string())
+            .map(|entry| {
+                entry["id"]
+                    .as_str()
+                    .expect("id should be a string")
+                    .to_string()
+            })
             .collect();
         ids.sort();
         ids
@@ -67,7 +73,19 @@ impl Fixture {
 
     /// Run `install`, passing through whatever filter flags the test wants.
     fn install(&self, filter_args: &[&str]) {
-        let mut command = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).expect("binary should build");
+        let mut command = Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
+            .expect("binary should build");
         command
             .arg("install")
             .arg(&self.plan)
@@ -157,7 +175,18 @@ download_handler = "local"
     let cache = root.join("cache");
     let instance = root.join("mo2-instance");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("compile")
         .arg(&modlist)
@@ -166,7 +195,18 @@ download_handler = "local"
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("query")
         .arg(&compiled)
@@ -178,7 +218,18 @@ download_handler = "local"
 
     // Downloading is deliberately unfiltered: every later filtered install
     // should find its archives already cached.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("download")
         .arg(&plan)
@@ -224,8 +275,14 @@ fn section_filter_installs_only_that_sections_mods() {
     fixture.install(&["--section", "B"]);
 
     let mods_dir = fixture.mods_dir();
-    assert!(mods_dir.join("b1").join("marker.txt").exists(), "b1 should install");
-    assert!(mods_dir.join("b2").join("marker.txt").exists(), "b2 should install");
+    assert!(
+        mods_dir.join("b1").join("marker.txt").exists(),
+        "b1 should install"
+    );
+    assert!(
+        mods_dir.join("b2").join("marker.txt").exists(),
+        "b2 should install"
+    );
     assert!(!mods_dir.join("a1").exists(), "a1 is in section A");
     assert!(!mods_dir.join("c1").exists(), "c1 is in section C");
 
@@ -235,8 +292,14 @@ fn section_filter_installs_only_that_sections_mods() {
         fixture.read_profile_file("modlist.txt"),
         "+b2\n-B - Nested_separator\n+b1\n-B_separator\n"
     );
-    assert!(!mods_dir.join("A_separator").exists(), "A has nothing under it yet");
-    assert!(!mods_dir.join("C_separator").exists(), "C has nothing under it yet");
+    assert!(
+        !mods_dir.join("A_separator").exists(),
+        "A has nothing under it yet"
+    );
+    assert!(
+        !mods_dir.join("C_separator").exists(),
+        "C has nothing under it yet"
+    );
     assert!(mods_dir.join("B_separator").exists());
     assert!(mods_dir.join("B - Nested_separator").exists());
 
@@ -296,7 +359,10 @@ fn only_installs_exactly_the_named_mod() {
         assert!(!mods_dir.join(other).exists(), "{other} should not install");
     }
 
-    assert_eq!(fixture.read_profile_file("modlist.txt"), "+b1\n-B_separator\n");
+    assert_eq!(
+        fixture.read_profile_file("modlist.txt"),
+        "+b1\n-B_separator\n"
+    );
     assert_eq!(
         fixture.read_profile_file("plugins.txt"),
         "Oblivion.esm\nB1.esp\n"
@@ -311,7 +377,10 @@ fn section_and_only_union_rather_than_intersect() {
 
     let mods_dir = fixture.mods_dir();
     assert!(mods_dir.join("a1").exists(), "--only adds to the selection");
-    assert!(mods_dir.join("c1").exists(), "--section adds to the selection");
+    assert!(
+        mods_dir.join("c1").exists(),
+        "--section adds to the selection"
+    );
     assert!(!mods_dir.join("b1").exists());
     assert!(!mods_dir.join("b2").exists());
 
@@ -325,7 +394,10 @@ fn no_filter_still_installs_everything() {
 
     let mods_dir = fixture.mods_dir();
     for mod_id in ["a1", "b1", "b2", "c1"] {
-        assert!(mods_dir.join(mod_id).join("marker.txt").exists(), "{mod_id}");
+        assert!(
+            mods_dir.join(mod_id).join("marker.txt").exists(),
+            "{mod_id}"
+        );
     }
 
     assert_eq!(
@@ -358,7 +430,10 @@ fn a_filtered_install_does_not_drop_previously_installed_mods_from_the_manifest(
 
     let mods_dir = fixture.mods_dir();
     for mod_id in ["a1", "b1", "b2", "c1"] {
-        assert!(mods_dir.join(mod_id).join("marker.txt").exists(), "{mod_id}");
+        assert!(
+            mods_dir.join(mod_id).join("marker.txt").exists(),
+            "{mod_id}"
+        );
     }
 
     // And the profile still describes all of it, because all of it is installed.
@@ -439,7 +514,12 @@ download_handler = "local"
     let cache = root.join("cache");
 
     for args in [
-        vec!["compile", modlist.to_str().unwrap(), "--output", compiled.to_str().unwrap()],
+        vec![
+            "compile",
+            modlist.to_str().unwrap(),
+            "--output",
+            compiled.to_str().unwrap(),
+        ],
         vec![
             "query",
             compiled.to_str().unwrap(),
@@ -448,7 +528,18 @@ download_handler = "local"
             "--headless",
         ],
     ] {
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary should build")
             .env("GAME_DIR", &game_dir)
             .args(args)
@@ -457,14 +548,41 @@ download_handler = "local"
     }
 
     // Unfiltered, a1's missing archive fails the download.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
-        .args(["download", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()])
+        .args([
+            "download",
+            plan.to_str().unwrap(),
+            "--cache",
+            cache.to_str().unwrap(),
+        ])
         .assert()
         .failure();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args([
@@ -479,14 +597,41 @@ download_handler = "local"
         .success();
 
     // check sees the same subset: b1 is cached, a1 was never fetched.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
-        .args(["check", plan.to_str().unwrap(), "--cache", cache.to_str().unwrap()])
+        .args([
+            "check",
+            plan.to_str().unwrap(),
+            "--cache",
+            cache.to_str().unwrap(),
+        ])
         .assert()
         .failure();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args([

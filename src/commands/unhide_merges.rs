@@ -25,7 +25,10 @@ pub async fn run(args: UnhideMergesArgs) -> anyhow::Result<()> {
     );
 
     if recorded == 0 {
-        println!("No hidden plugins recorded for profile {}.", args.profile_name);
+        println!(
+            "No hidden plugins recorded for profile {}.",
+            args.profile_name
+        );
     } else {
         println!(
             "Restored {restored} of {recorded} recorded plugin(s); \

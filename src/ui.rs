@@ -48,7 +48,9 @@ fn default_log_dir() -> Option<PathBuf> {
     {
         std::env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
-            .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("state")))
+            .or_else(|| {
+                std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local").join("state"))
+            })
             .map(|state| state.join("mudcrab").join("logs"))
     }
 }
@@ -80,7 +82,9 @@ fn timestamp() -> String {
 
 /// Keep the newest `keep` logs in `dir`; old runs are not worth a full disk.
 fn prune_logs(dir: &Path, keep: usize) {
-    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
     // Oldest first by modification time: names start with the command, so
     // sorting by name would evict every `check` log before any `install` one.
     let mut logs: Vec<(std::time::SystemTime, PathBuf)> = entries
@@ -118,7 +122,8 @@ impl Write for ConsoleWriter {
 /// be created is not fatal: the run goes ahead without one.
 pub fn init(command: &str, verbose: bool, log_file: Option<PathBuf>) {
     let _ = VERBOSE.set(verbose);
-    let file_filter = || EnvFilter::try_from_default_env().unwrap_or_else(|_| "mudcrab=info".into());
+    let file_filter =
+        || EnvFilter::try_from_default_env().unwrap_or_else(|_| "mudcrab=info".into());
 
     let path = log_file.or_else(|| {
         let dir = default_log_dir()?;
@@ -138,7 +143,11 @@ pub fn init(command: &str, verbose: bool, log_file: Option<PathBuf>) {
         )
     });
 
-    let console_filter = if verbose { file_filter() } else { EnvFilter::new("mudcrab=warn") };
+    let console_filter = if verbose {
+        file_filter()
+    } else {
+        EnvFilter::new("mudcrab=warn")
+    };
     let console_layer = tracing_subscriber::fmt::layer()
         .with_target(false)
         .compact()

@@ -17,7 +17,9 @@ pub(super) fn apply(action: &FileMoveAction, cx: &ActionCx<'_>) -> anyhow::Resul
 
     let from = mod_target.join(normalize_relative_path(&action.from)?);
     // Directories we create fold to lowercase like every other staged folder.
-    let to = mod_target.join(lowercase_dir_components(&normalize_relative_path(&action.to)?));
+    let to = mod_target.join(lowercase_dir_components(&normalize_relative_path(
+        &action.to,
+    )?));
 
     if cx.settings.dry_run {
         tracing::info!(
@@ -29,8 +31,10 @@ pub(super) fn apply(action: &FileMoveAction, cx: &ActionCx<'_>) -> anyhow::Resul
         return Ok(());
     }
 
-    let Some(source) = resolve_case_insensitive(mod_target, Path::new(&normalize_relative_path(&action.from)?))
-    else {
+    let Some(source) = resolve_case_insensitive(
+        mod_target,
+        Path::new(&normalize_relative_path(&action.from)?),
+    ) else {
         anyhow::bail!(
             "{}: file_move found no '{}' under {}. The path is relative to the staged \
              folder and matched case-insensitively.",
@@ -73,9 +77,10 @@ fn resolve_case_insensitive(root: &Path, relative: &Path) -> Option<std::path::P
     let mut current = root.to_path_buf();
     for segment in relative.components() {
         let wanted = segment.as_os_str().to_str()?.to_ascii_lowercase();
-        let matched = std::fs::read_dir(&current).ok()?.flatten().find(|entry| {
-            entry.file_name().to_string_lossy().to_ascii_lowercase() == wanted
-        })?;
+        let matched = std::fs::read_dir(&current)
+            .ok()?
+            .flatten()
+            .find(|entry| entry.file_name().to_string_lossy().to_ascii_lowercase() == wanted)?;
         current = matched.path();
     }
     Some(current)

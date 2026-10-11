@@ -11,7 +11,7 @@ mod esp;
 use assert_cmd::Command;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use tempfile::{tempdir, TempDir};
+use tempfile::{TempDir, tempdir};
 use zip::write::FileOptions;
 
 fn source_plugin(masters: &[&str], form_id: u32, editor_id: &str) -> Vec<u8> {
@@ -70,7 +70,18 @@ struct Fixture {
 impl Fixture {
     /// Run `install` and return what it logged.
     fn install(&self, extra: &[&str]) -> String {
-        let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        let assert = Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary should build")
             .arg("install")
             .arg("-v")
@@ -91,7 +102,9 @@ impl Fixture {
 
     /// A source plugin as it sits on disk after the merge hid it.
     fn hidden_source(&self, mod_id: &str, plugin: &str) -> PathBuf {
-        self.mods_dir.join(mod_id).join(format!("{plugin}.mohidden"))
+        self.mods_dir
+            .join(mod_id)
+            .join(format!("{plugin}.mohidden"))
     }
 }
 
@@ -178,7 +191,18 @@ sources = [
             cache.display().to_string(),
         ],
     ] {
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary should build")
             .args(&args)
             .assert()

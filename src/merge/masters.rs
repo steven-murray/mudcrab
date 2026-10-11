@@ -13,9 +13,7 @@ pub enum MasterError {
         required_by: PluginName,
     },
 
-    #[error(
-        "merged plugin would need {count} masters, but a TES4 plugin can address at most 255"
-    )]
+    #[error("merged plugin would need {count} masters, but a TES4 plugin can address at most 255")]
     TooManyMasters { count: usize },
 }
 
@@ -117,7 +115,10 @@ mod tests {
     #[test]
     fn unions_masters_and_orders_them_by_load_order() {
         let sources = vec![
-            ("b.esp".into(), plugin_with_masters(&["Oblivion.esm", "Knights.esp"])),
+            (
+                "b.esp".into(),
+                plugin_with_masters(&["Oblivion.esm", "Knights.esp"]),
+            ),
             ("c.esp".into(), plugin_with_masters(&["Oblivion.esm"])),
         ];
         let load_order = vec![

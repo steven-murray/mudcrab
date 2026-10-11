@@ -2,7 +2,7 @@
 
 use super::formid::{FormId, MasterTable, PluginName};
 use super::group::{Entry, Group, GroupType};
-use super::record::{parse_fields, Record, FLAG_COMPRESSED};
+use super::record::{FLAG_COMPRESSED, Record, parse_fields};
 use super::{Plugin, PluginError};
 
 const RECORD_HEADER_LEN: usize = 20;
@@ -18,7 +18,11 @@ pub fn parse(data: &[u8]) -> Result<Plugin, PluginError> {
         .record
         .fields_with(b"MAST")
         .map(|field| {
-            let end = field.data.iter().position(|b| *b == 0).unwrap_or(field.data.len());
+            let end = field
+                .data
+                .iter()
+                .position(|b| *b == 0)
+                .unwrap_or(field.data.len());
             PluginName::new(String::from_utf8_lossy(&field.data[..end]).into_owned())
         })
         .collect();
@@ -54,8 +58,7 @@ fn read_record(data: &[u8], offset: usize) -> Result<ReadRecord, PluginError> {
     let form_id = FormId(u32::from_le_bytes(
         data[offset + 12..offset + 16].try_into().unwrap(),
     ));
-    let version_control =
-        u32::from_le_bytes(data[offset + 16..offset + 20].try_into().unwrap());
+    let version_control = u32::from_le_bytes(data[offset + 16..offset + 20].try_into().unwrap());
 
     let body_start = offset + RECORD_HEADER_LEN;
     let body_end = body_start
@@ -72,15 +75,13 @@ fn read_record(data: &[u8], offset: usize) -> Result<ReadRecord, PluginError> {
         if raw_body.len() < 4 {
             return Err(PluginError::Truncated { offset });
         }
-        let expected =
-            u32::from_le_bytes(raw_body[0..4].try_into().unwrap()) as usize;
-        decompressed = inflate(&raw_body[4..], expected).map_err(|source| {
-            PluginError::Decompress {
+        let expected = u32::from_le_bytes(raw_body[0..4].try_into().unwrap()) as usize;
+        decompressed =
+            inflate(&raw_body[4..], expected).map_err(|source| PluginError::Decompress {
                 record: signature,
                 form_id,
                 source,
-            }
-        })?;
+            })?;
         &decompressed
     } else {
         raw_body

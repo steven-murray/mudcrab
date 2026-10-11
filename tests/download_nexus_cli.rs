@@ -36,7 +36,18 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
     let source = "name = \"Nexus CLI Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:skyrimspecialedition/1234/5678\"\ndownload_handler = \"nexus\"\n";
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -46,7 +57,18 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -57,7 +79,18 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")
@@ -70,8 +103,12 @@ async fn download_uses_nexus_api_descriptor_via_cli() {
         .success();
 
     // Saved under the server's name, with the .meta MO2 would write.
-    let payload = std::fs::read(cache.join("archive.bin")).expect("downloaded file should be readable");
+    let payload =
+        std::fs::read(cache.join("archive.bin")).expect("downloaded file should be readable");
     assert_eq!(payload, b"nexus-cli-payload");
     let meta = std::fs::read_to_string(cache.join("archive.bin.meta")).expect(".meta should exist");
-    assert!(meta.contains("modID=") && meta.contains("fileID="), "{meta}");
+    assert!(
+        meta.contains("modID=") && meta.contains("fileID="),
+        "{meta}"
+    );
 }

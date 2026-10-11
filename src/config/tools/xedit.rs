@@ -58,9 +58,7 @@ pub(crate) fn apply_qac_action(
     use std::time::{SystemTime, UNIX_EPOCH};
 
     let tes4edit_config = settings.tools.tes4edit.as_ref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "{owner_label} qac action requires [tes4edit] configuration in tools.toml"
-        )
+        anyhow::anyhow!("{owner_label} qac action requires [tes4edit] configuration in tools.toml")
     })?;
 
     let game_dir = settings
@@ -87,7 +85,11 @@ pub(crate) fn apply_qac_action(
             continue;
         }
 
-        tracing::info!(owner = owner_label, plugin = plugin_name, "qac: cleaning plugin");
+        tracing::info!(
+            owner = owner_label,
+            plugin = plugin_name,
+            "qac: cleaning plugin"
+        );
 
         // Build a temporary data sandbox.
         let stamp = SystemTime::now()
@@ -114,7 +116,13 @@ pub(crate) fn apply_qac_action(
             // exactly like a hang.
             //
             // Masters have masters, so this is a closure, not a list.
-            stage_masters(plugin_path, &temp_data, &game_data, &settings.mods_dir, owner_label)?;
+            stage_masters(
+                plugin_path,
+                &temp_data,
+                &game_data,
+                &settings.mods_dir,
+                owner_label,
+            )?;
 
             // Copy the plugin to clean into the sandbox.
             let temp_plugin = temp_data.join(&plugin_name);
@@ -239,9 +247,7 @@ pub(crate) fn apply_qac_action(
 
             // Copy the cleaned plugin back to the staging directory.
             std::fs::copy(&temp_plugin, plugin_path).map_err(|err| {
-                anyhow::anyhow!(
-                    "qac: failed to copy cleaned plugin back to staging dir: {err}"
-                )
+                anyhow::anyhow!("qac: failed to copy cleaned plugin back to staging dir: {err}")
             })?;
 
             Ok(())
@@ -250,12 +256,15 @@ pub(crate) fn apply_qac_action(
         let _ = std::fs::remove_dir_all(&temp_root);
         qac_result?;
 
-        tracing::info!(owner = owner_label, plugin = plugin_name, "qac: plugin cleaned successfully");
+        tracing::info!(
+            owner = owner_label,
+            plugin = plugin_name,
+            "qac: plugin cleaned successfully"
+        );
     }
 
     Ok(())
 }
-
 
 /// Which staged files a `qac` action's patterns name.
 ///
@@ -305,13 +314,13 @@ fn resolve_plugin_patterns(
             let glob = Glob::new(pattern).map_err(|err| {
                 anyhow::anyhow!("{owner_label} qac: invalid glob '{pattern}': {err}")
             })?;
-            let matcher = GlobSetBuilder::new()
-                .add(glob)
-                .build()
-                .map_err(|err| {
-                    anyhow::anyhow!("{owner_label} qac: failed to build glob set: {err}")
-                })?;
-            names.iter().filter(|name| matcher.is_match(*name)).collect()
+            let matcher = GlobSetBuilder::new().add(glob).build().map_err(|err| {
+                anyhow::anyhow!("{owner_label} qac: failed to build glob set: {err}")
+            })?;
+            names
+                .iter()
+                .filter(|name| matcher.is_match(*name))
+                .collect()
         } else {
             literal
         };
@@ -500,7 +509,8 @@ fn locate_plugin(name: &str, game_data: &Path, mods_dir: &Path) -> Option<PathBu
         let file = entry.file_name();
         let file = file.to_string_lossy();
         file.eq_ignore_ascii_case(name)
-            || file.eq_ignore_ascii_case(&format!("{name}{}", crate::config::mo2::MO2_HIDDEN_SUFFIX))
+            || file
+                .eq_ignore_ascii_case(&format!("{name}{}", crate::config::mo2::MO2_HIDDEN_SUFFIX))
     };
 
     if let Ok(entries) = std::fs::read_dir(game_data)
@@ -553,12 +563,15 @@ mod tests {
             "a filename should find the file with that name"
         );
 
-        let mut globbed = resolve_plugin_patterns(dir.path(), &["DLC*.esp".to_string()], "test")
-            .expect("glob");
+        let mut globbed =
+            resolve_plugin_patterns(dir.path(), &["DLC*.esp".to_string()], "test").expect("glob");
         globbed.sort();
         assert_eq!(
             globbed,
-            vec![dir.path().join("DLCOrrery.esp"), dir.path().join("DLCVileLair.esp")],
+            vec![
+                dir.path().join("DLCOrrery.esp"),
+                dir.path().join("DLCVileLair.esp")
+            ],
             "a pattern no file is named should still glob"
         );
     }
@@ -574,7 +587,10 @@ mod tests {
             .expect_err("should refuse");
         let message = err.to_string();
         assert!(message.contains("Absent.esp"), "{message}");
-        assert!(message.contains("Thing.esp"), "should list what is there: {message}");
+        assert!(
+            message.contains("Thing.esp"),
+            "should list what is there: {message}"
+        );
     }
 
     #[test]

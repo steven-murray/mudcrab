@@ -78,12 +78,19 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     }
 
     let under = args.under.as_ref().map(|value| {
-        format!("{}/", value.replace('\\', "/").trim_matches('/').to_lowercase())
+        format!(
+            "{}/",
+            value.replace('\\', "/").trim_matches('/').to_lowercase()
+        )
     });
 
     let overlap: Vec<&String> = mine
         .iter()
-        .filter(|path| under.as_deref().is_none_or(|prefix| path.starts_with(prefix)))
+        .filter(|path| {
+            under
+                .as_deref()
+                .is_none_or(|prefix| path.starts_with(prefix))
+        })
         .filter(|path| theirs.contains(*path))
         .collect();
 

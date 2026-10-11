@@ -65,7 +65,10 @@ fn index_plugins(mods_dir: &Path) -> anyhow::Result<BTreeMap<String, Vec<(String
 /// A request may be written `Some Mod/Plugin.esp` to name the provider
 /// directly, which is the way out of an ambiguity rather than a second syntax
 /// to learn: the error for an ambiguous name says to use it.
-pub fn resolve_sources(mods_dir: &Path, requested: &[String]) -> anyhow::Result<Vec<ResolvedSource>> {
+pub fn resolve_sources(
+    mods_dir: &Path,
+    requested: &[String],
+) -> anyhow::Result<Vec<ResolvedSource>> {
     let index = index_plugins(mods_dir)?;
     let mut out = Vec::with_capacity(requested.len());
     let mut seen: Vec<String> = Vec::new();
@@ -85,15 +88,17 @@ pub fn resolve_sources(mods_dir: &Path, requested: &[String]) -> anyhow::Result<
             anyhow::bail!("{wanted_plugin} is listed twice; a plugin can only be merged once");
         }
 
-        let candidates = index.get(&wanted_plugin.to_ascii_lowercase()).ok_or_else(|| {
-            anyhow::anyhow!(
-                "no mod in {} provides {wanted_plugin}.\n\
+        let candidates = index
+            .get(&wanted_plugin.to_ascii_lowercase())
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "no mod in {} provides {wanted_plugin}.\n\
                  If it is there but hidden as `{wanted_plugin}.mohidden`, it has already been \
                  merged away by something else -- unhide it first, or merge whatever produced it \
                  instead.",
-                mods_dir.display()
-            )
-        })?;
+                    mods_dir.display()
+                )
+            })?;
 
         let chosen = match wanted_mod {
             Some(owner) => candidates
@@ -102,14 +107,22 @@ pub fn resolve_sources(mods_dir: &Path, requested: &[String]) -> anyhow::Result<
                 .ok_or_else(|| {
                     anyhow::anyhow!(
                         "mod {owner} does not provide {wanted_plugin}. Mods that do: {}",
-                        candidates.iter().map(|(m, _)| m.as_str()).collect::<Vec<_>>().join(", ")
+                        candidates
+                            .iter()
+                            .map(|(m, _)| m.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", ")
                     )
                 })?,
             None if candidates.len() > 1 => anyhow::bail!(
                 "{wanted_plugin} is provided by {} mods, so which one to merge is ambiguous: {}.\n\
                  Name the one you mean as `<mod>/{wanted_plugin}`.",
                 candidates.len(),
-                candidates.iter().map(|(m, _)| m.as_str()).collect::<Vec<_>>().join(", ")
+                candidates
+                    .iter()
+                    .map(|(m, _)| m.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
             ),
             None => &candidates[0],
         };
@@ -122,7 +135,10 @@ pub fn resolve_sources(mods_dir: &Path, requested: &[String]) -> anyhow::Result<
     }
 
     if out.len() < 2 {
-        anyhow::bail!("a merge needs at least two source plugins; {} given", out.len());
+        anyhow::bail!(
+            "a merge needs at least two source plugins; {} given",
+            out.len()
+        );
     }
     Ok(out)
 }
@@ -180,7 +196,10 @@ pub fn post_merge_load_order(
     sources: &[ResolvedSource],
     output: &str,
 ) -> Vec<String> {
-    let merged: Vec<String> = sources.iter().map(|s| s.plugin.to_ascii_lowercase()).collect();
+    let merged: Vec<String> = sources
+        .iter()
+        .map(|s| s.plugin.to_ascii_lowercase())
+        .collect();
     let is_source = |name: &str| merged.iter().any(|m| m == &name.to_ascii_lowercase());
 
     let mut out = Vec::with_capacity(load_order.len());
@@ -241,7 +260,10 @@ pub fn render(
             continue;
         }
         declared.push(&source.mod_id);
-        out.push_str(&format!("[[mods]]\nid = {}\n\n", toml_string(&source.mod_id)));
+        out.push_str(&format!(
+            "[[mods]]\nid = {}\n\n",
+            toml_string(&source.mod_id)
+        ));
     }
 
     out.push_str(&format!(
@@ -254,10 +276,16 @@ pub fn render(
          \x20 # true only once the merge is verified and you want MO2 to stop loading\n\
          \x20 # the originals.\n  hide_sources = false\n",
     );
-    out.push_str("  # Ordered: this decides clobber precedence and FormID allocation.\n  sources = [\n");
+    out.push_str(
+        "  # Ordered: this decides clobber precedence and FormID allocation.\n  sources = [\n",
+    );
     // Pad after the comma, not before it: aligning the plugin column must not
     // leave a gap where the comma belongs.
-    let width = sources.iter().map(|s| toml_string(&s.mod_id).len()).max().unwrap_or(0);
+    let width = sources
+        .iter()
+        .map(|s| toml_string(&s.mod_id).len())
+        .max()
+        .unwrap_or(0);
     for source in sources {
         let id = toml_string(&source.mod_id);
         let pad = " ".repeat(width - id.len());
@@ -313,23 +341,48 @@ mod tests {
     #[test]
     fn two_mods_shipping_one_name_is_an_error_that_says_which() {
         let dir = tempfile::tempdir().unwrap();
-        let mods = instance(dir.path(), &[("Base", &["Shared.esp"]), ("Compat", &["Shared.esp"]), ("Other", &["O.esp"])]);
+        let mods = instance(
+            dir.path(),
+            &[
+                ("Base", &["Shared.esp"]),
+                ("Compat", &["Shared.esp"]),
+                ("Other", &["O.esp"]),
+            ],
+        );
 
-        let err = resolve_sources(&mods, &["Shared.esp".into(), "O.esp".into()]).unwrap_err().to_string();
+        let err = resolve_sources(&mods, &["Shared.esp".into(), "O.esp".into()])
+            .unwrap_err()
+            .to_string();
 
         assert!(err.contains("ambiguous"), "{err}");
         assert!(err.contains("Base") && err.contains("Compat"), "{err}");
-        assert!(err.contains("<mod>/Shared.esp"), "the escape hatch must be in the message: {err}");
+        assert!(
+            err.contains("<mod>/Shared.esp"),
+            "the escape hatch must be in the message: {err}"
+        );
     }
 
     #[test]
     fn naming_the_mod_resolves_the_ambiguity() {
         let dir = tempfile::tempdir().unwrap();
-        let mods = instance(dir.path(), &[("Base", &["Shared.esp"]), ("Compat", &["Shared.esp"]), ("Other", &["O.esp"])]);
+        let mods = instance(
+            dir.path(),
+            &[
+                ("Base", &["Shared.esp"]),
+                ("Compat", &["Shared.esp"]),
+                ("Other", &["O.esp"]),
+            ],
+        );
 
         let got = resolve_sources(&mods, &["Compat/Shared.esp".into(), "O.esp".into()]).unwrap();
 
-        assert_eq!(got[0], ResolvedSource { mod_id: "Compat".into(), plugin: "Shared.esp".into() });
+        assert_eq!(
+            got[0],
+            ResolvedSource {
+                mod_id: "Compat".into(),
+                plugin: "Shared.esp".into()
+            }
+        );
     }
 
     /// A `.mohidden` plugin has already been merged away. Offering it as a
@@ -337,11 +390,23 @@ mod tests {
     #[test]
     fn an_already_hidden_plugin_is_not_a_candidate() {
         let dir = tempfile::tempdir().unwrap();
-        let mods = instance(dir.path(), &[("Merged Away", &["Gone.esp.mohidden"]), ("A", &["A.esp"]), ("B", &["B.esp"])]);
+        let mods = instance(
+            dir.path(),
+            &[
+                ("Merged Away", &["Gone.esp.mohidden"]),
+                ("A", &["A.esp"]),
+                ("B", &["B.esp"]),
+            ],
+        );
 
-        let err = resolve_sources(&mods, &["Gone.esp".into(), "A.esp".into()]).unwrap_err().to_string();
+        let err = resolve_sources(&mods, &["Gone.esp".into(), "A.esp".into()])
+            .unwrap_err()
+            .to_string();
 
-        assert!(err.contains("mohidden"), "the message must explain why it is invisible: {err}");
+        assert!(
+            err.contains("mohidden"),
+            "the message must explain why it is invisible: {err}"
+        );
     }
 
     #[test]
@@ -349,30 +414,52 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let mods = instance(dir.path(), &[("Mod A", &["A.esp"])]);
 
-        let err = resolve_sources(&mods, &["A.esp".into()]).unwrap_err().to_string();
+        let err = resolve_sources(&mods, &["A.esp".into()])
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("at least two"), "{err}");
     }
 
     #[test]
     fn the_merged_plugin_takes_the_place_of_the_first_source() {
         let order: Vec<String> = ["Oblivion.esm", "A.esp", "Keep.esp", "B.esp", "Last.esp"]
-            .iter().map(ToString::to_string).collect();
+            .iter()
+            .map(ToString::to_string)
+            .collect();
         let sources = vec![
-            ResolvedSource { mod_id: "Mod A".into(), plugin: "A.esp".into() },
-            ResolvedSource { mod_id: "Mod B".into(), plugin: "B.esp".into() },
+            ResolvedSource {
+                mod_id: "Mod A".into(),
+                plugin: "A.esp".into(),
+            },
+            ResolvedSource {
+                mod_id: "Mod B".into(),
+                plugin: "B.esp".into(),
+            },
         ];
 
         let got = post_merge_load_order(&order, &sources, "Merged.esp");
 
-        assert_eq!(got, vec!["Oblivion.esm", "Merged.esp", "Keep.esp", "Last.esp"]);
+        assert_eq!(
+            got,
+            vec!["Oblivion.esm", "Merged.esp", "Keep.esp", "Last.esp"]
+        );
     }
 
     #[test]
     fn an_output_already_in_the_load_order_is_not_duplicated() {
-        let order: Vec<String> = ["A.esp", "Merged.esp", "B.esp"].iter().map(ToString::to_string).collect();
+        let order: Vec<String> = ["A.esp", "Merged.esp", "B.esp"]
+            .iter()
+            .map(ToString::to_string)
+            .collect();
         let sources = vec![
-            ResolvedSource { mod_id: "Mod A".into(), plugin: "A.esp".into() },
-            ResolvedSource { mod_id: "Mod B".into(), plugin: "B.esp".into() },
+            ResolvedSource {
+                mod_id: "Mod A".into(),
+                plugin: "A.esp".into(),
+            },
+            ResolvedSource {
+                mod_id: "Mod B".into(),
+                plugin: "B.esp".into(),
+            },
         ];
 
         let got = post_merge_load_order(&order, &sources, "Merged.esp");
@@ -384,10 +471,21 @@ mod tests {
     fn plugin_names_with_toml_metacharacters_survive_the_round_trip() {
         // `Harvest [Flora].esp` and friends: brackets, quotes, ampersands.
         let sources = vec![
-            ResolvedSource { mod_id: "A \"B\"".into(), plugin: "Harvest [Flora].esp".into() },
-            ResolvedSource { mod_id: "C & D".into(), plugin: "Waalx Animals & Creatures.esm".into() },
+            ResolvedSource {
+                mod_id: "A \"B\"".into(),
+                plugin: "Harvest [Flora].esp".into(),
+            },
+            ResolvedSource {
+                mod_id: "C & D".into(),
+                plugin: "Waalx Animals & Creatures.esm".into(),
+            },
         ];
-        let rendered = render("My Merge", "My Merge.esp", &sources, &["Oblivion.esm".into()]);
+        let rendered = render(
+            "My Merge",
+            "My Merge.esp",
+            &sources,
+            &["Oblivion.esm".into()],
+        );
 
         let parsed: toml::Value = toml::from_str(&rendered).expect("rendered TOML must parse");
         let mods = parsed["mods"].as_array().unwrap();

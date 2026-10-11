@@ -27,7 +27,18 @@ fn make_zip_with_files(path: &Path, entries: &[(&str, &[u8])]) {
 
 /// Compile then query a source modlist, leaving a personalized plan at `plan`.
 fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", game_dir)
         .args(["compile", modlist.to_str().unwrap()])
@@ -35,7 +46,18 @@ fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", game_dir)
         .args(["query", compiled.to_str().unwrap()])
@@ -90,7 +112,10 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
     std::fs::create_dir_all(&search_dir).expect("search dir should be created");
 
     let existing = search_dir.join("Really Big Mod-4321-1-0.zip");
-    make_zip_with_files(&existing, &[("Data/test.txt", b"hello from a local archive")]);
+    make_zip_with_files(
+        &existing,
+        &[("Data/test.txt", b"hello from a local archive")],
+    );
 
     // A nexus descriptor with no api key available: if anything tries to
     // download this, the command fails.
@@ -99,7 +124,18 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
     // Note there is no `download` run at all: install resolves the archive itself.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .args(["install", plan.to_str().unwrap()])
@@ -120,10 +156,16 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
     // The archive is now in the downloads folder under its own name, with
     // the .meta MO2 would have written, so it is found by its Nexus ids.
     let cached = cache.join("Really Big Mod-4321-1-0.zip");
-    assert!(cached.is_file(), "archive should be linked into the downloads folder");
+    assert!(
+        cached.is_file(),
+        "archive should be linked into the downloads folder"
+    );
     let meta = std::fs::read_to_string(cache.join("Really Big Mod-4321-1-0.zip.meta"))
         .expect(".meta should be written");
-    assert!(meta.contains("modID=4321") && meta.contains("fileID=9999"), "{meta}");
+    assert!(
+        meta.contains("modID=4321") && meta.contains("fileID=9999"),
+        "{meta}"
+    );
 
     #[cfg(unix)]
     {
@@ -138,7 +180,10 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
     }
 
     // The search path is a read-only source.
-    assert_eq!(dir_listing(&search_dir), vec!["Really Big Mod-4321-1-0.zip"]);
+    assert_eq!(
+        dir_listing(&search_dir),
+        vec!["Really Big Mod-4321-1-0.zip"]
+    );
 }
 
 #[test]
@@ -162,7 +207,18 @@ fn download_resolves_from_a_search_path_instead_of_fetching() {
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
     // Without a search path there is no api key, so the nexus handler fails.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .env("GAME_DIR", &game_dir)
@@ -171,7 +227,18 @@ fn download_resolves_from_a_search_path_instead_of_fetching() {
         .assert()
         .failure();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .env("GAME_DIR", &game_dir)
@@ -203,17 +270,25 @@ fn search_paths_are_tried_in_order_and_the_first_hit_wins() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    for (index, (a, b, expected)) in [
-        (&first, &second, "first"),
-        (&second, &first, "second"),
-    ]
-    .iter()
-    .enumerate()
+    for (index, (a, b, expected)) in [(&first, &second, "first"), (&second, &first, "second")]
+        .iter()
+        .enumerate()
     {
         let cache = dir.path().join(format!("cache-{index}"));
         let mods_dir = dir.path().join(format!("mods-{index}"));
 
-        Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary should build")
             .env_remove("NEXUS_API_KEY")
             .args(["install", plan.to_str().unwrap()])
@@ -257,7 +332,18 @@ fn search_path_filename_matching_ignores_case() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .args(["install", plan.to_str().unwrap()])
@@ -295,7 +381,10 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
 
     // `plain` has no file_name and is fetched the old way; `local` is adopted.
     let plain_archive = dir.path().join("plain.zip");
-    make_zip_with_files(&plain_archive, &[("Data/plain.txt", b"downloaded normally")]);
+    make_zip_with_files(
+        &plain_archive,
+        &[("Data/plain.txt", b"downloaded normally")],
+    );
     make_zip_with_files(
         &search_dir.join("Adopted-1-0.zip"),
         &[("Data/adopted.txt", b"adopted locally")],
@@ -308,7 +397,18 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .env("GAME_DIR", &game_dir)
@@ -318,7 +418,18 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .args(["install", plan.to_str().unwrap()])
@@ -376,7 +487,18 @@ fn an_mo2_install_points_mo2_at_the_downloads_folder_instead_of_copying() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env_remove("NEXUS_API_KEY")
         .args(["install", plan.to_str().unwrap()])
@@ -396,11 +518,22 @@ fn an_mo2_install_points_mo2_at_the_downloads_folder_instead_of_copying() {
     };
     assert!(ini.contains(&expected), "{ini}");
     assert!(!ini.contains("C:/old"), "{ini}");
-    assert!(ini.contains("language=en") && ini.contains("gameName=Oblivion"), "{ini}");
-    assert!(!ini.contains("\r\n\n") && ini.matches('\n').count() == ini.matches("\r\n").count(), "line endings kept: {ini:?}");
+    assert!(
+        ini.contains("language=en") && ini.contains("gameName=Oblivion"),
+        "{ini}"
+    );
+    assert!(
+        !ini.contains("\r\n\n") && ini.matches('\n').count() == ini.matches("\r\n").count(),
+        "line endings kept: {ini:?}"
+    );
 
     // Nothing is copied into the instance's own downloads/.
-    assert!(!instance_dir.join("downloads").join("Exported-7-1-0.zip").exists());
+    assert!(
+        !instance_dir
+            .join("downloads")
+            .join("Exported-7-1-0.zip")
+            .exists()
+    );
 }
 
 #[test]
@@ -429,7 +562,18 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
     // Only the first mod is actually fetched, so the other two stay unfetched.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["download", plan.to_str().unwrap()])
@@ -438,7 +582,18 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
         .assert()
         .success();
 
-    let all = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let all = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["check", "-v", plan.to_str().unwrap()])
@@ -471,7 +626,18 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
     );
 
     // With the unavailable mod excluded, everything is satisfied and check passes.
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .args(["check", plan.to_str().unwrap()])
@@ -493,7 +659,7 @@ fn check_classifies_archives_as_cached_local_or_needing_download() {
 /// the next install still unpacked the broken copy, silently.
 #[test]
 fn a_replaced_source_archive_supersedes_the_downloads_copy() {
-    use mudcrab::config::archive_store::{resolve, ArchiveRef};
+    use mudcrab::config::archive_store::{ArchiveRef, resolve};
     let dir = tempfile::tempdir().expect("temp dir");
     let search = dir.path().join("search");
     let downloads = dir.path().join("downloads");
@@ -515,5 +681,8 @@ fn a_replaced_source_archive_supersedes_the_downloads_copy() {
     std::thread::sleep(std::time::Duration::from_millis(20));
     std::fs::write(downloads.join("real.zip"), b"updated by hand").unwrap();
     resolve(&downloads, &[search], &archive).unwrap();
-    assert_eq!(std::fs::read(downloads.join("real.zip")).unwrap(), b"updated by hand");
+    assert_eq!(
+        std::fs::read(downloads.join("real.zip")).unwrap(),
+        b"updated by hand"
+    );
 }

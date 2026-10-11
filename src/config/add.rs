@@ -109,7 +109,10 @@ pub struct Insertion {
 /// No leading or trailing newline: the caller decides the separators, because
 /// they depend on what is already around the insertion point.
 pub fn render_block(new_mod: &NewMod) -> String {
-    let mut lines = vec!["[[mods]]".to_string(), format!("id = {}", toml_string(&new_mod.id))];
+    let mut lines = vec![
+        "[[mods]]".to_string(),
+        format!("id = {}", toml_string(&new_mod.id)),
+    ];
 
     if !new_mod.section.is_empty() {
         let joined = new_mod
@@ -124,7 +127,12 @@ pub fn render_block(new_mod: &NewMod) -> String {
         lines.push(format!("if = {}", toml_string(condition)));
     }
     if !new_mod.plugins.is_empty() {
-        let joined = new_mod.plugins.iter().map(|p| toml_string(p)).collect::<Vec<_>>().join(", ");
+        let joined = new_mod
+            .plugins
+            .iter()
+            .map(|p| toml_string(p))
+            .collect::<Vec<_>>()
+            .join(", ");
         lines.push(format!("plugins = [{joined}]"));
     }
 
@@ -179,7 +187,11 @@ pub fn render_block(new_mod: &NewMod) -> String {
 /// Plan the splice: find the insertion line and build the resulting file text.
 ///
 /// `mods` must come from parsing `text`; the two are cross-checked.
-pub fn plan_insertion(text: &str, mods: &[ModEntry], new_mod: &NewMod) -> anyhow::Result<Insertion> {
+pub fn plan_insertion(
+    text: &str,
+    mods: &[ModEntry],
+    new_mod: &NewMod,
+) -> anyhow::Result<Insertion> {
     plan_insertion_at(text, mods, new_mod, &Placement::default())
 }
 
@@ -196,7 +208,13 @@ pub fn plan_insertion_at(
     new_mod: &NewMod,
     placement: &Placement,
 ) -> anyhow::Result<Insertion> {
-    splice_block(text, mods, &new_mod.section, &render_block(new_mod), placement)
+    splice_block(
+        text,
+        mods,
+        &new_mod.section,
+        &render_block(new_mod),
+        placement,
+    )
 }
 
 /// Splice `block` (a whole `[[mods]]` entry, with any comments of its own)
@@ -350,7 +368,11 @@ pub fn plan_move(
         .iter()
         .position(|entry| entry.id == id)
         .ok_or_else(|| anyhow::anyhow!("the modlist has no mod with id '{id}'"))?;
-    if placement.before_mod.as_deref().is_some_and(|m| m.eq_ignore_ascii_case(id)) {
+    if placement
+        .before_mod
+        .as_deref()
+        .is_some_and(|m| m.eq_ignore_ascii_case(id))
+    {
         anyhow::bail!("cannot move '{id}' before itself");
     }
 
@@ -373,23 +395,41 @@ pub fn plan_move(
     let mut block: Vec<String> = lines[start..end].to_vec();
     let new_section = format!(
         "section = [{}]",
-        section.iter().map(|level| toml_string(level)).collect::<Vec<_>>().join(", ")
+        section
+            .iter()
+            .map(|level| toml_string(level))
+            .collect::<Vec<_>>()
+            .join(", ")
     );
     let carriage = if text.contains("\r\n") { "\r" } else { "" };
-    match block.iter().position(|line| line.trim_start().starts_with("section =")) {
+    match block
+        .iter()
+        .position(|line| line.trim_start().starts_with("section ="))
+    {
         Some(at) => block[at] = format!("{new_section}{carriage}"),
         None => {
-            let header = block.iter().position(|line| line.trim() == "[[mods]]").expect("block has its header");
+            let header = block
+                .iter()
+                .position(|line| line.trim() == "[[mods]]")
+                .expect("block has its header");
             block.insert(header + 2, format!("{new_section}{carriage}"));
         }
     }
     // Take the block out, with the blank line that separated it from the one
     // before, so the gap does not double up.
-    let cut_from = if start > 0 && kinds[start - 1] == LineKind::Blank { start - 1 } else { start };
+    let cut_from = if start > 0 && kinds[start - 1] == LineKind::Blank {
+        start - 1
+    } else {
+        start
+    };
     lines.drain(cut_from..end);
     let without = lines.join("\n");
 
-    let remaining: Vec<ModEntry> = mods.iter().filter(|entry| entry.id != id).cloned().collect();
+    let remaining: Vec<ModEntry> = mods
+        .iter()
+        .filter(|entry| entry.id != id)
+        .cloned()
+        .collect();
     let block = block
         .iter()
         .map(|line| line.trim_end_matches('\r'))
@@ -493,7 +533,9 @@ fn header_kind(trimmed: &str) -> LineKind {
 
     let inner = match head.strip_prefix("[[") {
         Some(rest) => rest.strip_suffix("]]"),
-        None => head.strip_prefix('[').and_then(|rest| rest.strip_suffix(']')),
+        None => head
+            .strip_prefix('[')
+            .and_then(|rest| rest.strip_suffix(']')),
     };
     let Some(inner) = inner else {
         return LineKind::Other;
@@ -791,7 +833,11 @@ mod tests {
         assert_eq!(kinds[1], LineKind::Other, "plugins = [ opens an array");
         assert_eq!(kinds[2], LineKind::Other, "array element, not a header");
         assert_eq!(kinds[5], LineKind::ModHeader);
-        assert_eq!(kinds[8], LineKind::Other, "[[mods.archives]] is a sub-table");
+        assert_eq!(
+            kinds[8],
+            LineKind::Other,
+            "[[mods.archives]] is a sub-table"
+        );
         assert_eq!(kinds[11], LineKind::ForeignHeader, "[ini] ends the block");
     }
 
@@ -820,8 +866,14 @@ mod tests {
 
         let plan = plan_insertion(text, &mods, &new_mod).expect("insertion should be planned");
 
-        assert!(plan.new_text.contains("# oracle version 1.0\n\n[[mods]]\nid = \"c\""));
-        assert!(plan.new_text.contains("# why b is odd\n[[mods]]\nid = \"b\""));
+        assert!(
+            plan.new_text
+                .contains("# oracle version 1.0\n\n[[mods]]\nid = \"c\"")
+        );
+        assert!(
+            plan.new_text
+                .contains("# why b is odd\n[[mods]]\nid = \"b\"")
+        );
     }
 
     #[test]
@@ -895,7 +947,10 @@ mod tests {
 
         let plan = plan_insertion(text, &mods, &new_mod).expect("insertion should be planned");
 
-        assert!(!plan.new_text.contains("\n\n"), "no bare LF should be introduced");
+        assert!(
+            !plan.new_text.contains("\n\n"),
+            "no bare LF should be introduced"
+        );
         assert!(plan.new_text.contains("[[mods]]\r\nid = \"b\"\r\n"));
     }
     #[test]
@@ -918,17 +973,30 @@ mod tests {
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
             .expect("should plan");
-        assert_eq!(plan.anchor, Anchor::BeforeSection(vec!["6 - UI".to_string()]));
+        assert_eq!(
+            plan.anchor,
+            Anchor::BeforeSection(vec!["6 - UI".to_string()])
+        );
 
         let five = plan.new_text.find("5 - LOD").expect("new section present");
-        let six = plan.new_text.find("6 - UI").expect("existing section present");
-        assert!(five < six, "the new section must precede the one it was placed before");
-        assert!(plan.new_text.contains("id = \"four\""), "existing mods survive");
+        let six = plan
+            .new_text
+            .find("6 - UI")
+            .expect("existing section present");
+        assert!(
+            five < six,
+            "the new section must precede the one it was placed before"
+        );
+        assert!(
+            plan.new_text.contains("id = \"four\""),
+            "existing mods survive"
+        );
     }
 
     #[test]
     fn placing_before_a_section_that_does_not_exist_is_an_error() {
-        let text = "name = \"x\"\nplugins = []\n\n[[mods]]\nid = \"four\"\nsection = [\"4 - TWEAKS\"]\n";
+        let text =
+            "name = \"x\"\nplugins = []\n\n[[mods]]\nid = \"four\"\nsection = [\"4 - TWEAKS\"]\n";
         let mods = vec![entry("four", &["4 - TWEAKS"])];
         let new_mod = NewMod {
             id: "lod".to_string(),
@@ -944,7 +1012,11 @@ mod tests {
 
         let err = plan_insertion_at(text, &mods, &new_mod, &before_section("9 - NOPE"))
             .expect_err("should refuse rather than silently append");
-        assert!(err.to_string().contains("no mod in the modlist is in that section"), "{err}");
+        assert!(
+            err.to_string()
+                .contains("no mod in the modlist is in that section"),
+            "{err}"
+        );
     }
 
     #[test]
@@ -967,7 +1039,10 @@ mod tests {
 
         let plan = plan_insertion_at(text, &mods, &new_mod, &before_section("6 - UI"))
             .expect("should plan");
-        assert_eq!(plan.anchor, Anchor::AfterSection(vec!["5 - LOD".to_string()]));
+        assert_eq!(
+            plan.anchor,
+            Anchor::AfterSection(vec!["5 - LOD".to_string()])
+        );
         let lod2 = plan.new_text.find("lod2").expect("added");
         let six = plan.new_text.find("6 - UI").expect("existing");
         assert!(lod2 < six);
@@ -985,13 +1060,19 @@ mod tests {
             ..NewMod::default()
         };
 
-        let plan = plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd"))
-            .expect("should plan");
+        let plan =
+            plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd")).expect("should plan");
 
         assert_eq!(plan.anchor, Anchor::BeforeMod("vwd".to_string()));
         let added = plan.new_text.find("evenstars").expect("added");
-        let first = plan.new_text.find("id = \"vwd\"").expect("existing first row");
-        assert!(added < first, "the new row must precede the one it was placed before");
+        let first = plan
+            .new_text
+            .find("id = \"vwd\"")
+            .expect("existing first row");
+        assert!(
+            added < first,
+            "the new row must precede the one it was placed before"
+        );
     }
 
     #[test]
@@ -1004,11 +1085,12 @@ mod tests {
             ..NewMod::default()
         };
 
-        let plan = plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd"))
-            .expect("should plan");
+        let plan =
+            plan_insertion_at(text, &mods, &new_mod, &before_mod("vwd")).expect("should plan");
 
         assert!(
-            plan.new_text.contains("# why vwd is odd\n[[mods]]\nid = \"vwd\""),
+            plan.new_text
+                .contains("# why vwd is odd\n[[mods]]\nid = \"vwd\""),
             "the comment must stay glued to the block it describes:\n{}",
             plan.new_text
         );
@@ -1057,12 +1139,21 @@ mod move_tests {
     const TEXT: &str = "name = \"x\"\n\n[[mods]]\nid = \"a\"\nsection = [\"One\"]\n\n# b needs its patch\n[[mods]]\nid = \"b\"\nsection = [\"One\"]\n\n[[mods.archives]]\npath = \"manual:b.7z\"\n# oracle version 1\n\n[[mods]]\nid = \"c\"\nsection = [\"Two\"]\n";
 
     fn mods() -> Vec<ModEntry> {
-        toml::from_str::<crate::config::schema::SourceModlist>(TEXT).unwrap().mods
+        toml::from_str::<crate::config::schema::SourceModlist>(TEXT)
+            .unwrap()
+            .mods
     }
 
     #[test]
     fn a_block_moves_with_its_comments_and_trailing_note() {
-        let plan = plan_move(TEXT, &mods(), "b", &["Two".to_string()], &Placement::default()).unwrap();
+        let plan = plan_move(
+            TEXT,
+            &mods(),
+            "b",
+            &["Two".to_string()],
+            &Placement::default(),
+        )
+        .unwrap();
         assert_eq!(
             plan.new_text,
             "name = \"x\"\n\n[[mods]]\nid = \"a\"\nsection = [\"One\"]\n\n[[mods]]\nid = \"c\"\nsection = [\"Two\"]\n\n# b needs its patch\n[[mods]]\nid = \"b\"\nsection = [\"Two\"]\n\n[[mods.archives]]\npath = \"manual:b.7z\"\n# oracle version 1\n"
@@ -1071,9 +1162,30 @@ mod move_tests {
 
     #[test]
     fn a_block_moves_before_a_named_mod() {
-        let placement = Placement { before_mod: Some("a".into()), before_section: None };
+        let placement = Placement {
+            before_mod: Some("a".into()),
+            before_section: None,
+        };
         let plan = plan_move(TEXT, &mods(), "c", &["One".to_string()], &placement).unwrap();
-        assert!(plan.new_text.starts_with("name = \"x\"\n\n[[mods]]\nid = \"c\"\nsection = [\"One\"]\n\n[[mods]]\nid = \"a\""), "{}", plan.new_text);
-        assert!(plan_move(TEXT, &mods(), "c", &[], &Placement { before_mod: Some("c".into()), before_section: None }).is_err());
+        assert!(
+            plan.new_text.starts_with(
+                "name = \"x\"\n\n[[mods]]\nid = \"c\"\nsection = [\"One\"]\n\n[[mods]]\nid = \"a\""
+            ),
+            "{}",
+            plan.new_text
+        );
+        assert!(
+            plan_move(
+                TEXT,
+                &mods(),
+                "c",
+                &[],
+                &Placement {
+                    before_mod: Some("c".into()),
+                    before_section: None
+                }
+            )
+            .is_err()
+        );
     }
 }

@@ -88,7 +88,11 @@ pub async fn run(args: MergeArgs) -> anyhow::Result<()> {
         println!("{id}");
         println!("  output     {}", plugin_path.display());
         println!("  sources    {}", report.source_count);
-        println!("  masters    {} ({})", report.masters.len(), report.masters.join(", "));
+        println!(
+            "  masters    {} ({})",
+            report.masters.len(),
+            report.masters.join(", ")
+        );
         println!("  records    {}", report.record_count);
         println!("  groups     {}", report.group_count);
         println!("  renumbered {}", report.remapped);

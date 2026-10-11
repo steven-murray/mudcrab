@@ -7,8 +7,8 @@
 //!     cargo run --bin plugin-audit -- ~/Games/.../MOFAM-03.25/mods
 //!     cargo run --bin plugin-audit -- <dir> --plugin "Unique Forts Fort Aurus.esp"
 
-use mudcrab::plugin::schema;
 use mudcrab::plugin::Plugin;
+use mudcrab::plugin::schema;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -95,7 +95,10 @@ fn main() -> std::process::ExitCode {
         println!("{key}  x{}  (e.g. {})", gap.count, gap.example_plugin);
     }
 
-    println!("\n--- detail for the first gap ---\n{}", ordered[0].1.detail);
+    println!(
+        "\n--- detail for the first gap ---\n{}",
+        ordered[0].1.detail
+    );
     std::process::ExitCode::from(1)
 }
 

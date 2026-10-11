@@ -6,8 +6,8 @@
 //! `LOOT --auto-sort` against it, reads the result back, and writes the sorted
 //! order into the MO2 profile.
 
-use crate::config::install::stage::is_plugin_file;
 use crate::config::install::InstallSettings;
+use crate::config::install::stage::is_plugin_file;
 use crate::config::mo2::mo2_profile_dir;
 use crate::config::schema::PersonalizedPlan;
 use crate::util::fs::link_or_copy;
@@ -15,7 +15,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
+pub(crate) fn run_loot_sort(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+) -> anyhow::Result<()> {
     let Some(game_dir) = &settings.game_dir else {
         anyhow::bail!("post-install action 'loot-sort' requires --game-dir");
     };
@@ -82,42 +85,41 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
         let seeded_plugins = canonicalize_plugins_for_staged_data(&plan.plugins, &temp_data)?;
 
         // Determine which plugins.txt path LOOT will actually read/write.
-        let plugins_dir: PathBuf =
-            if let Some(ref appdata) = game_appdata_path {
-                // Real-path strategy: write our desired list into the path LOOT
-                // auto-detects, and back up whatever is already there so it
-                // can be restored after a successful sort.
-                std::fs::create_dir_all(appdata).map_err(|err| {
-                    anyhow::anyhow!(
-                        "failed to create game AppData directory {}: {err}",
-                        appdata.display()
-                    )
-                })?;
-                let backup = plugin_list_variant_paths(appdata)
-                    .into_iter()
-                    .map(|p| {
-                        let original = std::fs::read(&p).ok();
-                        (p, original)
-                    })
-                    .collect::<Vec<_>>();
-                tracing::info!(
-                    appdata = %appdata.display(),
-                    "post-install loot-sort: using real game AppData path for plugins.txt"
-                );
-                write_plugin_list_files(appdata, &seeded_plugins)?;
-                plugins_backup = Some(backup);
-                appdata.clone()
-            } else {
-                tracing::warn!(
-                    "post-install loot-sort: no loot.game_appdata_path configured; \
+        let plugins_dir: PathBuf = if let Some(ref appdata) = game_appdata_path {
+            // Real-path strategy: write our desired list into the path LOOT
+            // auto-detects, and back up whatever is already there so it
+            // can be restored after a successful sort.
+            std::fs::create_dir_all(appdata).map_err(|err| {
+                anyhow::anyhow!(
+                    "failed to create game AppData directory {}: {err}",
+                    appdata.display()
+                )
+            })?;
+            let backup = plugin_list_variant_paths(appdata)
+                .into_iter()
+                .map(|p| {
+                    let original = std::fs::read(&p).ok();
+                    (p, original)
+                })
+                .collect::<Vec<_>>();
+            tracing::info!(
+                appdata = %appdata.display(),
+                "post-install loot-sort: using real game AppData path for plugins.txt"
+            );
+            write_plugin_list_files(appdata, &seeded_plugins)?;
+            plugins_backup = Some(backup);
+            appdata.clone()
+        } else {
+            tracing::warn!(
+                "post-install loot-sort: no loot.game_appdata_path configured; \
                      LOOT may auto-detect a different plugins.txt location and the \
                      sorted result may not be picked up correctly"
-                );
-                // Sandbox strategy: write to temp local dir as before.
-                write_plugin_list_files(&temp_local, &seeded_plugins)?;
-                write_loot_settings(&loot_data, &temp_root, &temp_local)?;
-                temp_local.clone()
-            };
+            );
+            // Sandbox strategy: write to temp local dir as before.
+            write_plugin_list_files(&temp_local, &seeded_plugins)?;
+            write_loot_settings(&loot_data, &temp_root, &temp_local)?;
+            temp_local.clone()
+        };
 
         tracing::info!("post-install loot-sort: running LOOT --auto-sort");
 
@@ -150,7 +152,10 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
         if !status.success() {
             anyhow::bail!(
                 "LOOT exited with status {}",
-                status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".to_string())
+                status
+                    .code()
+                    .map(|c| c.to_string())
+                    .unwrap_or_else(|| "signal".to_string())
             );
         }
 
@@ -166,12 +171,13 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
 
         // LOOT may persist ordering in loadorder.txt while plugins.txt is used
         // primarily for activation state. Prefer loadorder.txt when available.
-        let (sorted_plugins, order_source_path, order_source) =
-            if let Some((order, path)) = read_sorted_loot_load_order_from_dir_since(&plugins_dir, loot_started_at)? {
-                (order, path, "loadorder")
-            } else {
-                (plugins_list_order, plugin_list_path.clone(), "plugins")
-            };
+        let (sorted_plugins, order_source_path, order_source) = if let Some((order, path)) =
+            read_sorted_loot_load_order_from_dir_since(&plugins_dir, loot_started_at)?
+        {
+            (order, path, "loadorder")
+        } else {
+            (plugins_list_order, plugin_list_path.clone(), "plugins")
+        };
 
         if sorted_plugins.is_empty() {
             anyhow::bail!(
@@ -226,7 +232,10 @@ pub(crate) fn run_loot_sort(plan: &PersonalizedPlan, settings: &InstallSettings)
     sort_result
 }
 
-pub(crate) fn stage_game_executable(game_dir: &Path, destination_root: &Path) -> anyhow::Result<()> {
+pub(crate) fn stage_game_executable(
+    game_dir: &Path,
+    destination_root: &Path,
+) -> anyhow::Result<()> {
     let source = game_dir.join("Oblivion.exe");
     if !source.exists() {
         anyhow::bail!(
@@ -238,15 +247,19 @@ pub(crate) fn stage_game_executable(game_dir: &Path, destination_root: &Path) ->
     link_or_copy(&source, &destination_root.join("Oblivion.exe"))
 }
 
-pub(crate) fn stage_game_root_binaries(game_dir: &Path, destination_root: &Path) -> anyhow::Result<()> {
+pub(crate) fn stage_game_root_binaries(
+    game_dir: &Path,
+    destination_root: &Path,
+) -> anyhow::Result<()> {
     for entry in std::fs::read_dir(game_dir)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", game_dir.display()))?
     {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", game_dir.display()))?;
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", game_dir.display()))?;
         let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+        let file_type = entry.file_type().map_err(|err| {
+            anyhow::anyhow!("failed to read file type for {}: {err}", path.display())
+        })?;
         if !file_type.is_file() {
             continue;
         }
@@ -321,7 +334,8 @@ pub(crate) fn find_unlisted_plugins(declared: &[String], discovered: &[String]) 
     let mut seen = HashSet::new();
     for plugin in discovered {
         let normalized = plugin.trim().to_ascii_lowercase();
-        if normalized.is_empty() || declared_set.contains(&normalized) || seen.contains(&normalized) {
+        if normalized.is_empty() || declared_set.contains(&normalized) || seen.contains(&normalized)
+        {
             continue;
         }
 
@@ -332,7 +346,10 @@ pub(crate) fn find_unlisted_plugins(declared: &[String], discovered: &[String]) 
     unlisted
 }
 
-pub(crate) fn canonicalize_plugins_for_staged_data(input: &[String], staged_data_dir: &Path) -> anyhow::Result<Vec<String>> {
+pub(crate) fn canonicalize_plugins_for_staged_data(
+    input: &[String],
+    staged_data_dir: &Path,
+) -> anyhow::Result<Vec<String>> {
     let mut staged_paths: HashMap<String, PathBuf> = HashMap::new();
     collect_plugin_paths_for_stage(staged_data_dir, staged_data_dir, &mut staged_paths)?;
 
@@ -380,7 +397,11 @@ pub(crate) fn plugin_lists_differ(input: &[String], output: &[String]) -> bool {
     normalize(input) != normalize(output)
 }
 
-pub(crate) fn write_loot_settings(loot_data: &Path, game_path: &Path, local_path: &Path) -> anyhow::Result<()> {
+pub(crate) fn write_loot_settings(
+    loot_data: &Path,
+    game_path: &Path,
+    local_path: &Path,
+) -> anyhow::Result<()> {
     let settings = format!(
         "enableDebugLogging = false\n\
 enableLootUpdateCheck = false\n\
@@ -410,7 +431,9 @@ path = '{}'\n",
     })
 }
 
-pub(crate) fn read_sorted_loot_plugins_from_dir(path: &Path) -> anyhow::Result<(Vec<String>, PathBuf, usize, usize)> {
+pub(crate) fn read_sorted_loot_plugins_from_dir(
+    path: &Path,
+) -> anyhow::Result<(Vec<String>, PathBuf, usize, usize)> {
     let mut candidates: Vec<(PathBuf, std::time::SystemTime)> = plugin_list_variant_paths(path)
         .into_iter()
         .filter_map(|p| {
@@ -429,7 +452,10 @@ pub(crate) fn read_sorted_loot_plugins_from_dir(path: &Path) -> anyhow::Result<(
 
     for (candidate_path, modified) in candidates.drain(..) {
         let content = std::fs::read_to_string(&candidate_path).map_err(|err| {
-            anyhow::anyhow!("failed to read sorted LOOT plugins from {}: {err}", candidate_path.display())
+            anyhow::anyhow!(
+                "failed to read sorted LOOT plugins from {}: {err}",
+                candidate_path.display()
+            )
         })?;
 
         let mut out = Vec::new();
@@ -459,15 +485,18 @@ pub(crate) fn read_sorted_loot_plugins_from_dir(path: &Path) -> anyhow::Result<(
                 best = Some((out, candidate_path, active_count, total_count, modified));
             }
             Some((best_out, _, _, _, best_modified)) => {
-                if out.len() > best_out.len() || (out.len() == best_out.len() && modified > *best_modified) {
+                if out.len() > best_out.len()
+                    || (out.len() == best_out.len() && modified > *best_modified)
+                {
                     best = Some((out, candidate_path, active_count, total_count, modified));
                 }
             }
         }
     }
 
-    let (out, selected, active_count, total_count, _) = best
-        .ok_or_else(|| anyhow::anyhow!("failed to choose LOOT plugins list in {}", path.display()))?;
+    let (out, selected, active_count, total_count, _) = best.ok_or_else(|| {
+        anyhow::anyhow!("failed to choose LOOT plugins list in {}", path.display())
+    })?;
 
     Ok((out, selected, active_count, total_count))
 }
@@ -497,8 +526,12 @@ pub(crate) fn read_sorted_loot_load_order_from_dir_since(
         .map(|(p, _)| p.clone())
         .ok_or_else(|| anyhow::anyhow!("failed to choose LOOT load order in {}", path.display()))?;
 
-    let content = std::fs::read_to_string(&selected)
-        .map_err(|err| anyhow::anyhow!("failed to read LOOT load order from {}: {err}", selected.display()))?;
+    let content = std::fs::read_to_string(&selected).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to read LOOT load order from {}: {err}",
+            selected.display()
+        )
+    })?;
 
     let mut out = Vec::new();
     for line in content.lines() {
@@ -522,9 +555,14 @@ pub(crate) fn read_sorted_loot_load_order_from_dir_since(
     Ok(Some((out, selected)))
 }
 
-pub(crate) fn write_sorted_plugins_to_profile(settings: &InstallSettings, plugins: &[String]) -> anyhow::Result<()> {
+pub(crate) fn write_sorted_plugins_to_profile(
+    settings: &InstallSettings,
+    plugins: &[String],
+) -> anyhow::Result<()> {
     let Some(profile_dir) = mo2_profile_dir(settings) else {
-        tracing::warn!("post-install loot-sort: no MO2 profile directory configured; skipping plugins.txt write-back");
+        tracing::warn!(
+            "post-install loot-sort: no MO2 profile directory configured; skipping plugins.txt write-back"
+        );
         return Ok(());
     };
 
@@ -541,7 +579,10 @@ pub(crate) fn write_sorted_plugins_to_profile(settings: &InstallSettings, plugin
     Ok(())
 }
 
-pub(crate) fn stage_game_plugins(game_dir: &Path, destination_data_dir: &Path) -> anyhow::Result<()> {
+pub(crate) fn stage_game_plugins(
+    game_dir: &Path,
+    destination_data_dir: &Path,
+) -> anyhow::Result<()> {
     let source_data = game_dir.join("Data");
     if !source_data.exists() {
         return Ok(());
@@ -550,11 +591,12 @@ pub(crate) fn stage_game_plugins(game_dir: &Path, destination_data_dir: &Path) -
     for entry in std::fs::read_dir(&source_data)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", source_data.display()))?
     {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", source_data.display()))?;
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", source_data.display()))?;
         let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+        let file_type = entry.file_type().map_err(|err| {
+            anyhow::anyhow!("failed to read file type for {}: {err}", path.display())
+        })?;
         if !file_type.is_file() || !is_plugin_file(&path) {
             continue;
         }
@@ -608,11 +650,12 @@ pub(crate) fn collect_plugin_paths_for_stage(
     for entry in std::fs::read_dir(current)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?
     {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
         let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+        let file_type = entry.file_type().map_err(|err| {
+            anyhow::anyhow!("failed to read file type for {}: {err}", path.display())
+        })?;
 
         if file_type.is_dir() {
             collect_plugin_paths_for_stage(root, &path, out)?;

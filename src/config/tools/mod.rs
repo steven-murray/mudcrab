@@ -112,10 +112,7 @@ impl ToolsConfig {
         {
             std::env::var_os("XDG_CONFIG_HOME")
                 .map(PathBuf::from)
-                .or_else(|| {
-                    std::env::var_os("HOME")
-                        .map(|h| PathBuf::from(h).join(".config"))
-                })
+                .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".config")))
                 .map(|cfg| cfg.join("mudcrab").join("tools.toml"))
         }
     }
@@ -198,9 +195,7 @@ impl ToolsConfig {
 
                 // Last-resort fallback for Proton wrappers if the path parser above
                 // could not discover a Steam root from prefix structure.
-                if !set_client_install_path
-                    && let Some(home) = std::env::var_os("HOME")
-                {
+                if !set_client_install_path && let Some(home) = std::env::var_os("HOME") {
                     let default_steam_root = PathBuf::from(home).join(".local/share/Steam");
                     cmd.env("STEAM_COMPAT_CLIENT_INSTALL_PATH", default_steam_root);
                 }
@@ -259,7 +254,9 @@ pub fn generate_tools_toml(required: &RequiredTools) -> String {
         out.push_str("# Path to the Wine prefix directory (the folder containing drive_c/).\n");
         out.push_str("prefix = \"/path/to/your/wine-prefix\"\n");
         out.push_str("# Optional: use a specific Proton build instead of system wine.\n");
-        out.push_str("# proton = \"/home/user/.steam/root/steamapps/common/Proton 9.0/proton\"\n\n");
+        out.push_str(
+            "# proton = \"/home/user/.steam/root/steamapps/common/Proton 9.0/proton\"\n\n",
+        );
     }
 
     if required.needs_loot {

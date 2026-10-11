@@ -2,8 +2,8 @@
 
 use super::hash::{hash_file_name, hash_folder_name};
 use super::{
-    Bsa, BsaError, File, Folder, FLAG_CONVENTIONAL, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES,
-    HEADER_LEN, RECORD_LEN, VERSION_OBLIVION,
+    Bsa, BsaError, FLAG_CONVENTIONAL, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES, File, Folder, HEADER_LEN,
+    RECORD_LEN, VERSION_OBLIVION,
 };
 use crate::archive::ArchiveFilters;
 use std::borrow::Cow;
@@ -44,8 +44,14 @@ pub(super) fn write_to<W: Write>(bsa: &Bsa<'_>, out: &mut W) -> Result<(), BsaEr
     write_u32(out, VERSION_OBLIVION)?;
     write_u32(out, HEADER_LEN as u32)?;
     write_u32(out, bsa.archive_flags | FLAG_FOLDER_NAMES | FLAG_FILE_NAMES)?;
-    write_u32(out, u32::try_from(folder_count).map_err(|_| BsaError::TooLarge)?)?;
-    write_u32(out, u32::try_from(file_count).map_err(|_| BsaError::TooLarge)?)?;
+    write_u32(
+        out,
+        u32::try_from(folder_count).map_err(|_| BsaError::TooLarge)?,
+    )?;
+    write_u32(
+        out,
+        u32::try_from(file_count).map_err(|_| BsaError::TooLarge)?,
+    )?;
     write_u32(out, total_folder_name_length)?;
     write_u32(out, total_file_name_length)?;
     write_u32(out, bsa.file_flags)?;
@@ -222,12 +228,19 @@ pub(super) fn from_directory(
     // serve a given kind of request, so an archive of meshes that declares none
     // is invisible to the game while still parsing and extracting perfectly.
     // Every archive in the corpus sets them; none is zero.
-    let file_flags = super::file_flags::derive(folders.iter().flat_map(|folder| {
-        folder
-            .files
+    let file_flags = super::file_flags::derive(
+        folders
             .iter()
-            .map(move |file| format!("{}\\{}", folder.name, file.name))
-    }).collect::<Vec<_>>().iter().map(String::as_str));
+            .flat_map(|folder| {
+                folder
+                    .files
+                    .iter()
+                    .map(move |file| format!("{}\\{}", folder.name, file.name))
+            })
+            .collect::<Vec<_>>()
+            .iter()
+            .map(String::as_str),
+    );
 
     Ok(Bsa {
         // Names present, nothing compressed, plus the three bits every real

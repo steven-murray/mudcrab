@@ -155,10 +155,7 @@ impl<'a> Remapper<'a> {
 /// - **every GRUP label of type 1 and 6..=10**, which are raw little-endian
 ///   FormIDs naming a parent worldspace, cell or dialogue topic. Missing these
 ///   leaves children attached to a record that no longer exists.
-pub fn rewrite_entries(
-    entries: &mut [Entry],
-    remapper: &Remapper<'_>,
-) -> Result<(), RewriteError> {
+pub fn rewrite_entries(entries: &mut [Entry], remapper: &Remapper<'_>) -> Result<(), RewriteError> {
     for entry in entries {
         match entry {
             Entry::Record(record) => {
@@ -311,7 +308,10 @@ mod tests {
                 vec![Entry::Record(Record::new(
                     b"REFR",
                     FormId(0x0200_0801),
-                    vec![Subrecord::new(b"NAME", 0x0100_0801u32.to_le_bytes().to_vec())],
+                    vec![Subrecord::new(
+                        b"NAME",
+                        0x0100_0801u32.to_le_bytes().to_vec(),
+                    )],
                 ))],
             ))],
         ))];
@@ -321,7 +321,11 @@ mod tests {
         let Entry::Group(top) = &entries[0] else {
             panic!("expected group")
         };
-        assert_eq!(top.group_type, GroupType::TopLevel(*b"CELL"), "signature labels untouched");
+        assert_eq!(
+            top.group_type,
+            GroupType::TopLevel(*b"CELL"),
+            "signature labels untouched"
+        );
 
         let Entry::Group(children) = &top.entries[0] else {
             panic!("expected nested group")
@@ -342,7 +346,10 @@ mod tests {
         let mut entries = vec![Entry::Record(Record::new(
             b"ZZZZ", // not in the schema
             FormId(0x0200_0801),
-            vec![Subrecord::new(b"NAME", 0x0100_0801u32.to_le_bytes().to_vec())],
+            vec![Subrecord::new(
+                b"NAME",
+                0x0100_0801u32.to_le_bytes().to_vec(),
+            )],
         ))];
 
         assert!(matches!(

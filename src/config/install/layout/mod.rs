@@ -6,7 +6,7 @@ pub mod build;
 pub mod fomod;
 pub mod plan;
 
-use crate::archive::{extract_entries, extract_with_builtins, list_archive_paths, ArchiveFilters};
+use crate::archive::{ArchiveFilters, extract_entries, extract_with_builtins, list_archive_paths};
 use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::schema::{ArchiveLayout, CompiledArchive, ModType, PersonalizedMod};
 use build::extract_build_archive;
@@ -76,9 +76,8 @@ impl<'a> EntryReader<'a> {
     }
 
     pub(crate) fn read(&self, entry: &str) -> anyhow::Result<Vec<u8>> {
-        std::fs::create_dir_all(&self.scratch).map_err(|err| {
-            anyhow::anyhow!("failed to create {}: {err}", self.scratch.display())
-        })?;
+        std::fs::create_dir_all(&self.scratch)
+            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", self.scratch.display()))?;
         let wanted = BTreeSet::from([entry.to_string()]);
         extract_entries(self.source, &self.scratch, &wanted)?;
 
@@ -122,7 +121,11 @@ pub(crate) fn apply_plan(
                 .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", parent.display()))?;
         }
         std::fs::copy(&from, &to).map_err(|err| {
-            anyhow::anyhow!("failed to copy {} to {}: {err}", from.display(), to.display())
+            anyhow::anyhow!(
+                "failed to copy {} to {}: {err}",
+                from.display(),
+                to.display()
+            )
         })?;
     }
     Ok(plan.files.len())
@@ -141,7 +144,10 @@ pub(crate) fn install_mod_archives(
     // An empty mod is the folder and nothing else. It still has to exist: MO2
     // only offers a mod as a destination for a tool's output once it is there.
     // A generated mod's actions fill it, after this.
-    if matches!(mod_entry.mod_type, Some(ModType::Empty | ModType::Generated)) {
+    if matches!(
+        mod_entry.mod_type,
+        Some(ModType::Empty | ModType::Generated)
+    ) {
         if !settings.dry_run {
             std::fs::create_dir_all(target_root).map_err(|err| {
                 anyhow::anyhow!("failed to create {}: {err}", target_root.display())
@@ -198,7 +204,11 @@ pub(crate) fn install_mod_archives(
             // something to report and carry on from -- aborting on the first
             // one hides everything after it. It must not write, so a search
             // path copy is reported rather than linked in.
-            match archive_store::locate(&settings.cache_dir, &settings.archive_search_paths, &reference) {
+            match archive_store::locate(
+                &settings.cache_dir,
+                &settings.archive_search_paths,
+                &reference,
+            ) {
                 Some(archive_store::Found::Downloads(path)) => path,
                 Some(archive_store::Found::SearchPath(local)) => {
                     tracing::info!(
@@ -220,7 +230,11 @@ pub(crate) fn install_mod_archives(
         } else {
             // Installing straight from archives already on disk is the point of
             // --archive-search-path: no `download` run has to have happened.
-            match archive_store::resolve(&settings.cache_dir, &settings.archive_search_paths, &reference)? {
+            match archive_store::resolve(
+                &settings.cache_dir,
+                &settings.archive_search_paths,
+                &reference,
+            )? {
                 Some(found) => found,
                 None => anyhow::bail!(
                     "mod {}: archive {} is not in the downloads folder ({}) or any search path; \
@@ -323,7 +337,10 @@ pub(crate) fn install_mod_archives(
                     if archive.exclude.is_empty() {
                         String::new()
                     } else {
-                        format!(" exclude = {:?} may have taken everything;", archive.exclude)
+                        format!(
+                            " exclude = {:?} may have taken everything;",
+                            archive.exclude
+                        )
                     },
                 );
             }
@@ -358,9 +375,8 @@ pub(crate) fn install_mod_from_files(
     let mut seen_targets: HashSet<String> = HashSet::new();
 
     if !settings.dry_run {
-        std::fs::create_dir_all(target_root).map_err(|err| {
-            anyhow::anyhow!("failed to create {}: {err}", target_root.display())
-        })?;
+        std::fs::create_dir_all(target_root)
+            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", target_root.display()))?;
     }
 
     for pattern in &mod_entry.files {
@@ -378,11 +394,13 @@ pub(crate) fn install_mod_from_files(
             let file_name = source
                 .file_name()
                 .and_then(|v| v.to_str())
-                .ok_or_else(|| anyhow::anyhow!(
-                    "mod {} build-from-files source has invalid filename: {}",
-                    mod_entry.id,
-                    source.display()
-                ))?
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "mod {} build-from-files source has invalid filename: {}",
+                        mod_entry.id,
+                        source.display()
+                    )
+                })?
                 .to_string();
             let key = file_name.to_ascii_lowercase();
             if !seen_targets.insert(key) {
@@ -426,10 +444,7 @@ pub(crate) fn resolve_file_pattern(pattern: &str) -> anyhow::Result<Vec<PathBuf>
 
     let normalized = pattern.replace('\\', "/");
     let split_idx = normalized.rfind('/').ok_or_else(|| {
-        anyhow::anyhow!(
-            "glob pattern must include a parent directory: {}",
-            pattern
-        )
+        anyhow::anyhow!("glob pattern must include a parent directory: {}", pattern)
     })?;
     let (parent_str, file_pat) = normalized.split_at(split_idx);
     let file_pat = &file_pat[1..];
@@ -451,7 +466,9 @@ pub(crate) fn resolve_file_pattern(pattern: &str) -> anyhow::Result<Vec<PathBuf>
             .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", parent.display()))?;
         if !entry
             .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read type for {}: {err}", entry.path().display()))?
+            .map_err(|err| {
+                anyhow::anyhow!("failed to read type for {}: {err}", entry.path().display())
+            })?
             .is_file()
         {
             continue;
@@ -487,7 +504,14 @@ pub(crate) fn extract_archive(
         );
     }
 
-    plan_and_extract(source, target_root, mod_id, archive, filters, active_plugins)
+    plan_and_extract(
+        source,
+        target_root,
+        mod_id,
+        archive,
+        filters,
+        active_plugins,
+    )
 }
 
 fn plan_and_extract(

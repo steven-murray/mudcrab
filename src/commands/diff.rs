@@ -9,11 +9,13 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
         Some(path) => {
             let raw = std::fs::read_to_string(path)
                 .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
-            let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(
-                |err| {
-                    anyhow::anyhow!("failed to parse personalized plan {}: {err}", path.display())
-                },
-            )?;
+            let plan =
+                serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(|err| {
+                    anyhow::anyhow!(
+                        "failed to parse personalized plan {}: {err}",
+                        path.display()
+                    )
+                })?;
             plan_guide = plan.guide.clone();
             Some(PlanIndex::from_plan(&plan))
         }
@@ -61,7 +63,10 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
             print!("{}", config::diff::render_summary(&report));
             if report.has_differences() {
                 match crate::ui::log_path() {
-                    Some(path) => println!("details: --details, or the full report in {}", path.display()),
+                    Some(path) => println!(
+                        "details: --details, or the full report in {}",
+                        path.display()
+                    ),
                     None => println!("details: --details"),
                 }
             }

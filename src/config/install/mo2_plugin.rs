@@ -5,7 +5,7 @@
 //! extraction leaves the previous copy in place.
 
 use super::layout::install_mod_archives;
-use super::{safe_mod_dir_name, InstallSettings};
+use super::{InstallSettings, safe_mod_dir_name};
 use crate::config::schema::PersonalizedMod;
 use std::collections::HashSet;
 
@@ -35,16 +35,18 @@ pub(super) fn install(
     }
     let extracted = install_mod_archives(mod_entry, settings, &staging, active_plugins)?;
     if extracted == 0 {
-        anyhow::bail!("mod '{}': MO2 plugin archive produced no files", mod_entry.id);
+        anyhow::bail!(
+            "mod '{}': MO2 plugin archive produced no files",
+            mod_entry.id
+        );
     }
 
     if target.exists() {
         std::fs::remove_dir_all(&target)
             .map_err(|err| anyhow::anyhow!("failed to replace {}: {err}", target.display()))?;
     }
-    std::fs::rename(&staging, &target).map_err(|err| {
-        anyhow::anyhow!("failed to move {} into place: {err}", staging.display())
-    })?;
+    std::fs::rename(&staging, &target)
+        .map_err(|err| anyhow::anyhow!("failed to move {} into place: {err}", staging.display()))?;
 
     tracing::info!(
         mod_id = %mod_entry.id,

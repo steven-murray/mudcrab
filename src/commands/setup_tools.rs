@@ -1,14 +1,13 @@
-use crate::config::schema::ModAction;
 use crate::cli::SetupToolsArgs;
 use crate::config::loader::load_modlist;
+use crate::config::schema::ModAction;
 use crate::config::schema::PostInstallAction;
-use crate::config::tools::{generate_tools_toml, RequiredTools};
+use crate::config::tools::{RequiredTools, generate_tools_toml};
 use std::path::PathBuf;
 
 pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
-    let source = load_modlist(&args.input).map_err(|err| {
-        anyhow::anyhow!("failed to parse {}: {err}", args.input.display())
-    })?;
+    let source = load_modlist(&args.input)
+        .map_err(|err| anyhow::anyhow!("failed to parse {}: {err}", args.input.display()))?;
 
     // Detect which tools are referenced anywhere in the modlist.
     let mut required = RequiredTools::default();
@@ -63,7 +62,10 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
 
     if let Some(parent) = output_path.parent() {
         std::fs::create_dir_all(parent).map_err(|err| {
-            anyhow::anyhow!("failed to create output directory {}: {err}", parent.display())
+            anyhow::anyhow!(
+                "failed to create output directory {}: {err}",
+                parent.display()
+            )
         })?;
     }
 
@@ -72,7 +74,10 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
 
     tracing::info!(path = %output_path.display(), "setup-tools: wrote tools.toml template");
 
-    println!("Wrote tools configuration template to: {}", output_path.display());
+    println!(
+        "Wrote tools configuration template to: {}",
+        output_path.display()
+    );
     println!("Edit the file and fill in the placeholder paths before running 'mudcrab install'.");
 
     Ok(())

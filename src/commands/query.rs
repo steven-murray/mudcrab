@@ -5,12 +5,13 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
     let raw = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
 
-    let compiled = serde_json::from_str::<config::schema::CompiledModlist>(&raw).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to parse compiled artifact {}: {err}",
-            args.input.display()
-        )
-    })?;
+    let compiled =
+        serde_json::from_str::<config::schema::CompiledModlist>(&raw).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to parse compiled artifact {}: {err}",
+                args.input.display()
+            )
+        })?;
 
     let overrides = config::query::parse_overrides(&args.set)?;
     let plan = config::query::build_plan(&compiled, args.headless, &overrides)?;
@@ -39,7 +40,11 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         "Plan: {} of {} mod(s) selected{} -> {}",
         plan.selected_mods.len(),
         plan.mod_order.len(),
-        if answers.is_empty() { String::new() } else { format!(" ({})", answers.join(", ")) },
+        if answers.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", answers.join(", "))
+        },
         args.output.display()
     );
     let data = serde_json::to_string_pretty(&plan)

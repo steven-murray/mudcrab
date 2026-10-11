@@ -142,10 +142,7 @@ impl MasterTable {
     }
 
     pub fn index_of(&self, name: &PluginName) -> Option<u8> {
-        self.masters
-            .iter()
-            .position(|m| m == name)
-            .map(|i| i as u8)
+        self.masters.iter().position(|m| m == name).map(|i| i as u8)
     }
 
     pub fn get(&self, mod_index: u8) -> Option<&PluginName> {
@@ -164,10 +161,12 @@ impl MasterTable {
                 object_index: form_id.object_index(),
             });
         }
-        self.masters.get(index as usize).map(|plugin| Origin::Master {
-            plugin: plugin.clone(),
-            object_index: form_id.object_index(),
-        })
+        self.masters
+            .get(index as usize)
+            .map(|plugin| Origin::Master {
+                plugin: plugin.clone(),
+                object_index: form_id.object_index(),
+            })
     }
 }
 
@@ -194,7 +193,10 @@ mod tests {
 
     #[test]
     fn plugin_names_compare_case_insensitively() {
-        assert_eq!(PluginName::new("AFK_Weye.esp"), PluginName::new("afk_weye.esp"));
+        assert_eq!(
+            PluginName::new("AFK_Weye.esp"),
+            PluginName::new("afk_weye.esp")
+        );
         assert_ne!(PluginName::new("a.esp"), PluginName::new("b.esp"));
         // but the original spelling is preserved for output
         assert_eq!(PluginName::new("AFK_Weye.esp").as_str(), "AFK_Weye.esp");

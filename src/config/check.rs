@@ -60,7 +60,10 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
             .iter()
             .filter(|m| settings.filter.matches(&m.section, &m.id))
     };
-    let bar = crate::ui::progress(in_scope().map(|m| m.archives.len() as u64).sum(), "checking");
+    let bar = crate::ui::progress(
+        in_scope().map(|m| m.archives.len() as u64).sum(),
+        "checking",
+    );
     for mod_entry in in_scope() {
         mods_checked += 1;
         bar.set_message(mod_entry.id.clone());
@@ -69,12 +72,8 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
             archives_checked += 1;
             bar.inc(1);
 
-            let availability = archive_availability(
-                mod_entry.id.as_str(),
-                archive_index,
-                archive,
-                settings,
-            );
+            let availability =
+                archive_availability(mod_entry.id.as_str(), archive_index, archive, settings);
             match availability {
                 ArchiveAvailability::Cached => archives_cached += 1,
                 ArchiveAvailability::Local => archives_local += 1,
@@ -116,7 +115,11 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
     crate::ui::say(format!(
         "Checked {archives_checked} archive(s) in {mods_checked} mod(s): {archives_cached} in the \
          downloads folder, {archives_local} in search paths, {archives_must_download} to download{}",
-        if errors.is_empty() { String::new() } else { format!("; {} problem(s)", errors.len()) }
+        if errors.is_empty() {
+            String::new()
+        } else {
+            format!("; {} problem(s)", errors.len())
+        }
     ));
     tracing::info!(
         mods_checked,
@@ -162,7 +165,11 @@ fn archive_availability(
     };
 
     if !archive.build.is_empty() {
-        let found: Vec<_> = archive.build.iter().map(|layer| locate(&layer.path, None)).collect();
+        let found: Vec<_> = archive
+            .build
+            .iter()
+            .map(|layer| locate(&layer.path, None))
+            .collect();
         return if found.iter().all(|f| matches!(f, Some(Found::Downloads(_)))) {
             ArchiveAvailability::Cached
         } else if found.iter().all(Option::is_some) {
@@ -172,7 +179,10 @@ fn archive_availability(
         };
     }
 
-    match locate(archive.path.as_deref().unwrap_or_default(), archive.file_name.as_deref()) {
+    match locate(
+        archive.path.as_deref().unwrap_or_default(),
+        archive.file_name.as_deref(),
+    ) {
         Some(Found::Downloads(_)) => ArchiveAvailability::Cached,
         Some(Found::SearchPath(_)) => ArchiveAvailability::Local,
         None => ArchiveAvailability::MustDownload,
@@ -257,8 +267,13 @@ fn check_build_archive(
             continue;
         }
 
-        let layer_paths = archive::list_archive_paths(&source)
-            .map_err(|err| anyhow::anyhow!("unable to list build layer {} archive {}: {err}", layer_index, source.display()))?;
+        let layer_paths = archive::list_archive_paths(&source).map_err(|err| {
+            anyhow::anyhow!(
+                "unable to list build layer {} archive {}: {err}",
+                layer_index,
+                source.display()
+            )
+        })?;
 
         if let Some(dest_prefix) = layer.dest_prefix.as_deref() {
             let prefix = normalize_prefix(dest_prefix)?;
@@ -285,7 +300,10 @@ fn validate_file_references(paths: &[String], refs: &[String]) -> anyhow::Result
         let matched = paths.iter().any(|p| matcher.is_match(p));
         checked += 1;
         if !matched {
-            anyhow::bail!("file reference matched no files in archive contents: {}", reference);
+            anyhow::bail!(
+                "file reference matched no files in archive contents: {}",
+                reference
+            );
         }
     }
 

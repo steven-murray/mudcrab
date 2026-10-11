@@ -46,7 +46,8 @@ fn kind_of(path: &str) -> u32 {
     // Folder first: `meshes\landscape\lod\*.lod` is a mesh archive as far as
     // the engine is concerned, though no extension there says so. This is what
     // separates a real archive's flags from a purely extension-based guess.
-    let by_folder = if normalized.starts_with("meshes\\") || normalized.starts_with("distantlod\\") {
+    let by_folder = if normalized.starts_with("meshes\\") || normalized.starts_with("distantlod\\")
+    {
         KIND_MESHES
     } else if normalized.starts_with("textures\\") {
         KIND_TEXTURES

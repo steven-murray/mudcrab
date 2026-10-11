@@ -26,4 +26,3 @@ pub(crate) fn is_plugin_file(path: &Path) -> bool {
         .to_ascii_lowercase();
     lower == "esp" || lower == "esm"
 }
-

@@ -107,7 +107,8 @@ mod tests {
         assert_eq!(parsed.action.name(), "dds_decompress");
 
         let plain: ConditionalAction =
-            toml::from_str("action = \"ini_set\"\nfile = \"a.ini\"\nkey = \"k\"\nvalue = 0").unwrap();
+            toml::from_str("action = \"ini_set\"\nfile = \"a.ini\"\nkey = \"k\"\nvalue = 0")
+                .unwrap();
         assert!(plain.condition.is_none());
 
         let typo = toml::from_str::<ConditionalAction>(
@@ -192,8 +193,7 @@ mod tests {
         assert!(err.to_string().contains("block"), "{err}");
 
         let ModAction::IniAppendBlock(spec) =
-            parse("action=\"ini_append_block\"\nfile=\"ini/x.ini\"\nblock=\"set x to 1\"")
-                .unwrap()
+            parse("action=\"ini_append_block\"\nfile=\"ini/x.ini\"\nblock=\"set x to 1\"").unwrap()
         else {
             panic!("expected ini_append_block");
         };
@@ -253,7 +253,10 @@ mod tests {
             "action=\"file_prune\"\npaths=[\"meshes/**\"]",
             "action=\"file_prune\"\nconflicts_with=[\"Some Mod\"]",
         ] {
-            assert!(matches!(parse(source), Ok(ModAction::FilePrune(_))), "{source}");
+            assert!(
+                matches!(parse(source), Ok(ModAction::FilePrune(_))),
+                "{source}"
+            );
         }
     }
 

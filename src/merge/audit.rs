@@ -102,9 +102,8 @@ pub fn audit_scripts(
         }
 
         for offset in (0..bytecode.len().saturating_sub(3)).step_by(4) {
-            let word = u32::from_le_bytes(
-                bytecode[offset..offset + 4].try_into().expect("in bounds"),
-            );
+            let word =
+                u32::from_le_bytes(bytecode[offset..offset + 4].try_into().expect("in bounds"));
             if changed.contains(&word) {
                 return Err(AuditError::ScriptFormId {
                     plugin: plugin_name.clone(),
@@ -215,11 +214,17 @@ mod tests {
             .expect("voice tree");
         std::fs::write(root.join("Talkative.esp"), b"TES4").expect("plugin");
 
-        let err = audit_assets(&PluginName::new("Talkative.esp"), &root.join("Talkative.esp"))
-            .unwrap_err()
-            .to_string();
+        let err = audit_assets(
+            &PluginName::new("Talkative.esp"),
+            &root.join("Talkative.esp"),
+        )
+        .unwrap_err()
+        .to_string();
         assert!(err.contains("voice data"), "{err}");
-        assert!(err.contains("merge-engine.md"), "the error must cite its evidence: {err}");
+        assert!(
+            err.contains("merge-engine.md"),
+            "the error must cite its evidence: {err}"
+        );
     }
 
     #[test]
@@ -261,7 +266,11 @@ mod tests {
         std::fs::write(root.join("Talkative.esp"), b"TES4").expect("plugin");
 
         assert!(
-            audit_assets(&PluginName::new("Talkative.esp"), &root.join("Talkative.esp")).is_err()
+            audit_assets(
+                &PluginName::new("Talkative.esp"),
+                &root.join("Talkative.esp")
+            )
+            .is_err()
         );
     }
 
@@ -273,6 +282,7 @@ mod tests {
         std::fs::create_dir_all(root.join("Textures/Trees")).expect("textures");
         std::fs::write(root.join("Fort.esp"), b"TES4").expect("plugin");
 
-        audit_assets(&PluginName::new("Fort.esp"), &root.join("Fort.esp")).expect("no keyed assets");
+        audit_assets(&PluginName::new("Fort.esp"), &root.join("Fort.esp"))
+            .expect("no keyed assets");
     }
 }

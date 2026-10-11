@@ -3,7 +3,7 @@
 //! Sequenced after every mod is installed and before LOOT sorts, so LOOT sees
 //! the merged plugin and not its sources.
 
-use crate::config::mo2::{hide_plugin, unhide_plugin, HideOutcome, MO2_HIDDEN_SUFFIX};
+use crate::config::mo2::{HideOutcome, MO2_HIDDEN_SUFFIX, hide_plugin, unhide_plugin};
 use crate::config::schema::{MergeSpec, PersonalizedPlan};
 use crate::merge::{self, MergeRequest, MergeSource};
 use crate::plugin::PluginName;
@@ -12,8 +12,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use super::manifest::{hash_merge_inputs, should_skip_merge, BuiltMerge};
 use super::InstallSettings;
+use super::manifest::{BuiltMerge, hash_merge_inputs, should_skip_merge};
 
 /// A plugin hidden on behalf of a merge, recorded so it can be restored.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -100,7 +100,10 @@ pub(crate) fn run_merges(
             &mod_entry.id,
             spec,
             &plan.plugins,
-            &sources.iter().map(|source| source.path.clone()).collect::<Vec<_>>(),
+            &sources
+                .iter()
+                .map(|source| source.path.clone())
+                .collect::<Vec<_>>(),
             &settings.mods_dir,
         )?;
         let output_path = target.join(&spec.output);
@@ -239,7 +242,10 @@ fn write_merge_sidecar(
     std::fs::create_dir_all(&dir)
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", dir.display()))?;
 
-    write_text_file(&dir.join("map.json"), &merge::run::map_json(&output.allocation))?;
+    write_text_file(
+        &dir.join("map.json"),
+        &merge::run::map_json(&output.allocation),
+    )?;
 
     let report = serde_json::json!({
         "name": output.report.name,
@@ -355,9 +361,8 @@ fn unhide_all(mods_dir: &Path, hidden: &[HiddenPlugin]) -> anyhow::Result<usize>
 /// Without the hidden fallback a merge would succeed once and then fail on
 /// every re-install, because its own hiding step renamed its inputs away.
 fn locate_source_plugin(mod_dir: &Path, plugin: &str) -> Option<PathBuf> {
-    find_child_case_insensitive(mod_dir, plugin).or_else(|| {
-        find_child_case_insensitive(mod_dir, &format!("{plugin}{MO2_HIDDEN_SUFFIX}"))
-    })
+    find_child_case_insensitive(mod_dir, plugin)
+        .or_else(|| find_child_case_insensitive(mod_dir, &format!("{plugin}{MO2_HIDDEN_SUFFIX}")))
 }
 
 fn relative_to_mods_dir(mod_dir: &Path, mods_dir: &Path) -> String {
@@ -428,7 +433,9 @@ mod tests {
         touch(&mod_dir.join("Fort Aurus.esp"));
         touch(&mod_dir.join("Fort Aurus.esp.mohidden"));
 
-        let err = hide_plugin(mod_dir, "Fort Aurus.esp").unwrap_err().to_string();
+        let err = hide_plugin(mod_dir, "Fort Aurus.esp")
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("ambiguous"), "unexpected error: {err}");
     }
 
@@ -450,7 +457,9 @@ mod tests {
     #[test]
     fn a_missing_source_plugin_is_an_error() {
         let temp = tempdir().expect("tempdir");
-        let err = hide_plugin(temp.path(), "Absent.esp").unwrap_err().to_string();
+        let err = hide_plugin(temp.path(), "Absent.esp")
+            .unwrap_err()
+            .to_string();
         assert!(err.contains("not in"), "unexpected error: {err}");
     }
 

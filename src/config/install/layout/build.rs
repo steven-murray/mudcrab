@@ -3,7 +3,7 @@
 use super::bain::{apply_bain_from_staging, list_relative_paths};
 use super::fomod::apply_fomod_from_staging;
 use super::plan::plan_simple;
-use crate::archive::{extract_with_builtins, list_archive_paths, ArchiveFilters};
+use crate::archive::{ArchiveFilters, extract_with_builtins, list_archive_paths};
 use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::schema::{ArchiveLayout, CompiledArchive};
 use crate::util::fs::{copy_filtered_tree, normalize_relative_path, staging_dir_for};
@@ -65,7 +65,8 @@ pub(crate) fn extract_build_archive(
         let staged = list_relative_paths(&staging_dir)?;
         check_prediction(&predicted, &staged, mod_id)?;
 
-        let destination_root = super::destination_for(target_root, archive.target_subdir.as_deref())?;
+        let destination_root =
+            super::destination_for(target_root, archive.target_subdir.as_deref())?;
         std::fs::create_dir_all(&destination_root).map_err(|err| {
             anyhow::anyhow!("failed to create {}: {err}", destination_root.display())
         })?;
@@ -107,9 +108,17 @@ fn resolve_build_layers(
     for (layer_index, layer) in archive.build.iter().enumerate() {
         let reference = ArchiveRef::new(&layer.path, None);
         let found = if settings.dry_run {
-            archive_store::find(&settings.cache_dir, &settings.archive_search_paths, &reference)
+            archive_store::find(
+                &settings.cache_dir,
+                &settings.archive_search_paths,
+                &reference,
+            )
         } else {
-            archive_store::resolve(&settings.cache_dir, &settings.archive_search_paths, &reference)?
+            archive_store::resolve(
+                &settings.cache_dir,
+                &settings.archive_search_paths,
+                &reference,
+            )?
         };
         let Some(source) = found else {
             anyhow::bail!(
@@ -229,8 +238,9 @@ pub(crate) fn merge_layer_into_staging(
         } else {
             staging_dir.to_path_buf()
         };
-        std::fs::create_dir_all(&dest)
-            .map_err(|err| anyhow::anyhow!("failed to create staging dest {}: {err}", dest.display()))?;
+        std::fs::create_dir_all(&dest).map_err(|err| {
+            anyhow::anyhow!("failed to create staging dest {}: {err}", dest.display())
+        })?;
 
         // Preserve case: this assembles the *staging* tree, which a FOMOD or
         // BAIN script then reads, naming its sources in the archive's own

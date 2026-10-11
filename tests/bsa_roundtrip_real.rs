@@ -81,7 +81,11 @@ fn round_trips_every_real_archive_byte_for_byte() {
     let mut paths = Vec::new();
     collect_archives(&mods, &mut paths);
     paths.sort();
-    assert!(!paths.is_empty(), "found no archives under {}", mods.display());
+    assert!(
+        !paths.is_empty(),
+        "found no archives under {}",
+        mods.display()
+    );
 
     let mut checked = 0usize;
     let mut total_files = 0usize;
@@ -123,9 +127,8 @@ fn round_trips_every_real_archive_byte_for_byte() {
             let name = file.path_in(folder);
             match file.data(&name) {
                 Ok(data) => {
-                    let declared = u32::from_le_bytes(
-                        file.stored_bytes()[0..4].try_into().unwrap(),
-                    ) as usize;
+                    let declared =
+                        u32::from_le_bytes(file.stored_bytes()[0..4].try_into().unwrap()) as usize;
                     if data.len() != declared {
                         decompress_failures += 1;
                         if decompress_failures == 1 {
@@ -239,7 +242,10 @@ fn recomputed_hashes_reproduce_the_real_record_ordering() {
             .collect();
         folder_names += hashes.len();
         if hashes.windows(2).any(|pair| pair[0] > pair[1]) {
-            problems.push(format!("{}: folder hashes are not ascending", path.display()));
+            problems.push(format!(
+                "{}: folder hashes are not ascending",
+                path.display()
+            ));
         }
 
         for folder in &parsed.folders {
@@ -267,7 +273,12 @@ fn recomputed_hashes_reproduce_the_real_record_ordering() {
         problems.is_empty(),
         "{} ordering problems:\n  {}",
         problems.len(),
-        problems.iter().take(20).cloned().collect::<Vec<_>>().join("\n  ")
+        problems
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n  ")
     );
 }
 
@@ -292,7 +303,11 @@ fn derived_file_flags_cover_what_real_archives_declare() {
 
     let mut archives = Vec::new();
     collect_archives(&mods, &mut archives);
-    assert!(!archives.is_empty(), "no .bsa found under {}", mods.display());
+    assert!(
+        !archives.is_empty(),
+        "no .bsa found under {}",
+        mods.display()
+    );
 
     // Archives whose declared kinds are not present in their own contents.
     // Named so that a new shortfall is a test failure rather than a shrug.

@@ -41,7 +41,9 @@ fn merge_docs(modlist: &mut SourceModlist, file: DocsFile) -> anyhow::Result<()>
             .mods
             .iter_mut()
             .find(|entry| entry.id == id)
-            .ok_or_else(|| anyhow::anyhow!("documents mod {id:?}, which the modlist does not have"))?;
+            .ok_or_else(|| {
+                anyhow::anyhow!("documents mod {id:?}, which the modlist does not have")
+            })?;
         anyhow::ensure!(
             entry.docs.is_empty(),
             "mod {id:?} is documented in both the modlist and the docs file"

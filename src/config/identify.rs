@@ -130,7 +130,10 @@ pub enum Method {
 /// file-list lookup; a wrong guess produces no match rather than a wrong one,
 /// because the filename still has to agree.
 pub fn mod_id_from_file_name(file_name: &str) -> Option<u64> {
-    let stem = file_name.rsplit_once('.').map(|(head, _)| head).unwrap_or(file_name);
+    let stem = file_name
+        .rsplit_once('.')
+        .map(|(head, _)| head)
+        .unwrap_or(file_name);
     stem.split('-')
         .skip(1)
         .find(|field| !field.is_empty() && field.chars().all(|c| c.is_ascii_digit()))
@@ -173,7 +176,9 @@ pub async fn nexus_files(
 ) -> anyhow::Result<Vec<NexusFile>> {
     let endpoint = format!(
         "{}/games/{}/mods/{}/files.json",
-        api_base.unwrap_or("https://api.nexusmods.com/v1").trim_end_matches('/'),
+        api_base
+            .unwrap_or("https://api.nexusmods.com/v1")
+            .trim_end_matches('/'),
         game,
         mod_id
     );
@@ -184,7 +189,9 @@ pub async fn nexus_files(
         .await
         .map_err(|err| anyhow::anyhow!("nexus file-list request failed for mod {mod_id}: {err}"))?
         .error_for_status()
-        .map_err(|err| anyhow::anyhow!("nexus file list for {game}/{mod_id} returned an error: {err}"))?
+        .map_err(|err| {
+            anyhow::anyhow!("nexus file list for {game}/{mod_id} returned an error: {err}")
+        })?
         .json::<FileListing>()
         .await
         .map_err(|err| anyhow::anyhow!("failed to parse the nexus file list: {err}"))?
@@ -209,7 +216,9 @@ pub async fn identify(
 
     let endpoint = format!(
         "{}/games/{}/mods/md5_search/{}.json",
-        api_base.unwrap_or("https://api.nexusmods.com/v1").trim_end_matches('/'),
+        api_base
+            .unwrap_or("https://api.nexusmods.com/v1")
+            .trim_end_matches('/'),
         game,
         md5
     );
@@ -222,8 +231,16 @@ pub async fn identify(
         .map_err(|err| anyhow::anyhow!("nexus md5 lookup failed for {file_name}: {err}"))?;
 
     if response.status() == reqwest::StatusCode::NOT_FOUND {
-        return identify_by_file_list(client, &file_name, &md5, game, api_key, api_base, mod_id_hint)
-            .await;
+        return identify_by_file_list(
+            client,
+            &file_name,
+            &md5,
+            game,
+            api_key,
+            api_base,
+            mod_id_hint,
+        )
+        .await;
     }
 
     let results = response
@@ -237,8 +254,16 @@ pub async fn identify(
         .into_iter()
         .find(|entry| entry.r#mod.is_some() && entry.file_details.is_some())
     else {
-        return identify_by_file_list(client, &file_name, &md5, game, api_key, api_base, mod_id_hint)
-            .await;
+        return identify_by_file_list(
+            client,
+            &file_name,
+            &md5,
+            game,
+            api_key,
+            api_base,
+            mod_id_hint,
+        )
+        .await;
     };
 
     let mod_info = first.r#mod.expect("filtered for Some above");
@@ -350,7 +375,10 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("x.bin");
         std::fs::write(&path, b"abc").expect("write");
-        assert_eq!(md5_of_file(&path).unwrap(), "900150983cd24fb0d6963f7d28e17f72");
+        assert_eq!(
+            md5_of_file(&path).unwrap(),
+            "900150983cd24fb0d6963f7d28e17f72"
+        );
     }
 
     #[test]
@@ -373,7 +401,10 @@ mod tests {
             Some(24078)
         );
         // The title is skipped even when it starts with digits.
-        assert_eq!(mod_id_from_file_name("2 VWD Ships-50111-1-01.zip"), Some(50111));
+        assert_eq!(
+            mod_id_from_file_name("2 VWD Ships-50111-1-01.zip"),
+            Some(50111)
+        );
         assert_eq!(mod_id_from_file_name("hand-named.7z"), None);
     }
 

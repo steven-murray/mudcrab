@@ -1,8 +1,8 @@
 //! Parse a BSA from bytes.
 
 use super::{
-    Bsa, BsaError, File, Folder, Source, FLAG_COMPRESSED, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES,
-    HEADER_LEN, SIZE_COMPRESSION_DIFFERS, SIZE_MASK, VERSION_OBLIVION,
+    Bsa, BsaError, FLAG_COMPRESSED, FLAG_FILE_NAMES, FLAG_FOLDER_NAMES, File, Folder, HEADER_LEN,
+    SIZE_COMPRESSION_DIFFERS, SIZE_MASK, Source, VERSION_OBLIVION,
 };
 
 /// A cursor that fails with `Truncated` rather than panicking.
@@ -149,7 +149,9 @@ pub fn parse(data: &[u8]) -> Result<Bsa<'_>, BsaError> {
     if names_length != total_file_name_length {
         // The folder-offset arithmetic above depends on this being right, so a
         // disagreement means the archive is not laid out the way we think.
-        return Err(BsaError::Truncated { offset: names_start });
+        return Err(BsaError::Truncated {
+            offset: names_start,
+        });
     }
 
     let data_region_start = cursor.at;
@@ -176,8 +178,7 @@ pub fn parse(data: &[u8]) -> Result<Bsa<'_>, BsaError> {
 
             folder.files.push(File {
                 name,
-                compressed: compressed_by_default
-                    != (size_field & SIZE_COMPRESSION_DIFFERS != 0),
+                compressed: compressed_by_default != (size_field & SIZE_COMPRESSION_DIFFERS != 0),
                 stored: std::borrow::Cow::Borrowed(&data[start..end]),
                 offset: Some(offset),
             });

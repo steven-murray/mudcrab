@@ -59,8 +59,8 @@ pub enum DataOrder {
 }
 
 pub fn deflate(input: &[u8]) -> Vec<u8> {
-    use flate2::write::ZlibEncoder;
     use flate2::Compression;
+    use flate2::write::ZlibEncoder;
     use std::io::Write;
     let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
     encoder.write_all(input).unwrap();
@@ -102,8 +102,7 @@ pub fn archive(archive_flags: u32, folders: &[(&str, Vec<FileSpec>)], order: Dat
 
     let folder_count = folders.len();
     let file_count: usize = folders.iter().map(|(_, files)| files.len()).sum();
-    let total_folder_name_length: usize =
-        folders.iter().map(|(name, _)| name.len() + 1).sum();
+    let total_folder_name_length: usize = folders.iter().map(|(name, _)| name.len() + 1).sum();
     let total_file_name_length: usize = folders
         .iter()
         .flat_map(|(_, files)| files.iter())
@@ -120,13 +119,13 @@ pub fn archive(archive_flags: u32, folders: &[(&str, Vec<FileSpec>)], order: Dat
         })
         .collect();
 
-    let metadata_length =
-        36 + folder_count * 16
-            + folders
-                .iter()
-                .map(|(name, files)| 1 + name.len() + 1 + files.len() * 16)
-                .sum::<usize>()
-            + total_file_name_length;
+    let metadata_length = 36
+        + folder_count * 16
+        + folders
+            .iter()
+            .map(|(name, files)| 1 + name.len() + 1 + files.len() * 16)
+            .sum::<usize>()
+        + total_file_name_length;
 
     // Lay the data region out, recording where each file's payload landed.
     let mut region: Vec<u8> = Vec::new();

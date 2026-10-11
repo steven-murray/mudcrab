@@ -1,6 +1,6 @@
 //! Install manifest: what was installed, where, and whether it is still current.
 
-use crate::config::mo2::{mo2_profile_dir, MO2_HIDDEN_SUFFIX};
+use crate::config::mo2::{MO2_HIDDEN_SUFFIX, mo2_profile_dir};
 use crate::config::schema::{MergeSpec, PersonalizedMod};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -126,8 +126,12 @@ pub(crate) fn hash_personalized_mod(mod_entry: &PersonalizedMod) -> anyhow::Resu
     let mut hashable = mod_entry.clone();
     hashable.section.clear();
 
-    let payload = serde_json::to_vec(&hashable)
-        .map_err(|err| anyhow::anyhow!("failed to serialize mod {} for hashing: {err}", mod_entry.id))?;
+    let payload = serde_json::to_vec(&hashable).map_err(|err| {
+        anyhow::anyhow!(
+            "failed to serialize mod {} for hashing: {err}",
+            mod_entry.id
+        )
+    })?;
     Ok(hex_digest(&payload))
 }
 
@@ -162,8 +166,9 @@ pub(crate) fn hash_merge_inputs(
 ) -> anyhow::Result<String> {
     let mut sources = Vec::with_capacity(source_paths.len());
     for path in source_paths {
-        let metadata = std::fs::metadata(path)
-            .map_err(|err| anyhow::anyhow!("merge {merge_id}: failed to stat {}: {err}", path.display()))?;
+        let metadata = std::fs::metadata(path).map_err(|err| {
+            anyhow::anyhow!("merge {merge_id}: failed to stat {}: {err}", path.display())
+        })?;
         let modified = metadata
             .modified()
             .ok()
@@ -242,4 +247,3 @@ pub(crate) fn relative_path_to_mod(mod_path: &Path, mods_dir: &Path) -> String {
                 .to_string()
         })
 }
-

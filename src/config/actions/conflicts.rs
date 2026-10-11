@@ -53,12 +53,7 @@ pub(super) fn conflicting_files(
         };
 
         let installed_at = cx.settings.mods_dir.join(safe_mod_dir_name(&other.id)?);
-        match staged_paths(
-            other,
-            Some(&installed_at),
-            cx.settings,
-            cx.active_plugins,
-        ) {
+        match staged_paths(other, Some(&installed_at), cx.settings, cx.active_plugins) {
             Ok(paths) => theirs.extend(paths),
             // A partial build legitimately has not fetched a later section's
             // archives yet. That is a reason to say so, not to fail -- but the
@@ -72,10 +67,12 @@ pub(super) fn conflicting_files(
                 );
                 skipped.push(id.clone());
             }
-            Err(err) => return Err(err.context(format!(
-                "{}: conflicts_with could not determine what '{id}' provides",
-                cx.owner
-            ))),
+            Err(err) => {
+                return Err(err.context(format!(
+                    "{}: conflicts_with could not determine what '{id}' provides",
+                    cx.owner
+                )));
+            }
         }
     }
 
@@ -244,8 +241,7 @@ pub(super) mod tests {
             active_plugins: &Default::default(),
         };
 
-        let files =
-            conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[]).unwrap();
+        let files = conflicting_files(&cx, &subject, &["Partner".to_string()], None, &[]).unwrap();
         assert_eq!(files.files, ["meshes/shared.nif"]);
     }
 
@@ -325,8 +321,14 @@ pub(super) mod tests {
             active_plugins: &Default::default(),
         };
 
-        let files =
-            conflicting_files(&cx, &subject, &["Partner".to_string()], Some("textures"), &[]).unwrap();
+        let files = conflicting_files(
+            &cx,
+            &subject,
+            &["Partner".to_string()],
+            Some("textures"),
+            &[],
+        )
+        .unwrap();
         assert_eq!(files.files, ["textures/shared.dds"]);
     }
 }

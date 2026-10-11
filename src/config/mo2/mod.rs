@@ -92,7 +92,11 @@ pub(crate) fn unhide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<()> 
         );
     }
 
-    let file_name = hidden.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_name = hidden
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
     let restored = hidden.with_file_name(
         file_name
             .strip_suffix(MO2_HIDDEN_SUFFIX)
@@ -108,14 +112,20 @@ pub(crate) fn unhide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<()> 
 }
 
 pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<()> {
-    let root = mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
-    std::fs::create_dir_all(root.join("mods"))
-        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", root.join("mods").display()))?;
+    let root =
+        mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
+    std::fs::create_dir_all(root.join("mods")).map_err(|err| {
+        anyhow::anyhow!("failed to create {}: {err}", root.join("mods").display())
+    })?;
     std::fs::create_dir_all(root.join("downloads")).map_err(|err| {
-        anyhow::anyhow!("failed to create {}: {err}", root.join("downloads").display())
+        anyhow::anyhow!(
+            "failed to create {}: {err}",
+            root.join("downloads").display()
+        )
     })?;
 
-    let profile_dir = mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
+    let profile_dir =
+        mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
     std::fs::create_dir_all(&profile_dir)
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", profile_dir.display()))?;
 
@@ -163,9 +173,8 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
 
     // MO2 profile expects this file; keep it empty by default.
     let prefs_path = profile_dir.join("oblivionprefs.ini");
-    std::fs::write(&prefs_path, "").map_err(|err| {
-        anyhow::anyhow!("failed to write {}: {err}", prefs_path.display())
-    })?;
+    std::fs::write(&prefs_path, "")
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", prefs_path.display()))?;
 
     Ok(())
 }
@@ -175,12 +184,17 @@ pub(crate) fn export_mo2_instance(
     settings: &InstallSettings,
     scope: ExportScope<'_>,
 ) -> anyhow::Result<()> {
-    let root = mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
+    let root =
+        mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
     point_at_downloads(root, &settings.cache_dir, settings.dry_run)?;
     ensure_mo2_section_folders(plan, settings, scope)?;
 
-    let profile_dir = mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
-    write_text_file(&profile_dir.join("modlist.txt"), &render_mo2_modlist(plan, scope))?;
+    let profile_dir =
+        mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
+    write_text_file(
+        &profile_dir.join("modlist.txt"),
+        &render_mo2_modlist(plan, scope),
+    )?;
     // Both files, and they are not the same file twice. Oblivion has no
     // load-order file: the order *is* the plugins' modification times, oldest
     // first, and `plugins.txt` records only which plugins are active. The order
@@ -215,9 +229,18 @@ pub(crate) fn export_mo2_instance(
             "mo2 export: leaving declared-inactive plugins out of plugins.txt"
         );
     }
-    write_text_file(&profile_dir.join("plugins.txt"), &render_plugin_list(&active))?;
-    write_text_file(&profile_dir.join("loadorder.txt"), &render_plugin_list(&plugins))?;
-    write_text_file(&profile_dir.join("archives.txt"), &render_archive_list(plan, settings, scope)?)?;
+    write_text_file(
+        &profile_dir.join("plugins.txt"),
+        &render_plugin_list(&active),
+    )?;
+    write_text_file(
+        &profile_dir.join("loadorder.txt"),
+        &render_plugin_list(&plugins),
+    )?;
+    write_text_file(
+        &profile_dir.join("archives.txt"),
+        &render_archive_list(plan, settings, scope)?,
+    )?;
     Ok(())
 }
 
@@ -233,7 +256,10 @@ fn in_scope(scope: ExportScope<'_>, mod_id: &str) -> bool {
 /// `Mo2ModlistEntry::Section` exactly. Doing it from the mods' own section
 /// paths, rather than guessing which mods sit under a separator in the
 /// flattened list, is why `section` had to survive into the plan.
-fn scoped_section_names(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> Option<HashSet<String>> {
+fn scoped_section_names(
+    plan: &PersonalizedPlan,
+    scope: ExportScope<'_>,
+) -> Option<HashSet<String>> {
     let ids = scope?;
 
     let mut out = HashSet::new();
@@ -257,7 +283,11 @@ fn scoped_section_names(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> Opti
 /// archives the user may want to install by hand afterwards -- and one
 /// central folder can serve every instance on the machine. MO2 stores the path
 /// with forward slashes, under Wine as a `Z:` path.
-pub(crate) fn point_at_downloads(instance: &Path, downloads: &Path, dry_run: bool) -> anyhow::Result<()> {
+pub(crate) fn point_at_downloads(
+    instance: &Path,
+    downloads: &Path,
+    dry_run: bool,
+) -> anyhow::Result<()> {
     let absolute = std::path::absolute(downloads)
         .map_err(|err| anyhow::anyhow!("failed to resolve {}: {err}", downloads.display()))?;
     let value = mo2_path(&absolute);
@@ -280,18 +310,28 @@ pub(crate) fn point_at_downloads(instance: &Path, downloads: &Path, dry_run: boo
 /// that maps the Unix root.
 fn mo2_path(path: &Path) -> String {
     let forward = path.to_string_lossy().replace('\\', "/");
-    if cfg!(windows) { forward } else { format!("Z:{forward}") }
+    if cfg!(windows) {
+        forward
+    } else {
+        format!("Z:{forward}")
+    }
 }
 
 /// Set `key=value` in `[section]` of an INI, keeping everything else -- line
 /// endings included -- as it was. Adds the section if it is missing.
 fn set_ini_key(text: &str, section: &str, key: &str, value: &str) -> String {
-    let newline = if text.contains("\r\n") || text.is_empty() { "\r\n" } else { "\n" };
+    let newline = if text.contains("\r\n") || text.is_empty() {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let header = format!("[{section}]");
     let assignment = format!("{key}={value}");
     let mut lines: Vec<String> = text.lines().map(str::to_string).collect();
 
-    let section_start = lines.iter().position(|line| line.trim().eq_ignore_ascii_case(&header));
+    let section_start = lines
+        .iter()
+        .position(|line| line.trim().eq_ignore_ascii_case(&header));
     match section_start {
         Some(start) => {
             let end = lines[start + 1..]
@@ -331,7 +371,11 @@ pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>
                 if !in_scope(scope, id) {
                     continue;
                 }
-                let prefix = if selected.contains(id.as_str()) { '+' } else { '-' };
+                let prefix = if selected.contains(id.as_str()) {
+                    '+'
+                } else {
+                    '-'
+                };
                 out.push(prefix);
                 out.push_str(id);
             }
@@ -370,8 +414,12 @@ pub(crate) fn ensure_mo2_section_folders(
         }
 
         let path = settings.mods_dir.join(mo2_section_mod_name(name));
-        std::fs::create_dir_all(&path)
-            .map_err(|err| anyhow::anyhow!("failed to create MO2 section folder {}: {err}", path.display()))?;
+        std::fs::create_dir_all(&path).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to create MO2 section folder {}: {err}",
+                path.display()
+            )
+        })?;
     }
 
     Ok(())
@@ -449,11 +497,12 @@ fn collect_plugin_names(root: &Path, out: &mut HashSet<String>) -> anyhow::Resul
     for entry in std::fs::read_dir(root)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", root.display()))?
     {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", root.display()))?;
+        let entry =
+            entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", root.display()))?;
         let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+        let file_type = entry.file_type().map_err(|err| {
+            anyhow::anyhow!("failed to read file type for {}: {err}", path.display())
+        })?;
 
         if file_type.is_dir() {
             collect_plugin_names(&path, out)?;
@@ -500,15 +549,20 @@ pub(crate) fn render_archive_list(
     Ok(out)
 }
 
-pub(crate) fn collect_bsa_files(root: &Path, current: &Path, out: &mut Vec<String>) -> anyhow::Result<()> {
+pub(crate) fn collect_bsa_files(
+    root: &Path,
+    current: &Path,
+    out: &mut Vec<String>,
+) -> anyhow::Result<()> {
     for entry in std::fs::read_dir(current)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", current.display()))?
     {
-        let entry = entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
+        let entry = entry
+            .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", current.display()))?;
         let path = entry.path();
-        let file_type = entry
-            .file_type()
-            .map_err(|err| anyhow::anyhow!("failed to read file type for {}: {err}", path.display()))?;
+        let file_type = entry.file_type().map_err(|err| {
+            anyhow::anyhow!("failed to read file type for {}: {err}", path.display())
+        })?;
 
         if file_type.is_dir() {
             collect_bsa_files(root, &path, out)?;
@@ -540,13 +594,16 @@ pub(crate) fn collect_bsa_files(root: &Path, current: &Path, out: &mut Vec<Strin
     Ok(())
 }
 
-
 pub(crate) fn mo2_instance_dir(settings: &InstallSettings) -> Option<&Path> {
     settings.mo2_instance_dir.as_deref()
 }
 
 pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
-    Some(mo2_instance_dir(settings)?.join("profiles").join(&settings.profile_name))
+    Some(
+        mo2_instance_dir(settings)?
+            .join("profiles")
+            .join(&settings.profile_name),
+    )
 }
 
 pub(crate) fn locate_game_ini_source(game_dir: &Path, file_name: &str) -> Option<PathBuf> {

@@ -37,7 +37,18 @@ async fn identify_prints_a_pasteable_descriptor() {
     let archive = dir.path().join("EVE BAIN-24078.7z");
     std::fs::write(&archive, b"abc").expect("fixture archive");
 
-    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let assert = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary builds")
         .env("NEXUS_API_KEY", "test-key")
         .args(["identify", archive.to_str().unwrap()])
@@ -72,7 +83,18 @@ async fn identify_can_write_the_meta_sidecar_mo2_would_have() {
     let archive = dir.path().join("thing.7z");
     std::fs::write(&archive, b"abc").expect("fixture archive");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary builds")
         .env("NEXUS_API_KEY", "test-key")
         .args(["identify", archive.to_str().unwrap(), "--write-meta"])
@@ -101,7 +123,18 @@ async fn an_archive_with_no_mod_id_in_its_name_says_what_to_pass() {
     let archive = dir.path().join("repacked.7z");
     std::fs::write(&archive, b"abc").expect("fixture archive");
 
-    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let assert = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary builds")
         .env("NEXUS_API_KEY", "test-key")
         .args(["identify", archive.to_str().unwrap()])
@@ -145,10 +178,23 @@ async fn an_old_file_missing_from_the_md5_index_is_found_by_name() {
 
     let dir = tempdir().expect("temp dir");
     // The mod id is read out of the filename, so no --mod-id is needed.
-    let archive = dir.path().join("OOO Enhanced-47187-5-3-Pre-release-1740353484.rar");
+    let archive = dir
+        .path()
+        .join("OOO Enhanced-47187-5-3-Pre-release-1740353484.rar");
     std::fs::write(&archive, b"abc").expect("fixture archive");
 
-    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let assert = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary builds")
         .env("NEXUS_API_KEY", "test-key")
         .args(["identify", archive.to_str().unwrap()])
@@ -191,7 +237,18 @@ async fn a_file_in_neither_the_hash_index_nor_the_mods_file_list_is_reported() {
     let archive = dir.path().join("Renamed By Hand-47187-1-0.7z");
     std::fs::write(&archive, b"abc").expect("fixture archive");
 
-    let assert = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    let assert = Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary builds")
         .env("NEXUS_API_KEY", "test-key")
         .args(["identify", archive.to_str().unwrap()])
@@ -200,8 +257,14 @@ async fn a_file_in_neither_the_hash_index_nor_the_mods_file_list_is_reported() {
         .failure();
 
     let stderr = String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8");
-    assert!(stderr.contains("publishes no file with that name"), "{stderr}");
-    assert!(stderr.contains("renamed"), "renaming is a likely cause:\n{stderr}");
+    assert!(
+        stderr.contains("publishes no file with that name"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("renamed"),
+        "renaming is a likely cause:\n{stderr}"
+    );
 }
 
 #[tokio::test]
@@ -221,20 +284,46 @@ async fn nexus_files_lists_current_files_as_descriptors() {
         .await;
 
     let run = |extra: &[&str]| {
-        let out = Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+        let out = Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
             .expect("binary builds")
             .env("NEXUS_API_KEY", "test-key")
-            .args(["nexus-files", "52661", "--api-base", &format!("{}/v1", server.uri())])
+            .args([
+                "nexus-files",
+                "52661",
+                "--api-base",
+                &format!("{}/v1", server.uri()),
+            ])
             .args(extra)
             .output()
             .expect("runs");
-        assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
         String::from_utf8(out.stdout).expect("utf-8")
     };
 
     let current = run(&[]);
-    assert!(current.contains(r#"path = "nexus:oblivion/52661/7""#), "{current}");
-    assert!(current.contains(r#"file_name = "Swearing Rats-52661-1-1.zip""#), "{current}");
+    assert!(
+        current.contains(r#"path = "nexus:oblivion/52661/7""#),
+        "{current}"
+    );
+    assert!(
+        current.contains(r#"file_name = "Swearing Rats-52661-1-1.zip""#),
+        "{current}"
+    );
     assert!(current.contains("3.5 MB"), "{current}");
     assert!(!current.contains("Old-52661"), "{current}");
     assert!(current.contains("1 old or archived"), "{current}");

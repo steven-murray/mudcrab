@@ -120,7 +120,10 @@ fn canonicalize(form_id: FormId, masters: &MasterTable, inverse: &Inverse) -> Ca
         form_id
     };
     match masters.resolve(form_id) {
-        Some(Origin::Master { plugin, object_index }) => Canon::Master {
+        Some(Origin::Master {
+            plugin,
+            object_index,
+        }) => Canon::Master {
             plugin: plugin.as_str().to_ascii_lowercase(),
             object: object_index,
         },
@@ -304,7 +307,10 @@ fn compare_against_zmerge(name: &str) -> Option<Verdict> {
             .iter()
             .position(|entry| entry.eq_ignore_ascii_case(plugin))
     };
-    let positions: Vec<Option<usize>> = ours_masters.iter().map(|m| load_order_position(m)).collect();
+    let positions: Vec<Option<usize>> = ours_masters
+        .iter()
+        .map(|m| load_order_position(m))
+        .collect();
     assert!(
         positions.windows(2).all(|w| w[0] <= w[1]),
         "{name}: our master list is not in load order: {ours_masters:?}"

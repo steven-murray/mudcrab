@@ -1,8 +1,8 @@
 //! BAIN archive layout: merge selected top-level subpackages into the mod root.
 
+use super::plan::{LayoutPlan, Listing, folded_destination, strip_dir_prefix};
 use crate::archive::ArchiveFilters;
 use crate::config::schema::{BainSubpackage, CompiledArchive};
-use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan, Listing};
 use std::path::Path;
 
 /// Copy the selected subpackages out of an already-extracted staging tree.
@@ -81,8 +81,8 @@ pub(crate) fn list_relative_paths(root: &Path) -> anyhow::Result<Vec<String>> {
         for entry in std::fs::read_dir(dir)
             .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", dir.display()))?
         {
-            let entry =
-                entry.map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", dir.display()))?;
+            let entry = entry
+                .map_err(|err| anyhow::anyhow!("failed to iterate {}: {err}", dir.display()))?;
             let path = entry.path();
             let file_type = entry.file_type().map_err(|err| {
                 anyhow::anyhow!("failed to read type of {}: {err}", path.display())

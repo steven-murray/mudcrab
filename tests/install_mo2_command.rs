@@ -41,7 +41,18 @@ fn install_exports_modorganizer2_instance_structure() {
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -51,7 +62,18 @@ fn install_exports_modorganizer2_instance_structure() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -62,7 +84,18 @@ fn install_exports_modorganizer2_instance_structure() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")
@@ -72,7 +105,18 @@ fn install_exports_modorganizer2_instance_structure() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("install")
         .arg(&plan)
@@ -93,19 +137,25 @@ fn install_exports_modorganizer2_instance_structure() {
     // MO2 is pointed at the downloads folder rather than given copies.
     let ini = std::fs::read_to_string(instance_dir.join("ModOrganizer.ini"))
         .expect("ModOrganizer.ini should be written");
-    assert!(ini.contains("[Settings]") && ini.contains("download_directory="), "{ini}");
+    assert!(
+        ini.contains("[Settings]") && ini.contains("download_directory="),
+        "{ini}"
+    );
     let copied = std::fs::read_dir(instance_dir.join("downloads"))
         .map(|entries| entries.count())
         .unwrap_or(0);
-    assert_eq!(copied, 0, "no archive should be copied into the instance's downloads/");
+    assert_eq!(
+        copied, 0,
+        "no archive should be copied into the instance's downloads/"
+    );
 
     let profile_dir = instance_dir.join("profiles").join("test-profile");
-    let modlist_txt = std::fs::read_to_string(profile_dir.join("modlist.txt"))
-        .expect("modlist.txt should exist");
+    let modlist_txt =
+        std::fs::read_to_string(profile_dir.join("modlist.txt")).expect("modlist.txt should exist");
     assert_eq!(modlist_txt, "+core\n");
 
-    let plugins = std::fs::read_to_string(profile_dir.join("plugins.txt"))
-        .expect("plugins.txt should exist");
+    let plugins =
+        std::fs::read_to_string(profile_dir.join("plugins.txt")).expect("plugins.txt should exist");
     assert_eq!(plugins, "Core.esm\n");
 
     // Oblivion's plugins.txt says what is active, not what order it loads in.
@@ -145,7 +195,18 @@ fn install_exports_modorganizer2_instance_structure() {
     );
     std::fs::write(&profile_ini_path, &edited).expect("write profile ini");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("install")
         .arg(&plan)
@@ -183,8 +244,11 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
     let instance_dir = dir.path().join("mo2-instance");
 
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
-    std::fs::write(game_dir.join("Oblivion.ini"), "[Display]\nbFull Screen = 1\n")
-        .expect("game ini should be written");
+    std::fs::write(
+        game_dir.join("Oblivion.ini"),
+        "[Display]\nbFull Screen = 1\n",
+    )
+    .expect("game ini should be written");
 
     let zip_file = std::fs::File::create(&archive).expect("zip fixture should be created");
     let mut zip = zip::ZipWriter::new(zip_file);
@@ -201,7 +265,18 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -211,7 +286,18 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -222,7 +308,18 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")
@@ -232,7 +329,18 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("install")
         .arg(&plan)
@@ -247,8 +355,13 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
         .assert()
         .success();
 
-    let profile_ini = std::fs::read_to_string(instance_dir.join("profiles").join("test-profile").join("oblivion.ini"))
-        .expect("profile oblivion.ini should exist");
+    let profile_ini = std::fs::read_to_string(
+        instance_dir
+            .join("profiles")
+            .join("test-profile")
+            .join("oblivion.ini"),
+    )
+    .expect("profile oblivion.ini should exist");
     assert!(profile_ini.contains("bFull Screen = 0"));
     assert!(profile_ini.contains("iSize W = 1920"));
 
@@ -292,7 +405,18 @@ fn install_exports_modlist_txt_in_reverse_order() {
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -302,7 +426,18 @@ fn install_exports_modlist_txt_in_reverse_order() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -313,7 +448,18 @@ fn install_exports_modlist_txt_in_reverse_order() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")
@@ -323,7 +469,18 @@ fn install_exports_modlist_txt_in_reverse_order() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("install")
         .arg(&plan)
@@ -339,8 +496,8 @@ fn install_exports_modlist_txt_in_reverse_order() {
         .success();
 
     let profile_dir = instance_dir.join("profiles").join("test-profile");
-    let modlist_txt = std::fs::read_to_string(profile_dir.join("modlist.txt"))
-        .expect("modlist.txt should exist");
+    let modlist_txt =
+        std::fs::read_to_string(profile_dir.join("modlist.txt")).expect("modlist.txt should exist");
     assert_eq!(modlist_txt, "+beta\n+alpha\n");
 }
 
@@ -374,7 +531,18 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("compile")
@@ -384,7 +552,18 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("query")
@@ -395,7 +574,18 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .env("GAME_DIR", &game_dir)
         .arg("download")
@@ -405,7 +595,18 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
         .assert()
         .success();
 
-    Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c })
+    Command::cargo_bin("mudcrab")
+        .map(|mut c| {
+            c.env(
+                "XDG_STATE_HOME",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            )
+            .env(
+                "LOCALAPPDATA",
+                std::env::temp_dir().join("mudcrab-test-state"),
+            );
+            c
+        })
         .expect("binary should build")
         .arg("install")
         .arg(&plan)
@@ -421,8 +622,8 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
         .success();
 
     let profile_dir = instance_dir.join("profiles").join("test-profile");
-    let modlist_txt = std::fs::read_to_string(profile_dir.join("modlist.txt"))
-        .expect("modlist.txt should exist");
+    let modlist_txt =
+        std::fs::read_to_string(profile_dir.join("modlist.txt")).expect("modlist.txt should exist");
     assert_eq!(
         modlist_txt,
         "+alpha\n-OBSE PLUGINS - Core_separator\n-OBSE PLUGINS_separator\n"
@@ -472,19 +673,58 @@ fn an_mo2_plugin_goes_into_the_instances_plugins_folder_not_the_mod_list() {
     std::fs::write(game.join("Oblivion.ini"), "[Display]\n").unwrap();
 
     let run = |args: &[&std::ffi::OsStr]| {
-        assert_cmd::Command::cargo_bin("mudcrab").map(|mut c| { c.env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state")).env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state")); c }).unwrap().args(args).assert().success();
+        assert_cmd::Command::cargo_bin("mudcrab")
+            .map(|mut c| {
+                c.env(
+                    "XDG_STATE_HOME",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                )
+                .env(
+                    "LOCALAPPDATA",
+                    std::env::temp_dir().join("mudcrab-test-state"),
+                );
+                c
+            })
+            .unwrap()
+            .args(args)
+            .assert()
+            .success();
     };
-    run(&["compile".as_ref(), modlist.as_os_str(), "--output".as_ref(), compiled.as_os_str()]);
-    run(&["query".as_ref(), compiled.as_os_str(), "--output".as_ref(), plan.as_os_str(), "--headless".as_ref()]);
-    run(&["download".as_ref(), plan.as_os_str(), "--cache".as_ref(), cache.as_os_str()]);
     run(&[
-        "install".as_ref(), plan.as_os_str(), "--cache".as_ref(), cache.as_os_str(),
-        "--mo2-instance-dir".as_ref(), instance.as_os_str(), "--profile-name".as_ref(), "Default".as_ref(),
-        "--game-dir".as_ref(), game.as_os_str(),
+        "compile".as_ref(),
+        modlist.as_os_str(),
+        "--output".as_ref(),
+        compiled.as_os_str(),
+    ]);
+    run(&[
+        "query".as_ref(),
+        compiled.as_os_str(),
+        "--output".as_ref(),
+        plan.as_os_str(),
+        "--headless".as_ref(),
+    ]);
+    run(&[
+        "download".as_ref(),
+        plan.as_os_str(),
+        "--cache".as_ref(),
+        cache.as_os_str(),
+    ]);
+    run(&[
+        "install".as_ref(),
+        plan.as_os_str(),
+        "--cache".as_ref(),
+        cache.as_os_str(),
+        "--mo2-instance-dir".as_ref(),
+        instance.as_os_str(),
+        "--profile-name".as_ref(),
+        "Default".as_ref(),
+        "--game-dir".as_ref(),
+        game.as_os_str(),
     ]);
 
     assert!(instance.join("plugins/rootbuilder/__init__.py").exists());
     assert!(!instance.join("mods/rootbuilder").exists());
-    let modlist_txt = std::fs::read_to_string(instance.join("profiles/Default/modlist.txt")).unwrap_or_default();
+    let modlist_txt =
+        std::fs::read_to_string(instance.join("profiles/Default/modlist.txt")).unwrap_or_default();
     assert!(!modlist_txt.contains("rootbuilder"), "{modlist_txt}");
 }

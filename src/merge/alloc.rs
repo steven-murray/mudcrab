@@ -46,7 +46,11 @@ impl Allocation {
 
     /// Highest object index in use, for the merged header's `nextObjectID`.
     pub fn highest_object_index(&self) -> Option<u32> {
-        self.remaps.values().flat_map(BTreeMap::values).max().copied()
+        self.remaps
+            .values()
+            .flat_map(BTreeMap::values)
+            .max()
+            .copied()
     }
 }
 

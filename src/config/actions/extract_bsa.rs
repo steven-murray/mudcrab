@@ -17,7 +17,10 @@ use crate::util::fs::normalize_relative_path;
 
 pub(super) fn apply(action: &ExtractBsaAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     let Some(mod_target) = cx.mod_target else {
-        anyhow::bail!("{}: extract_bsa is only valid as a per-mod action", cx.owner);
+        anyhow::bail!(
+            "{}: extract_bsa is only valid as a per-mod action",
+            cx.owner
+        );
     };
 
     let archive = mod_target.join(normalize_relative_path(&action.archive)?);

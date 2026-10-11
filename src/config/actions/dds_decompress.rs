@@ -13,7 +13,10 @@ use std::path::Path;
 
 pub(super) fn apply(action: &DdsDecompressAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     let Some(mod_target) = cx.mod_target else {
-        anyhow::bail!("{}: dds_decompress is only valid as a per-mod action", cx.owner);
+        anyhow::bail!(
+            "{}: dds_decompress is only valid as a per-mod action",
+            cx.owner
+        );
     };
     if action.paths.is_empty() {
         anyhow::bail!("{}: dds_decompress requires at least one path", cx.owner);
@@ -89,7 +92,7 @@ fn convert(path: &Path, dry_run: bool) -> anyhow::Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::convert;
-    use crate::dds::{self, test_dxt1, Kind};
+    use crate::dds::{self, Kind, test_dxt1};
 
     #[test]
     fn converts_transparent_dxt1_and_leaves_the_rest() {

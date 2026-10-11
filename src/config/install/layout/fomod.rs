@@ -1,7 +1,7 @@
 //! FOMOD installer support: parse ModuleConfig.xml and apply the selected options.
 
-use super::plan::{folded_destination, strip_dir_prefix, LayoutPlan};
 use super::apply_plan;
+use super::plan::{LayoutPlan, folded_destination, strip_dir_prefix};
 use crate::archive::ArchiveFilters;
 use crate::config::schema::{CompiledArchive, FomodSelection};
 use crate::util::fs::{eq_ci, normalize_relative_path};
@@ -86,14 +86,7 @@ pub(crate) fn apply_fomod_from_staging(
     })?;
 
     let xml = read_xml_text(&staging_dir.join(&config_path))?;
-    let plan = plan_fomod(
-        &paths,
-        &config_path,
-        &xml,
-        archive,
-        filters,
-        active_plugins,
-    )?;
+    let plan = plan_fomod(&paths, &config_path, &xml, archive, filters, active_plugins)?;
     apply_plan(staging_dir, destination_root, &plan)
 }
 
@@ -195,7 +188,10 @@ fn collect_selected_entries(
     // the steps, and a FOMOD may have one without the other.
     let steps = find_child_element(root, "installSteps");
 
-    for step in steps.into_iter().flat_map(|steps| child_elements(steps, "installStep")) {
+    for step in steps
+        .into_iter()
+        .flat_map(|steps| child_elements(steps, "installStep"))
+    {
         if let Some(visible) = find_child_element(step, "visible")
             && let Some(deps) = find_child_element(visible, "dependencies")
             && !fomod_dependencies_match(deps, active_plugins, &flags)?
@@ -265,9 +261,7 @@ fn collect_selected_entries(
                     // A pattern with no dependencies is unconditional.
                     None => true,
                 };
-                if matched
-                    && let Some(files) = find_child_element(pattern, "files")
-                {
+                if matched && let Some(files) = find_child_element(pattern, "files") {
                     collect_fomod_entries(files, &mut entries)?;
                 }
             }
@@ -441,7 +435,10 @@ pub(crate) fn build_fomod_selection_map(
     out
 }
 
-pub(crate) fn find_child_element<'a, 'input>(node: Node<'a, 'input>, name: &str) -> Option<Node<'a, 'input>> {
+pub(crate) fn find_child_element<'a, 'input>(
+    node: Node<'a, 'input>,
+    name: &str,
+) -> Option<Node<'a, 'input>> {
     node.children()
         .find(|child| child.is_element() && child.tag_name().name() == name)
 }
@@ -454,7 +451,10 @@ pub(crate) fn child_elements<'a, 'input>(
         .filter(move |child| child.is_element() && child.tag_name().name() == name)
 }
 
-pub(crate) fn collect_fomod_entries(node: Node<'_, '_>, out: &mut Vec<FomodInstallEntry>) -> anyhow::Result<()> {
+pub(crate) fn collect_fomod_entries(
+    node: Node<'_, '_>,
+    out: &mut Vec<FomodInstallEntry>,
+) -> anyhow::Result<()> {
     for child in node.children().filter(|child| child.is_element()) {
         let priority = child
             .attribute("priority")
@@ -465,7 +465,10 @@ pub(crate) fn collect_fomod_entries(node: Node<'_, '_>, out: &mut Vec<FomodInsta
             .attribute("source")
             .ok_or_else(|| anyhow::anyhow!("FOMOD install entry missing source attribute"))?
             .to_string();
-        let destination = child.attribute("destination").unwrap_or(&source).to_string();
+        let destination = child
+            .attribute("destination")
+            .unwrap_or(&source)
+            .to_string();
 
         match child.tag_name().name() {
             "file" => out.push(FomodInstallEntry::File {
@@ -478,7 +481,10 @@ pub(crate) fn collect_fomod_entries(node: Node<'_, '_>, out: &mut Vec<FomodInsta
                 destination,
                 priority,
             }),
-            other => anyhow::bail!("unsupported FOMOD install entry '{}'; only file/folder are supported", other),
+            other => anyhow::bail!(
+                "unsupported FOMOD install entry '{}'; only file/folder are supported",
+                other
+            ),
         }
     }
     Ok(())
@@ -513,7 +519,9 @@ pub(crate) fn fomod_option_type(
                 }
 
                 if let Some(type_node) = find_child_element(pattern, "type") {
-                    return parse_fomod_option_type(type_node.attribute("name").unwrap_or(default_type));
+                    return parse_fomod_option_type(
+                        type_node.attribute("name").unwrap_or(default_type),
+                    );
                 }
             }
         }
@@ -590,7 +598,10 @@ pub(crate) fn select_fomod_options(
     option_types: &[FomodOptionType],
     selections: &HashMap<(String, String), Vec<String>>,
 ) -> anyhow::Result<Vec<usize>> {
-    let selection_key = (step_name.to_ascii_lowercase(), group_name.to_ascii_lowercase());
+    let selection_key = (
+        step_name.to_ascii_lowercase(),
+        group_name.to_ascii_lowercase(),
+    );
     if let Some(wanted) = selections.get(&selection_key) {
         let mut out = Vec::new();
         for desired in wanted {
@@ -813,7 +824,10 @@ mod tests {
         assert_eq!(
             files,
             [
-                ("00 Core/Meshes/a.nif".to_string(), "meshes/a.nif".to_string()),
+                (
+                    "00 Core/Meshes/a.nif".to_string(),
+                    "meshes/a.nif".to_string()
+                ),
                 (
                     "00 Core/Textures/Rock.dds".to_string(),
                     "textures/Rock.dds".to_string()
@@ -841,16 +855,19 @@ mod tests {
         // A FOMOD nested under a wrapper folder: `source` is relative to the
         // folder holding `fomod/`, not to the archive root.
         let files = plan(
-            &[
-                "AWLS/fomod/ModuleConfig.xml",
-                "AWLS/00 Core/meshes/a.nif",
-            ],
+            &["AWLS/fomod/ModuleConfig.xml", "AWLS/00 Core/meshes/a.nif"],
             "AWLS",
             &[folder("00 Core", "", 0)],
         )
         .expect("plan");
 
-        assert_eq!(files, [("AWLS/00 Core/meshes/a.nif".to_string(), "meshes/a.nif".to_string())]);
+        assert_eq!(
+            files,
+            [(
+                "AWLS/00 Core/meshes/a.nif".to_string(),
+                "meshes/a.nif".to_string()
+            )]
+        );
     }
 
     #[test]
@@ -858,7 +875,10 @@ mod tests {
         let files = plan(
             &["Base/textures/a.dds", "Patch/textures/a.dds"],
             "",
-            &[folder("Patch", "textures", 10), folder("Base", "textures", 0)],
+            &[
+                folder("Patch", "textures", 10),
+                folder("Base", "textures", 0),
+            ],
         )
         .expect("plan");
 
@@ -878,32 +898,40 @@ mod tests {
         )
         .expect("plan");
 
-        assert_eq!(files, [("Optional/DarNified.ini".to_string(), "menus/DarN.ini".to_string())]);
+        assert_eq!(
+            files,
+            [(
+                "Optional/DarNified.ini".to_string(),
+                "menus/DarN.ini".to_string()
+            )]
+        );
     }
 
     #[test]
     fn installer_case_need_not_match_the_archive() {
         // Real configs disagree with their own archives about case constantly;
         // on Windows nobody notices, and on Linux the copy used to fail.
-        let files = plan(
-            &["00 core/Meshes/A.nif"],
-            "",
-            &[folder("00 Core", "", 0)],
-        )
-        .expect("plan");
+        let files = plan(&["00 core/Meshes/A.nif"], "", &[folder("00 Core", "", 0)]).expect("plan");
         assert_eq!(files.len(), 1);
 
-        let files = plan(&["data/thing.esp"], "", &[file("Data/Thing.esp", "Thing.esp", 0)])
-            .expect("plan");
-        assert_eq!(files, [("data/thing.esp".to_string(), "Thing.esp".to_string())]);
+        let files = plan(
+            &["data/thing.esp"],
+            "",
+            &[file("Data/Thing.esp", "Thing.esp", 0)],
+        )
+        .expect("plan");
+        assert_eq!(
+            files,
+            [("data/thing.esp".to_string(), "Thing.esp".to_string())]
+        );
     }
 
     #[test]
     fn an_entry_naming_nothing_in_the_archive_is_an_error() {
         // Silence here means installing a mod quietly missing a third of its
         // files, which is exactly how a mistyped selection would look.
-        let err = plan(&["00 Core/a.nif"], "", &[folder("01 Typo", "", 0)])
-            .expect_err("should reject");
+        let err =
+            plan(&["00 Core/a.nif"], "", &[folder("01 Typo", "", 0)]).expect_err("should reject");
         assert!(err.to_string().contains("01 Typo"), "{err}");
 
         let err = plan(&["a.nif"], "", &[file("missing.nif", "missing.nif", 0)])

@@ -1,7 +1,8 @@
-use crate::config::schema::{
-    BainSubpackage, CompiledArchive, CompiledModlist, FomodSelection, InputSpec, InputType, InputValue, PersonalizedMod, PersonalizedPlan,
-};
 use crate::config::condition::Condition;
+use crate::config::schema::{
+    BainSubpackage, CompiledArchive, CompiledModlist, FomodSelection, InputSpec, InputType,
+    InputValue, PersonalizedMod, PersonalizedPlan,
+};
 use std::collections::{HashMap, HashSet};
 use std::io::{self, Write};
 
@@ -39,7 +40,11 @@ pub fn build_plan(
         if !included[entry.id.as_str()] {
             continue;
         }
-        if let Some(dep) = entry.dependencies.iter().find(|dep| !included.get(dep.as_str()).copied().unwrap_or(false)) {
+        if let Some(dep) = entry
+            .dependencies
+            .iter()
+            .find(|dep| !included.get(dep.as_str()).copied().unwrap_or(false))
+        {
             anyhow::bail!(
                 "mod {} is included but depends on {dep}, which is not; give {} `if = '{}'` \
                  (or change the answers) so they come and go together",
@@ -90,14 +95,22 @@ pub fn build_plan(
     // plugins something installs. A merge built from a left-out mod's plugin
     // would fail later, at merge time, so it is refused here instead.
     let mut left_out_plugins: HashSet<String> = HashSet::new();
-    for entry in compiled.mods.iter().filter(|entry| !included[entry.id.as_str()]) {
+    for entry in compiled
+        .mods
+        .iter()
+        .filter(|entry| !included[entry.id.as_str()])
+    {
         left_out_plugins.extend(entry.plugins.iter().map(|p| p.to_ascii_lowercase()));
         if let Some(merge) = &entry.merge {
             left_out_plugins.insert(merge.output.to_ascii_lowercase());
         }
     }
     // ...unless an included mod ships the same plugin, as alternatives do.
-    for entry in compiled.mods.iter().filter(|entry| included[entry.id.as_str()]) {
+    for entry in compiled
+        .mods
+        .iter()
+        .filter(|entry| included[entry.id.as_str()])
+    {
         for plugin in &entry.plugins {
             left_out_plugins.remove(&plugin.to_ascii_lowercase());
         }
@@ -105,9 +118,18 @@ pub fn build_plan(
             left_out_plugins.remove(&merge.output.to_ascii_lowercase());
         }
     }
-    for entry in compiled.mods.iter().filter(|entry| included[entry.id.as_str()]) {
+    for entry in compiled
+        .mods
+        .iter()
+        .filter(|entry| included[entry.id.as_str()])
+    {
         let Some(merge) = &entry.merge else { continue };
-        if let Some(source) = merge.sources.iter().find(|source| !included.get(source.mod_id.as_str()).copied().unwrap_or(true)) {
+        if let Some(source) = merge.sources.iter().find(|source| {
+            !included
+                .get(source.mod_id.as_str())
+                .copied()
+                .unwrap_or(true)
+        }) {
             anyhow::bail!(
                 "merge {} takes {} from mod {}, which is left out; give the merge `if = '{}'`, \
                  or a second merge without it for when it is out",
@@ -119,8 +141,18 @@ pub fn build_plan(
         }
     }
     let keep = |plugin: &String| !left_out_plugins.contains(&plugin.to_ascii_lowercase());
-    let plugins = compiled.plugins.iter().filter(|p| keep(p)).cloned().collect();
-    let inactive_plugins = compiled.inactive_plugins.iter().filter(|p| keep(p)).cloned().collect();
+    let plugins = compiled
+        .plugins
+        .iter()
+        .filter(|p| keep(p))
+        .cloned()
+        .collect();
+    let inactive_plugins = compiled
+        .inactive_plugins
+        .iter()
+        .filter(|p| keep(p))
+        .cloned()
+        .collect();
 
     Ok(PersonalizedPlan {
         guide: compiled.guide.clone(),
@@ -210,7 +242,10 @@ fn resolve_archives(
         let mut selections = Vec::new();
         for selection in archive.fomod_selections {
             if applies(selection.condition.as_deref())? {
-                selections.push(FomodSelection { condition: None, ..selection });
+                selections.push(FomodSelection {
+                    condition: None,
+                    ..selection
+                });
             }
         }
         archive.fomod_selections = selections;
@@ -280,14 +315,19 @@ fn resolve_included<'a>(
         if let Some(at) = stack.iter().position(|seen| *seen == key) {
             let mut cycle = stack[at..].to_vec();
             cycle.push(key);
-            anyhow::bail!("mod conditions depend on each other: {}", cycle.join(" -> "));
+            anyhow::bail!(
+                "mod conditions depend on each other: {}",
+                cycle.join(" -> ")
+            );
         }
         let answer = match condition {
             None => true,
             Some(condition) => {
                 stack.push(key);
                 let answer = condition
-                    .eval(responses, &mut |other| resolve(other, conditions, responses, done, stack))
+                    .eval(responses, &mut |other| {
+                        resolve(other, conditions, responses, done, stack)
+                    })
                     .map_err(|err| anyhow::anyhow!("mod {key}: {err:#}"));
                 stack.pop();
                 answer?
@@ -299,7 +339,13 @@ fn resolve_included<'a>(
 
     let mut done = HashMap::new();
     for entry in &compiled.mods {
-        resolve(&entry.id, &conditions, responses, &mut done, &mut Vec::new())?;
+        resolve(
+            &entry.id,
+            &conditions,
+            responses,
+            &mut done,
+            &mut Vec::new(),
+        )?;
     }
     Ok(done)
 }

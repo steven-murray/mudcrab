@@ -11,9 +11,9 @@
 
 pub mod formid;
 pub mod group;
+pub mod prune;
 pub mod reader;
 pub mod record;
-pub mod prune;
 pub mod schema;
 pub mod writer;
 

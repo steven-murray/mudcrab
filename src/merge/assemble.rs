@@ -89,15 +89,20 @@ impl CellBundle {
 
         if let Entry::Record(incoming) = &entry {
             let form_id = incoming.form_id;
-            if let Some(slot) = list.iter_mut().find(
-                |existing| matches!(existing, Entry::Record(r) if r.form_id == form_id),
-            ) {
+            if let Some(slot) = list
+                .iter_mut()
+                .find(|existing| matches!(existing, Entry::Record(r) if r.form_id == form_id))
+            {
                 *slot = entry;
                 return;
             }
             // A reference may also have been filed under a different
             // persistence than this source claims; drop the stale copy.
-            for other in [&mut self.persistent, &mut self.temporary, &mut self.visible_distant] {
+            for other in [
+                &mut self.persistent,
+                &mut self.temporary,
+                &mut self.visible_distant,
+            ] {
                 other.retain(|e| !matches!(e, Entry::Record(r) if r.form_id == form_id));
             }
             let list = match (from_group, persistent) {
@@ -556,7 +561,11 @@ mod tests {
     use crate::plugin::{Group, Subrecord};
 
     fn dial(form_id: u32) -> Record {
-        Record::new(b"DIAL", FormId(form_id), vec![Subrecord::new(b"EDID", b"t\0".to_vec())])
+        Record::new(
+            b"DIAL",
+            FormId(form_id),
+            vec![Subrecord::new(b"EDID", b"t\0".to_vec())],
+        )
     }
 
     fn info(form_id: u32, marker: &str) -> Entry {
@@ -587,7 +596,9 @@ mod tests {
                         .iter()
                         .find(|f| &f.signature == b"NAM1")
                         .map(|f| {
-                            String::from_utf8_lossy(&f.data).trim_end_matches('\0').to_string()
+                            String::from_utf8_lossy(&f.data)
+                                .trim_end_matches('\0')
+                                .to_string()
                         })
                         .unwrap_or_default(),
                 )),

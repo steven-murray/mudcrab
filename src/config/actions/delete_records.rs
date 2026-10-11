@@ -2,13 +2,16 @@
 
 use super::ActionCx;
 use crate::config::schema::DeleteRecordsAction;
+use crate::plugin::Plugin;
 use crate::plugin::formid::FormId;
 use crate::plugin::prune::PruneRequest;
-use crate::plugin::Plugin;
 
 pub(super) fn apply(action: &DeleteRecordsAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     let Some(mod_target) = cx.mod_target else {
-        anyhow::bail!("{}: delete_records is only valid as a per-mod action", cx.owner);
+        anyhow::bail!(
+            "{}: delete_records is only valid as a per-mod action",
+            cx.owner
+        );
     };
 
     if action.groups.is_empty() && action.form_ids.is_empty() {
@@ -98,8 +101,9 @@ pub(super) fn apply(action: &DeleteRecordsAction, cx: &ActionCx<'_>) -> anyhow::
         );
     }
 
-    std::fs::write(&path, plugin.to_bytes())
-        .map_err(|err| anyhow::anyhow!("{}: failed to write {}: {err}", cx.owner, path.display()))?;
+    std::fs::write(&path, plugin.to_bytes()).map_err(|err| {
+        anyhow::anyhow!("{}: failed to write {}: {err}", cx.owner, path.display())
+    })?;
 
     tracing::info!(
         owner = cx.owner,

@@ -1,7 +1,7 @@
 //! Records and subrecords.
 
-use super::formid::FormId;
 use super::PluginError;
+use super::formid::FormId;
 
 /// Record flag: the record body is zlib-compressed.
 pub const FLAG_COMPRESSED: u32 = 0x0004_0000;
@@ -116,7 +116,9 @@ impl Record {
     }
 
     pub fn fields_with(&self, signature: &[u8; 4]) -> impl Iterator<Item = &Subrecord> {
-        self.fields.iter().filter(move |f| &f.signature == signature)
+        self.fields
+            .iter()
+            .filter(move |f| &f.signature == signature)
     }
 
     pub(super) fn original_body(&self) -> Option<&[u8]> {
@@ -129,7 +131,10 @@ impl Record {
 /// Handles the `XXXX` overflow convention: a field larger than `u16::MAX` is
 /// preceded by an `XXXX` field carrying the real `u32` length, and its own size
 /// field is set to zero.
-pub(super) fn parse_fields(body: &[u8], record_sig: [u8; 4]) -> Result<Vec<Subrecord>, PluginError> {
+pub(super) fn parse_fields(
+    body: &[u8],
+    record_sig: [u8; 4],
+) -> Result<Vec<Subrecord>, PluginError> {
     let mut fields = Vec::new();
     let mut offset = 0usize;
     let mut pending_size: Option<usize> = None;
@@ -153,9 +158,8 @@ pub(super) fn parse_fields(body: &[u8], record_sig: [u8; 4]) -> Result<Vec<Subre
                     offset,
                 });
             }
-            pending_size = Some(u32::from_le_bytes(
-                body[offset..offset + 4].try_into().unwrap(),
-            ) as usize);
+            pending_size =
+                Some(u32::from_le_bytes(body[offset..offset + 4].try_into().unwrap()) as usize);
             offset += declared;
             continue;
         }
