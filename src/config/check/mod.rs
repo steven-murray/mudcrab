@@ -42,7 +42,7 @@ pub struct CheckReport {
 
 /// The plugins shipped by the game itself. A master among these is present
 /// unless the list's load order says otherwise.
-const GAME_PLUGINS: &[&str] = &[
+pub(crate) const GAME_PLUGINS: &[&str] = &[
     "oblivion.esm",
     "dlcshiveringisles.esp",
     "knights.esp",

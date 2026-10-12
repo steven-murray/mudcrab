@@ -200,6 +200,10 @@ The game's own folder is never touched. Settings the list changes in
 `Oblivion.ini` go into the profile's own copy, and mudcrab turns on MO2's
 "profile-specific game INI files" so they take effect.
 
+To see whether any plugin names a mesh or sound the game will not find,
+run `mudcrab assets --mo2-instance-dir <your MO2 folder>`: a report, worth a
+look if something shows as a missing-mesh marker in game.
+
 ## 5. Play
 
 Start MO2. It applies the load order when it loads the profile, so if it was

@@ -1,5 +1,6 @@
 pub mod add;
 mod add_wizard;
+mod assets;
 mod bsa;
 pub mod check;
 mod choose;
@@ -96,6 +97,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Export(args) => export::run(args).await,
         Command::SetupTools(args) => setup_tools::run(args).await,
         Command::GameDir(args) => game_dir::run(args),
+        Command::Assets(args) => assets::run(args),
         Command::UnhideMerges(args) => unhide_merges::run(args).await,
         Command::Merge(args) => merge::run(args).await,
         Command::NewMerge(args) => new_merge::run(args).await,

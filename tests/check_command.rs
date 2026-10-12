@@ -154,7 +154,12 @@ fn check_list(root: &Path, list: &str, downloads: &Path) -> (bool, String, Strin
         .assert()
         .success();
     mudcrab(root)
-        .args(["query", compiled.to_str().unwrap(), "--headless", "--output"])
+        .args([
+            "query",
+            compiled.to_str().unwrap(),
+            "--headless",
+            "--output",
+        ])
         .arg(&plan)
         .assert()
         .success();
@@ -234,7 +239,10 @@ md5 = "00000000000000000000000000000000"
         err.contains("A: install would fail") && err.contains("textures/missing.dds"),
         "{err}"
     );
-    assert!(err.contains("Ghost.esp is in the load order, but no mod installs it"), "{err}");
+    assert!(
+        err.contains("Ghost.esp is in the load order, but no mod installs it"),
+        "{err}"
+    );
     assert!(err.contains("is not the file the list records"), "{err}");
     // A's rehearsal failed, so its folder is not concluded from.
     assert!(!err.contains("Renamed.esp"), "{err}");
@@ -246,13 +254,28 @@ md5 = "00000000000000000000000000000000"
     );
     let (ok, out2, err) = check_list(root, &list, &downloads);
     assert!(!ok);
-    assert!(err.contains("A: declares Renamed.esp, which it does not install"), "{err}");
-    assert!(err.contains("A: installs orphan.bsa, which no active plugin loads"), "{err}");
+    assert!(
+        err.contains("A: declares Renamed.esp, which it does not install"),
+        "{err}"
+    );
+    assert!(
+        err.contains("A: installs orphan.bsa, which no active plugin loads"),
+        "{err}"
+    );
     assert!(!err.contains("a.bsa,"), "A.esp loads A.bsa: {err}");
     // Warnings, which do not fail the check by themselves.
-    assert!(out2.contains("warning: A: installs extra.esp, which the load order does not list"), "{out2}");
-    assert!(out2.contains("warning: Shared.esp is installed by 2 mods (B, C)"), "{out2}");
-    assert!(out2.contains("warning: A: exclude 'nothing-here/*' leaves nothing out"), "{out2}");
+    assert!(
+        out2.contains("warning: A: installs extra.esp, which the load order does not list"),
+        "{out2}"
+    );
+    assert!(
+        out2.contains("warning: Shared.esp is installed by 2 mods (B, C)"),
+        "{out2}"
+    );
+    assert!(
+        out2.contains("warning: A: exclude 'nothing-here/*' leaves nothing out"),
+        "{out2}"
+    );
     let _ = out;
 }
 
@@ -263,7 +286,10 @@ fn a_plugin_from_a_mod_that_moves_it_is_traced_through_the_move() {
     let downloads = root.join("downloads");
     make_zip(
         &downloads.join("M-1-1-0.zip"),
-        &[("optional/Moved.esp", &plugin(&["Oblivion.esm", "Nowhere.esm"]))],
+        &[(
+            "optional/Moved.esp",
+            &plugin(&["Oblivion.esm", "Nowhere.esm"]),
+        )],
     );
     let list = r#"name = "L"
 plugins = ["Moved.esp"]

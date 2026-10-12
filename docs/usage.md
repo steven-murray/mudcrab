@@ -738,6 +738,30 @@ they can be; the summary says how many plugins it could not read. Every
 problem is reported together, and the summary and warnings are printed even
 when the check fails. On a 700-mod list it takes a couple of minutes.
 
+## assets
+
+After an install: the meshes and sounds the active plugins name that the game
+would not find.
+
+```bash
+mudcrab assets --mo2-instance-dir <dir> [--profile-name <name>] [--game-dir <dir>] [--all]
+```
+
+Everything the game would see is gathered first: the game's own `Data` and
+its BSAs, each mod the profile enables (with the BSAs inside it), and
+`overwrite/` -- reading only each BSA's file table. Then every active plugin is
+read, and each model it names (`MODL`, and armour and clothing's `MOD2`-`MOD4`;
+a tree's SpeedTree file, under `Trees`) and each sound file is looked for.
+
+It is a report, not a check that fails: many well-known mods name files that
+were never shipped. What the game's own plugins already lack is left out, so
+what remains is what the list added. Each plugin's first few missing files are
+shown with the record that names them (`--all` for every one); a file several
+plugins name, often one mod left out, is listed at the end. Textures are named
+by meshes rather than plugins, and are not checked. The profile defaults to
+`Default`, and the game folder to the instance's. On a 700-mod instance it
+takes a few seconds.
+
 ## conflicts
 
 Which installed mods provide the same files, and which wins. Reads the mod

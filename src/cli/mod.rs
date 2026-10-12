@@ -40,6 +40,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
             "download",
             "check",
             "install",
+            "assets",
         ],
     ),
     (
@@ -132,6 +133,9 @@ pub enum Command {
     SetupTools(SetupToolsArgs),
     /// Find Oblivion's game folder, and print it as MO2's setup asks for it.
     GameDir(GameDirArgs),
+    /// After an install: the meshes and sounds the active plugins name that
+    /// the game would not find.
+    Assets(AssetsArgs),
     /// Restore plugins that were hidden to make room for a merge.
     UnhideMerges(UnhideMergesArgs),
     /// Build merged plugins from an already-installed mods directory.
@@ -758,6 +762,29 @@ pub struct ExportArgs {
     /// customise, and export nothing.
     #[arg(long, value_name = "DIR")]
     pub eject: Option<PathBuf>,
+}
+
+/// The meshes and sounds an installed instance's active plugins name, checked
+/// against everything the game would see: its own `Data` and BSAs, each
+/// enabled mod's files and BSAs, and `overwrite/`.
+///
+/// A report, not a gate: well-known mods name files that were never shipped.
+/// What the game's own plugins already lack is left out. Textures are named by
+/// meshes, not plugins, and are not checked.
+#[derive(Debug, Args)]
+pub struct AssetsArgs {
+    /// The installed MO2 instance.
+    #[arg(long)]
+    pub mo2_instance_dir: PathBuf,
+    /// The profile whose active plugins and enabled mods to read.
+    #[arg(long, default_value = "Default")]
+    pub profile_name: String,
+    /// The game folder. Defaults to the one the instance was set up with.
+    #[arg(long)]
+    pub game_dir: Option<PathBuf>,
+    /// List every missing file, not the first few per plugin.
+    #[arg(long)]
+    pub all: bool,
 }
 
 /// Where Oblivion is installed: Steam's copy (in any Steam library), then any

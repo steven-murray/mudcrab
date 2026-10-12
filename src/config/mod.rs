@@ -1,6 +1,7 @@
 pub mod actions;
 pub mod add;
 pub mod archive_store;
+pub mod assets;
 pub mod bain_wizard;
 pub mod check;
 pub mod compiler;
