@@ -555,9 +555,9 @@ fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec
             steps: format!(
                 "The list orders a Bashed Patch, and only Wrye Bash can build one (it has no \
                  command line). Until it is built, the game runs without the list's patch.\n\
-                 1. In MO2, add Wrye Bash as an executable if it is not one yet (the Executables \
-                 window, +, then \"Add from file\": {wrye_bash}), and start it from MO2, so it \
-                 sees the installed mods.\n\
+                 1. Start Wrye Bash from MO2's list of executables, so it sees the installed \
+                 mods. (install adds it there when the game folder has it; otherwise add it in \
+                 the Executables window: +, then \"Add from file\": {wrye_bash}.)\n\
                  2. Right-click {plugin}, choose Rebuild Patch, and accept the plugins it offers \
                  to deactivate.\n\
                  3. Build Patch, then close Wrye Bash.\n\

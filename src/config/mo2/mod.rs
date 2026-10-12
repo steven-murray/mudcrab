@@ -191,6 +191,20 @@ pub(crate) fn export_mo2_instance(
     let root =
         mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
     point_at_downloads(root, &settings.cache_dir, settings.dry_run)?;
+    // A list with a Bashed Patch needs Wrye Bash, and it has to be started from
+    // MO2 to see the mods: offer it there, as a hand-built instance would.
+    if plan
+        .plugins
+        .iter()
+        .any(|p| crate::config::check::made_by_wrye_bash(p))
+        && let Some(exe) = settings
+            .game_dir
+            .as_ref()
+            .map(|dir| dir.join("Mopy").join("Wrye Bash.exe"))
+            .filter(|exe| exe.is_file())
+    {
+        add_executable(root, "Wrye Bash", &exe, settings.dry_run)?;
+    }
     ensure_mo2_section_folders(plan, settings, scope)?;
 
     let profile_dir =
@@ -362,6 +376,117 @@ pub(crate) fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
         return Some(PathBuf::from(unix.replace('\\', "/")));
     }
     Some(instance.join("downloads"))
+}
+
+/// Add `binary` to MO2's list of executables under `title`, unless an entry
+/// already runs it (or has that title): MO2 keeps them in
+/// `[customExecutables]`, numbered from 1, with `size` the count.
+pub(crate) fn add_executable(
+    instance: &Path,
+    title: &str,
+    binary: &Path,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    let ini_path = instance.join("ModOrganizer.ini");
+    let value = mo2_path(binary);
+    if dry_run {
+        tracing::info!(title, binary = %value, "install dry-run: would add an MO2 executable");
+        return Ok(());
+    }
+    let existing = std::fs::read_to_string(&ini_path).unwrap_or_default();
+    if let Some(updated) = with_executable(&existing, title, &value) {
+        std::fs::write(&ini_path, updated)
+            .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", ini_path.display()))?;
+        tracing::info!(title, binary = %value, "added an MO2 executable");
+    }
+    Ok(())
+}
+
+/// `ini` with an executable entry added; `None` when one is there already.
+fn with_executable(ini: &str, title: &str, binary: &str) -> Option<String> {
+    let newline = if ini.contains("\r\n") || ini.is_empty() {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let lines: Vec<&str> = ini.lines().collect();
+    let start = lines
+        .iter()
+        .position(|l| l.trim().eq_ignore_ascii_case("[customExecutables]"));
+    let end = start.map(|s| {
+        lines[s + 1..]
+            .iter()
+            .position(|l| l.trim_start().starts_with('['))
+            .map_or(lines.len(), |p| s + 1 + p)
+    });
+    let section = match (start, end) {
+        (Some(s), Some(e)) => &lines[s + 1..e],
+        _ => &[][..],
+    };
+    let normal = |path: &str| path.replace('\\', "/").to_ascii_lowercase();
+    let taken = section.iter().any(|line| {
+        line.split_once('=').is_some_and(|(key, v)| {
+            (key.ends_with("\\binary") && normal(v) == normal(binary))
+                || (key.ends_with("\\title") && v.eq_ignore_ascii_case(title))
+        })
+    });
+    if taken {
+        return None;
+    }
+    let size: usize = section
+        .iter()
+        .find_map(|line| line.strip_prefix("size="))
+        .and_then(|n| n.trim().parse().ok())
+        .unwrap_or(0);
+    let n = size + 1;
+    let entry = [
+        format!("{n}\\arguments="),
+        format!("{n}\\binary={binary}"),
+        format!("{n}\\hide=false"),
+        format!("{n}\\ownicon=false"),
+        format!("{n}\\steamAppID="),
+        format!("{n}\\title={title}"),
+        format!("{n}\\toolbar=false"),
+        format!("{n}\\workingDirectory="),
+    ];
+    let mut out: Vec<String> = Vec::new();
+    match (start, end) {
+        (Some(s), Some(e)) => {
+            out.extend(lines[..=s].iter().map(|l| l.to_string()));
+            let mut had_size = false;
+            for line in &lines[s + 1..e] {
+                if line.starts_with("size=") {
+                    out.push(format!("size={n}"));
+                    had_size = true;
+                } else {
+                    out.push(line.to_string());
+                }
+            }
+            if !had_size {
+                out.insert(s + 1, format!("size={n}"));
+            }
+            // Before any blank lines that close the section.
+            let mut tail = Vec::new();
+            while out.last().is_some_and(|l| l.trim().is_empty()) {
+                tail.push(out.pop().unwrap_or_default());
+            }
+            out.extend(entry);
+            out.extend(tail);
+            out.extend(lines[e..].iter().map(|l| l.to_string()));
+        }
+        _ => {
+            out.extend(lines.iter().map(|l| l.to_string()));
+            if out.last().is_some_and(|l| !l.trim().is_empty()) {
+                out.push(String::new());
+            }
+            out.push("[customExecutables]".to_string());
+            out.push(format!("size={n}"));
+            out.extend(entry);
+        }
+    }
+    let mut text = out.join(newline);
+    text.push_str(newline);
+    Some(text)
 }
 
 /// A path as MO2 writes one: forward slashes, and under Wine the `Z:` drive
@@ -782,6 +907,51 @@ pub(crate) fn steam_compatdata_roots(game_dir: &Path) -> Vec<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// As MO2 wrote it for a new instance: Windows line endings, three
+    /// executables, then the next section.
+    const NEW_INSTANCE: &str = "[General]\r\ngameName=Oblivion\r\n\r\n[customExecutables]\r\nsize=3\r\n1\\arguments=\r\n1\\binary=Z:/game/Oblivion.exe\r\n1\\hide=false\r\n1\\ownicon=true\r\n1\\steamAppID=\r\n1\\title=Oblivion\r\n1\\toolbar=false\r\n1\\workingDirectory=Z:/game\r\n2\\binary=Z:/game/OblivionLauncher.exe\r\n2\\title=Oblivion Launcher\r\n3\\binary=Z:/list/explorer++/Explorer++.exe\r\n3\\title=Explore Virtual Folder\r\n\r\n[recentDirectories]\r\nsize=0\r\n";
+
+    #[test]
+    fn an_executable_is_added_after_the_others_once() {
+        let added = with_executable(NEW_INSTANCE, "Wrye Bash", "Z:/game/Mopy/Wrye Bash.exe")
+            .expect("not there yet");
+        assert!(
+            added.contains("[customExecutables]\r\nsize=4\r\n"),
+            "{added}"
+        );
+        assert!(
+            added.contains(
+                "3\\title=Explore Virtual Folder\r\n4\\arguments=\r\n4\\binary=Z:/game/Mopy/Wrye Bash.exe\r\n"
+            ),
+            "{added}"
+        );
+        assert!(added.contains("4\\title=Wrye Bash\r\n4\\toolbar=false\r\n4\\workingDirectory=\r\n\r\n[recentDirectories]"), "{added}");
+        assert!(
+            !added.contains("\n\n") || added.contains("\r\n\r\n"),
+            "line endings kept"
+        );
+        // Already there, by its program or by its name: left alone.
+        assert_eq!(
+            with_executable(&added, "Wrye Bash", "Z:/game/Mopy/Wrye Bash.exe"),
+            None
+        );
+        assert_eq!(
+            with_executable(&added, "Wrye Bash", "Z:\\game\\Mopy\\wrye bash.exe"),
+            None
+        );
+        assert_eq!(
+            with_executable(&added, "WB", "Z:/game/Mopy/Wrye Bash.exe"),
+            None
+        );
+    }
+
+    #[test]
+    fn an_instance_with_no_executables_gets_the_section() {
+        let added =
+            with_executable("[General]\ngameName=Oblivion\n", "Wrye Bash", "Z:/w.exe").unwrap();
+        assert!(added.ends_with("[customExecutables]\nsize=1\n1\\arguments=\n1\\binary=Z:/w.exe\n1\\hide=false\n1\\ownicon=false\n1\\steamAppID=\n1\\title=Wrye Bash\n1\\toolbar=false\n1\\workingDirectory=\n"), "{added}");
+    }
 
     #[test]
     fn the_game_path_comes_from_mo2s_own_settings() {

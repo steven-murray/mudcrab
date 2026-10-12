@@ -385,7 +385,7 @@ still to do:
 title = "build the Bashed Patch in Wrye Bash"
 done_when_plugin = "Bashed Patch, 0.esp"
 steps = """
-1. Start Wrye Bash from MO2.
+1. Start Wrye Bash from MO2 (`install` adds it to MO2's executables when it finds it in the game folder).
 2. Right-click Bashed Patch, 0.esp and choose Rebuild Patch.
 3. Build Patch, close Wrye Bash, and move the patch from Overwrite into its mod.
 """

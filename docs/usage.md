@@ -417,7 +417,9 @@ up with.
 
 When the list declares steps to take by hand (`[[manual-steps]]`, such as
 building a Bashed Patch in Wrye Bash), `install` ends by listing those not yet
-done; see [modlist-format.md](modlist-format.md#steps-by-hand).
+done; see [modlist-format.md](modlist-format.md#steps-by-hand). For a list
+with a Bashed Patch, it also adds Wrye Bash to the MO2 instance's executables,
+when the game folder has `Mopy/Wrye Bash.exe` and MO2 does not list it yet.
 
 `--redo-action <action>` reinstalls just the mods that have that action
 (`--redo-action qac`, say), when something outside the list changed what it
