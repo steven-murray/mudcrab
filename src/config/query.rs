@@ -85,6 +85,7 @@ pub fn build_plan(
             section: entry.section.clone(),
             mod_type: entry.mod_type,
             merge: entry.merge.clone(),
+            plugins: entry.plugins.clone(),
             archives,
             files: entry.files.clone(),
             actions,

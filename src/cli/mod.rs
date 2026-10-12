@@ -457,11 +457,9 @@ impl FilterArgs {
     }
 }
 
-/// Point a command at archives this machine already has.
-///
-/// Shared by `download`, `check` and `install` for the same reason as
-/// `FilterArgs`: the three have to agree on what is available, or `check` would
-/// report a download that `install` then does not need.
+/// Point a command at archives this machine already has: `download`, which
+/// links what it finds there into the downloads folder, so every later step
+/// looks only in that folder.
 #[derive(Debug, Default, Args)]
 pub struct ArchiveSourceArgs {
     /// Directory to search for archives that are already downloaded, before
@@ -583,8 +581,6 @@ pub struct ConflictsArgs {
     /// MO2 install) the instance's own `downloads/`.
     #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
     pub downloads: Option<PathBuf>,
-    #[command(flatten)]
-    pub archive_sources: ArchiveSourceArgs,
 }
 
 #[derive(Debug, Args)]
@@ -655,8 +651,6 @@ pub struct InstallArgs {
     pub ignore_running_mo2: bool,
     #[command(flatten)]
     pub filter: FilterArgs,
-    #[command(flatten)]
-    pub archive_sources: ArchiveSourceArgs,
 }
 
 /// Compare what mudcrab installed against a reference MO2 instance -- the

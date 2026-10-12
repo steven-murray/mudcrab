@@ -88,7 +88,8 @@ never writes the game folder itself. A list installs Root Builder as a
 mod and the files never reach the game.
 
 **Root Builder cannot be downloaded through the Nexus API** without a premium
-account, like any Nexus file. Put the archive in an `--archive-search-path`. Use copy mode (`copyfiles=**`); the author's link mode has a
+account, like any Nexus file: `download` opens its page for you to download
+by hand. Use copy mode (`copyfiles=**`); the author's link mode has a
 known bug with MO2 2.5.2 before Root Builder 5.0.5.
 
 **Several MO2 instances share one game folder.** Root Builder restores the game

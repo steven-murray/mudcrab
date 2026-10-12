@@ -1060,6 +1060,7 @@ mod tests {
                 section: Vec::new(),
                 mod_type: None,
                 merge: None,
+                plugins: Vec::new(),
                 archives: vec![CompiledArchive {
                     size: None,
                     md5: None,
@@ -1149,6 +1150,7 @@ mod tests {
                 section: Vec::new(),
                 mod_type: None,
                 merge: None,
+                plugins: Vec::new(),
                 archives: vec![CompiledArchive {
                     size: None,
                     md5: None,

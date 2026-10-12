@@ -107,19 +107,7 @@ fn resolve_build_layers(
     let mut out = Vec::with_capacity(archive.build.len());
     for (layer_index, layer) in archive.build.iter().enumerate() {
         let reference = ArchiveRef::new(&layer.path, layer.file_name.as_deref());
-        let found = if settings.dry_run {
-            archive_store::find(
-                &settings.cache_dir,
-                &settings.archive_search_paths,
-                &reference,
-            )
-        } else {
-            archive_store::resolve(
-                &settings.cache_dir,
-                &settings.archive_search_paths,
-                &reference,
-            )?
-        };
+        let found = archive_store::find(&settings.cache_dir, &[], &reference);
         let Some(source) = found else {
             anyhow::bail!(
                 "build layer {} of mod {} archive {} ({}) is not in the downloads folder",

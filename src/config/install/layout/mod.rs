@@ -198,51 +198,28 @@ pub(crate) fn install_mod_archives(
         }
 
         let reference = ArchiveRef::for_archive(archive);
-        let source = if settings.dry_run {
+        // `download` leaves every archive in the downloads folder, linking in
+        // any it finds in a search path, so that is the one place to look.
+        let source = match archive_store::find(&settings.cache_dir, &[], &reference) {
+            Some(found) => found,
             // A dry run exists to show the whole plan, so a missing archive is
             // something to report and carry on from -- aborting on the first
-            // one hides everything after it. It must not write, so a search
-            // path copy is reported rather than linked in.
-            match archive_store::locate(
-                &settings.cache_dir,
-                &settings.archive_search_paths,
-                &reference,
-            ) {
-                Some(archive_store::Found::Downloads(path)) => path,
-                Some(archive_store::Found::SearchPath(local)) => {
-                    tracing::info!(
-                        mod_id = %mod_entry.id,
-                        local = %local.display(),
-                        "install dry-run: archive would be linked in from a search path"
-                    );
-                    continue;
-                }
-                None => {
-                    tracing::warn!(
-                        mod_id = %mod_entry.id,
-                        archive = reference.describe(),
-                        "install dry-run: archive is not in the downloads folder, would need downloading"
-                    );
-                    continue;
-                }
+            // one hides everything after it.
+            None if settings.dry_run => {
+                tracing::warn!(
+                    mod_id = %mod_entry.id,
+                    archive = reference.describe(),
+                    "install dry-run: archive is not in the downloads folder, would need downloading"
+                );
+                continue;
             }
-        } else {
-            // Installing straight from archives already on disk is the point of
-            // --archive-search-path: no `download` run has to have happened.
-            match archive_store::resolve(
-                &settings.cache_dir,
-                &settings.archive_search_paths,
-                &reference,
-            )? {
-                Some(found) => found,
-                None => anyhow::bail!(
-                    "mod {}: archive {} is not in the downloads folder ({}) or any search path; \
-                     run `mudcrab download` first",
-                    mod_entry.id,
-                    reference.describe(),
-                    settings.cache_dir.display()
-                ),
-            }
+            None => anyhow::bail!(
+                "mod {}: archive {} is not in the downloads folder ({}); run `mudcrab download` \
+                 first",
+                mod_entry.id,
+                reference.describe(),
+                settings.cache_dir.display()
+            ),
         };
 
         // Game-root files go to the mod's own `root/`, where Root Builder

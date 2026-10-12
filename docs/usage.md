@@ -274,8 +274,8 @@ name with a `.meta` written as MO2 would.
 
 ## Using archives you already have
 
-`--archive-search-path` points `download` and `install` at other
-folders that may hold archives -- another instance's downloads, a Wabbajack
+`--archive-search-path` points `download` at other folders that may hold
+archives -- another instance's downloads, a Wabbajack
 folder. Each archive is resolved in this order:
 
 1. In the downloads folder -- used as is.
@@ -290,10 +290,12 @@ already in the downloads folder, it replaces it -- a re-downloaded fix there is
 not silently ignored.
 
 ```bash
-mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads \
-  --mo2-instance-dir ~/mo2/MOFAM \
+mudcrab download build/plan.json --downloads ~/Games/OblivionModDownloads \
   --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
 ```
+
+Every later step -- `check`, `install`, `conflicts` -- then looks only in the
+downloads folder.
 
 ## downloads tidy
 
@@ -396,7 +398,6 @@ mudcrab install <plan.json> [--downloads <dir>] (--mo2-instance-dir <dir> | --mo
                 [--profile-name <name>] [--game-dir <dir>] [--dry-run] [--skip-actions]
                 [--force-merges]
                 [--section <name>]... [--only <mod id>]...
-                [--archive-search-path <dir>]...
 ```
 
 Example:
@@ -416,7 +417,8 @@ up with.
 
 Current behavior:
 
-1. Finds every archive in the downloads folder (or a search path).
+1. Finds every archive in the downloads folder, where `download` put it
+   (archives in a search path are linked in by `download`, not here).
 2. Unpacks archives under per-mod directories.
 3. Writes `install_manifest.json` in the mods directory.
 4. Supports extraction for `.zip`, `.tar`, `.tar.gz`, `.tgz`, `.7z`, and `.rar`. The

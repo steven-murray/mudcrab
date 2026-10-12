@@ -58,7 +58,6 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
             ToolsConfig::load(&path)?
         },
         filter: args.filter.to_mod_filter(),
-        archive_search_paths: args.archive_sources.archive_search_paths.clone(),
         // Forcing a reinstall without also forcing the merges would rebuild
         // the sources and leave merges built from the old ones.
         force_merges: args.force_merges || args.force,

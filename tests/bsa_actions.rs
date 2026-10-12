@@ -26,7 +26,6 @@ fn settings(root: &Path) -> InstallSettings {
         dry_run: false,
         tools: Default::default(),
         filter: Default::default(),
-        archive_search_paths: Vec::new(),
         force_merges: false,
         force: false,
     }

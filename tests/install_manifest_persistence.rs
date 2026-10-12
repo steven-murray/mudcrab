@@ -187,13 +187,9 @@ file_name = "second.zip"
     );
 
     // Give the failing mod what it needs and run again.
-    let search_dir = root.join("downloads");
-    make_zip(
-        &search_dir.join("second.zip"),
-        &[("Data/second.txt", b"second")],
-    );
+    make_zip(&cache.join("second.zip"), &[("Data/second.txt", b"second")]);
 
-    let assert = install(&["--archive-search-path", search_dir.to_str().unwrap()]).success();
+    let assert = install(&[]).success();
     let report =
         strip_ansi(&String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8 stderr"));
 

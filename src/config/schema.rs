@@ -1044,6 +1044,10 @@ pub struct PersonalizedMod {
     pub mod_type: Option<ModType>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
+    /// The plugins the mod says it ships, for `check` to compare with what its
+    /// archives hold. Not part of what is installed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub plugins: Vec<String>,
     pub archives: Vec<CompiledArchive>,
     #[serde(default)]
     pub files: Vec<String>,

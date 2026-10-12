@@ -231,7 +231,7 @@ Plan: 3 of 4 mod(s) selected (butterflies=false) -> build/plan.json
 $ mudcrab download build/plan.json
 4 archive(s) ready in /home/you/Games/OblivionModDownloads (0 downloaded now)
 $ mudcrab check build/plan.json
-Checked 4 archive(s) in 4 mod(s): 4 in the downloads folder, 0 in search paths, 0 to download
+Checked 4 archive(s) in 4 mod(s), and the masters of 3 plugin(s)
 ```
 
 To see the result without an MO2 instance, install into a plain folder and

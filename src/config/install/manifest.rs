@@ -118,7 +118,8 @@ pub(crate) fn should_skip_mod_install(
 
 /// Fingerprint of everything about a mod that decides what lands on disk.
 ///
-/// `section` is deliberately excluded. It only decides where the mod appears in
+/// `section` is deliberately excluded, as is the declared `plugins` list (what
+/// lands on disk comes from the archives, not from the declaration). It only decides where the mod appears in
 /// MO2's list, so hashing it would have invalidated every existing manifest the
 /// first time a plan carried sections and forced a full reinstall of a 700-mod
 /// list for a purely cosmetic field. An archive's `size` and `md5`, and its
@@ -128,6 +129,7 @@ pub(crate) fn should_skip_mod_install(
 pub(crate) fn hash_personalized_mod(mod_entry: &PersonalizedMod) -> anyhow::Result<String> {
     let mut hashable = mod_entry.clone();
     hashable.section.clear();
+    hashable.plugins.clear();
     for archive in &mut hashable.archives {
         archive.size = None;
         archive.md5 = None;

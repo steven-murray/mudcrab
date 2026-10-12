@@ -36,7 +36,6 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         dry_run: true,
         tools: ToolsConfig::default(),
         filter: Default::default(),
-        archive_search_paths: args.archive_sources.archive_search_paths.clone(),
         force_merges: false,
         force: false,
     };

@@ -124,7 +124,7 @@ fn from_plan(
 
         let source = archive_store::find(
             &settings.cache_dir,
-            &settings.archive_search_paths,
+            &[],
             &ArchiveRef::for_archive(archive),
         )
         .ok_or_else(|| {

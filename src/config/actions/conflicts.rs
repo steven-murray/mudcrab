@@ -204,7 +204,6 @@ pub(super) mod tests {
             dry_run: false,
             tools: ToolsConfig::default(),
             filter: Default::default(),
-            archive_search_paths: Vec::new(),
             force_merges: false,
             force: false,
         }
@@ -217,6 +216,7 @@ pub(super) mod tests {
             section: Vec::new(),
             mod_type: None,
             merge: None,
+            plugins: Vec::new(),
             archives: Vec::new(),
             files: Vec::new(),
             actions: Vec::new(),

@@ -68,6 +68,22 @@ fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
 }
 
 /// Every file in a directory, sorted, for asserting a search path is untouched.
+/// `download`, finding archives in `search` -- the step that brings archives
+/// already on this machine into the downloads folder, for `install` to use.
+fn download_from(plan: &Path, cache: &Path, search: &[&Path]) {
+    let mut command = Command::cargo_bin("mudcrab").unwrap();
+    command
+        .env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state"))
+        .env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state"))
+        .env_remove("NEXUS_API_KEY")
+        .args(["download", plan.to_str().unwrap(), "--no-browser"])
+        .args(["--downloads", cache.to_str().unwrap()]);
+    for dir in search {
+        command.args(["--archive-search-path", dir.to_str().unwrap()]);
+    }
+    command.assert().success();
+}
+
 fn dir_listing(path: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(path)
         .expect("directory should be readable")
@@ -79,7 +95,7 @@ fn dir_listing(path: &Path) -> Vec<String> {
 }
 
 #[test]
-fn install_adopts_an_archive_from_a_search_path_without_downloading() {
+fn download_brings_a_search_path_archive_in_for_install() {
     let dir = tempdir().expect("temp dir should be created");
     let game_dir = dir.path().join("game");
     let search_dir = dir.path().join("existing-downloads");
@@ -103,7 +119,7 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
-    // Note there is no `download` run at all: install resolves the archive itself.
+    download_from(&plan, &cache, &[&search_dir]);
     Command::cargo_bin("mudcrab")
         .map(|mut c| {
             c.env(
@@ -122,7 +138,6 @@ fn install_adopts_an_archive_from_a_search_path_without_downloading() {
         .args(["--cache", cache.to_str().unwrap()])
         .args(["--mods-dir", mods_dir.to_str().unwrap()])
         .args(["--game-dir", game_dir.to_str().unwrap()])
-        .args(["--archive-search-path", search_dir.to_str().unwrap()])
         .assert()
         .success();
 
@@ -256,6 +271,7 @@ fn search_paths_are_tried_in_order_and_the_first_hit_wins() {
     {
         let cache = dir.path().join(format!("cache-{index}"));
         let mods_dir = dir.path().join(format!("mods-{index}"));
+        download_from(&plan, &cache, &[a, b]);
 
         Command::cargo_bin("mudcrab")
             .map(|mut c| {
@@ -275,8 +291,6 @@ fn search_paths_are_tried_in_order_and_the_first_hit_wins() {
             .args(["--cache", cache.to_str().unwrap()])
             .args(["--mods-dir", mods_dir.to_str().unwrap()])
             .args(["--game-dir", game_dir.to_str().unwrap()])
-            .args(["--archive-search-path", a.to_str().unwrap()])
-            .args(["--archive-search-path", b.to_str().unwrap()])
             .assert()
             .success();
 
@@ -312,6 +326,7 @@ fn search_path_filename_matching_ignores_case() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
+    download_from(&plan, &cache, &[&search_dir]);
     Command::cargo_bin("mudcrab")
         .map(|mut c| {
             c.env(
@@ -330,7 +345,6 @@ fn search_path_filename_matching_ignores_case() {
         .args(["--cache", cache.to_str().unwrap()])
         .args(["--mods-dir", mods_dir.to_str().unwrap()])
         .args(["--game-dir", game_dir.to_str().unwrap()])
-        .args(["--archive-search-path", search_dir.to_str().unwrap()])
         .assert()
         .success();
 
@@ -416,7 +430,6 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
         .args(["--cache", cache.to_str().unwrap()])
         .args(["--mods-dir", mods_dir.to_str().unwrap()])
         .args(["--game-dir", game_dir.to_str().unwrap()])
-        .args(["--archive-search-path", search_dir.to_str().unwrap()])
         .assert()
         .success();
 
@@ -467,6 +480,7 @@ fn an_mo2_install_points_mo2_at_the_downloads_folder_instead_of_copying() {
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
     build_plan(&game_dir, &modlist, &compiled, &plan);
 
+    download_from(&plan, &cache, &[&search_dir]);
     Command::cargo_bin("mudcrab")
         .map(|mut c| {
             c.env(
@@ -485,7 +499,6 @@ fn an_mo2_install_points_mo2_at_the_downloads_folder_instead_of_copying() {
         .args(["--downloads", cache.to_str().unwrap()])
         .args(["--mo2-instance-dir", instance_dir.to_str().unwrap()])
         .args(["--game-dir", game_dir.to_str().unwrap()])
-        .args(["--archive-search-path", search_dir.to_str().unwrap()])
         .assert()
         .success();
 

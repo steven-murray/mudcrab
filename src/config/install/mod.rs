@@ -21,7 +21,6 @@ pub struct InstallSettings {
     /// Read-only directories holding archives already on this machine. An
     /// archive found here is adopted into the cache instead of downloaded, so a
     /// list can be installed with no network access at all.
-    pub archive_search_paths: Vec<PathBuf>,
     /// Rebuild every merge in scope even when its recorded inputs still match.
     pub force_merges: bool,
     /// Reinstall every mod in scope even when its recorded definition matches.
@@ -686,6 +685,7 @@ mod tests {
             section: Vec::new(),
             mod_type: None,
             merge: None,
+            plugins: Vec::new(),
             archives: vec![CompiledArchive {
                 size: None,
                 md5: None,
