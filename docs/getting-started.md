@@ -40,11 +40,15 @@ You need:
 - **Oblivion**, installed and **run once** from its launcher, so it has
   written its `Oblivion.ini`. mudcrab has been tested with the Steam GOTY
   edition.
-- **A portable Mod Organizer 2 instance** for Oblivion, used for nothing else:
-  download MO2, unpack it into its own folder, start it, choose "portable" and
-  point it at the game. mudcrab fills this instance in. On Linux, MO2 runs
-  under Proton or Wine; see
-  [known-issues.md](known-issues.md#linux--proton).
+- **A portable Mod Organizer 2 instance** for Oblivion, used for nothing else.
+  mudcrab fills this instance in.
+  - On Windows: download MO2, unpack it into its own folder, start it, choose
+    "portable" and point it at the game.
+  - On Linux, MO2 runs under Proton, and [Jackify](https://github.com/Omni-guides/Jackify)
+    sets that up for you: in Jackify, open the "Additional Tasks" tab and
+    choose "Setup Mod Organizer 2". It installs MO2 into the folder you give
+    it and adds it to Steam, so it starts from your Steam library. See
+    [known-issues.md](known-issues.md#linux--proton) for what else Linux needs.
 - **`bsdtar` and `7z`** on your `PATH`, for `.7z` and `.rar` archives. Most
   Linux distributions have both a package away; on Windows, install 7-Zip and
   add it to `PATH`.
@@ -65,11 +69,15 @@ MO2 plugin. Step 1 tells you.
 mudcrab setup-tools mylist.toml
 ```
 
-This writes a `tools.toml` where every mudcrab command looks for it
-(`~/.config/mudcrab/tools.toml`, or `%APPDATA%\mudcrab\tools.toml` on
-Windows), with a section for each tool the list needs. Open it and fill in the
-paths. Set `downloads_dir` too: the one folder every archive goes in, shared
-by every list you install. The commands below then need no `--downloads`.
+This asks for what the list needs -- the downloads folder (one folder every
+archive goes in, shared by every list you install) and, if the list cleans
+plugins, xEdit and the Proton prefix to run it in -- offering what it finds:
+MO2 instances, Steam's Proton prefixes (named after their Steam shortcuts),
+xEdit under `~/Games`. Press Enter to take the first suggestion, a number for
+another, or type a path. It writes `tools.toml` where every mudcrab command
+looks for it (`~/.config/mudcrab/`, or `$XDG_CONFIG_HOME/mudcrab/` when that
+is set; `%APPDATA%\mudcrab\` on Windows) and says where. The commands below
+then need no `--downloads`.
 
 For Nexus downloads, put your API key (from your Nexus account's
 [API keys page](https://next.nexusmods.com/settings/api-keys)) in the

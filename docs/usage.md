@@ -892,23 +892,34 @@ own: see [exporters.md](exporters.md).
 
 ## setup-tools
 
-Scan a source modlist and generate a `tools.toml` configuration template for the
-machine-local tools (e.g. LOOT, xEdit) that the modlist's actions require, and
-for the downloads folder.
+Set up `tools.toml`, the machine-local settings: the downloads folder and the
+tools the list's actions need.
 
 ```bash
-mudcrab setup-tools <modlist.toml> [--output <tools.toml>] [--force]
+mudcrab setup-tools <modlist.toml> [--output <tools.toml>] [--force] [--defaults]
 ```
 
-`--output` defaults to where every command looks for it when not given
-`--tools-config`: `~/.config/mudcrab/tools.toml` (`%APPDATA%\mudcrab\tools.toml`
-on Windows). `--force` overwrites an existing `tools.toml`.
+It asks for each value the list needs, offering what it finds where such
+things usually are:
 
-Example:
+- **the downloads folder**: those of the MO2 instances under `~/Games`, and of
+  the instances Steam runs;
+- **the Wine/Proton prefix** to run xEdit in (Linux, for a list with `qac`
+  actions): Steam's prefixes, each named after its Steam shortcut, those
+  running MO2 first;
+- **Proton**: the build that prefix was last run with, then the others Steam
+  has;
+- **xEdit**: `TES4Edit.exe` or `xEdit.exe` under `~/Games`, `~/Downloads` and
+  the prefix. Its Quick Auto Clean executable is found beside it.
 
-```bash
-mudcrab setup-tools path/to/modlist.toml
-```
+Enter takes the first suggestion, a number another, `-` leaves a placeholder
+to fill in later, and anything else is a path. With `--defaults`, or when
+input is not a terminal, the first suggestion is taken for each.
+
+The file goes where every command looks when not given `--tools-config`:
+`$XDG_CONFIG_HOME/mudcrab/tools.toml`, else `~/.config/mudcrab/tools.toml`
+(`%APPDATA%\mudcrab\tools.toml` on Windows); the command says which, and why.
+`--force` overwrites an existing one.
 
 ## Nexus Sources
 

@@ -21,6 +21,74 @@ pub struct Cli {
     pub log_file: Option<PathBuf>,
 }
 
+/// `--help` groups the commands by who reaches for them; clap lists them in
+/// one alphabetical run. Every command is in exactly one group (a test checks).
+pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
+    (
+        "Installing a modlist",
+        &[
+            "setup-tools",
+            "compile",
+            "query",
+            "download",
+            "check",
+            "install",
+        ],
+    ),
+    (
+        "Writing a modlist",
+        &[
+            "inspect",
+            "add",
+            "move",
+            "nexus-files",
+            "identify",
+            "validate",
+            "conflicts",
+            "diff",
+            "export",
+        ],
+    ),
+    (
+        "Utilities",
+        &[
+            "downloads",
+            "merge",
+            "new-merge",
+            "unhide-merges",
+            "bsa",
+            "dds",
+        ],
+    ),
+];
+
+/// The CLI, with `--help` listing its commands in [`COMMAND_GROUPS`].
+pub fn command() -> clap::Command {
+    use clap::CommandFactory;
+    let command = Cli::command();
+    let width = command
+        .get_subcommands()
+        .map(|c| c.get_name().len())
+        .max()
+        .unwrap_or(0);
+    let mut groups = String::new();
+    for (title, names) in COMMAND_GROUPS {
+        groups.push_str(&format!("{title}:\n"));
+        for name in *names {
+            let about = command
+                .find_subcommand(name)
+                .and_then(|c| c.get_about())
+                .map(|a| a.to_string())
+                .unwrap_or_default();
+            groups.push_str(&format!("  {name:<width$}  {about}\n"));
+        }
+        groups.push('\n');
+    }
+    command.help_template(format!(
+        "{{about-with-newline}}\n{{usage-heading}} {{usage}}\n\n{groups}Options:\n{{options}}{{after-help}}"
+    ))
+}
+
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Add a mod to a source modlist, preserving its comments and formatting.
@@ -42,8 +110,8 @@ pub enum Command {
     Identify(IdentifyArgs),
     /// List the files a Nexus mod publishes, with the descriptor for each.
     NexusFiles(NexusFilesArgs),
-    /// List the files two mods both provide, which is what `conflicts_with`
-    /// acts on.
+    /// Which installed mods share files, and with whom; or the files two mods
+    /// both provide.
     Conflicts(ConflictsArgs),
     /// Install mods from downloaded archives.
     Install(InstallArgs),
@@ -53,7 +121,7 @@ pub enum Command {
     Validate(ValidateArgs),
     /// Render a modlist as a guide: JSON, or through an exporter's templates.
     Export(ExportArgs),
-    /// Scan a source modlist and generate a tools.toml configuration template.
+    /// Set up tools.toml: the downloads folder, Wine/Proton and xEdit, found and offered.
     SetupTools(SetupToolsArgs),
     /// Restore plugins that were hidden to make room for a merge.
     UnhideMerges(UnhideMergesArgs),
@@ -702,6 +770,10 @@ pub struct SetupToolsArgs {
     /// Overwrite an existing tools.toml file.
     #[arg(long)]
     pub force: bool,
+    /// Take the best guess for each value instead of asking. Also what
+    /// happens when input is not a terminal.
+    #[arg(long)]
+    pub defaults: bool,
 }
 
 #[derive(Debug, Subcommand)]
@@ -807,4 +879,28 @@ pub struct DownloadsTidyArgs {
     /// Carry out the plan rather than only printing it.
     #[arg(long)]
     pub apply: bool,
+}
+
+#[cfg(test)]
+mod help_tests {
+    #[test]
+    fn every_command_is_in_exactly_one_help_group() {
+        use clap::CommandFactory;
+        let listed: Vec<&str> = super::COMMAND_GROUPS
+            .iter()
+            .flat_map(|(_, names)| names.iter().copied())
+            .collect();
+        for command in super::Cli::command().get_subcommands() {
+            let name = command.get_name();
+            assert_eq!(
+                listed.iter().filter(|n| **n == name).count(),
+                1,
+                "{name} must be in exactly one group in COMMAND_GROUPS"
+            );
+        }
+        assert_eq!(
+            listed.len(),
+            super::Cli::command().get_subcommands().count()
+        );
+    }
 }

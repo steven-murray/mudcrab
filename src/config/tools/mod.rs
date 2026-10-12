@@ -1,3 +1,4 @@
+pub mod discover;
 pub mod loot;
 pub mod xedit;
 
@@ -235,10 +236,29 @@ impl RequiredTools {
     }
 }
 
-/// Generate a `tools.toml` template string tailored to the detected tool set.
-/// Entries for unneeded tools are omitted.  All values that require user input
-/// are left as clearly-marked placeholders.
-pub fn generate_tools_toml(required: &RequiredTools) -> String {
+/// Values chosen for `tools.toml`; each `None` is written as a placeholder.
+#[derive(Debug, Default, Clone)]
+pub struct ToolValues {
+    pub downloads_dir: Option<PathBuf>,
+    pub wine_prefix: Option<PathBuf>,
+    pub proton: Option<PathBuf>,
+    pub tes4edit: Option<PathBuf>,
+    pub loot_appdata: Option<PathBuf>,
+}
+
+fn toml_path(path: &Path) -> String {
+    format!(
+        "\"{}\"",
+        path.to_string_lossy()
+            .replace('\\', "\\\\")
+            .replace('"', "\\\"")
+    )
+}
+
+/// Generate `tools.toml` for the detected tool set: the chosen values where
+/// there are some, clearly-marked placeholders where not. Entries for tools
+/// the list does not need are left out.
+pub fn generate_tools_toml(required: &RequiredTools, values: &ToolValues) -> String {
     let mut out = String::new();
 
     out.push_str("# mudcrab tools.toml — machine-local tool configuration\n");
@@ -248,10 +268,13 @@ pub fn generate_tools_toml(required: &RequiredTools) -> String {
     // Top level, so before any table. Every list wants one.
     out.push_str("# The downloads folder every command uses unless given --downloads:\n");
     out.push_str("# one folder, shared by every list and every MO2 instance.\n");
-    #[cfg(not(target_os = "windows"))]
-    out.push_str("# downloads_dir = \"/home/you/Games/OblivionModDownloads\"\n\n");
-    #[cfg(target_os = "windows")]
-    out.push_str("# downloads_dir = \"D:\\\\Games\\\\OblivionModDownloads\"\n\n");
+    match &values.downloads_dir {
+        Some(dir) => out.push_str(&format!("downloads_dir = {}\n\n", toml_path(dir))),
+        #[cfg(not(target_os = "windows"))]
+        None => out.push_str("# downloads_dir = \"/home/you/Games/OblivionModDownloads\"\n\n"),
+        #[cfg(target_os = "windows")]
+        None => out.push_str("# downloads_dir = \"D:\\\\Games\\\\OblivionModDownloads\"\n\n"),
+    }
 
     // Wine section — only on Linux and only when at least one Windows tool is needed.
     // On Windows this section is not needed and is omitted.
@@ -260,30 +283,42 @@ pub fn generate_tools_toml(required: &RequiredTools) -> String {
         out.push_str("# Shared Wine / Proton prefix for all Windows-only tools.\n");
         out.push_str("[wine]\n");
         out.push_str("# Path to the Wine prefix directory (the folder containing drive_c/).\n");
-        out.push_str("prefix = \"/path/to/your/wine-prefix\"\n");
+        match &values.wine_prefix {
+            Some(prefix) => out.push_str(&format!("prefix = {}\n", toml_path(prefix))),
+            None => out.push_str("prefix = \"/path/to/your/wine-prefix\"\n"),
+        }
         out.push_str("# Optional: use a specific Proton build instead of system wine.\n");
-        out.push_str(
-            "# proton = \"/home/user/.steam/root/steamapps/common/Proton 9.0/proton\"\n\n",
-        );
+        match &values.proton {
+            Some(proton) => out.push_str(&format!("proton = {}\n\n", toml_path(proton))),
+            None => out.push_str(
+                "# proton = \"/home/user/.steam/root/steamapps/common/Proton 9.0/proton\"\n\n",
+            ),
+        }
     }
 
     if required.needs_loot {
         out.push_str("# LOOT is a native binary on Linux; no Wine wrapper needed.\n");
         out.push_str("[loot]\n");
         out.push_str("# Optional: override if LOOT is not on your PATH.\n");
-        out.push_str("# exe = \"/usr/local/bin/LOOT\"\n\n");
+        out.push_str("# exe = \"/usr/local/bin/LOOT\"\n");
+        if let Some(appdata) = &values.loot_appdata {
+            out.push_str(&format!("game_appdata_path = {}\n", toml_path(appdata)));
+        }
+        out.push('\n');
     }
 
     if required.needs_tes4edit {
-        out.push_str("# TES4Edit / xEdit — run through Wine on Linux.\n");
+        out.push_str("# TES4Edit / xEdit — run through Wine on Linux. Its Quick Auto Clean\n");
+        out.push_str("# executable is found beside it.\n");
         out.push_str("[tes4edit]\n");
-        out.push_str("# Path to the xEdit .exe inside your Wine prefix.\n");
-
-        #[cfg(not(target_os = "windows"))]
-        out.push_str("exe = \"/path/to/your/wine-prefix/drive_c/tools/xEdit/xEdit.exe\"\n\n");
-
-        #[cfg(target_os = "windows")]
-        out.push_str("exe = \"C:\\\\tools\\\\xEdit\\\\xEdit.exe\"\n\n");
+        match &values.tes4edit {
+            Some(exe) => out.push_str(&format!("exe = {}\n\n", toml_path(exe))),
+            #[cfg(not(target_os = "windows"))]
+            None => out
+                .push_str("exe = \"/path/to/your/wine-prefix/drive_c/tools/xEdit/xEdit.exe\"\n\n"),
+            #[cfg(target_os = "windows")]
+            None => out.push_str("exe = \"C:\\\\tools\\\\xEdit\\\\xEdit.exe\"\n\n"),
+        }
     }
 
     if out.ends_with("\n\n") {
