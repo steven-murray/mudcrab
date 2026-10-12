@@ -820,6 +820,81 @@ pub fn place_plugins(
     Ok(lines.join("\n"))
 }
 
+/// Add `lines` to one archive table of one mod: after its `file_name` line,
+/// or its `path` line when it has none. Line-based like the rest of `add`, so
+/// nothing else in the file changes. `mods` must come from parsing `text`.
+pub fn plan_archive_lines(
+    text: &str,
+    mods: &[ModEntry],
+    mod_index: usize,
+    archive_index: usize,
+    lines: &[String],
+) -> anyhow::Result<String> {
+    let kinds = classify_lines(text);
+    let headers: Vec<usize> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| **kind == LineKind::ModHeader)
+        .map(|(index, _)| index)
+        .collect();
+    anyhow::ensure!(
+        headers.len() == mods.len(),
+        "line scan found {} `[[mods]]` headers but the parsed modlist has {} mods; \
+         refusing to edit a file this tool cannot read reliably",
+        headers.len(),
+        mods.len()
+    );
+    let mut all: Vec<String> = text.split('\n').map(str::to_string).collect();
+    let start = headers[mod_index];
+    let end = (start + 1..kinds.len())
+        .find(|&i| matches!(kinds[i], LineKind::ModHeader | LineKind::ForeignHeader))
+        .unwrap_or(kinds.len());
+    let tables: Vec<usize> = (start..end)
+        .filter(|&i| {
+            kinds[i] == LineKind::Other
+                && strip_trailing_comment(&all[i]).trim() == "[[mods.archives]]"
+        })
+        .collect();
+    let table = *tables.get(archive_index).ok_or_else(|| {
+        anyhow::anyhow!(
+            "mod '{}' has no archive {} in the file",
+            mods[mod_index].id,
+            archive_index + 1
+        )
+    })?;
+    let table_end = tables.get(archive_index + 1).copied().unwrap_or(end).min(
+        (table + 1..end)
+            .find(|&i| {
+                strip_trailing_comment(&all[i])
+                    .trim_start()
+                    .starts_with('[')
+            })
+            .unwrap_or(end),
+    );
+    let key_line = |key: &str| {
+        (table + 1..table_end).find(|&i| {
+            kinds[i] == LineKind::Other
+                && all[i]
+                    .trim_start()
+                    .strip_prefix(key)
+                    .is_some_and(|rest| rest.trim_start().starts_with('='))
+        })
+    };
+    let after = key_line("file_name")
+        .or_else(|| key_line("path"))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "mod '{}' archive {} has neither a file_name nor a path line",
+                mods[mod_index].id,
+                archive_index + 1
+            )
+        })?;
+    let carriage = if all[after].ends_with('\r') { "\r" } else { "" };
+    let new: Vec<String> = lines.iter().map(|l| format!("{l}{carriage}")).collect();
+    all.splice(after + 1..after + 1, new);
+    Ok(all.join("\n"))
+}
+
 pub fn parse_meta_ini(text: &str) -> OracleMeta {
     let mut meta = OracleMeta::default();
     let mut section = String::new();

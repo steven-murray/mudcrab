@@ -121,10 +121,16 @@ pub(crate) fn should_skip_mod_install(
 /// `section` is deliberately excluded. It only decides where the mod appears in
 /// MO2's list, so hashing it would have invalidated every existing manifest the
 /// first time a plan carried sections and forced a full reinstall of a 700-mod
-/// list for a purely cosmetic field.
+/// list for a purely cosmetic field. An archive's `size` and `md5` are left out
+/// for the same reason: they say how to *find* an archive, not what it
+/// installs, so recording them must not reinstall the mods they belong to.
 pub(crate) fn hash_personalized_mod(mod_entry: &PersonalizedMod) -> anyhow::Result<String> {
     let mut hashable = mod_entry.clone();
     hashable.section.clear();
+    for archive in &mut hashable.archives {
+        archive.size = None;
+        archive.md5 = None;
+    }
 
     let payload = serde_json::to_vec(&hashable).map_err(|err| {
         anyhow::anyhow!(
@@ -246,4 +252,26 @@ pub(crate) fn relative_path_to_mod(mod_path: &Path, mods_dir: &Path) -> String {
                 .unwrap_or("unknown")
                 .to_string()
         })
+}
+
+#[cfg(test)]
+mod content_tests {
+    use super::*;
+
+    #[test]
+    fn recording_an_archives_size_and_md5_does_not_reinstall_its_mod() {
+        let archive = crate::config::schema::CompiledArchive {
+            path: Some("manual:h.zip".to_string()),
+            ..Default::default()
+        };
+        let mut entry: PersonalizedMod = serde_json::from_value(serde_json::json!({
+            "id": "Handmade",
+            "archives": [archive],
+        }))
+        .unwrap();
+        let before = hash_personalized_mod(&entry).unwrap();
+        entry.archives[0].size = Some(7);
+        entry.archives[0].md5 = Some("0".repeat(32));
+        assert_eq!(hash_personalized_mod(&entry).unwrap(), before);
+    }
 }

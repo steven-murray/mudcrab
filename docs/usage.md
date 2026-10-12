@@ -251,6 +251,22 @@ source get the `.meta` lookup needs. Without `--apply` it only prints the plan.
 Because resolution happens during `install` too, a list whose archives are all
 already on disk can be installed without running `download` at all.
 
+## downloads record
+
+Write the size and MD5 of a list's hand-downloaded (`manual:`) archives into
+the list, so each is still found after its host renames it.
+
+```bash
+mudcrab downloads record <modlist.toml> [--downloads <dir>] [--archive-search-path <dir>]... [--dry-run]
+```
+
+Every `manual:` archive found on disk that does not record them yet gets
+`size` and `md5` lines after its `file_name` (or `path`); nothing else in the
+file changes, and the list is validated afterwards. Archives not on disk are
+named and skipped. Recording them does not count as a change to the mods: an
+install does not redo them for it. `add --archive --manual` records both when
+it writes an entry.
+
 ## Working on part of a modlist
 
 A large list is built a section at a time, so `download`, `check`, `install` and

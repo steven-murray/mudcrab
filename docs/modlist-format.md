@@ -124,7 +124,7 @@ these from the archive itself.
 | --- | --- |
 | `path` | Always: where the archive comes from. See below. |
 | `file_name` | Nearly always: the archive's name as the host serves it. It is how a copy already on disk is found, and how `check` names a missing one. |
-| `size`, `md5` | For a `manual:` archive: its size in bytes and MD5, so a copy its host has since renamed is still found, by content. Both or neither; `add --archive --manual` writes them. |
+| `size`, `md5` | For a `manual:` archive: its size in bytes and MD5, so a copy its host has since renamed is still found, by content. Both or neither; `add --archive --manual` writes them, and `downloads record` adds them to an existing list. |
 | `layout` | When the archive needs telling how it is laid out: `"fomod"`, `"bain"` or `"custom-data-folder"`. Without it the layout is detected (data at the top, or in one folder MO2 would unwrap). |
 | `data_folder` | With `layout = "custom-data-folder"`: the folder inside the archive that holds the data. |
 | `target_subdir` | When the files belong in a folder the archive lacks: where in the mod to put them (`"obse/plugins"`). |

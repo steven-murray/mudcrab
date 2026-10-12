@@ -728,6 +728,25 @@ pub enum DownloadsCommand {
     /// (`{mod}_{index}_{source}` + `.orig-name`) to real names with MO2 `.meta`
     /// files. Prints what it would do; changes nothing without --apply.
     Tidy(DownloadsTidyArgs),
+    /// Record the size and MD5 of a modlist's hand-downloaded (`manual:`)
+    /// archives in the list itself, so each is still found after its host
+    /// renames it. Only archives found on disk and not yet recorded are
+    /// written; comments and layout are kept.
+    Record(DownloadsRecordArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DownloadsRecordArgs {
+    /// The modlist to edit in place.
+    pub modlist: PathBuf,
+    /// The downloads folder. Defaults to `downloads_dir` in tools.toml.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
+    /// Print what would be recorded, and change nothing.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

@@ -1,13 +1,91 @@
 //! `mudcrab downloads`: housekeeping for the downloads folder.
 
-use crate::cli::{DownloadsCommand, DownloadsTidyArgs};
+use crate::cli::{DownloadsCommand, DownloadsRecordArgs, DownloadsTidyArgs};
 use crate::config::downloads_tidy::{self, Step};
 use std::collections::HashMap;
 
 pub async fn run(command: DownloadsCommand) -> anyhow::Result<()> {
     match command {
         DownloadsCommand::Tidy(args) => tidy(args).await,
+        DownloadsCommand::Record(args) => record(args),
     }
+}
+
+/// Write `size` and `md5` into every `manual:` archive entry that lacks them
+/// and whose file is on disk.
+fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
+    use crate::config::archive_store::{ArchiveRef, find};
+
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let search = &args.archive_sources.archive_search_paths;
+    let original = std::fs::read_to_string(&args.modlist)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.modlist.display()))?;
+    let source = crate::config::loader::load_modlist(&args.modlist)?;
+
+    let mut text = original.clone();
+    let (mut recorded, mut missing, mut already) = (0usize, Vec::new(), 0usize);
+    for (mod_index, entry) in source.mods.iter().enumerate() {
+        for (archive_index, archive) in entry.archives.iter().enumerate() {
+            let Some(path) = archive.path.as_deref().filter(|p| p.starts_with("manual:")) else {
+                continue;
+            };
+            if archive.size.is_some() || archive.md5.is_some() {
+                already += 1;
+                continue;
+            }
+            let reference = ArchiveRef::new(path, archive.file_name.as_deref());
+            let Some(file) = find(&downloads, search, &reference) else {
+                missing.push(format!("{} ({})", entry.id, reference.describe()));
+                continue;
+            };
+            let size = std::fs::metadata(&file)
+                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", file.display()))?
+                .len();
+            let md5 = crate::config::identify::md5_of_file(&file)?;
+            println!(
+                "{}: {} -- size {size}, md5 {md5}",
+                entry.id,
+                reference.describe()
+            );
+            text = crate::config::add::plan_archive_lines(
+                &text,
+                &source.mods,
+                mod_index,
+                archive_index,
+                &[format!("size = {size}"), format!("md5 = \"{md5}\"")],
+            )?;
+            recorded += 1;
+        }
+    }
+
+    for item in &missing {
+        eprintln!("not on disk, so not recorded: {item}");
+    }
+    eprintln!(
+        "{recorded} hand-downloaded archive(s) recorded{}{}",
+        if already > 0 {
+            format!(", {already} already were")
+        } else {
+            String::new()
+        },
+        if missing.is_empty() {
+            String::new()
+        } else {
+            format!(", {} not found", missing.len())
+        },
+    );
+    if args.dry_run || recorded == 0 {
+        if args.dry_run {
+            eprintln!("(--dry-run: nothing written)");
+        }
+        return Ok(());
+    }
+    super::add::write_atomic(&args.modlist, &text)?;
+    if let Err(err) = super::add::reload_and_validate(&args.modlist) {
+        super::add::write_atomic(&args.modlist, &original)?;
+        anyhow::bail!("the edited modlist no longer validates ({err}); the original is restored");
+    }
+    Ok(())
 }
 
 /// Real names for Nexus archives nothing on disk names, from the API's files
