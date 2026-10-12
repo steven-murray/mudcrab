@@ -121,7 +121,11 @@ file_name = "Absent-3-1-0.zip"
         .output()
         .unwrap();
     assert!(!output.status.success());
-    let said = String::from_utf8_lossy(&output.stderr);
+    let said = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
     assert!(
         said.contains("Absent-3-1-0.zip is not in the downloads folder"),
         "{said}"
@@ -138,11 +142,11 @@ file_name = "Absent-3-1-0.zip"
         !said.contains("Oblivion.esm"),
         "a game plugin is present: {said}"
     );
-    assert!(said.contains("3 issue(s)"), "{said}");
+    assert!(said.contains("3 problem(s)"), "{said}");
 }
 
 /// Compile, query and check `list` against `downloads`; (success, stdout,
-/// stderr).
+/// stdout and stderr together).
 fn check_list(root: &Path, list: &str, downloads: &Path) -> (bool, String, String) {
     let path = root.join("list.toml");
     std::fs::write(&path, list).unwrap();
@@ -168,11 +172,9 @@ fn check_list(root: &Path, list: &str, downloads: &Path) -> (bool, String, Strin
         .arg(downloads)
         .output()
         .unwrap();
-    (
-        output.status.success(),
-        String::from_utf8_lossy(&output.stdout).into_owned(),
-        String::from_utf8_lossy(&output.stderr).into_owned(),
-    )
+    let out = String::from_utf8_lossy(&output.stdout).into_owned();
+    let all = format!("{out}{}", String::from_utf8_lossy(&output.stderr));
+    (output.status.success(), out, all)
 }
 
 #[test]
@@ -236,7 +238,7 @@ md5 = "00000000000000000000000000000000"
     assert!(!ok);
     // Errors.
     assert!(
-        err.contains("A: install would fail") && err.contains("textures/missing.dds"),
+        err.contains("Would fail at install") && err.contains("textures/missing.dds"),
         "{err}"
     );
     assert!(
@@ -259,21 +261,15 @@ md5 = "00000000000000000000000000000000"
         "{err}"
     );
     assert!(
-        err.contains("A: installs orphan.bsa, which no active plugin loads"),
+        err.contains("A: orphan.bsa -- no active plugin's name begins it"),
         "{err}"
     );
     assert!(!err.contains("a.bsa,"), "A.esp loads A.bsa: {err}");
     // Warnings, which do not fail the check by themselves.
+    assert!(out2.contains("extra.esp (A)"), "{out2}");
+    assert!(out2.contains("Shared.esp: C > B"), "{out2}");
     assert!(
-        out2.contains("warning: A: installs extra.esp, which the load order does not list"),
-        "{out2}"
-    );
-    assert!(
-        out2.contains("warning: Shared.esp is installed by 2 mods (B, C)"),
-        "{out2}"
-    );
-    assert!(
-        out2.contains("warning: A: exclude 'nothing-here/*' leaves nothing out"),
+        out2.contains("A: exclude 'nothing-here/*' leaves nothing out"),
         "{out2}"
     );
     let _ = out;
@@ -342,7 +338,69 @@ file_name = "Y-2-1-0.zip"
     let (ok, _, err) = check_list(root, list, &downloads);
     assert!(!ok);
     assert!(
-        err.contains("X: install would fail") && err.contains("selected no files"),
+        err.contains("Would fail at install") && err.contains("selected no files"),
         "{err}"
     );
+}
+
+/// A plan from before mods' declared plugins were carried into it cannot say
+/// who installs a plugin `check` cannot read; it says so rather than report
+/// every such plugin as installed by nothing.
+#[test]
+fn an_older_plan_skips_the_load_order_comparison_and_says_why() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    // Its content is inside a second archive, so its plugin cannot be read.
+    make_zip(&downloads.join("Wrapped-1-1-0.zip"), &[("inner.7z", b"7z")]);
+    let list = root.join("list.toml");
+    std::fs::write(
+        &list,
+        r#"name = "L"
+plugins = ["Wrapped.esp"]
+
+[[mods]]
+id = "Wrapped"
+plugins = ["Wrapped.esp"]
+[[mods.archives]]
+path = "nexus:oblivion/1/10"
+file_name = "Wrapped-1-1-0.zip"
+inner_archive = "inner.7z"
+"#,
+    )
+    .unwrap();
+    let compiled = root.join("compiled.json");
+    let plan = root.join("plan.json");
+    mudcrab(root)
+        .args(["compile", list.to_str().unwrap(), "--output"])
+        .arg(&compiled)
+        .assert()
+        .success();
+    mudcrab(root)
+        .args([
+            "query",
+            compiled.to_str().unwrap(),
+            "--headless",
+            "--output",
+        ])
+        .arg(&plan)
+        .assert()
+        .success();
+    // As an older mudcrab wrote it: no `plugins` on the mods.
+    let mut json: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&plan).unwrap()).unwrap();
+    for entry in json["mods"].as_array_mut().unwrap() {
+        entry.as_object_mut().unwrap().remove("plugins");
+    }
+    std::fs::write(&plan, json.to_string()).unwrap();
+
+    let output = mudcrab(root)
+        .args(["check", plan.to_str().unwrap(), "--downloads"])
+        .arg(&downloads)
+        .output()
+        .unwrap();
+    let said = String::from_utf8_lossy(&output.stdout);
+    assert!(output.status.success(), "{said}");
+    assert!(said.contains("made by an older mudcrab"), "{said}");
+    assert!(!said.contains("no mod installs it"), "{said}");
 }

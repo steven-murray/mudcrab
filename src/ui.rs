@@ -179,16 +179,98 @@ pub fn say(message: impl std::fmt::Display) {
     multi().suspend(|| println!("{message}"));
 }
 
+/// How a line or a section reads: a symbol and a colour. Colour and the
+/// symbols' Unicode forms follow the terminal -- none when output is piped,
+/// `NO_COLOR` is set, or the terminal cannot show them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Tone {
+    Good,
+    Warning,
+    Problem,
+    Note,
+}
+
+impl Tone {
+    fn symbol(self) -> console::Emoji<'static, 'static> {
+        match self {
+            Tone::Good => console::Emoji("✔", "ok"),
+            Tone::Warning => console::Emoji("⚠", "!"),
+            Tone::Problem => console::Emoji("✖", "x"),
+            Tone::Note => console::Emoji("ℹ", "i"),
+        }
+    }
+
+    fn paint<D>(self, text: D) -> console::StyledObject<D> {
+        let styled = console::style(text);
+        match self {
+            Tone::Good => styled.green(),
+            Tone::Warning => styled.yellow(),
+            Tone::Problem => styled.red(),
+            Tone::Note => styled.cyan(),
+        }
+    }
+}
+
+/// A one-line status: symbol, then the message, in the tone's colour.
+pub fn status(tone: Tone, message: impl std::fmt::Display) {
+    say(format!(
+        "{} {}",
+        tone.paint(tone.symbol()).bold(),
+        tone.paint(message.to_string())
+    ));
+}
+
+/// A titled list: a heading with its symbol and count, then one bullet per
+/// item, blank line before. Nothing for an empty list.
+pub fn section(tone: Tone, heading: &str, items: &[String]) {
+    if items.is_empty() {
+        return;
+    }
+    say("");
+    say(format!(
+        "{} {} {}",
+        tone.paint(tone.symbol()).bold(),
+        console::style(heading).bold(),
+        console::style(format!("({})", items.len())).dim()
+    ));
+    for item in items {
+        // Continuation lines line up under the bullet's text.
+        let item = item.replace('\n', "\n    ");
+        say(format!("  {} {item}", tone.paint(console::Emoji("•", "-"))));
+    }
+}
+
+/// A name the user might look for -- a mod, a plugin, a file -- set off from
+/// the words around it.
+pub fn name(text: impl std::fmt::Display) -> String {
+    console::style(text.to_string()).bold().to_string()
+}
+
 /// Print a failed run's error for a person: the message and its causes, then
 /// where the full log is.
 pub fn report_error(err: &anyhow::Error) {
     multi().suspend(|| {
-        eprintln!("error: {err}");
+        let problem = Tone::Problem;
+        eprintln!(
+            "{} {err}",
+            problem
+                .paint(format!("{} error:", problem.symbol()))
+                .bold()
+                .for_stderr()
+        );
         for cause in err.chain().skip(1) {
-            eprintln!("  caused by: {cause}");
+            eprintln!(
+                "  {} {cause}",
+                console::style("caused by:").dim().for_stderr()
+            );
         }
         if let Some(path) = log_path() {
-            eprintln!("full log: {}", path.display());
+            eprintln!(
+                "{}",
+                console::style(format!("full log: {}", path.display()))
+                    .dim()
+                    .for_stderr()
+            );
         }
     });
 }

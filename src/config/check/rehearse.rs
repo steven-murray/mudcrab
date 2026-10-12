@@ -91,9 +91,10 @@ pub(super) fn rehearse(
                     .map_err(|err| format!("{err:#}"))
             });
             if let Err(why) = known {
+                tracing::info!(mod_id = %mod_entry.id, partner = %partner, why, "check: partner's files unknown");
                 return Ok(Rehearsal::Unknown(format!(
                     "its {} compares with {partner}, whose files are only known once it is \
-                     installed ({why})",
+                     installed",
                     action.name()
                 )));
             }

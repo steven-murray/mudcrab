@@ -20,7 +20,10 @@ use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::filter::ModFilter;
 use crate::config::install::InstallSettings;
 use crate::config::install::layout::{self, EntryReader};
-use crate::config::schema::{CompiledArchive, ModType, PersonalizedMod, PersonalizedPlan};
+use crate::config::schema::{
+    CompiledArchive, Mo2ModlistEntry, ModType, PersonalizedMod, PersonalizedPlan,
+};
+use crate::ui::Tone;
 use globset::{GlobBuilder, GlobMatcher};
 use rehearse::{PartnerCache, Rehearsal};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -55,6 +58,79 @@ pub(crate) const GAME_PLUGINS: &[&str] = &[
     "dlcthievesden.esp",
     "dlcvilelair.esp",
 ];
+
+/// What a finding is about, which decides its heading and whether it fails
+/// the check. Reported grouped, in this order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Kind {
+    MissingArchive,
+    DamagedArchive,
+    WouldFail,
+    Masters,
+    LoadOrder,
+    Bsa,
+    Overwritten,
+    Unordered,
+    Filters,
+    NotChecked,
+}
+
+impl Kind {
+    fn heading(self) -> &'static str {
+        match self {
+            Kind::MissingArchive => "Not in the downloads folder",
+            Kind::DamagedArchive => "Archives that are not what the list expects",
+            Kind::WouldFail => "Would fail at install",
+            Kind::Masters => "Plugins whose masters will not be loaded before them",
+            Kind::LoadOrder => "Load order and installed plugins disagree",
+            Kind::Bsa => "BSAs the game will not load",
+            Kind::Overwritten => "Plugins installed by more than one mod (winner > overwritten)",
+            Kind::Unordered => {
+                "Installed but not in the load order (MO2 shows them unticked: exclude them, or \
+                 add them to `plugins`)"
+            }
+            Kind::Filters => "Filters that do nothing",
+            Kind::NotChecked => "Not checked",
+        }
+    }
+
+    fn tone(self) -> Tone {
+        match self {
+            Kind::Overwritten | Kind::Unordered | Kind::Filters => Tone::Warning,
+            Kind::NotChecked => Tone::Note,
+            _ => Tone::Problem,
+        }
+    }
+}
+
+/// Everything `check` found, to be reported grouped by kind.
+#[derive(Default)]
+struct Findings(Vec<(Kind, String)>);
+
+impl Findings {
+    fn push(&mut self, kind: Kind, message: String) {
+        self.0.push((kind, message));
+    }
+
+    fn count(&self, tone: Tone) -> usize {
+        self.0
+            .iter()
+            .filter(|(kind, _)| kind.tone() == tone)
+            .count()
+    }
+
+    /// Each kind under its heading; the log gets every line too.
+    fn report(&self) {
+        let mut by_kind: BTreeMap<Kind, Vec<String>> = BTreeMap::new();
+        for (kind, message) in &self.0 {
+            tracing::info!(kind = ?kind, message, "check finding");
+            by_kind.entry(*kind).or_default().push(message.clone());
+        }
+        for (kind, messages) in &by_kind {
+            crate::ui::section(kind.tone(), kind.heading(), messages);
+        }
+    }
+}
 
 /// A plugin Wrye Bash writes after the install: `Bashed Patch, 0.esp`. A list
 /// declares and orders it ahead of time, so it lands in place when it appears;
@@ -99,10 +175,7 @@ fn check_in(
 ) -> anyhow::Result<CheckReport> {
     let mut mods_checked = 0usize;
     let mut archives_checked = 0usize;
-    let mut errors: Vec<String> = Vec::new();
-    let mut warnings: Vec<String> = Vec::new();
-    // Mods whose actions could not be rehearsed, and why.
-    let mut unrehearsed: Vec<(String, String)> = Vec::new();
+    let mut findings = Findings::default();
     let mut folders: BTreeMap<String, ModFolder> = BTreeMap::new();
     let mut partners = PartnerCache::new();
     let active_plugins: HashSet<String> = plan
@@ -145,9 +218,7 @@ fn check_in(
             &active_plugins,
             &mut partners,
             scratch,
-            &mut errors,
-            &mut warnings,
-            &mut unrehearsed,
+            &mut findings,
         );
         folders.insert(mod_entry.id.clone(), folder);
     }
@@ -168,11 +239,13 @@ fn check_in(
         })
         .collect();
     let (master_errors, plugins_checked) = master_problems(plan, &shipped);
-    errors.extend(master_errors);
+    for error in master_errors {
+        findings.push(Kind::Masters, error);
+    }
     let whole_plan = settings.filter.is_empty();
-    load_order_problems(plan, &folders, whole_plan, &mut errors, &mut warnings);
-    bsa_problems(plan, &folders, &mut errors);
-    duplicate_plugins(&folders, &mut warnings);
+    load_order_problems(plan, &folders, whole_plan, &mut findings);
+    bsa_problems(plan, &folders, &mut findings);
+    duplicate_plugins(plan, &folders, &mut findings);
 
     let unread = plan
         .plugins
@@ -184,53 +257,53 @@ fn check_in(
                 && !made_by_wrye_bash(plugin)
         })
         .count();
-    // Emitted before the bail: the run that fails is exactly the run whose
-    // summary the author needs.
-    crate::ui::say(format!(
-        "Checked {archives_checked} archive(s) in {mods_checked} mod(s), and the masters of \
-         {plugins_checked} plugin(s){}{}{}",
-        if unread > 0 && whole_plan {
+    if unread > 0 && whole_plan {
+        findings.push(
+            Kind::NotChecked,
             format!(
-                " ({unread} more are made at install, or come from an archive inside an archive)"
-            )
-        } else {
-            String::new()
-        },
-        if errors.is_empty() {
-            String::new()
-        } else {
-            format!("; {} problem(s)", errors.len())
-        },
-        if warnings.is_empty() {
-            String::new()
-        } else {
-            format!("; {} warning(s)", warnings.len())
-        },
-    ));
-    for warning in &warnings {
-        crate::ui::say(format!("warning: {warning}"));
+                "the masters of {unread} plugin(s) made at install (merges) or inside an \
+                 archive in an archive"
+            ),
+        );
     }
-    for (id, why) in &unrehearsed {
-        crate::ui::say(format!("note: {id}'s actions were not checked: {why}"));
-    }
+
+    // Reported before the bail: the run that fails is exactly the run whose
+    // findings the author needs.
+    findings.report();
+    let problems = findings.count(Tone::Problem);
+    let warnings = findings.count(Tone::Warning);
+    crate::ui::say("");
+    crate::ui::status(
+        if problems > 0 {
+            Tone::Problem
+        } else if warnings > 0 {
+            Tone::Warning
+        } else {
+            Tone::Good
+        },
+        format!(
+            "Checked {archives_checked} archive(s) in {mods_checked} mod(s), and the masters of \
+             {plugins_checked} plugin(s): {problems} problem(s), {warnings} warning(s)"
+        ),
+    );
     tracing::info!(
         mods_checked,
         archives_checked,
         plugins_checked,
-        warnings = warnings.len(),
+        problems,
+        warnings,
         "check summary"
     );
 
-    if !errors.is_empty() {
-        let joined = errors.join("\n");
-        anyhow::bail!("check failed with {} issue(s):\n{joined}", errors.len());
+    if problems > 0 {
+        anyhow::bail!("check found {problems} problem(s), listed above");
     }
 
     Ok(CheckReport {
         mods_checked,
         archives_checked,
         plugins_checked,
-        warnings: warnings.len(),
+        warnings,
     })
 }
 
@@ -245,9 +318,7 @@ fn check_mod(
     active_plugins: &HashSet<String>,
     partners: &mut PartnerCache,
     scratch: &Path,
-    errors: &mut Vec<String>,
-    warnings: &mut Vec<String>,
-    unrehearsed: &mut Vec<(String, String)>,
+    findings: &mut Findings,
 ) -> ModFolder {
     let mut folder = ModFolder {
         complete: !matches!(
@@ -283,7 +354,7 @@ fn check_mod(
                 scratch,
                 &real.join(archive_index.to_string()),
                 &extract_bsas,
-                warnings,
+                findings,
             )
         } else {
             check_build_archive(archive, settings).map(|()| None)
@@ -295,7 +366,15 @@ fn check_mod(
             }
             Ok(None) => folder.complete = false,
             Err(err) => {
-                errors.push(format!("{}{which}: {err:#}", mod_entry.id));
+                let message = format!("{err:#}");
+                let (kind, message) = if message.contains("is not in the downloads folder") {
+                    (Kind::MissingArchive, message)
+                } else if let Some(rest) = message.strip_prefix("install would fail: ") {
+                    (Kind::WouldFail, rest.to_string())
+                } else {
+                    (Kind::DamagedArchive, message)
+                };
+                findings.push(kind, format!("{}{which}: {message}", mod_entry.id));
                 folder.complete = false;
             }
         }
@@ -324,18 +403,18 @@ fn check_mod(
         ) {
             Ok(Rehearsal::Done(files)) => files,
             Ok(Rehearsal::Fails(err)) => {
-                errors.push(format!("{}: install would fail: {err:#}", mod_entry.id));
+                findings.push(Kind::WouldFail, format!("{}: {err:#}", mod_entry.id));
                 folder.complete = false;
                 return folder;
             }
             Ok(Rehearsal::Unknown(why)) => {
                 tracing::info!(mod_id = %mod_entry.id, why, "check: actions not rehearsed");
-                unrehearsed.push((mod_entry.id.clone(), why));
+                findings.push(Kind::NotChecked, format!("{}: {why}", mod_entry.id));
                 folder.complete = false;
                 return folder;
             }
             Err(err) => {
-                errors.push(format!("{}: {err:#}", mod_entry.id));
+                findings.push(Kind::WouldFail, format!("{}: {err:#}", mod_entry.id));
                 folder.complete = false;
                 return folder;
             }
@@ -410,7 +489,7 @@ fn check_single_archive(
     scratch: &Path,
     real: &Path,
     extract_bsas: &BTreeSet<String>,
-    warnings: &mut Vec<String>,
+    findings: &mut Findings,
 ) -> anyhow::Result<Option<Contents>> {
     let source = present(archive, &ArchiveRef::for_archive(archive), settings)?;
 
@@ -470,10 +549,13 @@ fn check_single_archive(
         if plan_with(std::slice::from_ref(pattern), &archive.exclude)
             .is_ok_and(|plan| plan.is_empty())
         {
-            warnings.push(format!(
-                "{}: include '{pattern}' matches nothing in {file_name}",
-                mod_entry.id
-            ));
+            findings.push(
+                Kind::Filters,
+                format!(
+                    "{}: include '{pattern}' matches nothing in {file_name}",
+                    mod_entry.id
+                ),
+            );
         }
     }
     if !archive.exclude.is_empty()
@@ -483,10 +565,13 @@ fn check_single_archive(
             if plan_with(&archive.include, std::slice::from_ref(pattern))
                 .is_ok_and(|plan| plan.len() == unfiltered.len())
             {
-                warnings.push(format!(
-                    "{}: exclude '{pattern}' leaves nothing out of {file_name}",
-                    mod_entry.id
-                ));
+                findings.push(
+                    Kind::Filters,
+                    format!(
+                        "{}: exclude '{pattern}' leaves nothing out of {file_name}",
+                        mod_entry.id
+                    ),
+                );
             }
         }
     }
@@ -551,9 +636,21 @@ fn load_order_problems(
     plan: &PersonalizedPlan,
     folders: &BTreeMap<String, ModFolder>,
     whole_plan: bool,
-    errors: &mut Vec<String>,
-    warnings: &mut Vec<String>,
+    findings: &mut Findings,
 ) {
+    // A plan made before mods' declared plugins were carried into it says
+    // nothing about who declares what; comparing against that would report
+    // every plugin of a mod not fully known here.
+    let declarations_known =
+        plan.plugins.is_empty() || plan.mods.iter().any(|m| !m.plugins.is_empty());
+    if !declarations_known {
+        findings.push(
+            Kind::NotChecked,
+            "the load order against what each mod declares: this plan was made by an older \
+             mudcrab; run `compile` and `query` again"
+                .to_string(),
+        );
+    }
     let ordered: HashSet<String> = plan
         .plugins
         .iter()
@@ -573,25 +670,28 @@ fn load_order_problems(
             if !folder.plugins.contains_key(&declared.to_ascii_lowercase())
                 && !made_by_wrye_bash(declared)
             {
-                errors.push(format!(
-                    "{}: declares {declared}, which it does not install (a renamed plugin \
-                     after a mod update, or a layout that leaves it out)",
-                    mod_entry.id
-                ));
+                findings.push(
+                    Kind::LoadOrder,
+                    format!(
+                        "{}: declares {}, which it does not install (renamed in a mod update, \
+                         or left out by its layout)",
+                        mod_entry.id,
+                        crate::ui::name(declared)
+                    ),
+                );
             }
         }
         for (key, (name, _)) in &folder.plugins {
             if !ordered.contains(key) && !merged_away.contains(key) {
-                warnings.push(format!(
-                    "{}: installs {name}, which the load order does not list, so MO2 shows it \
-                     unticked; exclude it, or add it to `plugins`",
-                    mod_entry.id
-                ));
+                findings.push(
+                    Kind::Unordered,
+                    format!("{} ({})", crate::ui::name(name), mod_entry.id),
+                );
             }
         }
     }
 
-    if !whole_plan {
+    if !whole_plan || !declarations_known {
         return;
     }
     // A plugin may still come from a mod whose folder is not fully known;
@@ -612,9 +712,13 @@ fn load_order_problems(
             && !merge_outputs.contains(&key)
             && !GAME_PLUGINS.contains(&key.as_str())
         {
-            errors.push(format!(
-                "{plugin} is in the load order, but no mod installs it"
-            ));
+            findings.push(
+                Kind::LoadOrder,
+                format!(
+                    "{} is in the load order, but no mod installs it",
+                    crate::ui::name(plugin)
+                ),
+            );
         }
     }
 }
@@ -633,7 +737,7 @@ fn merged_away(plan: &PersonalizedPlan) -> HashSet<String> {
 fn bsa_problems(
     plan: &PersonalizedPlan,
     folders: &BTreeMap<String, ModFolder>,
-    errors: &mut Vec<String>,
+    findings: &mut Findings,
 ) {
     let inactive: HashSet<String> = plan
         .inactive_plugins
@@ -668,32 +772,53 @@ fn bsa_problems(
             {
                 continue;
             }
-            errors.push(format!(
-                "{id}: installs {bsa}, which no active plugin loads (Oblivion loads a BSA only \
-                 when an active plugin's name begins its own), so its contents never reach \
-                 the game; add a plugin of that name (`create_dummy_plugin`), or rename it"
-            ));
+            findings.push(
+                Kind::Bsa,
+                format!(
+                    "{id}: {} -- no active plugin's name begins it, so its contents never \
+                     reach the game; add a plugin of that name (`create_dummy_plugin`), or \
+                     rename it",
+                    crate::ui::name(bsa)
+                ),
+            );
         }
     }
 }
 
-/// The same plugin from two mods: allowed (the later mod's wins), but worth
-/// knowing about.
-fn duplicate_plugins(folders: &BTreeMap<String, ModFolder>, warnings: &mut Vec<String>) {
+/// The same plugin from two mods: allowed -- the copy from the mod highest in
+/// MO2's list wins -- but worth knowing about. Listed winner first.
+fn duplicate_plugins(
+    plan: &PersonalizedPlan,
+    folders: &BTreeMap<String, ModFolder>,
+    findings: &mut Findings,
+) {
+    // Later in the plan is higher in MO2's list.
+    // MO2's own list where the plan has one, else the plan's mods.
+    let mut priority: HashMap<&str, usize> = HashMap::new();
+    let ids = plan
+        .mo2_modlist_entries
+        .iter()
+        .filter_map(|entry| match entry {
+            Mo2ModlistEntry::Mod { id } => Some(id.as_str()),
+            _ => None,
+        })
+        .chain(plan.mods.iter().map(|m| m.id.as_str()));
+    for (index, id) in ids.enumerate() {
+        priority.entry(id).or_insert(index);
+    }
     let mut by_plugin: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for (id, folder) in folders {
         for key in folder.plugins.keys() {
             by_plugin.entry(key.as_str()).or_default().push(id.as_str());
         }
     }
-    for (key, mods) in by_plugin.into_iter().filter(|(_, mods)| mods.len() > 1) {
+    for (key, mut mods) in by_plugin.into_iter().filter(|(_, mods)| mods.len() > 1) {
+        mods.sort_by_key(|id| std::cmp::Reverse(priority.get(id).copied().unwrap_or(0)));
         let name = &folders[mods[0]].plugins[key].0;
-        warnings.push(format!(
-            "{name} is installed by {} mods ({}); MO2 uses the copy from the one lowest in its \
-             list",
-            mods.len(),
-            mods.join(", ")
-        ));
+        findings.push(
+            Kind::Overwritten,
+            format!("{}: {}", crate::ui::name(name), mods.join(" > ")),
+        );
     }
 }
 

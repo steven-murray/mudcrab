@@ -274,7 +274,11 @@ download_note = "The second file on the page, Trees.7z."
             .output()
             .unwrap();
         assert!(!output.status.success(), "{command} should fail");
-        let said = String::from_utf8_lossy(&output.stderr);
+        let said = format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
         assert!(
             said.contains("get it from: https://example.org/trees"),
             "{command}: {said}"
