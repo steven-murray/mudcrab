@@ -18,9 +18,8 @@ file behind, so a problem shows up early and nothing is ever redone needlessly:
 - **`compile` checks the list's own consistency before anything is
   downloaded.** A typo, a reference to a mod that is not there, or a
   contradiction in the list's logic is reported in seconds, not an hour into
-  an install. (Problems inside the archives -- a missing master, a conflict
-  -- can only be found once they are downloaded; `check` and `install` do
-  that.)
+  an install. (Problems inside the archives, such as an installer option
+  that does not exist, can only be found once they are downloaded.)
 - **`query` turns the list plus your answers into a plan**: one file saying
   exactly what will be installed. Your choices live there, not in the list, so
   changing your mind means re-running one quick step. The plan is also what to
@@ -28,8 +27,8 @@ file behind, so a problem shows up early and nothing is ever redone needlessly:
 - **`download` is the slow, network-bound part**, kept apart so it can be
   retried, done partly by hand, or done once for several installs. Everything
   after it works offline.
-- **`check` confirms every archive is present and holds what the list
-  expects**, before a long install starts.
+- **`check` confirms every archive is present and opens**, before a long
+  install starts.
 - **`install` only acts.** It can be stopped and re-run, and only redoes what
   changed.
 
@@ -156,6 +155,20 @@ When `download` reports nothing missing, check what you have:
 ```bash
 mudcrab check plan.json
 ```
+
+`check` looks for every archive the plan needs -- in the downloads folder and
+any `--archive-search-path` folder, by name or, for a hand download that
+records them, by size and MD5 -- and opens each one to read its list of
+files, which catches a download that stopped partway or a file that is not
+the archive it is named as. Where the list says certain files must be in an
+archive (files for the game's own folder, next to `Oblivion.exe`), it checks
+they are. It reports every problem together, with what the list says about
+getting any archive that is missing, and changes nothing.
+
+It does not unpack anything, so some problems only show at `install`: an
+installer option or BAIN subpackage the archive does not have, or a file the
+list's edits expect that is not there. Neither command checks that each
+plugin's masters are present; MO2 flags a missing master in its plugin list.
 
 ## 4. Install
 

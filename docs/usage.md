@@ -146,10 +146,11 @@ What it checks is the list's own consistency, from the TOML alone:
 - each archive has a `path` (or `build`), the fields its `layout` needs, and
   `size` with `md5`.
 
-It downloads and opens nothing, so it cannot see inside archives: whether a
-FOMOD option exists, a plugin's masters are present, or two mods' files
-overwrite each other is found by `check`, `install` and `conflicts`. Nor does
-it answer the list's questions; that is `query`. A list running over
+It downloads and opens nothing, so it cannot see inside archives: whether an
+archive is there and opens is for `check`, whether a FOMOD option or BAIN
+subpackage exists for `install`, and which mods overwrite each other's files
+for `conflicts`. (Whether each plugin's masters are present is not checked;
+MO2 flags a missing master.) Nor does it answer the list's questions; that is `query`. A list running over
 Oblivion's 255-plugin limit is a warning; `--strict` makes warnings errors.
 The docs file (`docs_file`) is not read: only `export` and `validate` need it.
 
@@ -679,7 +680,8 @@ mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
 
 ## check
 
-Validate downloaded archives and archive-backed file references without installing.
+Confirm every archive the plan needs is present and readable, without
+installing or changing anything.
 
 ```bash
 mudcrab check <plan.json> [--downloads <dir>] [--section <name>]... [--only <mod id>]...
@@ -692,6 +694,15 @@ Example:
 mudcrab check build/plan.json --downloads ~/Games/OblivionModDownloads \
   --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
 ```
+
+Each archive is looked for in the downloads folder and the search paths (by
+name, or by size and MD5 where the list records them) and opened to read its
+file list, which fails for a truncated or mislabelled download. Where an
+archive has `game_root_files`, each pattern must match a file in it. Build
+layers are checked for presence. A missing archive is reported with the
+list's `download_page` and `download_note`, and every problem is reported
+together. Nothing is unpacked: installer options, BAIN subpackages and the
+files an action names are only checked by `install`.
 
 Every archive is reported as one of `cached`, `resolvable locally` (present in a
 search path) or `MUST BE DOWNLOADED`, followed by a summary count. The summary is
