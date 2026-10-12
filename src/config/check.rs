@@ -186,9 +186,10 @@ fn archive_availability(
         };
     }
 
-    match locate(
-        archive.path.as_deref().unwrap_or_default(),
-        archive.file_name.as_deref(),
+    match archive_store::locate(
+        &settings.cache_dir,
+        &settings.archive_search_paths,
+        &ArchiveRef::for_archive(archive),
     ) {
         Some(Found::Downloads(_)) => ArchiveAvailability::Cached,
         Some(Found::SearchPath(_)) => ArchiveAvailability::Local,
@@ -198,15 +199,12 @@ fn archive_availability(
 
 /// Where an archive is, in the downloads folder or a search path. A search
 /// path copy is validated in place: `check` only ever reads.
-fn located(settings: &CheckSettings, source: &str, file_name: Option<&str>) -> Option<PathBuf> {
-    archive_store::locate(
-        &settings.cache_dir,
-        &settings.archive_search_paths,
-        &ArchiveRef::new(source, file_name),
+fn located(settings: &CheckSettings, archive: &ArchiveRef<'_>) -> Option<PathBuf> {
+    archive_store::locate(&settings.cache_dir, &settings.archive_search_paths, archive).map(
+        |found| match found {
+            Found::Downloads(path) | Found::SearchPath(path) => path,
+        },
     )
-    .map(|found| match found {
-        Found::Downloads(path) | Found::SearchPath(path) => path,
-    })
 }
 
 fn check_single_archive(
@@ -214,8 +212,8 @@ fn check_single_archive(
     settings: &CheckSettings,
 ) -> anyhow::Result<usize> {
     let path = archive.path.as_deref().unwrap_or_default();
-    let reference = ArchiveRef::new(path, archive.file_name.as_deref());
-    let Some(source) = located(settings, path, archive.file_name.as_deref()) else {
+    let reference = ArchiveRef::for_archive(archive);
+    let Some(source) = located(settings, &reference) else {
         let how = if path.starts_with("manual:") {
             "it is downloaded by hand (`manual:`), so put it there yourself"
         } else {
@@ -268,7 +266,7 @@ fn check_build_archive(
     let mut merged_paths: Vec<String> = Vec::new();
 
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let Some(source) = located(settings, &layer.path, None) else {
+        let Some(source) = located(settings, &ArchiveRef::new(&layer.path, None)) else {
             anyhow::bail!(
                 "build layer {} ({}) is not in \
                  {} or any search path",

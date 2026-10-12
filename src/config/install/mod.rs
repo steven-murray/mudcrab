@@ -687,6 +687,8 @@ mod tests {
             mod_type: None,
             merge: None,
             archives: vec![CompiledArchive {
+                size: None,
+                md5: None,
                 condition: None,
                 path: Some(archive_path.to_string()),
                 file_name: None,
@@ -1173,6 +1175,8 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1242,6 +1246,8 @@ mod tests {
         zip.finish().expect("finish zip");
 
         let simple = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("manual:WACv_1beta.7z".to_string()),
             file_name: None,
@@ -1284,6 +1290,8 @@ mod tests {
         // refuses. This is the assertion that makes the fix load-bearing --
         // before it, `simple` took this branch too.
         let detected = CompiledArchive {
+            size: None,
+            md5: None,
             layout: None,
             ..simple
         };
@@ -1325,6 +1333,8 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1387,6 +1397,8 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1447,6 +1459,8 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1553,6 +1567,8 @@ mod tests {
 
         let target_root = temp.path().join("out");
         let archive = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("local-fomod.zip".to_string()),
             file_name: None,

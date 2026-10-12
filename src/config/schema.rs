@@ -773,6 +773,15 @@ pub struct ArchiveSpec {
     /// the name the archive is exported under into MO2's `downloads/`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
+    /// The archive's size in bytes and its MD5, for an archive fetched by hand.
+    ///
+    /// A host that renames a file breaks a lookup by name; these recognise the
+    /// same bytes under any name. Given together or not at all. Only files of
+    /// exactly this size are ever hashed, so the lookup stays cheap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
@@ -938,6 +947,11 @@ pub struct CompiledArchive {
     /// The archive's own filename; see `ArchiveSpec::file_name`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_name: Option<String>,
+    /// See [`ArchiveSpec::size`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub md5: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,

@@ -68,8 +68,25 @@ pub fn compile_archive(id: &str, archive: &ArchiveSpec) -> anyhow::Result<Compil
             id
         ));
     }
+    // A size picks the files worth hashing and the hash says which is this
+    // one; either alone would make a rename-proof lookup slow or unsound.
+    let md5 = match (archive.size, archive.md5.as_deref()) {
+        (Some(_), Some(md5)) => {
+            let md5 = md5.trim().to_ascii_lowercase();
+            if md5.len() != 32 || !md5.bytes().all(|b| b.is_ascii_hexdigit()) {
+                anyhow::bail!("mod '{id}': md5 must be 32 hex digits, got '{md5}'");
+            }
+            Some(md5)
+        }
+        (None, None) => None,
+        _ => {
+            anyhow::bail!("mod '{id}': an archive's size and md5 go together; give both or neither")
+        }
+    };
     Ok(CompiledArchive {
         condition: archive.condition.clone(),
+        size: archive.size,
+        md5,
         path: archive.path.clone(),
         file_name: archive
             .file_name

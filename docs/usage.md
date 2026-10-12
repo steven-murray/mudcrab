@@ -45,7 +45,8 @@ unpacked until `install`.
 
 `--archive` writes the archive entry from the archive itself, as `inspect`
 reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
-`--manual` for `manual:<file name>`), the file name and the layout. In a
+`--manual` for `manual:<file name>`, with the file's `size` and `md5` so a
+renamed copy is still found), the file name and the layout. In a
 terminal, an installer's choices are asked: a FOMOD step by step, through the
 same walk install makes (so a step shown only after certain answers is shown
 here only then), and a BAIN package's subpackages as one list. A BAIN package
@@ -192,12 +193,18 @@ instance's `ModOrganizer.ini` to the folder, so MO2 lists everything there --
 including archives you may want to install by hand afterwards -- rather than
 being given copies.
 
-An archive is found by what it is, never by which mod uses it:
+An archive is found by what it is, never by which mod uses it -- and, when
+the list records an archive's `size` and `md5` and nothing has its name, by
+content, so a hand-downloaded file its host has renamed is still found. Only
+files of exactly that size are hashed.
+
+The lookups, in order:
 
 - a Nexus archive by the `modID`/`fileID` in its `.meta` (so MO2's `(1)`
   suffixes and hand renames do not matter);
 - anything else by its `file_name`, case-insensitively, or for a URL source by
-  the `url` in its `.meta`.
+  the `url` in its `.meta`;
+- failing those, by `size` and `md5`, when the list records them.
 
 So renaming a mod, reordering its archives or using one archive in several mods
 changes nothing on disk. A download mudcrab makes is saved under the server's

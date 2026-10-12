@@ -254,6 +254,28 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     .filter(|line| !line.trim_start().starts_with('#'))
     .collect::<Vec<_>>()
     .join("\n");
+    // A hand-fetched archive is found by name, and its host may rename it:
+    // its size and MD5 find it under any name.
+    let block = if source.starts_with("manual:") {
+        let size = std::fs::metadata(archive)
+            .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", archive.display()))?
+            .len();
+        let md5 = crate::config::identify::md5_of_file(archive)?;
+        block
+            .lines()
+            .flat_map(|line| {
+                let mut out = vec![line.to_string()];
+                if line.starts_with("file_name = ") {
+                    out.push(format!("size = {size}"));
+                    out.push(format!("md5 = \"{md5}\""));
+                }
+                out
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    } else {
+        block
+    };
     // Actions the installer's choices call for follow the archive.
     let block = actions
         .iter()

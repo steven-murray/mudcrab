@@ -105,7 +105,9 @@ The list marks this archive `manual:`, because no download link can reach it
 (a forum host behind a login, say). Its entry should say where to get it.
 If the message lists *similarly named files*, one of them may be the same
 archive, renamed by its host since the list was written: if so, set the
-entry's `file_name` to that name.
+entry's `file_name` to that name. (An entry that records the archive's `size`
+and `md5` finds a renamed copy by itself; `add --archive --manual` writes
+them.)
 
 ## Checking
 

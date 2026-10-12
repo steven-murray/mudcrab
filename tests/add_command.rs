@@ -649,3 +649,86 @@ EndSelect
         "{text}"
     );
 }
+
+#[test]
+fn a_hand_download_is_recorded_by_content_and_found_after_a_rename() {
+    let (dir, path) = fixture();
+    let downloads = dir.path().join("downloads");
+    std::fs::create_dir_all(&downloads).unwrap();
+    let archive = downloads.join("Handmade 1.0.zip");
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+    zip.start_file("meshes/a.nif", zip::write::SimpleFileOptions::default())
+        .unwrap();
+    std::io::Write::write_all(&mut zip, b"NIF").unwrap();
+    zip.finish().unwrap();
+    let bytes = std::fs::read(&archive).unwrap();
+
+    add(&path)
+        .arg("--archive")
+        .arg(&archive)
+        .args(["--manual", "--id", "Handmade", "--section", "CORE"])
+        .assert()
+        .success();
+    let text = std::fs::read_to_string(&path).unwrap();
+    assert!(
+        text.contains(&format!(
+            "path = \"manual:Handmade 1.0.zip\"\nfile_name = \"Handmade 1.0.zip\"\nsize = {}\nmd5 = \"{:x}\"",
+            bytes.len(),
+            md5::compute(&bytes)
+        )),
+        "{text}"
+    );
+
+    // The host renames the file. The list still finds it, by its content.
+    std::fs::rename(&archive, downloads.join("Handmade_v1_final.zip")).unwrap();
+    let mudcrab = |args: &[&str]| {
+        let mut command = Command::cargo_bin("mudcrab").unwrap();
+        command.env("XDG_STATE_HOME", dir.path().join("state"));
+        command.args(args);
+        command
+    };
+    let compiled = dir.path().join("compiled.json");
+    let plan = dir.path().join("plan.json");
+    mudcrab(&[
+        "compile",
+        path.to_str().unwrap(),
+        "--offline",
+        "--output",
+        compiled.to_str().unwrap(),
+    ])
+    .assert()
+    .success();
+    mudcrab(&[
+        "query",
+        compiled.to_str().unwrap(),
+        "--headless",
+        "--output",
+        plan.to_str().unwrap(),
+    ])
+    .assert()
+    .success();
+    mudcrab(&[
+        "check",
+        plan.to_str().unwrap(),
+        "--downloads",
+        downloads.to_str().unwrap(),
+        "--only",
+        "Handmade",
+    ])
+    .assert()
+    .success();
+
+    // A size alone, or a hash alone, is refused.
+    let half = text.replace(&format!("md5 = \"{:x}\"\n", md5::compute(&bytes)), "");
+    std::fs::write(&path, half).unwrap();
+    mudcrab(&[
+        "compile",
+        path.to_str().unwrap(),
+        "--offline",
+        "--output",
+        compiled.to_str().unwrap(),
+    ])
+    .assert()
+    .failure()
+    .stderr(predicates::str::contains("size and md5 go together"));
+}

@@ -717,11 +717,10 @@ fn inspect_archive(
     if archive.inner_archive.is_some() {
         return (None, None);
     }
-    let Some(source) = archive.path.as_deref() else {
+    if archive.path.is_none() {
         return (None, None);
-    };
-    let reference =
-        crate::config::archive_store::ArchiveRef::new(source, archive.file_name.as_deref());
+    }
+    let reference = crate::config::archive_store::ArchiveRef::for_archive(archive);
     let Some(path) =
         crate::config::archive_store::find(lookup.downloads, lookup.search_paths, &reference)
     else {

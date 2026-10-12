@@ -639,14 +639,10 @@ mod layout_audit {
                 {
                     continue;
                 }
-                let Some(path) = archive.path.as_deref() else {
+                if archive.path.is_none() {
                     continue;
-                };
-                let Some(file) = find(
-                    &downloads,
-                    &[],
-                    &ArchiveRef::new(path, archive.file_name.as_deref()),
-                ) else {
+                }
+                let Some(file) = find(&downloads, &[], &ArchiveRef::for_archive(archive)) else {
                     println!("AUDIT\t{}\t{index}\tMISSING", entry.id);
                     continue;
                 };

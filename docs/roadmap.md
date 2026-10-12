@@ -23,14 +23,13 @@ their real names with MO2 `.meta` files, found by Nexus ids or filename, and MO2
 is pointed at it rather than given copies. `downloads tidy` converts a folder
 from the old derived names.
 
-### A2. Make manual archives resolvable when the host renames the file — error done
+### A2. ~~Make manual archives resolvable when the host renames the file~~ — done
 
-Today a `manual:` source matches its `file_name` exactly. The cheap part is
-done: when one is missing, the error now names the best-matching files in the
-search paths (same words, ignoring version-like ones), so "go download it by
-hand" no longer hides the copy already on disk. Matching on content hash, or
-letting `file_name` be a set of alternates, would make it resolve by itself;
-neither is done.
+A `manual:` archive can record its `size` and `md5`; when nothing has its name,
+the downloads folder and search paths are searched by content -- only files of
+that exact size are hashed, once each per run -- so a renamed copy is found.
+`add --archive --manual` records both. Without them, `check` and `download`
+still name similarly named files on disk, for the author to confirm.
 
 ### A3. ~~One implementation of "where is the content root"~~ — done
 

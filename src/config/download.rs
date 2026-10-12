@@ -67,6 +67,7 @@ pub async fn download_all(
                         label: format!("build layer {} ({})", layer_index + 1, layer.path),
                         path: &layer.path,
                         file_name: None,
+                        content: None,
                         handler: layer.download_handler.as_deref(),
                     });
                 }
@@ -77,6 +78,7 @@ pub async fn download_all(
                     label: archive.file_name.as_deref().unwrap_or(path).to_string(),
                     path,
                     file_name: archive.file_name.as_deref(),
+                    content: archive.size.zip(archive.md5.as_deref()),
                     handler: archive.download_handler.as_deref(),
                 });
             }
@@ -93,9 +95,15 @@ pub async fn download_all(
             let client = &client;
             let bar = bar.clone();
             async move {
-                let result =
-                    download_with_retry(client, job.path, job.file_name, job.handler, settings)
-                        .await;
+                let result = download_with_retry(
+                    client,
+                    job.path,
+                    job.file_name,
+                    job.content,
+                    job.handler,
+                    settings,
+                )
+                .await;
                 bar.inc(1);
                 bar.set_message(job.mod_id.to_string());
                 (job, result)
@@ -157,6 +165,8 @@ struct Job<'a> {
     label: String,
     path: &'a str,
     file_name: Option<&'a str>,
+    /// Size and MD5, for finding a renamed copy.
+    content: Option<(u64, &'a str)>,
     handler: Option<&'a str>,
 }
 
@@ -168,11 +178,13 @@ async fn download_with_retry(
     client: &Client,
     path: &str,
     file_name: Option<&str>,
+    content: Option<(u64, &str)>,
     handler: Option<&str>,
     settings: &DownloadSettings,
 ) -> anyhow::Result<DownloadOutcome> {
     let downloads = &settings.cache_dir;
-    let archive = ArchiveRef::new(path, file_name);
+    let mut archive = ArchiveRef::new(path, file_name);
+    archive.content = content;
 
     if let Some(found) =
         archive_store::resolve(downloads, &settings.archive_search_paths, &archive)?
@@ -734,6 +746,8 @@ mod tests {
     #[test]
     fn resolves_nexus_handler_from_source_shape() {
         let explicit = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("https://www.nexusmods.com/skyrimspecialedition/mods/1".to_string()),
             file_name: None,
@@ -758,6 +772,8 @@ mod tests {
         );
 
         let scheme = CompiledArchive {
+            size: None,
+            md5: None,
             condition: None,
             path: Some("nexus:skyrimspecialedition/1/2".to_string()),
             file_name: None,
@@ -810,6 +826,7 @@ mod tests {
             &Client::new(),
             "manual:WACv_1beta.7z",
             Some("WACv_1beta.7z"),
+            None,
             None,
             &settings,
         )
@@ -925,6 +942,8 @@ mod tests {
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
+                    size: None,
+                    md5: None,
                     condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,
@@ -1010,6 +1029,8 @@ mod tests {
                 mod_type: None,
                 merge: None,
                 archives: vec![CompiledArchive {
+                    size: None,
+                    md5: None,
                     condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,

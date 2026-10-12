@@ -197,8 +197,7 @@ pub(crate) fn install_mod_archives(
             continue;
         }
 
-        let path = archive.path.as_deref().unwrap_or_default();
-        let reference = ArchiveRef::new(path, archive.file_name.as_deref());
+        let reference = ArchiveRef::for_archive(archive);
         let source = if settings.dry_run {
             // A dry run exists to show the whole plan, so a missing archive is
             // something to report and carry on from -- aborting on the first

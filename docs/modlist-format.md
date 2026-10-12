@@ -124,6 +124,7 @@ these from the archive itself.
 | --- | --- |
 | `path` | Always: where the archive comes from. See below. |
 | `file_name` | Nearly always: the archive's name as the host serves it. It is how a copy already on disk is found, and how `check` names a missing one. |
+| `size`, `md5` | For a `manual:` archive: its size in bytes and MD5, so a copy its host has since renamed is still found, by content. Both or neither; `add --archive --manual` writes them. |
 | `layout` | When the archive needs telling how it is laid out: `"fomod"`, `"bain"` or `"custom-data-folder"`. Without it the layout is detected (data at the top, or in one folder MO2 would unwrap). |
 | `data_folder` | With `layout = "custom-data-folder"`: the folder inside the archive that holds the data. |
 | `target_subdir` | When the files belong in a folder the archive lacks: where in the mod to put them (`"obse/plugins"`). |
@@ -142,7 +143,7 @@ these from the archive itself.
 | --- | --- |
 | `nexus:oblivion/<mod id>/<file id>` | A file on Nexus Mods. Downloaded through the API (premium accounts), or by hand. `mudcrab nexus-files <mod id>` lists a mod's files with this line ready to paste. |
 | `https://...` | Any other direct download. |
-| `manual:<file name>` | A file no download link can reach (a forum host behind a login, say): whoever installs the list downloads it by hand. Say where in a comment. |
+| `manual:<file name>` | A file no download link can reach (a forum host behind a login, say): whoever installs the list downloads it by hand. Say where in a comment, and give `size` and `md5` so a renamed copy is still recognised. |
 | a file path | A file on this machine. Ties the list to one computer, so mostly for testing. |
 
 Archives are kept in one downloads folder under their real names; see

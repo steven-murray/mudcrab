@@ -122,11 +122,10 @@ fn from_plan(
             );
         }
 
-        let path = archive.path.as_deref().unwrap_or_default();
         let source = archive_store::find(
             &settings.cache_dir,
             &settings.archive_search_paths,
-            &ArchiveRef::new(path, archive.file_name.as_deref()),
+            &ArchiveRef::for_archive(archive),
         )
         .ok_or_else(|| {
             anyhow::anyhow!(

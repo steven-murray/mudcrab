@@ -25,11 +25,27 @@ pub struct ArchiveRef<'a> {
     pub source: &'a str,
     /// The archive's own filename, when the modlist declares it.
     pub file_name: Option<&'a str>,
+    /// Size and MD5, when the modlist records them: found by content when
+    /// nothing has the expected name.
+    pub content: Option<(u64, &'a str)>,
 }
 
 impl<'a> ArchiveRef<'a> {
     pub fn new(source: &'a str, file_name: Option<&'a str>) -> Self {
-        Self { source, file_name }
+        Self {
+            source,
+            file_name,
+            content: None,
+        }
+    }
+
+    /// Everything the modlist says about one of its archives.
+    pub fn for_archive(archive: &'a crate::config::schema::CompiledArchive) -> Self {
+        Self {
+            source: archive.path.as_deref().unwrap_or_default(),
+            file_name: archive.file_name.as_deref(),
+            content: archive.size.zip(archive.md5.as_deref()),
+        }
     }
 
     /// `(game, mod id, file id)` for a Nexus source.
@@ -257,6 +273,10 @@ pub enum Found {
 }
 
 /// Find an archive in the downloads folder, then the search paths. Read-only.
+///
+/// By what the archive is -- Nexus ids, URL, name -- and, failing those, by
+/// content, when the modlist records it: a host that renames a hand-fetched
+/// file leaves the bytes the same.
 pub fn locate(
     downloads: &Path,
     search_paths: &[PathBuf],
@@ -265,11 +285,70 @@ pub fn locate(
     if let Some(path) = find_in(downloads, archive) {
         return Some(Found::Downloads(path));
     }
-    search_paths
-        .iter()
-        .filter(|dir| dir.as_path() != downloads)
-        .find_map(|dir| find_in(dir, archive))
-        .map(Found::SearchPath)
+    let others = || search_paths.iter().filter(|dir| dir.as_path() != downloads);
+    if let Some(path) = others().find_map(|dir| find_in(dir, archive)) {
+        return Some(Found::SearchPath(path));
+    }
+    let (size, md5) = archive.content?;
+    let found = find_by_content(downloads, size, md5)
+        .map(Found::Downloads)
+        .or_else(|| {
+            others()
+                .find_map(|dir| find_by_content(dir, size, md5))
+                .map(Found::SearchPath)
+        })?;
+    let (Found::Downloads(path) | Found::SearchPath(path)) = &found;
+    tracing::info!(
+        wanted = archive.describe(),
+        found = %path.display(),
+        "archive found by its content under another name"
+    );
+    Some(found)
+}
+
+/// A file in `dir` (not below it, like the name lookups) of exactly `size`
+/// bytes whose MD5 is `md5`. Only same-sized files are hashed, and a hash is
+/// remembered for the run, so a folder of large archives costs one `stat`
+/// each.
+fn find_by_content(dir: &Path, size: u64, md5: &str) -> Option<PathBuf> {
+    static HASHES: OnceLock<Mutex<HashMap<PathBuf, String>>> = OnceLock::new();
+    let entries = std::fs::read_dir(dir).ok()?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if is_sidecar(&name) || name.to_ascii_lowercase().ends_with(".meta") {
+            continue;
+        }
+        if !entry
+            .metadata()
+            .is_ok_and(|m| m.is_file() && m.len() == size)
+        {
+            continue;
+        }
+        let hashes = HASHES.get_or_init(Default::default);
+        let known = hashes
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .get(&path)
+            .cloned();
+        let hash = match known {
+            Some(hash) => hash,
+            None => {
+                let Ok(hash) = crate::config::identify::md5_of_file(&path) else {
+                    continue;
+                };
+                hashes
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner())
+                    .insert(path.clone(), hash.clone());
+                hash
+            }
+        };
+        if hash.eq_ignore_ascii_case(md5) {
+            return Some(path);
+        }
+    }
+    None
 }
 
 /// Find an archive's path, in the downloads folder or a search path, without
@@ -587,6 +666,36 @@ mod tests {
         assert_eq!(
             locate(dir.path(), &[], &wanted),
             Some(Found::Downloads(archive))
+        );
+    }
+
+    #[test]
+    fn a_renamed_hand_download_is_found_by_its_content() {
+        let downloads = tempfile::tempdir().unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        // The host renamed it; a different file happens to share its size.
+        let renamed = touch(elsewhere.path(), "WAC v1 beta (fixed).7z", "payload");
+        touch(elsewhere.path(), "Other.7z", "PAYLOAD");
+        let md5 = format!("{:x}", md5::compute(b"payload"));
+
+        let mut wanted = ArchiveRef::new("manual:WACv_1beta.7z", None);
+        assert_eq!(
+            locate(downloads.path(), &[elsewhere.path().to_path_buf()], &wanted),
+            None
+        );
+
+        wanted.content = Some((7, &md5));
+        assert_eq!(
+            locate(downloads.path(), &[elsewhere.path().to_path_buf()], &wanted),
+            Some(Found::SearchPath(renamed))
+        );
+
+        // Same name, different bytes: not this archive.
+        let other = format!("{:x}", md5::compute(b"payloaX"));
+        wanted.content = Some((7, &other));
+        assert_eq!(
+            locate(downloads.path(), &[elsewhere.path().to_path_buf()], &wanted),
+            None
         );
     }
 
