@@ -830,6 +830,27 @@ pub fn plan_archive_lines(
     archive_index: usize,
     lines: &[String],
 ) -> anyhow::Result<String> {
+    plan_table_lines(
+        text,
+        mods,
+        mod_index,
+        "[[mods.archives]]",
+        archive_index,
+        lines,
+    )
+}
+
+/// As [`plan_archive_lines`], for the `nth` table of a mod headed `header`:
+/// `[[mods.archives]]`, or `[[mods.archives.build]]` for a build layer
+/// (counted across all of the mod's archives).
+pub fn plan_table_lines(
+    text: &str,
+    mods: &[ModEntry],
+    mod_index: usize,
+    header: &str,
+    archive_index: usize,
+    lines: &[String],
+) -> anyhow::Result<String> {
     let kinds = classify_lines(text);
     let headers: Vec<usize> = kinds
         .iter()
@@ -851,8 +872,7 @@ pub fn plan_archive_lines(
         .unwrap_or(kinds.len());
     let tables: Vec<usize> = (start..end)
         .filter(|&i| {
-            kinds[i] == LineKind::Other
-                && strip_trailing_comment(&all[i]).trim() == "[[mods.archives]]"
+            kinds[i] == LineKind::Other && strip_trailing_comment(&all[i]).trim() == header
         })
         .collect();
     let table = *tables.get(archive_index).ok_or_else(|| {

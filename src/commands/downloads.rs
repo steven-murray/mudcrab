@@ -1,6 +1,6 @@
 //! `mudcrab downloads`: housekeeping for the downloads folder.
 
-use crate::cli::{DownloadsCommand, DownloadsRecordArgs, DownloadsTidyArgs};
+use crate::cli::{DownloadsCommand, DownloadsLocateArgs, DownloadsRecordArgs, DownloadsTidyArgs};
 use crate::config::downloads_tidy::{self, Step};
 use std::collections::HashMap;
 
@@ -8,11 +8,58 @@ pub async fn run(command: DownloadsCommand) -> anyhow::Result<()> {
     match command {
         DownloadsCommand::Tidy(args) => tidy(args).await,
         DownloadsCommand::Record(args) => record(args),
+        DownloadsCommand::Locate(args) => locate(args),
     }
 }
 
-/// Write `size` and `md5` into every `manual:` archive entry that lacks them
-/// and whose file is on disk.
+/// Where each archive the plan needs is, as tab-separated lines on stdout.
+fn locate(args: DownloadsLocateArgs) -> anyhow::Result<()> {
+    use crate::config::archive_store::{ArchiveRef, find};
+
+    let raw = std::fs::read_to_string(&args.plan)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.plan.display()))?;
+    let plan: crate::config::schema::PersonalizedPlan = serde_json::from_str(&raw)
+        .map_err(|err| anyhow::anyhow!("failed to parse plan {}: {err}", args.plan.display()))?;
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let search = &args.archive_sources.archive_search_paths;
+    let (mut found, mut missing) = (0usize, 0usize);
+    for entry in &plan.mods {
+        for (index, archive) in entry.archives.iter().enumerate() {
+            let mut lines: Vec<(String, Option<std::path::PathBuf>)> = Vec::new();
+            if archive.build.is_empty() {
+                let reference = ArchiveRef::for_archive(archive);
+                lines.push((
+                    reference.source.to_string(),
+                    find(&downloads, search, &reference),
+                ));
+            } else {
+                for layer in &archive.build {
+                    let reference = ArchiveRef::new(&layer.path, layer.file_name.as_deref());
+                    lines.push((layer.path.clone(), find(&downloads, search, &reference)));
+                }
+            }
+            for (source, path) in lines {
+                let at = match &path {
+                    Some(path) => {
+                        found += 1;
+                        path.display().to_string()
+                    }
+                    None => {
+                        missing += 1;
+                        "MISSING".to_string()
+                    }
+                };
+                println!("{}\t{}\t{source}\t{at}", entry.id, index + 1);
+            }
+        }
+    }
+    eprintln!("{found} found, {missing} missing");
+    Ok(())
+}
+
+/// Fill in what lets an archive be recognised wherever it turns up: the file
+/// name of a Nexus or URL archive that has none, and the size and MD5 of a
+/// `manual:` one. Only for archives whose file is on disk.
 fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
     use crate::config::archive_store::{ArchiveRef, find};
 
@@ -26,11 +73,22 @@ fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
     let (mut recorded, mut missing, mut already) = (0usize, Vec::new(), 0usize);
     for (mod_index, entry) in source.mods.iter().enumerate() {
         for (archive_index, archive) in entry.archives.iter().enumerate() {
-            let Some(path) = archive.path.as_deref().filter(|p| p.starts_with("manual:")) else {
+            let Some(path) = archive.path.as_deref() else {
                 continue;
             };
-            if archive.size.is_some() || archive.md5.is_some() {
-                already += 1;
+            let manual = path.starts_with("manual:");
+            // A file name lets a copy with no `.meta` -- a browser download, a
+            // file from another machine -- be recognised; a `manual:` source
+            // already carries one.
+            let needs_name = archive.file_name.is_none()
+                && (path.starts_with("nexus:")
+                    || path.starts_with("http://")
+                    || path.starts_with("https://"));
+            let needs_content = manual && archive.size.is_none() && archive.md5.is_none();
+            if !needs_name && !needs_content {
+                if manual || archive.file_name.is_some() {
+                    already += 1;
+                }
                 continue;
             }
             let reference = ArchiveRef::new(path, archive.file_name.as_deref());
@@ -38,23 +96,75 @@ fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
                 missing.push(format!("{} ({})", entry.id, reference.describe()));
                 continue;
             };
-            let size = std::fs::metadata(&file)
-                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", file.display()))?
-                .len();
-            let md5 = crate::config::identify::md5_of_file(&file)?;
-            println!(
-                "{}: {} -- size {size}, md5 {md5}",
-                entry.id,
-                reference.describe()
-            );
+            let mut lines = Vec::new();
+            if needs_name {
+                let name = file
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                println!("{}: {path} -- file_name {name}", entry.id);
+                lines.push(format!(
+                    "file_name = \"{}\"",
+                    name.replace('\\', "\\\\").replace('"', "\\\"")
+                ));
+            }
+            if needs_content {
+                let size = std::fs::metadata(&file)
+                    .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", file.display()))?
+                    .len();
+                let md5 = crate::config::identify::md5_of_file(&file)?;
+                println!(
+                    "{}: {} -- size {size}, md5 {md5}",
+                    entry.id,
+                    reference.describe()
+                );
+                lines.push(format!("size = {size}"));
+                lines.push(format!("md5 = \"{md5}\""));
+            }
             text = crate::config::add::plan_archive_lines(
                 &text,
                 &source.mods,
                 mod_index,
                 archive_index,
-                &[format!("size = {size}"), format!("md5 = \"{md5}\"")],
+                &lines,
             )?;
             recorded += 1;
+        }
+    }
+
+    // Build layers: a file name each, as for an archive.
+    for (mod_index, entry) in source.mods.iter().enumerate() {
+        let mut nth = 0usize;
+        for archive in &entry.archives {
+            for layer in &archive.build {
+                let this = nth;
+                nth += 1;
+                if layer.file_name.is_some() {
+                    continue;
+                }
+                let reference = ArchiveRef::new(&layer.path, None);
+                let Some(file) = find(&downloads, search, &reference) else {
+                    missing.push(format!("{} ({})", entry.id, layer.path));
+                    continue;
+                };
+                let name = file
+                    .file_name()
+                    .map(|n| n.to_string_lossy().into_owned())
+                    .unwrap_or_default();
+                println!("{}: {} -- file_name {name}", entry.id, layer.path);
+                text = crate::config::add::plan_table_lines(
+                    &text,
+                    &source.mods,
+                    mod_index,
+                    "[[mods.archives.build]]",
+                    this,
+                    &[format!(
+                        "file_name = \"{}\"",
+                        name.replace('\\', "\\\\").replace('"', "\\\"")
+                    )],
+                )?;
+                recorded += 1;
+            }
         }
     }
 
@@ -62,7 +172,7 @@ fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
         eprintln!("not on disk, so not recorded: {item}");
     }
     eprintln!(
-        "{recorded} hand-downloaded archive(s) recorded{}{}",
+        "{recorded} archive(s) recorded{}{}",
         if already > 0 {
             format!(", {already} already were")
         } else {

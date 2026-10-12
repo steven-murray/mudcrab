@@ -758,11 +758,28 @@ pub enum DownloadsCommand {
     /// (`{mod}_{index}_{source}` + `.orig-name`) to real names with MO2 `.meta`
     /// files. Prints what it would do; changes nothing without --apply.
     Tidy(DownloadsTidyArgs),
-    /// Record the size and MD5 of a modlist's hand-downloaded (`manual:`)
-    /// archives in the list itself, so each is still found after its host
-    /// renames it. Only archives found on disk and not yet recorded are
-    /// written; comments and layout are kept.
+    /// Record in a modlist what lets each archive be recognised wherever it
+    /// turns up: the file name of a Nexus or URL archive that has none (so a
+    /// browser download, with no MO2 `.meta`, is found), and the size and MD5
+    /// of a hand-downloaded (`manual:`) one (so it is found after its host
+    /// renames it). Only archives found on disk are written; comments and
+    /// layout are kept.
     Record(DownloadsRecordArgs),
+    /// Print where each archive a plan needs is: one tab-separated line per
+    /// archive -- mod id, archive number, source, and its path, or MISSING.
+    /// For scripts and for checking a downloads folder by eye. Only reads.
+    Locate(DownloadsLocateArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct DownloadsLocateArgs {
+    /// Path to a personalized install plan.
+    pub plan: PathBuf,
+    /// The downloads folder. Defaults to `downloads_dir` in tools.toml.
+    #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
+    #[command(flatten)]
+    pub archive_sources: ArchiveSourceArgs,
 }
 
 #[derive(Debug, Args)]

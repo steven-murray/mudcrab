@@ -102,7 +102,7 @@ pub async fn download_report(
                         mod_id: &mod_entry.id,
                         label: format!("build layer {} ({})", layer_index + 1, layer.path),
                         path: &layer.path,
-                        file_name: None,
+                        file_name: layer.file_name.as_deref(),
                         content: None,
                         handler: layer.download_handler.as_deref(),
                     });

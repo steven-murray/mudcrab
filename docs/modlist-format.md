@@ -135,7 +135,7 @@ these from the archive itself.
 | `inner_archive` | When the download is a wrapper around the real archive: the inner one's path, which is unpacked as the mod. |
 | `if` | When the archive only applies for some answers: a condition. |
 | `download_handler` | Rarely: `"nexus"`, `"http"`, `"manual"` or `"local"`, when it cannot be told from `path`. |
-| `build` | Rarely, for `build-from-files` mods: layers (`path`, `dest_prefix`) overlaid in order. |
+| `build` | Rarely: layers (`path`, `file_name`, `dest_prefix`) whose archives are overlaid in order into one. |
 
 ### Where an archive comes from (`path`)
 

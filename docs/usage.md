@@ -228,6 +228,7 @@ files of exactly that size are hashed.
 
 The lookups, in order:
 
+- by the `file_name` the list gives, when a file of that name is there;
 - a Nexus archive by the `modID`/`fileID` in its `.meta` (so MO2's `(1)`
   suffixes and hand renames do not matter);
 - anything else by its `file_name`, case-insensitively, or for a URL source by
@@ -281,19 +282,36 @@ already on disk can be installed without running `download` at all.
 
 ## downloads record
 
-Write the size and MD5 of a list's hand-downloaded (`manual:`) archives into
-the list, so each is still found after its host renames it.
+Write into a list what lets each of its archives be recognised wherever it
+turns up.
 
 ```bash
 mudcrab downloads record <modlist.toml> [--downloads <dir>] [--archive-search-path <dir>]... [--dry-run]
 ```
 
-Every `manual:` archive found on disk that does not record them yet gets
-`size` and `md5` lines after its `file_name` (or `path`); nothing else in the
+For every archive found on disk:
+
+- a Nexus or URL archive (or build layer) with no `file_name` gets one, the
+  name of the file it was found as. Without it, a copy with no MO2 `.meta` --
+  saved by a browser, brought from another machine -- is not recognised;
+- a `manual:` archive gets `size` and `md5`, so it is found after its host
+  renames it.
+
+The lines go after the archive's `file_name` (or `path`); nothing else in the
 file changes, and the list is validated afterwards. Archives not on disk are
-named and skipped. Recording them does not count as a change to the mods: an
-install does not redo them for it. `add --archive --manual` records both when
-it writes an entry.
+named and skipped. `add --archive` writes all of these when it writes an
+entry, so this is for lists written before it did.
+
+## downloads locate
+
+Where each archive a plan needs is, one tab-separated line per archive: mod
+id, archive number, source, and its path or `MISSING`. Only reads.
+
+```bash
+mudcrab downloads locate <plan.json> [--downloads <dir>] [--archive-search-path <dir>]...
+```
+
+For scripts, and for seeing at a glance what a downloads folder lacks.
 
 ## Working on part of a modlist
 

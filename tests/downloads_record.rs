@@ -36,3 +36,36 @@ fn records_a_hand_downloads_size_and_md5_in_place() {
         "two lines added after the path, nothing else touched"
     );
 }
+
+#[test]
+fn records_the_file_name_of_a_nexus_archive_found_by_its_meta() {
+    let dir = tempfile::tempdir().unwrap();
+    let downloads = dir.path().join("downloads");
+    std::fs::create_dir_all(&downloads).unwrap();
+    std::fs::write(downloads.join("Mod-12-1-0.7z"), b"x").unwrap();
+    std::fs::write(
+        downloads.join("Mod-12-1-0.7z.meta"),
+        "[General]\ngameName=Oblivion\nmodID=12\nfileID=34\n",
+    )
+    .unwrap();
+    let list = dir.path().join("list.toml");
+    let text = "name = \"R\"\n\n[[mods]]\nid = \"M\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/12/34\"\n";
+    std::fs::write(&list, text).unwrap();
+
+    Command::cargo_bin("mudcrab")
+        .unwrap()
+        .env("XDG_STATE_HOME", dir.path().join("state"))
+        .args(["downloads", "record"])
+        .arg(&list)
+        .arg("--downloads")
+        .arg(&downloads)
+        .assert()
+        .success();
+    assert_eq!(
+        std::fs::read_to_string(&list).unwrap(),
+        text.replace(
+            "path = \"nexus:oblivion/12/34\"\n",
+            "path = \"nexus:oblivion/12/34\"\nfile_name = \"Mod-12-1-0.7z\"\n"
+        )
+    );
+}

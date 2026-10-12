@@ -106,7 +106,7 @@ fn resolve_build_layers(
 ) -> anyhow::Result<Vec<PathBuf>> {
     let mut out = Vec::with_capacity(archive.build.len());
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let reference = ArchiveRef::new(&layer.path, None);
+        let reference = ArchiveRef::new(&layer.path, layer.file_name.as_deref());
         let found = if settings.dry_run {
             archive_store::find(
                 &settings.cache_dir,

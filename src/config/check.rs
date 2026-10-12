@@ -175,7 +175,7 @@ fn archive_availability(
         let found: Vec<_> = archive
             .build
             .iter()
-            .map(|layer| locate(&layer.path, None))
+            .map(|layer| locate(&layer.path, layer.file_name.as_deref()))
             .collect();
         return if found.iter().all(|f| matches!(f, Some(Found::Downloads(_)))) {
             ArchiveAvailability::Cached
@@ -266,7 +266,10 @@ fn check_build_archive(
     let mut merged_paths: Vec<String> = Vec::new();
 
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let Some(source) = located(settings, &ArchiveRef::new(&layer.path, None)) else {
+        let Some(source) = located(
+            settings,
+            &ArchiveRef::new(&layer.path, layer.file_name.as_deref()),
+        ) else {
             anyhow::bail!(
                 "build layer {} ({}) is not in \
                  {} or any search path",

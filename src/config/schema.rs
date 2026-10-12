@@ -871,6 +871,9 @@ impl From<&str> for BainSubpackage {
 #[serde(deny_unknown_fields)]
 pub struct BuildLayer {
     pub path: String,
+    /// The layer archive's own filename, as for an archive's `file_name`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_name: Option<String>,
     #[serde(default)]
     pub download_handler: Option<String>,
     /// Subdirectory inside the merged staging dir to overlay this layer's extracted files into.

@@ -175,6 +175,45 @@ fn parse_meta(text: &str) -> HashMap<String, String> {
         .collect()
 }
 
+/// The file whose `.meta` names this archive's Nexus ids.
+fn by_nexus_ids(archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<PathBuf> {
+    let (game, mod_id, file_id) = archive.nexus_ids()?;
+    let candidates = index
+        .by_nexus
+        .get(&(mod_id.to_string(), file_id.to_string()))?;
+    let wanted_game = mo2_game_name(game);
+    let mut matching: Vec<&PathBuf> = candidates
+        .iter()
+        .filter(|(meta_game, path)| {
+            path.is_file()
+                && match (wanted_game, meta_game) {
+                    (Some(wanted), Some(have)) => wanted.eq_ignore_ascii_case(have),
+                    _ => true,
+                }
+        })
+        .map(|(_, path)| path)
+        .collect();
+    // Several files claiming one Nexus file is a re-download -- MO2 names
+    // the second `1_<name>` -- and one of them may be the broken download
+    // that prompted it. Prefer one that opens, deterministically.
+    matching.sort();
+    if matching.len() > 1
+        && let Some(good) = matching
+            .iter()
+            .find(|path| crate::archive::list_archive_paths(path).is_ok())
+    {
+        if matching.first() != Some(good) {
+            tracing::warn!(
+                chosen = %good.display(),
+                skipped = ?matching.iter().take_while(|p| *p != good).map(|p| p.display().to_string()).collect::<Vec<_>>(),
+                "several archives claim the same Nexus file; using the first that opens"
+            );
+        }
+        return Some((*good).clone());
+    }
+    matching.first().map(|path| (*path).clone())
+}
+
 /// Process-wide indexes, one per folder. A hit is re-checked on disk and a
 /// miss rebuilds the folder's index once, so a file added or removed behind
 /// our back is never misreported for long.
@@ -184,44 +223,35 @@ fn indexes() -> &'static Mutex<HashMap<PathBuf, DirIndex>> {
 }
 
 fn lookup_in(dir: &Path, archive: &ArchiveRef<'_>, index: &DirIndex) -> Option<PathBuf> {
-    if let Some((game, mod_id, file_id)) = archive.nexus_ids()
-        && let Some(candidates) = index
-            .by_nexus
-            .get(&(mod_id.to_string(), file_id.to_string()))
-    {
-        let wanted_game = mo2_game_name(game);
-        let mut matching: Vec<&PathBuf> = candidates
-            .iter()
-            .filter(|(meta_game, path)| {
-                path.is_file()
-                    && match (wanted_game, meta_game) {
-                        (Some(wanted), Some(have)) => wanted.eq_ignore_ascii_case(have),
-                        _ => true,
-                    }
-            })
-            .map(|(_, path)| path)
-            .collect();
-        // Several files claiming one Nexus file is a re-download -- MO2 names
-        // the second `1_<name>` -- and one of them may be the broken download
-        // that prompted it. Prefer one that opens, deterministically.
-        matching.sort();
-        if matching.len() > 1
-            && let Some(good) = matching
-                .iter()
-                .find(|path| crate::archive::list_archive_paths(path).is_ok())
-        {
-            if matching.first() != Some(good) {
-                tracing::warn!(
-                    chosen = %good.display(),
-                    skipped = ?matching.iter().take_while(|p| *p != good).map(|p| p.display().to_string()).collect::<Vec<_>>(),
-                    "several archives claim the same Nexus file; using the first that opens"
-                );
+    // The name the list gives is its own statement of which file it means,
+    // and beats a `.meta` claim: MO2 can record a newer file's id in an older
+    // download's `.meta`, leaving two versions claiming one Nexus file.
+    let named = archive
+        .file_name
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .and_then(|name| index.by_name.get(&name.to_ascii_lowercase()))
+        .filter(|path| path.is_file())
+        .cloned();
+    let by_ids = by_nexus_ids(archive, index);
+    match (named, by_ids) {
+        (Some(named), Some(other)) if named != other => {
+            // Unless the named file is a broken download and the other opens.
+            if crate::archive::list_archive_paths(&named).is_ok()
+                || crate::archive::list_archive_paths(&other).is_err()
+            {
+                return Some(named);
             }
-            return Some((*good).clone());
+            tracing::warn!(
+                named = %named.display(),
+                chosen = %other.display(),
+                "the archive the list names does not open; using another that claims the same Nexus file"
+            );
+            return Some(other);
         }
-        if let Some(path) = matching.first() {
-            return Some((*path).clone());
-        }
+        (Some(named), _) => return Some(named),
+        (None, Some(other)) => return Some(other),
+        (None, None) => {}
     }
     if let Some(name) = archive.expected_name()
         && let Some(path) = index.by_name.get(&name.to_ascii_lowercase())
@@ -666,6 +696,40 @@ mod tests {
         assert_eq!(
             locate(dir.path(), &[], &wanted),
             Some(Found::Downloads(archive))
+        );
+    }
+
+    #[test]
+    fn the_named_file_beats_an_older_one_whose_meta_claims_the_same_id() {
+        // MO2 wrote the newer file's id into the older download's .meta.
+        let dir = tempfile::tempdir().unwrap();
+        let zip = |name: &str| {
+            let path = dir.path().join(name);
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+            zip.start_file("a.esp", zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.finish().unwrap();
+            path
+        };
+        let older = zip("Patch-51851-3-4-5.7z");
+        let newer = zip("Patch-51851-3-4-7.7z");
+        for file in [&older, &newer] {
+            let mut meta = file.as_os_str().to_os_string();
+            meta.push(".meta");
+            std::fs::write(
+                meta,
+                "[General]\ngameName=Oblivion\nmodID=51851\nfileID=1000038748\n",
+            )
+            .unwrap();
+        }
+        invalidate(dir.path());
+        let wanted = ArchiveRef::new(
+            "nexus:oblivion/51851/1000038748",
+            Some("Patch-51851-3-4-7.7z"),
+        );
+        assert_eq!(
+            locate(dir.path(), &[], &wanted),
+            Some(Found::Downloads(newer))
         );
     }
 
