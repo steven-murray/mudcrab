@@ -90,9 +90,9 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
             );
 
             let result = if archive.build.is_empty() {
-                check_single_archive(mod_entry.id.as_str(), archive_index, archive, settings)
+                check_single_archive(archive, settings)
             } else {
-                check_build_archive(mod_entry.id.as_str(), archive_index, archive, settings)
+                check_build_archive(archive, settings)
             };
 
             match result {
@@ -100,10 +100,17 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
                     file_references_checked += reference_count;
                 }
                 Err(err) => {
-                    errors.push(format!(
-                        "mod '{}' archive {} failed check: {err}",
-                        mod_entry.id, archive_index
-                    ));
+                    // Counted from 1, as a person counts a mod's archives.
+                    let which = if mod_entry.archives.len() > 1 {
+                        format!(
+                            " (archive {} of {})",
+                            archive_index + 1,
+                            mod_entry.archives.len()
+                        )
+                    } else {
+                        String::new()
+                    };
+                    errors.push(format!("{}{which}: {err}", mod_entry.id));
                 }
             }
         }
@@ -203,17 +210,34 @@ fn located(settings: &CheckSettings, source: &str, file_name: Option<&str>) -> O
 }
 
 fn check_single_archive(
-    mod_id: &str,
-    archive_index: usize,
     archive: &CompiledArchive,
     settings: &CheckSettings,
 ) -> anyhow::Result<usize> {
     let path = archive.path.as_deref().unwrap_or_default();
     let reference = ArchiveRef::new(path, archive.file_name.as_deref());
     let Some(source) = located(settings, path, archive.file_name.as_deref()) else {
+        let how = if path.starts_with("manual:") {
+            "it is downloaded by hand (`manual:`), so put it there yourself"
+        } else {
+            "`mudcrab download` fetches it"
+        };
+        let mut searched = vec![settings.cache_dir.clone()];
+        searched.extend(settings.archive_search_paths.iter().cloned());
+        let similar = crate::config::download::similar_archives(reference.describe(), &searched);
+        let hint = if similar.is_empty() {
+            String::new()
+        } else {
+            format!(
+                "; similarly named, if one is this file renamed: {}",
+                similar
+                    .iter()
+                    .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
+        };
         anyhow::bail!(
-            "mod '{mod_id}' archive {archive_index}: must be downloaded; {} is not in {} or any \
-             search path",
+            "{} is not in the downloads folder ({}) or any search path; {how}{hint}",
             reference.describe(),
             settings.cache_dir.display(),
         );
@@ -237,8 +261,6 @@ fn check_single_archive(
 }
 
 fn check_build_archive(
-    mod_id: &str,
-    archive_index: usize,
     archive: &CompiledArchive,
     settings: &CheckSettings,
 ) -> anyhow::Result<usize> {
@@ -248,8 +270,9 @@ fn check_build_archive(
     for (layer_index, layer) in archive.build.iter().enumerate() {
         let Some(source) = located(settings, &layer.path, None) else {
             anyhow::bail!(
-                "mod '{mod_id}' archive {archive_index}: build layer {layer_index} ({}) is not in \
+                "build layer {} ({}) is not in \
                  {} or any search path",
+                layer_index + 1,
                 layer.path,
                 settings.cache_dir.display()
             );

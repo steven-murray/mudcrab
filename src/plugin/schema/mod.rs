@@ -87,6 +87,14 @@ pub enum SchemaError {
     },
 }
 
+/// Subrecords only Oblivion Magic Extender writes.
+fn is_obme_field(field: &[u8; 4]) -> bool {
+    matches!(
+        field,
+        b"OBME" | b"EFME" | b"EFIX" | b"EFXX" | b"EDDX" | b"ESCE"
+    )
+}
+
 impl SchemaError {
     /// A short key for deduplicating gaps in a whole-corpus audit.
     pub fn gap_key(&self) -> String {
@@ -115,6 +123,23 @@ impl std::fmt::Display for SchemaError {
                 sig(record),
                 sig(record),
                 sig(record)
+            ),
+            // Not a gap to fill: see the header of tes4.rs for why OBME fields
+            // stay refused. Said plainly, because the person reading it is
+            // merging plugins, not extending the schema.
+            SchemaError::UnknownField {
+                record,
+                field,
+                form_id,
+                ..
+            } if is_obme_field(field) => write!(
+                f,
+                "this plugin uses Oblivion Magic Extender (OBME): {}/{} at {form_id}.\n\
+                 mudcrab cannot merge OBME plugins: one OBME field can hold a FormID or a\n\
+                 plain number depending on another, and getting that wrong would leave a\n\
+                 broken reference with no error. Leave this plugin out of the merge.",
+                sig(record),
+                sig(field)
             ),
             SchemaError::UnknownField {
                 record,
@@ -496,5 +521,23 @@ mod tests {
             0x3F80_0000u32.to_le_bytes(),
             "the scale float must be untouched"
         );
+    }
+}
+
+#[cfg(test)]
+mod obme_tests {
+    use super::*;
+
+    #[test]
+    fn an_obme_field_is_named_as_obme_not_as_a_schema_gap() {
+        let error = SchemaError::UnknownField {
+            record: *b"SPEL",
+            field: *b"EFME",
+            form_id: FormId(0x0100_0ABC),
+            size: 10,
+        };
+        let message = error.to_string();
+        assert!(message.contains("Oblivion Magic Extender"), "{message}");
+        assert!(!message.contains("tes4.rs"), "{message}");
     }
 }

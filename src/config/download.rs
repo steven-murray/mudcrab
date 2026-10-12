@@ -57,14 +57,14 @@ pub async fn download_all(
             continue;
         }
 
-        for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
+        for archive in &mod_entry.archives {
             if !archive.build.is_empty() {
                 for (layer_index, layer) in archive.build.iter().enumerate() {
                     // Build layers carry no `file_name`, so there is nothing to
                     // match a local copy against; they always take the network path.
                     jobs.push(Job {
                         mod_id: &mod_entry.id,
-                        label: format!("archive {archive_index} build layer {layer_index}"),
+                        label: format!("build layer {} ({})", layer_index + 1, layer.path),
                         path: &layer.path,
                         file_name: None,
                         handler: layer.download_handler.as_deref(),
@@ -74,11 +74,7 @@ pub async fn download_all(
                 let path = archive.path.as_deref().unwrap_or_default();
                 jobs.push(Job {
                     mod_id: &mod_entry.id,
-                    label: format!(
-                        "archive {} ({})",
-                        archive_index,
-                        archive.file_name.as_deref().unwrap_or(path)
-                    ),
+                    label: archive.file_name.as_deref().unwrap_or(path).to_string(),
                     path,
                     file_name: archive.file_name.as_deref(),
                     handler: archive.download_handler.as_deref(),
@@ -120,7 +116,7 @@ pub async fn download_all(
                 }
                 log_download_outcome(job.mod_id, job.path, &outcome);
             }
-            Err(err) => errors.push(format!("mod '{}' {}: {err}", job.mod_id, job.label)),
+            Err(err) => errors.push(format!("{} ({}): {err}", job.mod_id, job.label)),
         }
     }
     // Completion order is arbitrary with more than one in flight; the report
@@ -241,6 +237,11 @@ async fn download_with_retry(
                 archive_store::write_meta(&final_path, &archive)?;
                 archive_store::note_written(downloads);
                 return Ok(DownloadOutcome::Downloaded(final_path));
+            }
+            // Asking again cannot change "no key" or "not premium".
+            Err(err) if err.downcast_ref::<NoRetry>().is_some() => {
+                let _ = std::fs::remove_file(&partial);
+                return Err(err);
             }
             Err(err) if attempt < attempts => {
                 tracing::warn!(
@@ -434,6 +435,18 @@ async fn download_http(
     Ok(original_name)
 }
 
+/// A failure no retry can fix: the answer will be the same next time.
+#[derive(Debug)]
+struct NoRetry(String);
+
+impl std::fmt::Display for NoRetry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+impl std::error::Error for NoRetry {}
+
 async fn download_nexus(
     client: &Client,
     source: &str,
@@ -583,7 +596,7 @@ fn percent_decode(value: &str) -> String {
 /// share more than half of `wanted`'s words -- half lets a lone "Oblivion"
 /// match half a downloads folder -- including one of three letters or more.
 /// At most three, closest first.
-fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
+pub(crate) fn similar_archives(wanted: &str, search_paths: &[PathBuf]) -> Vec<PathBuf> {
     fn words(name: &str) -> std::collections::BTreeSet<String> {
         let stem = name.rsplit_once('.').map_or(name, |(stem, _)| stem);
         stem.split(|c: char| !c.is_ascii_alphanumeric())
