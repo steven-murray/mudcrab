@@ -146,7 +146,24 @@ fn find_files(root: &Path, names: &[&str], depth: usize, out: &mut Vec<PathBuf>)
 /// Downloads folders of the MO2 instances under `roots`, and of those Steam
 /// runs (`shortcuts`).
 pub fn downloads_dirs(roots: &[PathBuf], shortcuts: &[Shortcut]) -> Vec<Candidate> {
-    let instances = mo2_instances(roots, shortcuts);
+    let mut inis = Vec::new();
+    for root in roots {
+        find_files(root, &["ModOrganizer.ini"], 4, &mut inis);
+    }
+    inis.sort();
+    let mut instances: Vec<PathBuf> = inis
+        .iter()
+        .filter_map(|ini| ini.parent().map(Path::to_path_buf))
+        .collect();
+    // An instance Steam runs but that has not written its settings yet.
+    for shortcut in shortcuts.iter().filter(|s| runs_mo2(s)) {
+        if let Some(dir) = Path::new(&shortcut.exe).parent()
+            && dir.is_dir()
+            && !instances.iter().any(|i| i == dir)
+        {
+            instances.push(dir.to_path_buf());
+        }
+    }
     let mut out: Vec<Candidate> = Vec::new();
     for instance in &instances {
         let instance = instance.as_path();
@@ -166,30 +183,6 @@ pub fn downloads_dirs(roots: &[PathBuf], shortcuts: &[Shortcut]) -> Vec<Candidat
         });
     }
     out
-}
-
-/// MO2 instance folders: those under `roots` (by their `ModOrganizer.ini`),
-/// then those Steam runs (`shortcuts`).
-pub fn mo2_instances(roots: &[PathBuf], shortcuts: &[Shortcut]) -> Vec<PathBuf> {
-    let mut inis = Vec::new();
-    for root in roots {
-        find_files(root, &["ModOrganizer.ini"], 4, &mut inis);
-    }
-    inis.sort();
-    let mut instances: Vec<PathBuf> = inis
-        .iter()
-        .filter_map(|ini| ini.parent().map(Path::to_path_buf))
-        .collect();
-    // An instance Steam runs but that has not written its settings yet.
-    for shortcut in shortcuts.iter().filter(|s| runs_mo2(s)) {
-        if let Some(dir) = Path::new(&shortcut.exe).parent()
-            && dir.is_dir()
-            && !instances.iter().any(|i| i == dir)
-        {
-            instances.push(dir.to_path_buf());
-        }
-    }
-    instances
 }
 
 /// Proton prefixes (`compatdata/<id>/pfx`), most recently used first, with

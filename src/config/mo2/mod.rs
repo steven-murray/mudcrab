@@ -672,23 +672,6 @@ pub(crate) fn instance_game_path(instance: &Path) -> Option<PathBuf> {
     parse_game_path(&text, cfg!(windows))
 }
 
-/// The game an MO2 instance manages: `gameName` in its `ModOrganizer.ini`.
-pub(crate) fn instance_game_name(instance: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).ok()?;
-    let mut in_general = false;
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_general = line.eq_ignore_ascii_case("[General]");
-            continue;
-        }
-        if in_general && let Some(value) = line.strip_prefix("gameName=") {
-            return Some(value.trim().to_string());
-        }
-    }
-    None
-}
-
 /// MO2 writes `gamePath=@ByteArray(C:\\Games\\Oblivion)`: a Qt byte array,
 /// backslashes escaped. Under Wine the Unix root is drive `Z:`; any other drive
 /// is inside a prefix we do not know, so it is not guessed at.
