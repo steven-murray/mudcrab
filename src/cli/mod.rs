@@ -106,10 +106,17 @@ pub struct MoveArgs {
 pub struct AddArgs {
     /// Path to the source modlist TOML to edit in place.
     pub input: PathBuf,
-    /// Read the mod's details from `<DIR>/<--mod>/meta.ini`, as written by
-    /// Mod Organizer 2. Only ever read from.
-    #[arg(long, value_name = "ORACLE_MODS_DIR", conflicts_with_all = ["nexus", "archive"])]
-    pub from_oracle: Option<PathBuf>,
+    /// Take the mod from an MO2 instance where it is already installed:
+    /// `<MODS_DIR>/<--mod>/meta.ini`, as MO2 writes it, gives the Nexus ids,
+    /// archive name and version. For moving a list built by hand in MO2 into
+    /// a modlist. Only ever read from.
+    #[arg(
+        long = "from-mo2",
+        alias = "from-oracle",
+        value_name = "MODS_DIR",
+        conflicts_with_all = ["nexus", "archive"]
+    )]
+    pub from_mo2: Option<PathBuf>,
     /// Write the archive entry from the archive itself: its source (from the
     /// MO2 `.meta` beside it, or --nexus / --manual), file name, layout, FOMOD
     /// defaults and BAIN packages, as `inspect` reports them. Only ever read
@@ -124,23 +131,23 @@ pub struct AddArgs {
     /// Also what happens when input is not a terminal.
     #[arg(long, requires = "archive")]
     pub defaults: bool,
-    /// Name of the mod folder inside the Oracle mods directory.
-    #[arg(long = "mod", value_name = "FOLDER", requires = "from_oracle")]
+    /// Name of the mod's folder in the --from-mo2 mods directory.
+    #[arg(long = "mod", value_name = "FOLDER", requires = "from_mo2")]
     pub mod_folder: Option<String>,
-    /// Nexus source as `<modid>/<fileid>`, for a mod with no Oracle folder.
+    /// Nexus source as `<modid>/<fileid>`.
     /// With --archive, the source when the archive has no `.meta` naming it.
     #[arg(long, value_name = "MODID/FILEID")]
     pub nexus: Option<String>,
     /// Mod id, which is also the directory it installs into.
-    /// Defaults to the Oracle folder name; required with --nexus.
+    /// Defaults to the MO2 folder name with --from-mo2; required otherwise.
     #[arg(long, value_name = "MOD_ID")]
     pub id: Option<String>,
     /// Section to file the mod under. Repeat for a nested section path,
     /// outermost first. The block is inserted after that section's last mod.
     #[arg(long = "section", value_name = "NAME")]
     pub sections: Vec<String>,
-    /// The archive's own filename. Taken from the Oracle `installationFile=`
-    /// when not given.
+    /// The archive's own filename. With --from-mo2, taken from `meta.ini`'s
+    /// `installationFile=` when not given.
     #[arg(long = "file-name", value_name = "ARCHIVE")]
     pub file_name: Option<String>,
     /// The mod's `if`, for an optional mod, e.g. `swearing_rats` or
@@ -182,7 +189,7 @@ pub struct AddArgs {
     pub before_mod: Option<String>,
     /// Write the block with a `manual:` source instead of a Nexus descriptor.
     ///
-    /// For an archive no automated fetch can reach, and for the case the Oracle
+    /// For an archive no automated fetch can reach, and for the case MO2
     /// leaves half-recorded: a real `modid` with no `fileid`, which is not
     /// enough to build a download URL. The archive still resolves from
     /// `--archive-search-path` by filename, so the build proceeds; a TODO in
@@ -546,7 +553,9 @@ pub struct InstallArgs {
     pub archive_sources: ArchiveSourceArgs,
 }
 
-/// Compare what we installed against a reference ("Oracle") MO2 instance.
+/// Compare what mudcrab installed against a reference MO2 instance -- the
+/// "Oracle": the same list built another way (by hand in MO2, say) and known
+/// to be right.
 ///
 /// Verification is per section, not per list: a 700-mod list is only
 /// reproducible if each section can be signed off as it is built, while the
@@ -556,8 +565,9 @@ pub struct DiffArgs {
     /// Installation directory holding the mod folders we produced.
     #[arg(long)]
     pub mods_dir: PathBuf,
-    /// The reference instance's mods directory. Only ever read from.
-    #[arg(long)]
+    /// The reference ("Oracle") instance's mods directory. Only ever read
+    /// from.
+    #[arg(long, value_name = "REFERENCE_MODS_DIR")]
     pub oracle: PathBuf,
     /// Personalized install plan, which supplies each mod's section and the
     /// archive it was meant to come from. Without it every directory present in

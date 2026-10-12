@@ -189,12 +189,12 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
     if let Some(archive) = &args.archive {
         return Ok((from_archive(archive, args)?, None));
     }
-    match (&args.from_oracle, &args.nexus) {
+    match (&args.from_mo2, &args.nexus) {
         (Some(oracle_dir), None) => {
             let folder = args
                 .mod_folder
                 .as_ref()
-                .ok_or_else(|| anyhow::anyhow!("--from-oracle requires --mod <mod folder name>"))?;
+                .ok_or_else(|| anyhow::anyhow!("--from-mo2 requires --mod <mod folder name>"))?;
             let mod_dir = oracle_dir.join(folder);
             let new_mod = from_oracle(&mod_dir, folder, args)?;
             Ok((new_mod, Some(mod_dir)))
@@ -202,10 +202,10 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
         (None, Some(nexus)) => Ok((from_nexus(nexus, args)?, None)),
         (None, None) => anyhow::bail!(
             "give a source: --archive <file>, --nexus <modid>/<fileid>, or \
-             --from-oracle <ORACLE_MODS_DIR> --mod <folder>"
+             --from-mo2 <MODS_DIR> --mod <folder>"
         ),
         (Some(_), Some(_)) => {
-            unreachable!("clap declares --from-oracle and --nexus as conflicting")
+            unreachable!("clap declares --from-mo2 and --nexus as conflicting")
         }
     }
 }

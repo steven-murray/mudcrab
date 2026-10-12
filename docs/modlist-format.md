@@ -192,7 +192,7 @@ Along with standard archive-based mods, `type` selects a few other kinds:
 - `"generated"` holds only what its actions write: `write_file` authors a file
   (`path`, `content`), refusing to overwrite one.
 - `"mo2-plugin"` installs into the MO2 instance's `plugins/<id>` rather than
-  `mods/`, and stays out of the profile's mod list and the Oracle diff. The id
+  `mods/`, and stays out of the profile's mod list and `diff`. The id
   is the plugin's folder name. It is rebuilt on every install.
 
 ### Game-root files

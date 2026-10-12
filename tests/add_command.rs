@@ -268,7 +268,7 @@ fn accepts_ids_containing_spaces_brackets_apostrophes_and_ampersands() {
 }
 
 #[test]
-fn from_oracle_reads_meta_ini() {
+fn from_mo2_reads_meta_ini_and_the_old_flag_name_still_works() {
     let (dir, path) = fixture();
     let oracle = oracle_mod(dir.path(), "Blockhead", NEXUS_META);
 
@@ -287,7 +287,7 @@ fn from_oracle_reads_meta_ini() {
     assert!(updated.contains("path = \"nexus:oblivion/43752/1000029844\""));
     assert!(updated.contains("download_handler = \"nexus\""));
     assert!(updated.contains("file_name = \"Blockhead-43752-11-1-1640043918.7z\""));
-    assert!(updated.contains("# oracle version 11.1.0.0"));
+    assert!(updated.contains("# version 11.1.0.0"));
 }
 
 #[test]
@@ -296,7 +296,7 @@ fn from_oracle_id_can_be_overridden() {
     let oracle = oracle_mod(dir.path(), "Blockhead", NEXUS_META);
 
     add(&path)
-        .arg("--from-oracle")
+        .arg("--from-mo2")
         .arg(&oracle)
         .args(["--mod", "Blockhead", "--id", "Blockhead (OBSE)"])
         .args(["--section", "OBSE PLUGINS"])
@@ -328,7 +328,7 @@ size=1
     let oracle = oracle_mod(dir.path(), "DarNified UI", meta);
 
     add(&path)
-        .arg("--from-oracle")
+        .arg("--from-mo2")
         .arg(&oracle)
         .args(["--mod", "DarNified UI", "--section", "UI"])
         .assert()
@@ -365,7 +365,7 @@ fn reports_plugins_without_touching_the_load_order() {
     std::fs::write(mod_dir.join("Disabled.esp.mohidden"), b"x").expect("hidden should be written");
 
     add(&path)
-        .arg("--from-oracle")
+        .arg("--from-mo2")
         .arg(&oracle)
         .args(["--mod", "Blockhead", "--section", "OBSE PLUGINS"])
         .assert()
@@ -416,7 +416,7 @@ fn omitting_the_section_warns_and_leaves_the_key_off() {
     let oracle = oracle_mod(dir.path(), "Blockhead", NEXUS_META);
 
     add(&path)
-        .arg("--from-oracle")
+        .arg("--from-mo2")
         .arg(&oracle)
         .args(["--mod", "Blockhead"])
         .assert()
@@ -463,7 +463,7 @@ fn a_modid_with_no_installed_fileid_is_refused_rather_than_guessed() {
     let oracle = oracle_mod(dir.path(), "Script Patch", meta);
 
     add(&path)
-        .arg("--from-oracle")
+        .arg("--from-mo2")
         .arg(&oracle)
         .args(["--mod", "Script Patch", "--section", "CORE"])
         .assert()

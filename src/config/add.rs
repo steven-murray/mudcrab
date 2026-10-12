@@ -184,7 +184,7 @@ pub fn render_block(new_mod: &NewMod) -> String {
         }
     }
     if let Some(version) = &new_mod.version {
-        lines.push(format!("# oracle version {version}"));
+        lines.push(format!("# version {version}, as installed in MO2"));
     }
 
     lines.join("\n")
@@ -982,7 +982,7 @@ mod tests {
 
     #[test]
     fn comment_glued_to_the_next_header_stays_with_it() {
-        let text = "name = \"t\"\n\n[[mods]]\nid = \"a\"\nsection = [\"S\"]\n# oracle version 1.0\n\n# why b is odd\n[[mods]]\nid = \"b\"\nsection = [\"T\"]\n";
+        let text = "name = \"t\"\n\n[[mods]]\nid = \"a\"\nsection = [\"S\"]\n# version 1.0, as installed in MO2\n\n# why b is odd\n[[mods]]\nid = \"b\"\nsection = [\"T\"]\n";
         let mods = [entry("a", &["S"]), entry("b", &["T"])];
         let new_mod = NewMod {
             id: "c".to_string(),
@@ -994,7 +994,7 @@ mod tests {
 
         assert!(
             plan.new_text
-                .contains("# oracle version 1.0\n\n[[mods]]\nid = \"c\"")
+                .contains("# version 1.0, as installed in MO2\n\n[[mods]]\nid = \"c\"")
         );
         assert!(
             plan.new_text

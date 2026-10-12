@@ -35,7 +35,7 @@ Add one `[[mods]]` block to a source modlist, in place.
 ```bash
 mudcrab add <modlist.toml> --archive <archive> --id "<mod id>" --section "<name>" [--nexus <modid>/<fileid> | --manual] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
-mudcrab add <modlist.toml> --from-oracle <ORACLE_MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
+mudcrab add <modlist.toml> --from-mo2 <MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
 ```
 
 [authoring.md](authoring.md) walks through using it on a new list.
@@ -73,20 +73,23 @@ is preserved exactly. The block goes after the last existing mod in `--section`,
 so the file stays grouped; if that section has no mods yet, it is appended at the
 end of the file. Repeat `--section` for a nested section path, outermost first.
 
-`--from-oracle` reads `<ORACLE_MODS_DIR>/<mod folder>/meta.ini` as written by Mod
-Organizer 2 and takes `modid` + `[installedFiles] 1\fileid` for the
-`nexus:oblivion/<modid>/<fileid>` path, `installationFile` for `file_name`, and
-`version` for a trailing `# oracle version ...` comment. The mod id defaults to
-the folder name. The directory is only ever read from.
+`--from-mo2` takes a mod from an MO2 instance where it is already installed --
+the way to turn a list built by hand in MO2 into a modlist, one mod at a time.
+It reads `<MODS_DIR>/<mod folder>/meta.ini` as MO2 writes it and takes `modid`
++ `[installedFiles] 1\fileid` for the `nexus:oblivion/<modid>/<fileid>` path,
+`installationFile` for `file_name`, and `version` for a trailing
+`# version ..., as installed in MO2` comment. The mod id defaults to the folder
+name. The directory is only ever read from. (`--from-oracle` is the same flag's
+old name.)
 
 A folder with `modid=0` was not installed from Nexus: the block is written with
 `file_name` but no `path`, marked with a `# TODO: non-Nexus source` comment, and a
 warning goes to stderr. No URL is invented.
 
-If the Oracle folder ships `.esp`/`.esm` files, they are listed on stderr. They
+If the MO2 folder holds `.esp`/`.esm` files, they are listed on stderr. They
 are **not** added to the top-level `plugins` array and the block declares no
 `plugins` key -- putting a plugin at the wrong point in load order fails silently
-in game, so the position is yours to choose.
+in game, so the position is yours to choose (`--plugin` with `--load-after`).
 
 `--plugin <FILE>` (repeatable) writes the block's `plugins` key, and `--if
 <CONDITION>` its `if`, for an optional mod (the input has to be declared
@@ -106,8 +109,8 @@ Safety:
 Example:
 
 ```bash
-mudcrab add mofam.toml \
-  --from-oracle ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+mudcrab add mylist.toml \
+  --from-mo2 ~/mo2/MyHandBuiltList/mods \
   --mod "Blockhead" --section "OBSE PLUGINS" --dry-run
 ```
 
@@ -679,13 +682,16 @@ entry headers.
 
 ## diff
 
-Compare the mods directory we produced against a reference ("Oracle") MO2
-instance, so each section can be verified as it is built rather than at the end.
-Where `check` validates the archives we are about to install from, `diff`
-validates what actually landed on disk.
+Compare the mods mudcrab installed against a **reference** MO2 instance: the
+same list built some other way -- by hand in MO2, say, or by Wabbajack -- that
+you know to be right. `diff` calls that instance the *Oracle*, as in "the
+answer to check against", in its options and its report. It is how a list is
+verified while it is being written, a section at a time, rather than by playing
+the result. Where `check` validates the archives about to be installed from,
+`diff` validates what actually landed on disk.
 
 ```bash
-mudcrab diff --mods-dir <OURS> --oracle <ORACLE_MODS_DIR> [--plan <plan.json>]
+mudcrab diff --mods-dir <OURS> --oracle <REFERENCE_MODS_DIR> [--plan <plan.json>]
              [--section <name>]... [--only <mod id>]... [--format text|json]
              [--details] [--fail-on-differences]
 ```
@@ -698,15 +704,14 @@ exit code is 0 unless `--fail-on-differences` is given.
 Example:
 
 ```bash
-mudcrab diff --mods-dir ~/Games/Wabbajack/Oblivion/MudCrab/mods \
-  --oracle ~/Games/Wabbajack/Oblivion/MOFAM-03.25/mods \
+mudcrab diff --mods-dir ~/mo2/MyList/mods \
+  --oracle ~/mo2/MyHandBuiltList/mods \
   --plan build/plan.json --section "OBSE PLUGINS"
 ```
 
 For every mod folder in scope the report gives presence (ours only, Oracle only,
 or both) and, for the ones in both, the files present on only one side and the
-files whose contents differ. The exit code is non-zero when anything differs, so
-a section can be gated on it.
+files whose contents differ.
 
 Both trees come from Windows-authored archives, so paths are matched
 case-insensitively and `\` is folded to `/`. Three things are deliberately not
@@ -719,12 +724,12 @@ Without it every directory in either tree is compared and `--section` is refused
 because a mod folder on disk does not record which section it belongs to.
 `--only` works either way, since it matches the folder name.
 
-Mods are matched between the trees by folder name, so an id we deliberately
-spell differently from the Oracle's folder would otherwise report as one missing
-mod plus one extra, twice over, and bury the real differences. A mod may
-therefore declare `oracle_name` -- the folder name to look for in the reference
-instance. Our side always uses `id`; only the Oracle side follows `oracle_name`,
-and the mod is still reported under our `id`, with the Oracle's folder named
+Mods are matched between the trees by folder name, so an id spelled differently
+from the reference's folder would otherwise report as one missing mod plus one
+extra, twice over, and bury the real differences. A mod may therefore declare
+`oracle_name` -- the folder name to look for in the reference instance. Our
+side always uses `id`; only the reference side follows `oracle_name`, and the
+mod is still reported under our `id`, with the reference's folder named
 alongside it. It is read by `diff` alone and has no effect on installation:
 
 ```toml
@@ -733,18 +738,19 @@ id = "Cleaned DLC Masters"
 oracle_name = "Clean ESM"  # ours is build-from-files
 ```
 
-Version drift is reported separately, under `version notes`. The MOFAM guide was
-published in March 2025 and often says only "use the top file on the page", so an
-Oracle archive stamped later than that is a file the guide never named. The
-timestamp comes from the `installationFile=` recorded in the Oracle's `meta.ini`,
-which usually ends in a Unix timestamp (`Better Fort Aurus-50682-1-1-1647873144.7z`
--> 2022-03-21); such mods are flagged `POST-GUIDE`. Where no timestamp can be
-read the mod is listed under `UNKNOWN AGE` rather than assumed to be fine.
-Neither flag affects the exit code -- both describe the reference's own archive,
-not a fault in our copy of it. A plan that names an archive the Oracle did not
-install *is* a difference, and does gate the run.
+Version drift is reported separately, under `version notes`, when the list says
+when the guide it follows was published (`[guide] published = "YYYY-MM-DD"`).
+A guide that says "use the top file on the page" means the top file *then*, so
+a reference archive stamped later than that is a file the guide never named.
+The timestamp comes from the `installationFile=` recorded in the reference's
+`meta.ini`, which usually ends in a Unix timestamp
+(`Better Fort Aurus-50682-1-1-1647873144.7z` -> 2022-03-21); such mods are
+flagged `POST-GUIDE`. Where no timestamp can be read the mod is listed under
+`UNKNOWN AGE` rather than assumed to be fine. Neither flag affects the exit code
+-- both describe the reference's own archive, not a fault in our copy of it. A
+plan that names an archive the reference did not install *is* a difference.
 
-Content is established lazily, because the Oracle is 40GB: nothing is read for a
+Content is established lazily, because a reference instance can be 40GB: nothing is read for a
 mod that exists on only one side, differing sizes settle a file without reading
 a byte, equal sizes are compared chunk by chunk with an early exit, and digests
 are computed only for the handful of files already known to differ, to name the
