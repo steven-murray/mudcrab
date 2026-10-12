@@ -61,9 +61,8 @@ silently not renumbered. The header of `src/plugin/schema/tes4.rs` says so, at
 length, because it looks like an easy win.
 
 **Remaining work**: a field kind with access to its sibling subrecords, which
-would close OBME and let `EFIT` be handled correctly too. Until then a clearer
-refusal ("this plugin uses OBME") would be worth more than the current
-per-field error.
+would close OBME and let `EFIT` be handled correctly too. The refusal now says
+plainly that the plugin uses OBME and should be left out of the merge.
 
 ### A4c. The CTDA table was wrong in seven places — fixed
 
@@ -219,11 +218,20 @@ Needed:
    the source from the download's `.meta`; `add --nexus` fills the file name
    from Nexus; a plain `--mods-dir` install no longer demands a game folder,
    and a relative one no longer sends extraction to the system temp dir.
+   After it: `add --archive` walks a FOMOD's or BAIN package's choices with
+   the author and records the answers, running a BAIN wizard as Wrye Bash
+   would (subpackages, left-out plugins, renames, `EditINI` as `ini_tweak`);
+   and `conflicts` with no `--mod` sweeps the list for mods that share files.
 3. **Format reference** — [modlist-format.md](modlist-format.md) covers the
    shape; it needs to stay in step with the schema, and every field wants a
    one-line "when you need this".
-4. **Troubleshooting** — the failure messages a user will actually see, and what
-   each one means.
+4. ~~**Troubleshooting**~~ — done: [troubleshooting.md](troubleshooting.md),
+   quoting the messages from real runs. Writing it improved several: `check`
+   names similarly named archives on disk and says whether `download` can
+   fetch one; `check` and `download` no longer number archives from 0 or
+   repeat the mod's name; `download` no longer retries a missing API key or a
+   free account's refusal; and an OBME plugin in a merge is now refused as
+   OBME, not as a gap in the schema (the A4b refusal).
 5. **Doc comments are the strength here** and should stay that way: the code
    explains its own reasoning throughout. User docs should link into it rather
    than restate it.

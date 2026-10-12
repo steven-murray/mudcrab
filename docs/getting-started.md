@@ -164,8 +164,9 @@ Bash Bashed Patch.
   changed is installed again.
 - **A new version of the list**: the same three steps after `compile`.
 - **Something went wrong**: every run writes a full log and prints its path on
-  failure (`full log: ...`). [known-issues.md](known-issues.md) covers what is
-  already known; to report something new, see
+  failure (`full log: ...`). [troubleshooting.md](troubleshooting.md) explains
+  the messages you are likely to see, and [known-issues.md](known-issues.md)
+  covers what is already known; to report something new, see
   [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly).
 
 ## Where to next

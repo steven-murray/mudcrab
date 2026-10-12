@@ -90,6 +90,7 @@ tools and no API key. See
 | [docs/modlist-format.md](docs/modlist-format.md) | The TOML format |
 | [docs/exporters.md](docs/exporters.md) | Turning a modlist back into a guide: Nexus BBCode, Markdown, a GitHub Pages site |
 | [docs/mo2-output-structure.md](docs/mo2-output-structure.md) | What gets written into an MO2 instance |
+| [docs/troubleshooting.md](docs/troubleshooting.md) | The error messages you are likely to see, and what to do |
 | [docs/known-issues.md](docs/known-issues.md) | Limitations, and what to do about them |
 | [docs/roadmap.md](docs/roadmap.md) | What is planned before a release |
 
