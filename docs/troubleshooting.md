@@ -105,6 +105,14 @@ Everything else works on a free account.
 The key is wrong or has been revoked. Copy it again from the API keys page.
 `NEXUS_API_KEY`, when set, is used instead of the one in `tools.toml`.
 
+### "Mod Manager Download" opens a different MO2
+
+Only one program receives Nexus's `nxm:` links, so with several MO2 instances
+for Oblivion the link may open another one. `download` watches the other
+instances' downloads folders and hard-links in what arrives there, so this
+works anyway. If the two folders are on different drives, a hard link is not
+possible: the command says so, and you move the file yourself.
+
 ### Pages open in an unfamiliar browser window (Linux)
 
 The browser was started with a different `XDG_CONFIG_HOME` from usual, so it

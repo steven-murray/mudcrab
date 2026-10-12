@@ -15,6 +15,7 @@ use super::choose::{Availability, Choice, Question, Rule, ask};
 use crate::cli::BrowserDownloads;
 use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::download::Unfetched;
+use crate::config::tools::discover;
 use std::collections::HashMap;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -218,12 +219,11 @@ fn ask_policy(watch: &Path, downloads: &Path) -> anyhow::Result<BrowserDownloads
 }
 
 /// Say whether MO2 can take the "Mod Manager Download" clicks.
-fn mo2_advice(downloads: &Path) {
+fn mo2_advice(downloads: &Path, others: &[(String, PathBuf)]) {
     let running = crate::config::mo2::running::running_instances();
     let saving_here = |instance: &PathBuf| {
-        crate::config::mo2::instance_download_dir(instance).is_some_and(|dir| {
-            std::fs::canonicalize(&dir).ok() == std::fs::canonicalize(downloads).ok()
-        })
+        crate::config::mo2::instance_download_dir(instance)
+            .is_some_and(|dir| same_dir(&dir, downloads))
     };
     match running {
         Some(instances) if instances.iter().any(saving_here) => println!(
@@ -231,17 +231,79 @@ fn mo2_advice(downloads: &Path) {
              Download\" sends the file straight there."
         ),
         Some(instances) if !instances.is_empty() => println!(
-            "MO2 is running, but saves its downloads somewhere other than {}; files from \
-             \"Mod Manager Download\" will not be seen. Use \"Manual Download\", or point that \
-             MO2 at the downloads folder.",
+            "MO2 is running, but saves its downloads somewhere other than {}. \"Mod Manager \
+             Download\" still works: what it saves is hard-linked in from there.",
             downloads.display()
         ),
         _ => println!(
-            "To use the \"Mod Manager Download\" button (MO2 fetches the file into the downloads \
-             folder), open MO2 now, if it is not already open. Otherwise use \"Manual \
-             Download\": your browser saves the file, and it is picked up from there."
+            "To use the \"Mod Manager Download\" button (MO2 fetches the file), open MO2 now, \
+             if it is not already open. Otherwise use \"Manual Download\": your browser saves \
+             the file, and it is picked up from there."
         ),
     }
+    if !others.is_empty() {
+        println!(
+            "Only one MO2 can receive Nexus's links, and it may not be this one: what any of \
+             these downloads from now on is hard-linked in too (archives they already have \
+             are not; give their folders with --archive-search-path for that):"
+        );
+        for (name, dir) in others {
+            println!("  \"{name}\": {}", dir.display());
+        }
+    }
+}
+
+fn same_dir(a: &Path, b: &Path) -> bool {
+    std::fs::canonicalize(a).ok() == std::fs::canonicalize(b).ok()
+}
+
+/// Downloads folders of Oblivion MO2 `instances` other than the one saving
+/// into `downloads`, each with the instance's name. A Nexus "Mod Manager Download" goes to whichever MO2 owns
+/// `nxm:` links, which need not be the one this list installs into.
+fn other_instance_dirs(downloads: &Path, instances: Vec<PathBuf>) -> Vec<(String, PathBuf)> {
+    let mut out: Vec<(String, PathBuf)> = Vec::new();
+    for instance in instances {
+        let game = crate::config::mo2::instance_game_name(&instance);
+        if game.is_some_and(|game| !game.eq_ignore_ascii_case("Oblivion")) {
+            continue;
+        }
+        let Some(dir) = crate::config::mo2::instance_download_dir(&instance) else {
+            continue;
+        };
+        if !dir.is_dir() || same_dir(&dir, downloads) || out.iter().any(|(_, d)| same_dir(d, &dir))
+        {
+            continue;
+        }
+        let name = instance
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        out.push((name, dir));
+    }
+    out
+}
+
+/// Whether `file` was written at or after `since`: a download made while
+/// `download` runs, not one another instance already had. A little slack
+/// covers a file system's coarse timestamps.
+fn arrived_since(file: &Path, since: std::time::SystemTime) -> bool {
+    let since = since - Duration::from_secs(2);
+    file.metadata()
+        .and_then(|m| m.modified())
+        .is_ok_and(|modified| modified >= since)
+}
+
+/// Bring an archive another MO2 instance downloaded into the downloads
+/// folder, as a hard link: that folder is the other instance's, so nothing is
+/// moved out of it, and nothing is copied.
+fn link_in(file: &Path, downloads: &Path, archive: &ArchiveRef<'_>) -> anyhow::Result<PathBuf> {
+    let name = file
+        .file_name()
+        .ok_or_else(|| anyhow::anyhow!("{} has no file name", file.display()))?;
+    let destination = downloads.join(name);
+    std::fs::hard_link(file, &destination).map_err(|err| anyhow::anyhow!("{err}"))?;
+    archive_store::write_meta(&destination, archive)?;
+    Ok(destination)
 }
 
 pub(crate) async fn run(
@@ -270,7 +332,11 @@ pub(crate) async fn run(
             .map(|dir| format!(" in the downloads folder or in {}", dir.display()))
             .unwrap_or_default()
     );
-    mo2_advice(downloads);
+    // Those under ~/Games, those Steam runs, and any running now.
+    let mut instances = discover::mo2_instances(&discover::search_roots(), &discover::shortcuts());
+    instances.extend(crate::config::mo2::running::running_instances().unwrap_or_default());
+    let mut others = other_instance_dirs(downloads, instances);
+    mo2_advice(downloads, &others);
     if let Some(warning) = profile_warning() {
         println!("{warning}");
     }
@@ -295,6 +361,9 @@ pub(crate) async fn run(
         .filter_map(|u| Some((u.source.clone(), page_of(u)?)))
         .collect();
     to_open.reverse();
+    // Another instance's folder may hold the archive from long ago; only a
+    // download made while this runs is taken from there.
+    let started = std::time::SystemTime::now();
     let mut sizes: HashMap<PathBuf, u64> = HashMap::new();
     let mut told_left: Vec<PathBuf> = Vec::new();
     let mut done = 0usize;
@@ -333,7 +402,28 @@ pub(crate) async fn run(
             if let Some(path) = archive_store::find(downloads, &[], &reference)
                 && settled(&path, &mut sizes)
             {
-                arrived.push((index, path));
+                arrived.push((index, path, None));
+                continue;
+            }
+            if let Some((name, file)) = others.iter().find_map(|(name, dir)| {
+                archive_store::find(dir, &[], &reference).map(|file| (name, file))
+            }) && arrived_since(&file, started)
+                && settled(&file, &mut sizes)
+            {
+                match link_in(&file, downloads, &reference) {
+                    Ok(path) => arrived.push((index, path, Some(name.clone()))),
+                    Err(err) if !told_left.contains(&file) => {
+                        println!(
+                            "  {} is in MO2 instance \"{name}\"'s downloads ({}) but could not \
+                             be hard-linked into {} ({err}); move or copy it there yourself",
+                            item.label,
+                            file.display(),
+                            downloads.display()
+                        );
+                        told_left.push(file);
+                    }
+                    Err(_) => {}
+                }
                 continue;
             }
             let Some(watch) = &watch else { continue };
@@ -372,18 +462,30 @@ pub(crate) async fn run(
                 }
                 continue;
             }
-            arrived.push((index, adopt(&file, downloads, &reference, how)?));
+            arrived.push((index, adopt(&file, downloads, &reference, how)?, None));
+        }
+
+        // An MO2 started since -- by a Nexus link, say -- is watched too.
+        if let Some(running) = crate::config::mo2::running::running_instances() {
+            for (name, dir) in other_instance_dirs(downloads, running) {
+                if !others.iter().any(|(_, d)| same_dir(d, &dir)) {
+                    println!("  watching MO2 instance \"{name}\" too: {}", dir.display());
+                    others.push((name, dir));
+                }
+            }
         }
 
         // Highest index first, so removing one does not shift the next.
         arrived.sort_by(|a, b| b.0.cmp(&a.0));
-        for (index, path) in arrived {
+        for (index, path, from) in arrived {
             let item = pending.remove(index);
             done += 1;
             println!(
-                "  [{done}/{total}] {} -- {}",
+                "  [{done}/{total}] {} -- {}{}",
                 item.mod_id,
-                path.file_name().unwrap_or_default().to_string_lossy()
+                path.file_name().unwrap_or_default().to_string_lossy(),
+                from.map(|name| format!(" (linked from MO2 instance \"{name}\")"))
+                    .unwrap_or_default()
             );
         }
         if pending.is_empty() {
@@ -445,5 +547,48 @@ mod tests {
             meta.contains("modID=1") && meta.contains("fileID=2"),
             "{meta}"
         );
+    }
+
+    #[test]
+    fn only_a_file_written_since_the_start_counts_as_arrived() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("a.7z");
+        std::fs::write(&file, b"x").unwrap();
+        let now = std::time::SystemTime::now();
+        assert!(arrived_since(&file, now));
+        assert!(!arrived_since(&file, now + Duration::from_secs(60)));
+    }
+
+    #[test]
+    fn another_instances_download_is_linked_in_and_left_in_place() {
+        let other = tempfile::tempdir().unwrap();
+        let downloads = tempfile::tempdir().unwrap();
+        let file = other.path().join("Mod-1-2.7z");
+        std::fs::write(&file, b"x").unwrap();
+        let reference = ArchiveRef::new("nexus:oblivion/1/2", Some("Mod-1-2.7z"));
+        let linked = link_in(&file, downloads.path(), &reference).unwrap();
+        assert!(file.exists(), "the other instance keeps its copy");
+        assert_eq!(std::fs::read(&linked).unwrap(), b"x");
+        assert!(archive_store::meta_path(&linked).exists());
+    }
+
+    #[test]
+    fn other_instances_are_oblivion_ones_not_saving_into_the_downloads_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let make = |name: &str, game: &str| {
+            let instance = root.path().join(name);
+            std::fs::create_dir_all(instance.join("downloads")).unwrap();
+            std::fs::write(
+                instance.join("ModOrganizer.ini"),
+                format!("[General]\ngameName={game}\n"),
+            )
+            .unwrap();
+            instance
+        };
+        let this = make("This", "Oblivion");
+        let old = make("Old", "Oblivion");
+        let skyrim = make("Skyrim", "Skyrim Special Edition");
+        let found = other_instance_dirs(&this.join("downloads"), vec![this, old.clone(), skyrim]);
+        assert_eq!(found, vec![("Old".to_string(), old.join("downloads"))]);
     }
 }

@@ -211,7 +211,13 @@ next one:
 - **"Mod Manager Download"** hands the file to MO2, which saves it into its
   downloads folder with a `.meta`. When that is mudcrab's downloads folder
   (`install` sets the instance up that way), the file is simply there. MO2 has
-  to be open for this; the command says whether it is.
+  to be open for this; the command says whether it is. Only one MO2 on a
+  machine receives Nexus's links, and with several Oblivion instances it may
+  be another one, which saves into its own folder. So the downloads folders
+  of your other Oblivion MO2 instances (under `~/Games`, those Steam runs,
+  and any running) are watched too: a file downloaded there while the
+  command runs is hard-linked in, and left where it is. Archives those
+  folders already held are not taken; `--archive-search-path` is for those.
 - **"Manual Download"** has the browser save it, normally to your Downloads
   folder (`--watch` names another). The first time a file arrives there, you
   are asked whether to leave such files where they are (you will move them
