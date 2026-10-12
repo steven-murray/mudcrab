@@ -46,12 +46,9 @@ You need:
 - **A portable Mod Organizer 2 instance** for Oblivion, used for nothing else.
   mudcrab fills this instance in.
   - On Windows: download MO2, unpack it into its own folder, start it, choose
-    "portable" and point it at the game.
-  - On Linux, MO2 runs under Proton, and [Jackify](https://github.com/Omni-guides/Jackify)
-    sets that up for you: in Jackify, open the "Additional Tasks" tab and
-    choose "Setup Mod Organizer 2". It installs MO2 into the folder you give
-    it and adds it to Steam, so it starts from your Steam library. See
-    [known-issues.md](known-issues.md#linux--proton) for what else Linux needs.
+    "Portable" and point it at the game folder (`mudcrab game-dir` prints it).
+  - On Linux, MO2 runs under Proton, and Jackify sets that up: see
+    [Setting up MO2 on Linux](#setting-up-mo2-on-linux) below.
 - **`bsdtar` and `7z`** on your `PATH`, for `.7z` and `.rar` archives. Most
   Linux distributions have both a package away; on Windows, install 7-Zip and
   add it to `PATH`.
@@ -65,6 +62,32 @@ You need:
 
 Some lists need more: xEdit, if the list cleans plugins (`qac` actions), or an
 MO2 plugin. Step 1 tells you.
+
+### Setting up MO2 on Linux
+
+1. In [Jackify](https://github.com/Omni-guides/Jackify), open the
+   "Additional Tasks" tab and choose "Setup Mod Organizer 2". It installs MO2
+   into the folder you give it and adds it to Steam as a non-Steam game. It
+   then shows in Jackify's dashboard too.
+2. Give it a name you will recognise. Steam calls it "Mod Organizer 2", which
+   gets confusing once you have more than one: in your Steam library,
+   right-click it, choose Properties, and change the name at the top.
+3. Start it from Steam (or Jackify's dashboard). MO2's setup window appears.
+4. Choose **Portable**, so the instance lives in its own folder.
+5. When it asks for the game, a file window opens. MO2 runs under Proton,
+   which sees your Linux files as drive `Z:`, so browsing there is tedious.
+   Instead, run
+
+   ```bash
+   mudcrab game-dir
+   ```
+
+   and paste the `Z:\...` folder it prints into the **File name** box at the
+   bottom of the window. (`mudcrab game-dir --plain` prints only that, for
+   piping to the clipboard.)
+
+See [known-issues.md](known-issues.md#linux--proton) for what else Linux
+needs.
 
 ## 1. Tell mudcrab where things live
 

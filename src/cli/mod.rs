@@ -33,6 +33,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Installing a modlist",
         &[
+            "game-dir",
             "setup-tools",
             "compile",
             "query",
@@ -129,6 +130,8 @@ pub enum Command {
     Export(ExportArgs),
     /// Set up tools.toml: the downloads folder, Wine/Proton and xEdit, found and offered.
     SetupTools(SetupToolsArgs),
+    /// Find Oblivion's game folder, and print it as MO2's setup asks for it.
+    GameDir(GameDirArgs),
     /// Restore plugins that were hidden to make room for a merge.
     UnhideMerges(UnhideMergesArgs),
     /// Build merged plugins from an already-installed mods directory.
@@ -763,6 +766,20 @@ pub struct ExportArgs {
     /// customise, and export nothing.
     #[arg(long, value_name = "DIR")]
     pub eject: Option<PathBuf>,
+}
+
+/// Where Oblivion is installed: Steam's copy (in any Steam library), then any
+/// `Oblivion.exe` under `~/Games`.
+///
+/// Setting up an MO2 instance asks for this folder. Under Proton, MO2 sees the
+/// Linux filesystem as drive `Z:`, so the path is also printed in that form,
+/// ready to paste into the file window's "File name" box.
+#[derive(Debug, Args)]
+pub struct GameDirArgs {
+    /// Print only the first folder found, in the form MO2 takes (the `Z:`
+    /// form on Linux), for a script or the clipboard.
+    #[arg(long)]
+    pub plain: bool,
 }
 
 #[derive(Debug, Args)]

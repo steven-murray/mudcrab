@@ -11,6 +11,7 @@ pub mod download;
 mod download_browser;
 mod downloads;
 pub mod export;
+mod game_dir;
 pub mod identify;
 pub mod inspect;
 pub mod install;
@@ -94,6 +95,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Validate(args) => validate::run(args).await,
         Command::Export(args) => export::run(args).await,
         Command::SetupTools(args) => setup_tools::run(args).await,
+        Command::GameDir(args) => game_dir::run(args),
         Command::UnhideMerges(args) => unhide_merges::run(args).await,
         Command::Merge(args) => merge::run(args).await,
         Command::NewMerge(args) => new_merge::run(args).await,

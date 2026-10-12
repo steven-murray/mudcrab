@@ -918,6 +918,20 @@ Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
 modlist; `--list-options` shows them) and can be customised or replaced by your
 own: see [exporters.md](exporters.md).
 
+## game-dir
+
+Find Oblivion's game folder: Steam's copy, in any Steam library, then any
+`Oblivion.exe` under `~/Games`.
+
+```bash
+mudcrab game-dir [--plain]
+```
+
+On Linux each folder is also printed as MO2 sees it under Proton, on drive
+`Z:` (`Z:\home\you\.local\share\Steam\steamapps\common\Oblivion`), ready
+to paste into the file window MO2's first-run setup opens. `--plain` prints
+only the first folder found, in that form.
+
 ## setup-tools
 
 Set up `tools.toml`, the machine-local settings: the downloads folder and the

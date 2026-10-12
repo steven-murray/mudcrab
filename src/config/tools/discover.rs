@@ -299,6 +299,87 @@ pub fn xedit_exes(roots: &[PathBuf], prefix: Option<&Path>) -> Vec<Candidate> {
         .collect()
 }
 
+/// Steam's library folders under each of `steam_roots`: the root itself and
+/// every `path` its `libraryfolders.vdf` lists.
+fn steam_libraries(steam_roots: &[PathBuf]) -> Vec<PathBuf> {
+    let mut libraries: Vec<PathBuf> = Vec::new();
+    for root in steam_roots {
+        libraries.push(root.clone());
+        let text =
+            std::fs::read_to_string(root.join("steamapps/libraryfolders.vdf")).unwrap_or_default();
+        for line in text.lines() {
+            let line = line.trim();
+            if !line.starts_with("\"path\"") {
+                continue;
+            }
+            let value = line["\"path\"".len()..].trim().trim_matches('"');
+            libraries.push(PathBuf::from(value.replace("\\\\", "\\")));
+        }
+    }
+    let mut seen = Vec::new();
+    libraries.retain(|lib| {
+        let real = std::fs::canonicalize(lib).unwrap_or_else(|_| lib.clone());
+        let new = !seen.contains(&real);
+        seen.push(real);
+        new
+    });
+    libraries
+}
+
+/// Oblivion's game folder (the one holding `Oblivion.exe`): Steam's install,
+/// in any library, then any found under `roots` (a GOG copy, say).
+pub fn game_dirs(steam_roots: &[PathBuf], roots: &[PathBuf]) -> Vec<Candidate> {
+    let mut out: Vec<Candidate> = Vec::new();
+    let mut push = |path: PathBuf, why: String| {
+        let real = std::fs::canonicalize(&path).unwrap_or_else(|_| path.clone());
+        if path.join("Oblivion.exe").is_file()
+            && !out
+                .iter()
+                .any(|c| std::fs::canonicalize(&c.path).unwrap_or_else(|_| c.path.clone()) == real)
+        {
+            out.push(Candidate { path, why });
+        }
+    };
+    for library in steam_libraries(steam_roots) {
+        let manifest = std::fs::read_to_string(library.join("steamapps/appmanifest_22330.acf"));
+        let Ok(manifest) = manifest else { continue };
+        let installdir = manifest
+            .lines()
+            .map(str::trim)
+            .find_map(|line| line.strip_prefix("\"installdir\""))
+            .map(|value| value.trim().trim_matches('"').to_string())
+            .unwrap_or_else(|| "Oblivion".to_string());
+        push(
+            library.join("steamapps/common").join(installdir),
+            "Steam".to_string(),
+        );
+    }
+    for root in roots {
+        let mut exes = Vec::new();
+        find_files(root, &["Oblivion.exe"], 4, &mut exes);
+        for exe in exes {
+            if let Some(dir) = exe.parent() {
+                push(dir.to_path_buf(), format!("found under {}", root.display()));
+            }
+        }
+    }
+    out
+}
+
+/// Every Steam install found on this machine, for [`game_dirs`].
+pub fn steam_install_roots() -> Vec<PathBuf> {
+    let mut roots = steam_roots();
+    if cfg!(windows) {
+        for base in ["C:\\Program Files (x86)\\Steam", "C:\\Program Files\\Steam"] {
+            let base = PathBuf::from(base);
+            if base.join("steamapps").is_dir() {
+                roots.push(base);
+            }
+        }
+    }
+    roots
+}
+
 /// Where to look for games and tools: `~/Games` and `~/Downloads`, as present.
 pub fn search_roots() -> Vec<PathBuf> {
     let Some(home) = home() else {
@@ -331,6 +412,40 @@ mod tests {
         assert_eq!(downloads[0].path, instance.join("downloads"));
         assert!(downloads[0].why.contains("My List"));
         assert_eq!(xedit_exes(&roots, None)[0].path, tools.join("TES4Edit.exe"));
+    }
+
+    #[test]
+    fn finds_the_game_in_any_steam_library_and_under_a_root() {
+        let temp = tempfile::tempdir().unwrap();
+        let steam = temp.path().join("Steam");
+        let library = temp.path().join("Other Library");
+        std::fs::create_dir_all(steam.join("steamapps")).unwrap();
+        std::fs::write(
+            steam.join("steamapps/libraryfolders.vdf"),
+            format!(
+                "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n}}\n",
+                library.display()
+            ),
+        )
+        .unwrap();
+        let game = library.join("steamapps/common/Oblivion GOTY");
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(game.join("Oblivion.exe"), b"MZ").unwrap();
+        std::fs::write(
+            library.join("steamapps/appmanifest_22330.acf"),
+            "\"AppState\"\n{\n\t\"installdir\"\t\t\"Oblivion GOTY\"\n}\n",
+        )
+        .unwrap();
+        let games = temp.path().join("Games");
+        let gog = games.join("GOG/Oblivion");
+        std::fs::create_dir_all(&gog).unwrap();
+        std::fs::write(gog.join("Oblivion.exe"), b"MZ").unwrap();
+
+        let found = game_dirs(&[steam], &[games.clone(), library.clone()]);
+        let paths: Vec<_> = found.iter().map(|c| c.path.clone()).collect();
+        // The Steam copy once, though the root search also reaches it.
+        assert_eq!(paths, vec![game, gog]);
+        assert_eq!(found[0].why, "Steam");
     }
 
     #[test]
