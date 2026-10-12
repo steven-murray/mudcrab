@@ -415,6 +415,36 @@ pub struct DownloadArgs {
     pub filter: FilterArgs,
     #[command(flatten)]
     pub archive_sources: ArchiveSourceArgs,
+    /// For archives that cannot be downloaded directly (a free Nexus account,
+    /// no API key, a hand download), open their pages in the browser, a batch
+    /// at a time, and wait while you download them: each file is picked up as
+    /// it arrives, in the downloads folder (from MO2's "Mod Manager Download")
+    /// or in the browser's own downloads folder.
+    #[arg(long)]
+    pub browser: bool,
+    /// With --browser: how many pages to have open at once.
+    #[arg(long, default_value_t = 10, requires = "browser", value_name = "N")]
+    pub batch: usize,
+    /// With --browser: the folder your browser saves downloads to. Defaults to
+    /// your Downloads folder.
+    #[arg(long, requires = "browser", value_name = "DIR")]
+    pub watch: Option<PathBuf>,
+    /// With --browser: what to do with an archive that arrives in the
+    /// browser's folder, instead of asking: leave it there, move it into the
+    /// downloads folder, or hard-link it there.
+    #[arg(long, value_enum, requires = "browser", value_name = "WHAT")]
+    pub browser_downloads: Option<BrowserDownloads>,
+}
+
+/// What `download --browser` does with an archive the browser saved.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum BrowserDownloads {
+    /// Leave it; you will put it in the downloads folder yourself.
+    Leave,
+    /// Move it into the downloads folder.
+    Move,
+    /// Hard-link it into the downloads folder, leaving it where it is too.
+    Link,
 }
 
 #[derive(Debug, Args)]

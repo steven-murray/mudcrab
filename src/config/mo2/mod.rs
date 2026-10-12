@@ -331,6 +331,39 @@ pub(crate) fn point_at_downloads(
     Ok(())
 }
 
+/// Where an MO2 instance saves downloads: `download_directory` in its
+/// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
+/// a Wine drive other than `Z:`.
+pub(crate) fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
+    let mut in_settings = false;
+    for line in text.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            in_settings = line.eq_ignore_ascii_case("[Settings]");
+            continue;
+        }
+        let Some(value) = line
+            .strip_prefix("download_directory=")
+            .filter(|_| in_settings)
+        else {
+            continue;
+        };
+        let value = value.trim();
+        if value.is_empty() {
+            break;
+        }
+        if cfg!(windows) {
+            return Some(PathBuf::from(value));
+        }
+        let unix = value
+            .strip_prefix("Z:")
+            .or_else(|| value.strip_prefix("z:"))?;
+        return Some(PathBuf::from(unix.replace('\\', "/")));
+    }
+    Some(instance.join("downloads"))
+}
+
 /// A path as MO2 writes one: forward slashes, and under Wine the `Z:` drive
 /// that maps the Unix root.
 fn mo2_path(path: &Path) -> String {

@@ -8,6 +8,7 @@ pub mod conflicts;
 mod dds;
 pub mod diff;
 pub mod download;
+mod download_browser;
 mod downloads;
 pub mod export;
 pub mod identify;

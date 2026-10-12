@@ -48,6 +48,55 @@ pub fn running_in(instance: &Path) -> Vec<u32> {
     }
 }
 
+/// The instance folder of every MO2 that is running. `None` where this cannot
+/// be told (anywhere but Linux).
+pub fn running_instances() -> Option<Vec<PathBuf>> {
+    #[cfg(target_os = "linux")]
+    {
+        let mut out = Vec::new();
+        for entry in std::fs::read_dir("/proc").ok()?.flatten() {
+            if entry
+                .file_name()
+                .to_str()
+                .and_then(|n| n.parse::<u32>().ok())
+                .is_none()
+            {
+                continue;
+            }
+            let Ok(cmdline) = std::fs::read(entry.path().join("cmdline")) else {
+                continue;
+            };
+            if let Some(dir) = mo2_instance_of(&cmdline)
+                && !out.contains(&dir)
+            {
+                out.push(dir);
+            }
+        }
+        Some(out)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+/// The folder `ModOrganizer.exe` runs from, when a command line's program is
+/// MO2.
+fn mo2_instance_of(cmdline: &[u8]) -> Option<PathBuf> {
+    let program = cmdline
+        .split(|byte| *byte == 0)
+        .next()
+        .and_then(|arg| std::str::from_utf8(arg).ok())
+        .and_then(as_unix_path)?;
+    let is_mo2 = program.file_name().is_some_and(|name| {
+        name.to_string_lossy()
+            .eq_ignore_ascii_case("modorganizer.exe")
+    });
+    is_mo2
+        .then(|| program.parent().map(Path::to_path_buf))
+        .flatten()
+}
+
 /// Whether a NUL-separated command line's program is `ModOrganizer.exe` inside
 /// `instance`, as a Unix path or a Wine `Z:\` one.
 ///
@@ -102,6 +151,16 @@ mod tests {
     fn a_unix_path_matches_case_insensitively() {
         let cmdline = b"/home/u/Games/mudcrab test/modorganizer.exe\0-p\0Default\0";
         assert!(cmdline_runs_instance(cmdline, Path::new(INSTANCE)));
+    }
+
+    #[test]
+    fn any_mo2_is_named_by_its_folder() {
+        let cmdline = b"Z:\\home\\u\\Games\\MudCrab Test\\ModOrganizer.exe\0";
+        assert_eq!(
+            super::mo2_instance_of(cmdline),
+            Some(std::path::PathBuf::from(INSTANCE))
+        );
+        assert_eq!(super::mo2_instance_of(b"pgrep\0ModOrganizer.exe\0"), None);
     }
 
     #[test]

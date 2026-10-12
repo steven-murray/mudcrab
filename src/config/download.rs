@@ -28,10 +28,46 @@ enum DownloadOutcome {
     Downloaded(PathBuf),
 }
 
+/// An archive the download pass could not fetch, and why.
+#[derive(Debug, Clone)]
+pub struct Unfetched {
+    pub mod_id: String,
+    /// The archive's name, or its source when it has none.
+    pub label: String,
+    /// `nexus:...`, `manual:...`, a URL or a path.
+    pub source: String,
+    pub file_name: Option<String>,
+    /// Size and MD5, when the list records them.
+    pub content: Option<(u64, String)>,
+    pub error: String,
+}
+
+/// Fetch every archive the plan needs; fail, naming each, if any could not be.
 pub async fn download_all(
     plan: &PersonalizedPlan,
     settings: &DownloadSettings,
 ) -> anyhow::Result<()> {
+    let unfetched = download_report(plan, settings).await?;
+    if !unfetched.is_empty() {
+        let joined = unfetched
+            .iter()
+            .map(|u| format!("{} ({}): {}", u.mod_id, u.label, u.error))
+            .collect::<Vec<_>>()
+            .join("\n");
+        anyhow::bail!(
+            "download failed for {} archive(s):\n{joined}",
+            unfetched.len()
+        );
+    }
+    Ok(())
+}
+
+/// Fetch every archive the plan needs, and return the ones that could not be,
+/// for a caller that has another way to get them (`download --browser`).
+pub async fn download_report(
+    plan: &PersonalizedPlan,
+    settings: &DownloadSettings,
+) -> anyhow::Result<Vec<Unfetched>> {
     std::fs::create_dir_all(&settings.cache_dir).map_err(|err| {
         anyhow::anyhow!(
             "failed to create cache directory {}: {err}",
@@ -45,7 +81,7 @@ pub async fn download_all(
     // Accumulated rather than propagated, exactly as `check` does. A section of
     // a 700-mod list routinely contains more than one dead link, and stopping
     // at the first one turns finding them into one round trip each.
-    let mut errors: Vec<String> = Vec::new();
+    let mut errors: Vec<Unfetched> = Vec::new();
 
     // Collected first, then fetched `settings.parallel` at a time. Two jobs for
     // one archive (a file several mods use) are run once: the second would
@@ -124,12 +160,19 @@ pub async fn download_all(
                 }
                 log_download_outcome(job.mod_id, job.path, &outcome);
             }
-            Err(err) => errors.push(format!("{} ({}): {err}", job.mod_id, job.label)),
+            Err(err) => errors.push(Unfetched {
+                mod_id: job.mod_id.to_string(),
+                label: job.label.clone(),
+                source: job.path.to_string(),
+                file_name: job.file_name.map(str::to_string),
+                content: job.content.map(|(size, md5)| (size, md5.to_string())),
+                error: err.to_string(),
+            }),
         }
     }
     // Completion order is arbitrary with more than one in flight; the report
     // should not be.
-    errors.sort();
+    errors.sort_by(|a, b| (&a.mod_id, &a.label).cmp(&(&b.mod_id, &b.label)));
 
     crate::ui::say(format!(
         "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
@@ -150,12 +193,7 @@ pub async fn download_all(
         "download phase completed"
     );
 
-    if !errors.is_empty() {
-        let joined = errors.join("\n");
-        anyhow::bail!("download failed for {} archive(s):\n{joined}", errors.len());
-    }
-
-    Ok(())
+    Ok(errors)
 }
 
 /// One archive (or build layer) to fetch.

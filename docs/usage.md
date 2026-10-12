@@ -163,6 +163,7 @@ Download archives required by a personalized plan.
 mudcrab download <plan.json> [--downloads <dir>] [--retry <n>] [--parallel <n>]
                  [--section <name>]... [--only <mod id>]...
                  [--archive-search-path <dir>]...
+                 [--browser [--batch <n>] [--watch <dir>] [--browser-downloads leave|move|link]]
 ```
 
 Example:
@@ -177,6 +178,33 @@ A failed source does not stop the run. Every archive is attempted, the failures
 are reported together at the end and the exit code is non-zero -- the same shape
 as `check`. A section routinely contains more than one dead Nexus link, and
 aborting on the first one turned finding them into one round trip each.
+
+### Downloading by hand, quickly: `--browser`
+
+Without a premium Nexus account (or without an API key, or for a `manual:`
+archive) a person has to click to download each file. `--browser` makes that
+as quick as clicking allows. After the direct downloads, it opens the page of
+each archive still missing -- 10 at a time, `--batch` to change that -- and
+waits. Each file is picked up as it arrives, and its page is replaced by the
+next one:
+
+- **"Mod Manager Download"** hands the file to MO2, which saves it into its
+  downloads folder with a `.meta`. When that is mudcrab's downloads folder
+  (`install` sets the instance up that way), the file is simply there. MO2 has
+  to be open for this; the command says whether it is.
+- **"Manual Download"** has the browser save it, normally to your Downloads
+  folder (`--watch` names another). The first time a file arrives there, you
+  are asked whether to leave such files where they are (you will move them
+  yourself), move them into the downloads folder (recommended), or hard-link
+  them there. `--browser-downloads leave|move|link` answers in advance.
+
+A file counts as arrived when it has the archive's name (or, for a `manual:`
+archive that records them, its size and MD5) and has stopped growing; a
+browser's partial `.part` or `.crdownload` file is ignored. A `manual:` archive
+has no page to open: the command lists those, for you to fetch as the list's
+notes say, and waits for them too. Ctrl-C stops; running the command again
+carries on with what is still missing. The click is always yours: nothing
+presses a download button for you.
 
 ## The downloads folder
 

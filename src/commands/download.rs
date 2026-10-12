@@ -22,7 +22,19 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         parallel: args.parallel,
     };
 
-    config::download::download_all(&plan, &settings).await?;
+    if args.browser {
+        let unfetched = config::download::download_report(&plan, &settings).await?;
+        super::download_browser::run(
+            unfetched,
+            &settings.cache_dir,
+            args.batch,
+            args.watch.clone(),
+            args.browser_downloads,
+        )
+        .await?;
+    } else {
+        config::download::download_all(&plan, &settings).await?;
+    }
 
     tracing::info!(
         input = %args.input.display(),

@@ -102,10 +102,17 @@ Every archive is attempted; failures are listed together at the end. Re-run
 it as often as you like: archives already in the downloads folder are not
 fetched again.
 
-**Without a premium Nexus account**, each Nexus archive fails with a link to
-its page on the Nexus files tab. Download those files by hand, into the
-downloads folder, then run `download` again. mudcrab finds archives by name,
-so there is nothing to rename. If you already have some of the archives --
+**Without a premium Nexus account**, run it with `--browser`:
+
+```bash
+mudcrab download plan.json --browser
+```
+
+It opens the pages of the files it cannot download itself, ten at a time, and
+picks each file up as it arrives. On each page, click "Mod Manager Download"
+if MO2 is open (MO2 saves the file straight into the downloads folder), or
+"Manual Download" (your browser saves it, and mudcrab offers to move it in).
+As each file arrives, the next page opens. If you already have some of the archives --
 another MO2 instance's downloads, a Wabbajack folder -- point mudcrab at them
 instead: `--archive-search-path <folder>` (repeatable) uses them without
 copying or changing them.

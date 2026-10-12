@@ -91,9 +91,11 @@ file from the link given.
 
 ### `Nexus gives download links to premium accounts only; download it by hand from ...`
 
-Nexus only lets premium accounts download through its API. Open the link,
-download the file into the downloads folder, and run `download` again:
-mudcrab finds it by name. Everything else works on a free account.
+Nexus only lets premium accounts download through its API. Run
+`mudcrab download <plan> --browser`: it opens each file's page and picks the
+file up as you download it. Or open the link, download the file into the
+downloads folder, and run `download` again: mudcrab finds it by name.
+Everything else works on a free account.
 
 ### `Nexus refused the API key: check NEXUS_API_KEY`
 
