@@ -27,12 +27,24 @@ const POLL: Duration = Duration::from_secs(2);
 /// itself. A `manual:` archive or a local path has none.
 fn page_for(source: &str) -> Option<String> {
     if let Some((game, mod_id, file_id)) = ArchiveRef::new(source, None).nexus_ids() {
-        // `nmm=1` opens the file's "Mod Manager Download" page.
-        return Some(format!(
-            "https://www.nexusmods.com/{game}/mods/{mod_id}?tab=files&file_id={file_id}&nmm=1"
-        ));
+        return Some(nexus_page(game, mod_id, file_id, MOD_MANAGER_LINKS));
     }
     (source.starts_with("http://") || source.starts_with("https://")).then(|| source.to_string())
+}
+
+/// Whether to offer Nexus's "Mod Manager Download". On Linux it is not: the
+/// `nxm:` link goes to whichever MO2 owns such links, which with more than
+/// one instance is often not this list's, and the usual Linux handler (it
+/// starts the game's Steam entry) does nothing once that is running. The
+/// browser's own download always works.
+const MOD_MANAGER_LINKS: bool = !cfg!(target_os = "linux");
+
+/// A Nexus file's download page: with `mod_manager`, the one whose button
+/// hands the file to MO2 (`nmm=1`); without, the one whose "Slow download"
+/// has the browser save it.
+fn nexus_page(game: &str, mod_id: &str, file_id: &str, mod_manager: bool) -> String {
+    let nmm = if mod_manager { "&nmm=1" } else { "" };
+    format!("https://www.nexusmods.com/{game}/mods/{mod_id}?tab=files&file_id={file_id}{nmm}")
 }
 
 /// The page to open for one unfetched archive: its source's, or the page the
@@ -219,6 +231,13 @@ fn ask_policy(watch: &Path, downloads: &Path) -> anyhow::Result<BrowserDownloads
 
 /// Say whether MO2 can take the "Mod Manager Download" clicks.
 fn mo2_advice(downloads: &Path) {
+    if !MOD_MANAGER_LINKS {
+        println!(
+            "On each page, click \"Slow download\" (or \"Manual download\"): your browser \
+             saves the file, and it is picked up from there."
+        );
+        return;
+    }
     let running = crate::config::mo2::running::running_instances();
     let saving_here = |instance: &PathBuf| {
         crate::config::mo2::instance_download_dir(instance).is_some_and(|dir| {
@@ -401,10 +420,21 @@ mod tests {
     #[test]
     fn pages_for_nexus_files_and_urls_only() {
         assert_eq!(
-            page_for("nexus:oblivion/47085/1000022995").as_deref(),
-            Some(
-                "https://www.nexusmods.com/oblivion/mods/47085?tab=files&file_id=1000022995&nmm=1"
-            )
+            page_for("nexus:oblivion/47085/1000022995"),
+            Some(nexus_page(
+                "oblivion",
+                "47085",
+                "1000022995",
+                MOD_MANAGER_LINKS
+            ))
+        );
+        assert_eq!(
+            nexus_page("oblivion", "47085", "1000022995", true),
+            "https://www.nexusmods.com/oblivion/mods/47085?tab=files&file_id=1000022995&nmm=1"
+        );
+        assert_eq!(
+            nexus_page("oblivion", "47085", "1000022995", false),
+            "https://www.nexusmods.com/oblivion/mods/47085?tab=files&file_id=1000022995"
         );
         assert_eq!(
             page_for("https://x.example/a.7z").as_deref(),

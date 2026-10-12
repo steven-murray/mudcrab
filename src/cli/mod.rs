@@ -495,7 +495,8 @@ pub struct DownloadArgs {
     /// For archives that cannot be downloaded directly (a free Nexus account,
     /// no API key, a hand download), open their pages in the browser, a batch
     /// at a time, and wait while you download them: each file is picked up as
-    /// it arrives, in the downloads folder (from MO2's "Mod Manager Download")
+    /// it arrives, in the downloads folder (from MO2's "Mod Manager Download",
+    /// offered on Windows)
     /// or in the browser's own downloads folder. The default in a terminal
     /// when a browser can be opened.
     #[arg(long, conflicts_with = "no_browser")]

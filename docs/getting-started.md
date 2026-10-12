@@ -142,9 +142,10 @@ in the downloads folder are not fetched again.
 by hand, someone has to click. `download` opens the pages of the files it
 cannot download itself in your browser, ten at a time, and picks each file up
 as it arrives. (`--no-browser` lists them and stops instead; with no browser
-to open, that is what happens.) On each page, click "Mod Manager Download"
-if MO2 is open (MO2 saves the file straight into the downloads folder), or
-"Manual Download" (your browser saves it, and mudcrab offers to move it in).
+to open, that is what happens.) On each page, click "Slow download" (on
+Linux the pages open there): your browser saves the file, and mudcrab offers
+to move it into the downloads folder. On Windows, "Mod Manager Download" also
+works if MO2 is open: MO2 saves the file straight into the downloads folder.
 As each file arrives, the next page opens. If you already have some of the archives --
 another MO2 instance's downloads, a Wabbajack folder -- point mudcrab at them
 instead: `--archive-search-path <folder>` (repeatable) uses them without

@@ -208,11 +208,15 @@ each archive still missing -- 10 at a time, `--batch` to change that -- and
 waits. Each file is picked up as it arrives, and its page is replaced by the
 next one:
 
-- **"Mod Manager Download"** hands the file to MO2, which saves it into its
-  downloads folder with a `.meta`. When that is mudcrab's downloads folder
-  (`install` sets the instance up that way), the file is simply there. MO2 has
-  to be open for this; the command says whether it is.
-- **"Manual Download"** has the browser save it, normally to your Downloads
+- **"Mod Manager Download"** (not on Linux) hands the file to MO2, which
+  saves it into its downloads folder with a `.meta`. When that is mudcrab's
+  downloads folder (`install` sets the instance up that way), the file is
+  simply there. MO2 has to be open for this; the command says whether it is.
+  On Linux the pages open on the browser download instead: there, a Nexus
+  link goes to whichever MO2 instance owns `nxm:` links (often not this
+  list's when you have several), and the usual handler, which starts the
+  game's Steam entry, does nothing while that is already running.
+- **"Slow download"** (or "Manual Download") has the browser save it, normally to your Downloads
   folder (`--watch` names another). The first time a file arrives there, you
   are asked whether to leave such files where they are (you will move them
   yourself), move them into the downloads folder (recommended), or hard-link
