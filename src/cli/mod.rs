@@ -109,7 +109,7 @@ pub enum Command {
     Query(QueryArgs),
     /// Download archives required by a compiled or personalized modlist.
     Download(DownloadArgs),
-    /// Validate cached archives and archive-backed file references without installing.
+    /// Before installing: archives, layouts, actions, masters, load order and BSAs, all checked.
     Check(CheckArgs),
     /// Report an archive's layout, FOMOD options and plugins, for writing its
     /// modlist entry.
