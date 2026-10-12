@@ -66,6 +66,43 @@ fn pick(
     }
 }
 
+/// Ask for the Nexus API key. Enter keeps the one already in the environment,
+/// if there is one; `-` (or Enter with none) leaves it out. Not interactive:
+/// left out, so a key is never written to a file nobody was asked about.
+fn ask_api_key(
+    from_env: Option<&str>,
+    interactive: bool,
+    input: &mut dyn BufRead,
+    output: &mut dyn Write,
+) -> anyhow::Result<Option<String>> {
+    if !interactive {
+        return Ok(None);
+    }
+    writeln!(
+        output,
+        "\nNexus API key, from https://next.nexusmods.com/settings/api-keys. Kept here, \
+         every command finds it without NEXUS_API_KEY being set; this file is yours \
+         alone, so do not share or commit it. Premium accounts download directly; \
+         free accounts use it to name and recognise files."
+    )?;
+    let hint = match from_env {
+        Some(_) => {
+            writeln!(output, "  Enter stores the key NEXUS_API_KEY holds now.")?;
+            "Enter, a key, or -"
+        }
+        None => "a key, or Enter to leave it out",
+    };
+    write!(output, "  Key [{hint}]: ")?;
+    output.flush()?;
+    let mut line = String::new();
+    input.read_line(&mut line)?;
+    Ok(match line.trim() {
+        "-" => None,
+        "" => from_env.map(str::to_string),
+        key => Some(key.to_string()),
+    })
+}
+
 /// `~/x` -> `$HOME/x`, as a shell would.
 fn shellexpand_home(text: &str) -> String {
     match (text.strip_prefix("~/"), std::env::var("HOME")) {
@@ -166,6 +203,10 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
         )?,
         ..ToolValues::default()
     };
+    let env_key = std::env::var("NEXUS_API_KEY")
+        .ok()
+        .filter(|key| !key.trim().is_empty());
+    values.nexus_api_key = ask_api_key(env_key.as_deref(), interactive, &mut input, &mut out)?;
     if required.needs_wine_on_linux() && !cfg!(windows) {
         values.wine_prefix = pick(
             "Wine/Proton prefix to run xEdit in (the folder holding drive_c). MO2's own prefix is a good choice.",
@@ -213,6 +254,12 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
 
     std::fs::write(&output_path, &content)
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", output_path.display()))?;
+    // It may hold the API key: readable by its owner only.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&output_path, std::fs::Permissions::from_mode(0o600))?;
+    }
 
     tracing::info!(path = %output_path.display(), "setup-tools: wrote tools.toml template");
 
@@ -222,4 +269,42 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::tools::RequiredTools;
+
+    fn answer(env: Option<&str>, typed: &str) -> Option<String> {
+        let mut out = Vec::new();
+        ask_api_key(env, true, &mut typed.as_bytes(), &mut out).unwrap()
+    }
+
+    #[test]
+    fn the_api_key_is_typed_kept_from_the_environment_or_left_out() {
+        assert_eq!(answer(None, "abc123\n").as_deref(), Some("abc123"));
+        assert_eq!(answer(None, "\n"), None);
+        assert_eq!(answer(Some("fromenv"), "\n").as_deref(), Some("fromenv"));
+        assert_eq!(answer(Some("fromenv"), "-\n"), None);
+        assert_eq!(answer(Some("fromenv"), "other\n").as_deref(), Some("other"));
+    }
+
+    #[test]
+    fn a_key_is_never_written_without_asking() {
+        let mut out = Vec::new();
+        let key = ask_api_key(Some("fromenv"), false, &mut "".as_bytes(), &mut out).unwrap();
+        assert_eq!(key, None);
+    }
+
+    #[test]
+    fn a_stored_key_reads_back() {
+        let values = ToolValues {
+            nexus_api_key: Some("k\"ey".to_string()),
+            ..ToolValues::default()
+        };
+        let text = generate_tools_toml(&RequiredTools::default(), &values);
+        let config: ToolsConfig = toml::from_str(&text).unwrap();
+        assert_eq!(config.nexus_api_key.as_deref(), Some("k\"ey"));
+    }
 }

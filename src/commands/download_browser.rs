@@ -35,6 +35,12 @@ fn page_for(source: &str) -> Option<String> {
     (source.starts_with("http://") || source.starts_with("https://")).then(|| source.to_string())
 }
 
+/// The page to open for one unfetched archive: its source's, or the page the
+/// list gives for a hand download.
+fn page_of(item: &Unfetched) -> Option<String> {
+    page_for(&item.source).or_else(|| item.page.clone())
+}
+
 /// The folder browsers save to: XDG's download directory on Linux, else
 /// `~/Downloads`.
 fn default_watch_dir() -> Option<PathBuf> {
@@ -78,6 +84,46 @@ fn open_url(url: &str) -> bool {
         .stderr(Stdio::null())
         .spawn()
         .is_ok()
+}
+
+/// Whether pages can be opened for someone to click: a terminal to talk to,
+/// and (on Linux) a desktop session with `xdg-open`.
+pub(crate) fn available() -> bool {
+    if !(std::io::stdin().is_terminal() && std::io::stdout().is_terminal()) {
+        return false;
+    }
+    if cfg!(windows) || cfg!(target_os = "macos") {
+        return true;
+    }
+    let desktop = ["DISPLAY", "WAYLAND_DISPLAY"]
+        .iter()
+        .any(|var| std::env::var_os(var).is_some_and(|v| !v.is_empty()));
+    let xdg_open = std::env::var_os("PATH")
+        .is_some_and(|path| std::env::split_paths(&path).any(|dir| dir.join("xdg-open").is_file()));
+    desktop && xdg_open
+}
+
+/// A browser started from here takes its profile from `XDG_CONFIG_HOME`. If
+/// that is not where the usual one lives, a second browser starts on a fresh
+/// profile -- even while the usual one is open, since Chromium-based browsers
+/// keep their one-instance lock in the profile. No bookmarks, no Nexus login,
+/// and an unbranded look that can pass for another browser.
+fn profile_warning() -> Option<String> {
+    if cfg!(windows) || cfg!(target_os = "macos") {
+        return None;
+    }
+    let config = PathBuf::from(std::env::var_os("XDG_CONFIG_HOME")?);
+    let home = PathBuf::from(std::env::var_os("HOME")?);
+    let usual = home.join(".config");
+    if std::fs::canonicalize(&config).ok() == std::fs::canonicalize(&usual).ok() {
+        return None;
+    }
+    Some(format!(
+        "note: XDG_CONFIG_HOME is {}, so the browser opened from here looks for its \
+         profile there and may start fresh, as a second window without your Nexus \
+         login. If it does, run this command with XDG_CONFIG_HOME unset.",
+        config.display()
+    ))
 }
 
 /// A file a browser or MO2 has finished writing: not empty, not shadowed by a
@@ -224,14 +270,18 @@ pub(crate) async fn run(
             .unwrap_or_default()
     );
     mo2_advice(downloads);
-    let no_page: Vec<&Unfetched> = unfetched
-        .iter()
-        .filter(|u| page_for(&u.source).is_none())
-        .collect();
+    if let Some(warning) = profile_warning() {
+        println!("{warning}");
+    }
+    let no_page: Vec<&Unfetched> = unfetched.iter().filter(|u| page_of(u).is_none()).collect();
     if !no_page.is_empty() {
-        println!("These have no page to open; download them as the list's notes say:");
+        println!("These have no page to open; download them by hand:");
         for item in &no_page {
             println!("  {} ({})", item.mod_id, item.label);
+            match &item.note {
+                Some(note) => println!("    {}", note.trim()),
+                None => println!("    (the list does not say where from)"),
+            }
         }
     }
     println!("Ctrl-C stops; running the same command again carries on.\n");
@@ -239,10 +289,9 @@ pub(crate) async fn run(
     let mut pending: Vec<Unfetched> = unfetched;
     // Sources whose page is open, and those still to open, first last.
     let mut opened: Vec<String> = Vec::new();
-    let mut to_open: Vec<String> = pending
+    let mut to_open: Vec<(String, String)> = pending
         .iter()
-        .filter(|u| page_for(&u.source).is_some())
-        .map(|u| u.source.clone())
+        .filter_map(|u| Some((u.source.clone(), page_of(u)?)))
         .collect();
     to_open.reverse();
     let mut sizes: HashMap<PathBuf, u64> = HashMap::new();
@@ -256,10 +305,17 @@ pub(crate) async fn run(
             .filter(|u| opened.contains(&u.source))
             .count();
         for _ in open_now..batch.max(1) {
-            let Some(source) = to_open.pop() else { break };
-            let url = page_for(&source).expect("only sources with a page are queued");
+            let Some((source, url)) = to_open.pop() else {
+                break;
+            };
             if !open_url(&url) {
                 println!("  open this page yourself: {url}");
+            }
+            // A hand download's page is not a Nexus file page: say what to get.
+            if let Some(item) = pending.iter().find(|u| u.source == source)
+                && let Some(note) = &item.note
+            {
+                println!("  {}: {}", item.mod_id, note.trim());
             }
             opened.push(source);
             // A browser handed many tabs in the same instant drops some.

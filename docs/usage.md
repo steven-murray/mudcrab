@@ -129,11 +129,29 @@ longer validates.
 
 ## compile
 
-Validate and compile a source modlist.
+Check a source modlist and write it out compiled: sections flattened, the
+top-level INI tables turned into actions, each archive's fields checked.
 
 ```bash
-mudcrab compile <modlist.toml> --output <compiled.json> [--strict] [--offline]
+mudcrab compile <modlist.toml> --output <compiled.json> [--strict]
 ```
+
+What it checks is the list's own consistency, from the TOML alone:
+
+- each input has a question, and its default fits its type;
+- each condition (`if`) asks about a declared input or an existing mod;
+- dependencies and `conflicts_with` name mods that exist;
+- each plugin a mod declares is in the load order, once, with a valid name;
+- merges name their sources, and nothing depends on itself in a cycle;
+- each archive has a `path` (or `build`), the fields its `layout` needs, and
+  `size` with `md5`.
+
+It downloads and opens nothing, so it cannot see inside archives: whether a
+FOMOD option exists, a plugin's masters are present, or two mods' files
+overwrite each other is found by `check`, `install` and `conflicts`. Nor does
+it answer the list's questions; that is `query`. A list running over
+Oblivion's 255-plugin limit is a warning; `--strict` makes warnings errors.
+The docs file (`docs_file`) is not read: only `export` and `validate` need it.
 
 Example:
 
@@ -163,7 +181,7 @@ Download archives required by a personalized plan.
 mudcrab download <plan.json> [--downloads <dir>] [--retry <n>] [--parallel <n>]
                  [--section <name>]... [--only <mod id>]...
                  [--archive-search-path <dir>]...
-                 [--browser [--batch <n>] [--watch <dir>] [--browser-downloads leave|move|link]]
+                 [--no-browser | [--batch <n>] [--watch <dir>] [--browser-downloads leave|move|link]]
 ```
 
 Example:
@@ -179,11 +197,13 @@ are reported together at the end and the exit code is non-zero -- the same shape
 as `check`. A section routinely contains more than one dead Nexus link, and
 aborting on the first one turned finding them into one round trip each.
 
-### Downloading by hand, quickly: `--browser`
+### Downloading by hand, quickly: the browser
 
 Without a premium Nexus account (or without an API key, or for a `manual:`
-archive) a person has to click to download each file. `--browser` makes that
-as quick as clicking allows. After the direct downloads, it opens the page of
+archive) a person has to click to download each file. `download` makes that
+as quick as clicking allows, whenever it runs in a terminal and a browser can
+be opened (on Linux, a desktop session with `xdg-open`); `--no-browser` turns
+it off, reporting what is missing and failing instead. After the direct downloads, it opens the page of
 each archive still missing -- 10 at a time, `--batch` to change that -- and
 waits. Each file is picked up as it arrives, and its page is replaced by the
 next one:
@@ -200,9 +220,15 @@ next one:
 
 A file counts as arrived when it has the archive's name (or, for a `manual:`
 archive that records them, its size and MD5) and has stopped growing; a
-browser's partial `.part` or `.crdownload` file is ignored. A `manual:` archive
-has no page to open: the command lists those, for you to fetch as the list's
-notes say, and waits for them too. Ctrl-C stops; running the command again
+browser's partial `.part` or `.crdownload` file is ignored. A `manual:`
+archive's page is the list's `download_page`, opened like the rest, with its
+`download_note` printed beside it; one with no page is listed, with its note,
+for you to fetch, and waited for too.
+
+On Linux the browser takes its profile from `XDG_CONFIG_HOME`. If that is set
+somewhere unusual in the shell you run `download` from, the pages open in a
+fresh browser profile -- a second window without your Nexus login -- and the
+command says so. Ctrl-C stops; running the command again
 carries on with what is still missing. The click is always yours: nothing
 presses a download button for you.
 
@@ -910,7 +936,10 @@ things usually are:
 - **Proton**: the build that prefix was last run with, then the others Steam
   has;
 - **xEdit**: `TES4Edit.exe` or `xEdit.exe` under `~/Games`, `~/Downloads` and
-  the prefix. Its Quick Auto Clean executable is found beside it.
+  the prefix. Its Quick Auto Clean executable is found beside it;
+- **your Nexus API key**, kept as `nexus_api_key`. Enter keeps the one in
+  `NEXUS_API_KEY`, if that is set; it is never written without being asked.
+  The file is made readable by you alone.
 
 Enter takes the first suggestion, a number another, `-` leaves a placeholder
 to fill in later, and anything else is a path. With `--defaults`, or when
@@ -928,11 +957,17 @@ Nexus downloads support:
 1. Direct URL with `nexusmods.com`.
 2. API descriptor format: `nexus:<game>/<mod_id>/<file_id>`.
 
-For API descriptor sources, export a key:
+For API descriptor sources, mudcrab needs your API key: `nexus_api_key` in
+`tools.toml` (`setup-tools` asks for it), or the environment, which takes
+precedence:
 
 ```bash
 export NEXUS_API_KEY="your-api-key"
 ```
+
+Only premium accounts are given download links; a free account's key still
+names and recognises files (`add --nexus`, `identify`, `nexus-files`). A
+refusal is not retried: asking again gets the same answer.
 
 Optional API base override:
 

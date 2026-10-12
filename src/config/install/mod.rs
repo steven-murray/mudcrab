@@ -689,6 +689,8 @@ mod tests {
             archives: vec![CompiledArchive {
                 size: None,
                 md5: None,
+                download_page: None,
+                download_note: None,
                 condition: None,
                 path: Some(archive_path.to_string()),
                 file_name: None,
@@ -1177,6 +1179,8 @@ mod tests {
         let archive = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1248,6 +1252,8 @@ mod tests {
         let simple = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("manual:WACv_1beta.7z".to_string()),
             file_name: None,
@@ -1292,6 +1298,8 @@ mod tests {
         let detected = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             layout: None,
             ..simple
         };
@@ -1335,6 +1343,8 @@ mod tests {
         let archive = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1399,6 +1409,8 @@ mod tests {
         let archive = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1461,6 +1473,8 @@ mod tests {
         let archive = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("nexus:oblivion/1/1".to_string()),
             file_name: None,
@@ -1569,6 +1583,8 @@ mod tests {
         let archive = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("local-fomod.zip".to_string()),
             file_name: None,

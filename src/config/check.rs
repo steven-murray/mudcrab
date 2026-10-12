@@ -234,8 +234,14 @@ fn check_single_archive(
                     .join(", ")
             )
         };
+        let by_hand = crate::config::download::how_to_get(
+            archive.download_page.as_deref(),
+            archive.download_note.as_deref(),
+        )
+        .map(|how| format!("\n{how}"))
+        .unwrap_or_default();
         anyhow::bail!(
-            "{} is not in the downloads folder ({}) or any search path; {how}{hint}",
+            "{} is not in the downloads folder ({}) or any search path; {how}{hint}{by_hand}",
             reference.describe(),
             settings.cache_dir.display(),
         );

@@ -51,7 +51,8 @@ Linux, also `[wine]`).
 
 ## Writing or changing a list
 
-`validate` and `compile` check the whole list before anything is downloaded.
+`validate` and `compile` check the list's own consistency before anything is
+downloaded (see [usage.md](usage.md#compile) for what that covers).
 
 ### `mod X declares plugin Y that is missing from global plugins load order`
 
@@ -83,28 +84,39 @@ does not have.
 
 ## Downloading
 
-### `NEXUS_API_KEY is not set, so Nexus cannot be asked for this file; download it by hand from ...`
+### `no Nexus API key (NEXUS_API_KEY, or nexus_api_key in tools.toml) ...`
 
-Set your API key (`export NEXUS_API_KEY=...`, from your Nexus account's
-[API keys page](https://next.nexusmods.com/settings/api-keys)), or download the
-file from the link given.
+Give mudcrab your API key, from your Nexus account's
+[API keys page](https://next.nexusmods.com/settings/api-keys): `setup-tools`
+stores it in `tools.toml` (with `--force` if you already have one, or add
+`nexus_api_key = "..."` to the file yourself), or set `NEXUS_API_KEY`. Or
+download the file from the link given.
 
 ### `Nexus gives download links to premium accounts only; download it by hand from ...`
 
 Nexus only lets premium accounts download through its API. Run
-`mudcrab download <plan> --browser`: it opens each file's page and picks the
-file up as you download it. Or open the link, download the file into the
+`mudcrab download <plan>` in a terminal: it opens each file's page and picks
+the file up as you download it. Or open the link, download the file into the
 downloads folder, and run `download` again: mudcrab finds it by name.
 Everything else works on a free account.
 
-### `Nexus refused the API key: check NEXUS_API_KEY`
+### `Nexus refused the API key: check NEXUS_API_KEY or nexus_api_key in tools.toml`
 
 The key is wrong or has been revoked. Copy it again from the API keys page.
+`NEXUS_API_KEY`, when set, is used instead of the one in `tools.toml`.
+
+### Pages open in an unfamiliar browser window (Linux)
+
+The browser was started with a different `XDG_CONFIG_HOME` from usual, so it
+opened a fresh profile. `download` warns when it is set. Unset it for that
+command.
 
 ### `archive 'A' must be downloaded by hand -- it is not fetchable from any automated source`
 
 The list marks this archive `manual:`, because no download link can reach it
-(a forum host behind a login, say). Its entry should say where to get it.
+(a forum host behind a login, say). Where the list says where and how to get
+it, that follows the message (`get it from: ...`); `download` opens that page
+for you.
 If the message lists *similarly named files*, one of them may be the same
 archive, renamed by its host since the list was written: if so, set the
 entry's `file_name` to that name. (An entry that records the archive's `size`

@@ -2,9 +2,9 @@ use crate::cli::IdentifyArgs;
 use crate::config::identify::{Method, identify, write_meta_sidecar};
 
 pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
-    let api_key = std::env::var("NEXUS_API_KEY").map_err(|_| {
+    let api_key = crate::config::tools::ToolsConfig::nexus_api_key().ok_or_else(|| {
         anyhow::anyhow!(
-            "NEXUS_API_KEY must be set: identifying an archive is a Nexus API call, \
+            "a Nexus API key is needed (NEXUS_API_KEY, or nexus_api_key in tools.toml): identifying an archive is a Nexus API call, \
              the same one Mod Organizer 2 makes when it recognises a file you \
              downloaded by hand."
         )

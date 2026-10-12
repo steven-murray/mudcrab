@@ -83,10 +83,17 @@ pub fn compile_archive(id: &str, archive: &ArchiveSpec) -> anyhow::Result<Compil
             anyhow::bail!("mod '{id}': an archive's size and md5 go together; give both or neither")
         }
     };
+    if let Some(page) = &archive.download_page
+        && !(page.starts_with("https://") || page.starts_with("http://"))
+    {
+        anyhow::bail!("mod '{id}': download_page must be a web address, got '{page}'");
+    }
     Ok(CompiledArchive {
         condition: archive.condition.clone(),
         size: archive.size,
         md5,
+        download_page: archive.download_page.clone(),
+        download_note: archive.download_note.clone(),
         path: archive.path.clone(),
         file_name: archive
             .file_name

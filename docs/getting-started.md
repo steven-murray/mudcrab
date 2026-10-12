@@ -15,9 +15,12 @@ If you are used to installing mods one at a time in MO2, five commands may
 seem like a lot. Each one finishes a different kind of work, and each leaves a
 file behind, so a problem shows up early and nothing is ever redone needlessly:
 
-- **`compile` checks the whole list before anything is downloaded.** A typo, a
-  reference to a mod that is not there, or a contradiction in the list's logic is reported
-  in seconds, not an hour into an install.
+- **`compile` checks the list's own consistency before anything is
+  downloaded.** A typo, a reference to a mod that is not there, or a
+  contradiction in the list's logic is reported in seconds, not an hour into
+  an install. (Problems inside the archives -- a missing master, a conflict
+  -- can only be found once they are downloaded; `check` and `install` do
+  that.)
 - **`query` turns the list plus your answers into a plan**: one file saying
   exactly what will be installed. Your choices live there, not in the list, so
   changing your mind means re-running one quick step. The plan is also what to
@@ -74,18 +77,18 @@ archive goes in, shared by every list you install) and, if the list cleans
 plugins, xEdit and the Proton prefix to run it in -- offering what it finds:
 MO2 instances, Steam's Proton prefixes (named after their Steam shortcuts),
 xEdit under `~/Games`. Press Enter to take the first suggestion, a number for
-another, or type a path. It writes `tools.toml` where every mudcrab command
-looks for it (`~/.config/mudcrab/`, or `$XDG_CONFIG_HOME/mudcrab/` when that
-is set; `%APPDATA%\mudcrab\` on Windows) and says where. The commands below
-then need no `--downloads`.
+another, or type a path.
 
-For Nexus downloads, put your API key (from your Nexus account's
-[API keys page](https://next.nexusmods.com/settings/api-keys)) in the
-environment:
+It also asks for your Nexus API key, from your Nexus account's
+[API keys page](https://next.nexusmods.com/settings/api-keys). A premium
+account downloads with it; a free one uses it to name files. Kept in
+`tools.toml`, every command finds it; `NEXUS_API_KEY` in the environment, if
+set, takes precedence. The file is readable only by you -- do not share it.
 
-```bash
-export NEXUS_API_KEY="your-api-key"
-```
+It writes `tools.toml` where every mudcrab command looks for it
+(`~/.config/mudcrab/`, or `$XDG_CONFIG_HOME/mudcrab/` when that is set;
+`%APPDATA%\mudcrab\` on Windows) and says where. The commands below then need
+no `--downloads`.
 
 ## 2. Compile the list and answer its questions
 
@@ -94,8 +97,11 @@ mudcrab compile mylist.toml --output compiled.json
 mudcrab query compiled.json --output plan.json
 ```
 
-`compile` checks the list and resolves it. `query` asks the questions the list
-declares -- an optional mod, a choice between versions -- and writes
+`compile` checks that the list is consistent -- every name it refers to
+exists, every plugin is in the load order, every condition asks a question the
+list declares -- and writes it out in the form the later steps read. It does
+not look at any archive (you have none yet) or ask anything. `query` asks the
+questions the list declares -- an optional mod, a choice between versions -- and writes
 `plan.json`: exactly what will be installed, given your answers. Press Enter
 to take the default the list's author chose. `--headless` takes every default
 without asking.
@@ -106,18 +112,14 @@ without asking.
 mudcrab download plan.json
 ```
 
-Every archive is attempted; failures are listed together at the end. Re-run
-it as often as you like: archives already in the downloads folder are not
-fetched again.
+Every archive is attempted. Re-run it as often as you like: archives already
+in the downloads folder are not fetched again.
 
-**Without a premium Nexus account**, run it with `--browser`:
-
-```bash
-mudcrab download plan.json --browser
-```
-
-It opens the pages of the files it cannot download itself, ten at a time, and
-picks each file up as it arrives. On each page, click "Mod Manager Download"
+**Without a premium Nexus account**, or for a file the list says to download
+by hand, someone has to click. `download` opens the pages of the files it
+cannot download itself in your browser, ten at a time, and picks each file up
+as it arrives. (`--no-browser` lists them and stops instead; with no browser
+to open, that is what happens.) On each page, click "Mod Manager Download"
 if MO2 is open (MO2 saves the file straight into the downloads folder), or
 "Manual Download" (your browser saves it, and mudcrab offers to move it in).
 As each file arrives, the next page opens. If you already have some of the archives --

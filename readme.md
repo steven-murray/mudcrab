@@ -103,7 +103,8 @@ mudcrab download build/plan.json --downloads ~/Games/OblivionModDownloads
 mudcrab install  build/plan.json --downloads ~/Games/OblivionModDownloads --mo2-instance-dir ~/mo2/MyList
 ```
 
-1. **compile** — validate the source list and resolve what can be resolved.
+1. **compile** — check the source list's own consistency (names, load order,
+   conditions) and write it out for the next steps.
 2. **query** — ask the user any questions the list declares, producing a plan
    specific to their answers.
 3. **download** — fetch (or find locally) every archive the plan needs.
@@ -127,7 +128,8 @@ MIT or Apache-2.0, at your option. See [LICENSE-MIT](LICENSE-MIT) and
   in-process.
 - For `qac`: xEdit, configured via `tools.toml` (`mudcrab setup-tools` writes a
   template). It runs headlessly, under Proton or Wine on Linux.
-- For Nexus sources: `NEXUS_API_KEY` in the environment.
+- For Nexus sources: your API key, in `tools.toml` (`setup-tools` asks) or
+  `NEXUS_API_KEY`.
 
 ## Development
 

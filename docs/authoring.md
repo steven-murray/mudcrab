@@ -181,7 +181,9 @@ A few more ways in:
 - **`--archive` with `--nexus`**, for an archive with no `.meta`.
 - **`--manual`**, with `--archive`, for a file that is not on Nexus. The entry
   says `path = "manual:<file name>"`, and whoever installs the list downloads
-  it themselves. Say where from in a comment.
+  it themselves. Fill in the `download_page` and `download_note` lines it
+  leaves commented out: `download` opens the page and prints the note, so
+  nobody has to open the list to find out where to go.
 - **`--before-mod`**, to put an entry somewhere other than the end of its
   section. Order within a section is MO2's priority order, which decides whose
   files win a conflict. `mudcrab move` moves an entry later.

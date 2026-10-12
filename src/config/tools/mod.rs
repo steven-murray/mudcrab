@@ -16,6 +16,9 @@ pub struct ToolsConfig {
     /// otherwise. One central folder, with each MO2 instance pointed at it, is
     /// the recommended setup.
     pub downloads_dir: Option<PathBuf>,
+    /// The Nexus API key, from https://next.nexusmods.com/settings/api-keys.
+    /// `NEXUS_API_KEY` in the environment takes precedence.
+    pub nexus_api_key: Option<String>,
     /// Wine / Proton runner used on non-Windows hosts for Windows-only tools.
     /// On Windows this section is ignored.
     pub wine: Option<WineConfig>,
@@ -99,6 +102,23 @@ impl ToolsConfig {
             .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
         toml::from_str(&raw)
             .map_err(|err| anyhow::anyhow!("failed to parse {}: {err}", path.display()))
+    }
+
+    /// The Nexus API key: `NEXUS_API_KEY` if set, else `nexus_api_key` in the
+    /// default tools.toml. A tools.toml that cannot be read gives no key; the
+    /// commands that need one say how to set it.
+    pub fn nexus_api_key() -> Option<String> {
+        let from_env = std::env::var("NEXUS_API_KEY")
+            .ok()
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty());
+        from_env.or_else(|| {
+            let config = Self::load(&Self::default_path()?).ok()?;
+            config
+                .nexus_api_key
+                .map(|key| key.trim().to_string())
+                .filter(|key| !key.is_empty())
+        })
     }
 
     /// Return the default tools.toml path: `~/.config/mudcrab/tools.toml`.
@@ -240,6 +260,7 @@ impl RequiredTools {
 #[derive(Debug, Default, Clone)]
 pub struct ToolValues {
     pub downloads_dir: Option<PathBuf>,
+    pub nexus_api_key: Option<String>,
     pub wine_prefix: Option<PathBuf>,
     pub proton: Option<PathBuf>,
     pub tes4edit: Option<PathBuf>,
@@ -274,6 +295,16 @@ pub fn generate_tools_toml(required: &RequiredTools, values: &ToolValues) -> Str
         None => out.push_str("# downloads_dir = \"/home/you/Games/OblivionModDownloads\"\n\n"),
         #[cfg(target_os = "windows")]
         None => out.push_str("# downloads_dir = \"D:\\\\Games\\\\OblivionModDownloads\"\n\n"),
+    }
+
+    out.push_str("# Your Nexus API key (https://next.nexusmods.com/settings/api-keys).\n");
+    out.push_str("# NEXUS_API_KEY in the environment overrides it.\n");
+    match &values.nexus_api_key {
+        Some(key) => out.push_str(&format!(
+            "nexus_api_key = \"{}\"\n\n",
+            key.replace('\\', "\\\\").replace('"', "\\\"")
+        )),
+        None => out.push_str("# nexus_api_key = \"...\"\n\n"),
     }
 
     // Wine section — only on Linux and only when at least one Windows tool is needed.

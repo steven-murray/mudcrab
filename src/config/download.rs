@@ -39,7 +39,33 @@ pub struct Unfetched {
     pub file_name: Option<String>,
     /// Size and MD5, when the list records them.
     pub content: Option<(u64, String)>,
+    /// Where and how to get it by hand, when the list says.
+    pub page: Option<String>,
+    pub note: Option<String>,
     pub error: String,
+}
+
+impl Unfetched {
+    /// The error, then the list's own word on getting the archive by hand.
+    pub fn describe(&self) -> String {
+        match how_to_get(self.page.as_deref(), self.note.as_deref()) {
+            Some(how) => format!("{}\n{how}", self.error),
+            None => self.error.clone(),
+        }
+    }
+}
+
+/// What the list says about fetching an archive by hand, indented to sit under
+/// the message about it; `None` when it says nothing.
+pub(crate) fn how_to_get(page: Option<&str>, note: Option<&str>) -> Option<String> {
+    let mut lines = Vec::new();
+    if let Some(page) = page {
+        lines.push(format!("    get it from: {page}"));
+    }
+    if let Some(note) = note {
+        lines.push(format!("    {}", note.trim()));
+    }
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 /// Fetch every archive the plan needs; fail, naming each, if any could not be.
@@ -51,7 +77,7 @@ pub async fn download_all(
     if !unfetched.is_empty() {
         let joined = unfetched
             .iter()
-            .map(|u| format!("{} ({}): {}", u.mod_id, u.label, u.error))
+            .map(|u| format!("{} ({}): {}", u.mod_id, u.label, u.describe()))
             .collect::<Vec<_>>()
             .join("\n");
         anyhow::bail!(
@@ -104,6 +130,8 @@ pub async fn download_report(
                         path: &layer.path,
                         file_name: layer.file_name.as_deref(),
                         content: None,
+                        page: None,
+                        note: None,
                         handler: layer.download_handler.as_deref(),
                     });
                 }
@@ -115,6 +143,8 @@ pub async fn download_report(
                     path,
                     file_name: archive.file_name.as_deref(),
                     content: archive.size.zip(archive.md5.as_deref()),
+                    page: archive.download_page.as_deref(),
+                    note: archive.download_note.as_deref(),
                     handler: archive.download_handler.as_deref(),
                 });
             }
@@ -166,6 +196,8 @@ pub async fn download_report(
                 source: job.path.to_string(),
                 file_name: job.file_name.map(str::to_string),
                 content: job.content.map(|(size, md5)| (size, md5.to_string())),
+                page: job.page.map(str::to_string),
+                note: job.note.map(str::to_string),
                 error: err.to_string(),
             }),
         }
@@ -205,6 +237,8 @@ struct Job<'a> {
     file_name: Option<&'a str>,
     /// Size and MD5, for finding a renamed copy.
     content: Option<(u64, &'a str)>,
+    page: Option<&'a str>,
+    note: Option<&'a str>,
     handler: Option<&'a str>,
 }
 
@@ -516,9 +550,10 @@ async fn download_nexus(
          into the downloads folder (or a folder given with --archive-search-path)"
     );
     let api_key = settings.nexus_api_key.as_deref().ok_or_else(|| {
-        anyhow::anyhow!(
-            "NEXUS_API_KEY is not set, so Nexus cannot be asked for this file; {by_hand}"
-        )
+        NoRetry(format!(
+            "no Nexus API key (NEXUS_API_KEY, or nexus_api_key in tools.toml), so Nexus \
+             cannot be asked for this file; {by_hand}"
+        ))
     })?;
 
     let api_base = settings
@@ -541,12 +576,19 @@ async fn download_nexus(
         .map_err(|err| anyhow::anyhow!("nexus api request failed: {err}"))?;
     match response.status() {
         reqwest::StatusCode::FORBIDDEN => {
-            anyhow::bail!("Nexus gives download links to premium accounts only; {by_hand}")
+            return Err(NoRetry(format!(
+                "Nexus gives download links to premium accounts only; {by_hand}"
+            ))
+            .into());
         }
-        reqwest::StatusCode::UNAUTHORIZED => anyhow::bail!(
-            "Nexus refused the API key: check NEXUS_API_KEY (your key is at \
-             https://next.nexusmods.com/settings/api-keys)"
-        ),
+        reqwest::StatusCode::UNAUTHORIZED => {
+            return Err(NoRetry(
+                "Nexus refused the API key: check NEXUS_API_KEY or nexus_api_key in \
+                 tools.toml (your key is at https://next.nexusmods.com/settings/api-keys)"
+                    .to_string(),
+            )
+            .into());
+        }
         _ => {}
     }
     let links = response
@@ -786,6 +828,8 @@ mod tests {
         let explicit = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("https://www.nexusmods.com/skyrimspecialedition/mods/1".to_string()),
             file_name: None,
@@ -812,6 +856,8 @@ mod tests {
         let scheme = CompiledArchive {
             size: None,
             md5: None,
+            download_page: None,
+            download_note: None,
             condition: None,
             path: Some("nexus:skyrimspecialedition/1/2".to_string()),
             file_name: None,
@@ -890,6 +936,41 @@ mod tests {
             describe_search_paths(&[PathBuf::from("/a"), PathBuf::from("/b")]),
             "/a, /b"
         );
+    }
+
+    #[tokio::test]
+    async fn a_free_account_is_asked_once_not_once_per_retry() {
+        let server = MockServer::start().await;
+        Mock::given(method("GET"))
+            .and(path(
+                "/v1/games/oblivion/mods/1234/files/5678/download_link.json",
+            ))
+            .respond_with(ResponseTemplate::new(403))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let temp = tempdir().expect("temp dir should be created");
+        let settings = DownloadSettings {
+            cache_dir: temp.path().to_path_buf(),
+            retry: 3,
+            nexus_api_key: Some("test-key".to_string()),
+            nexus_api_base: Some(format!("{}/v1", server.uri())),
+            filter: ModFilter::default(),
+            archive_search_paths: Vec::new(),
+            parallel: 1,
+        };
+        let err = download_with_retry(
+            &Client::new(),
+            "nexus:oblivion/1234/5678",
+            None,
+            None,
+            None,
+            &settings,
+        )
+        .await
+        .expect_err("a 403 fails");
+        assert!(!err.to_string().contains("attempt"), "{err}");
     }
 
     #[tokio::test]
@@ -982,6 +1063,8 @@ mod tests {
                 archives: vec![CompiledArchive {
                     size: None,
                     md5: None,
+                    download_page: None,
+                    download_note: None,
                     condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,
@@ -1069,6 +1152,8 @@ mod tests {
                 archives: vec![CompiledArchive {
                     size: None,
                     md5: None,
+                    download_page: None,
+                    download_note: None,
                     condition: None,
                     path: Some("nexus:skyrimspecialedition/1234/5678".to_string()),
                     file_name: None,

@@ -2,8 +2,11 @@ use crate::cli::NexusFilesArgs;
 use crate::config::identify::nexus_files;
 
 pub async fn run(args: NexusFilesArgs) -> anyhow::Result<()> {
-    let api_key = std::env::var("NEXUS_API_KEY").map_err(|_| {
-        anyhow::anyhow!("NEXUS_API_KEY must be set: listing a mod's files is a Nexus API call")
+    let api_key = crate::config::tools::ToolsConfig::nexus_api_key().ok_or_else(|| {
+        anyhow::anyhow!(
+            "a Nexus API key is needed (NEXUS_API_KEY, or nexus_api_key in tools.toml): \
+             listing a mod's files is a Nexus API call"
+        )
     })?;
     let client = reqwest::Client::builder()
         .user_agent("mudcrab")

@@ -162,7 +162,7 @@ async fn nexus_file_name(path: Option<&str>) -> Option<String> {
     let mut parts = spec.split('/');
     let (game, mod_id, file_id) = (parts.next()?, parts.next()?, parts.next()?);
     let (mod_id, file_id): (u64, u64) = (mod_id.parse().ok()?, file_id.parse().ok()?);
-    let api_key = std::env::var("NEXUS_API_KEY").ok()?;
+    let api_key = crate::config::tools::ToolsConfig::nexus_api_key()?;
     let api_base = std::env::var("NEXUS_API_BASE").ok();
     let client = reqwest::Client::builder()
         .user_agent("mudcrab")
@@ -268,6 +268,10 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
                 if line.starts_with("file_name = ") {
                     out.push(format!("size = {size}"));
                     out.push(format!("md5 = \"{md5}\""));
+                    // Printed by `download` and `check`, so whoever installs
+                    // the list knows where to go without opening it.
+                    out.push("# download_page = \"https://...\"".to_string());
+                    out.push("# download_note = \"Which file on the page, and how.\"".to_string());
                 }
                 out
             })

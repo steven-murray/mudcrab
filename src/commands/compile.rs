@@ -3,8 +3,16 @@ use crate::config;
 
 pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
     let source = config::loader::load_modlist(&args.input)?;
-    for warning in config::validator::validate(&source)? {
+    let warnings = config::validator::validate(&source)?;
+    for warning in &warnings {
         tracing::warn!("{warning}");
+    }
+    if args.strict && !warnings.is_empty() {
+        anyhow::bail!(
+            "{} warning(s), and --strict makes them errors:\n{}",
+            warnings.len(),
+            warnings.join("\n")
+        );
     }
     let compiled = config::compiler::compile(source)?;
 

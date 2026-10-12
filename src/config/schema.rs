@@ -782,6 +782,14 @@ pub struct ArchiveSpec {
     pub size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub md5: Option<String>,
+    /// For an archive fetched by hand: the page to get it from. `download`
+    /// opens it, as it opens a Nexus file's page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_page: Option<String>,
+    /// For an archive fetched by hand: how, in a sentence or two -- which
+    /// file on the page, a login it needs. `download` and `check` print it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_note: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,
@@ -955,6 +963,12 @@ pub struct CompiledArchive {
     pub size: Option<u64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub md5: Option<String>,
+    /// See [`ArchiveSpec::download_page`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_page: Option<String>,
+    /// See [`ArchiveSpec::download_note`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_note: Option<String>,
     pub download_handler: Option<String>,
     pub layout: Option<ArchiveLayout>,
     pub data_folder: Option<String>,

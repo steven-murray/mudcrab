@@ -2,7 +2,7 @@ use crate::cli::ValidateArgs;
 use crate::config;
 
 pub async fn run(args: ValidateArgs) -> anyhow::Result<()> {
-    let source = config::loader::load_modlist(&args.input)?;
+    let source = config::loader::load_modlist_with_docs(&args.input)?;
     let warnings = config::validator::validate(&source)?;
 
     for warning in &warnings {

@@ -15,14 +15,17 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
     let settings = config::download::DownloadSettings {
         cache_dir,
         retry: args.retry,
-        nexus_api_key: std::env::var("NEXUS_API_KEY").ok(),
+        nexus_api_key: crate::config::tools::ToolsConfig::nexus_api_key(),
         nexus_api_base: std::env::var("NEXUS_API_BASE").ok(),
         filter: args.filter.to_mod_filter(),
         archive_search_paths: args.archive_sources.archive_search_paths.clone(),
         parallel: args.parallel,
     };
 
-    if args.browser {
+    // Pages are opened for what cannot be fetched directly, unless told not
+    // to or there is nobody at a terminal, or no browser, to click.
+    let browser = args.browser || (!args.no_browser && super::download_browser::available());
+    if browser {
         let unfetched = config::download::download_report(&plan, &settings).await?;
         super::download_browser::run(
             unfetched,

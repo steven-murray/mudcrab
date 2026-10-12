@@ -211,9 +211,10 @@ async fn nexus_names(
     if wanted.is_empty() {
         return Ok(HashMap::new());
     }
-    let Ok(key) = std::env::var("NEXUS_API_KEY") else {
+    let Some(key) = crate::config::tools::ToolsConfig::nexus_api_key() else {
         eprintln!(
-            "note: {} archive(s) have no recorded name; set NEXUS_API_KEY to look them up",
+            "note: {} archive(s) have no recorded name; set a Nexus API key \
+             (NEXUS_API_KEY, or nexus_api_key in tools.toml) to look them up",
             wanted.len()
         );
         return Ok(HashMap::new());

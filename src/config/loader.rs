@@ -2,7 +2,18 @@ use crate::config::docs::DocsFile;
 use crate::config::schema::SourceModlist;
 use std::path::Path;
 
+/// Load a modlist, without its `docs_file`: only the guide needs the prose,
+/// so a list shared without its docs file still compiles and installs.
 pub fn load_modlist(path: &Path) -> anyhow::Result<SourceModlist> {
+    load(path, false)
+}
+
+/// Load a modlist with its `docs_file` folded in, for `export` and `validate`.
+pub fn load_modlist_with_docs(path: &Path) -> anyhow::Result<SourceModlist> {
+    load(path, true)
+}
+
+fn load(path: &Path, with_docs: bool) -> anyhow::Result<SourceModlist> {
     let raw = std::fs::read_to_string(path)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
 
@@ -10,7 +21,7 @@ pub fn load_modlist(path: &Path) -> anyhow::Result<SourceModlist> {
         .map_err(|err| anyhow::anyhow!("failed to parse TOML {}: {err}", path.display()))?;
 
     let base_dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
-    if let Some(docs_file) = parsed.docs_file.clone() {
+    if with_docs && let Some(docs_file) = parsed.docs_file.clone() {
         let docs = DocsFile::load(&base_dir.join(&docs_file))?;
         merge_docs(&mut parsed, docs).map_err(|err| anyhow::anyhow!("{docs_file}: {err}"))?;
     }

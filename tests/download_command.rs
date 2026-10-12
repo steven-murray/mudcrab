@@ -235,3 +235,53 @@ fn download_copies_local_archives_into_cache() {
 
     assert_eq!(files.len(), 1);
 }
+
+/// A hand download is reported with what the list says about getting it, so
+/// nobody has to open the list to find out.
+#[test]
+fn a_hand_download_is_reported_with_where_and_how_to_get_it() {
+    let dir = tempdir().expect("temp dir should be created");
+    let root = dir.path();
+    let game_dir = root.join("game");
+    let modlist = root.join("modlist.toml");
+    let compiled = root.join("compiled.json");
+    let plan = root.join("plan.json");
+    std::fs::create_dir_all(&game_dir).unwrap();
+    std::fs::write(
+        &modlist,
+        r#"
+name = "Hand Download"
+
+[[mods]]
+id = "Trees"
+[[mods.archives]]
+path = "manual:Trees.7z"
+download_page = "https://example.org/trees"
+download_note = "The second file on the page, Trees.7z."
+"#,
+    )
+    .unwrap();
+    build_plan(&game_dir, &modlist, &compiled, &plan);
+
+    for command in ["download", "check"] {
+        let output = Command::cargo_bin("mudcrab")
+            .unwrap()
+            .env("XDG_STATE_HOME", root.join("state"))
+            .env("XDG_CONFIG_HOME", root.join("config"))
+            .env("LOCALAPPDATA", root.join("state"))
+            .args([command, plan.to_str().unwrap()])
+            .args(["--downloads", root.join("downloads").to_str().unwrap()])
+            .output()
+            .unwrap();
+        assert!(!output.status.success(), "{command} should fail");
+        let said = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            said.contains("get it from: https://example.org/trees"),
+            "{command}: {said}"
+        );
+        assert!(
+            said.contains("The second file on the page"),
+            "{command}: {said}"
+        );
+    }
+}

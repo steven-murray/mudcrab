@@ -89,3 +89,25 @@ fn compile_flattens_nested_mod_sections() {
     assert_eq!(json["mods"][1]["id"], "combat");
     assert_eq!(json["mods"][2]["id"], "magic");
 }
+
+/// The docs file is the guide's prose: a list shared without it still compiles.
+#[test]
+fn compile_does_not_need_the_docs_file() {
+    let dir = tempdir().expect("temp dir should be created");
+    let list = dir.path().join("list.toml");
+    std::fs::write(
+        &list,
+        "name = \"L\"\ndocs_file = \"list.docs.toml\"\n\n[[mods]]\nid = \"M\"\n\n[[mods.archives]]\npath = \"manual:m.7z\"\n",
+    )
+    .unwrap();
+    Command::cargo_bin("mudcrab")
+        .unwrap()
+        .env("XDG_STATE_HOME", dir.path().join("state"))
+        .env("LOCALAPPDATA", dir.path().join("state"))
+        .arg("compile")
+        .arg(&list)
+        .arg("--output")
+        .arg(dir.path().join("compiled.json"))
+        .assert()
+        .success();
+}

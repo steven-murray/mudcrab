@@ -1,5 +1,5 @@
 use crate::cli::ExportArgs;
-use crate::config::loader::load_modlist;
+use crate::config::loader::load_modlist_with_docs;
 use crate::config::schema::PersonalizedPlan;
 use crate::config::validator::validate;
 use crate::export::exporter::{Exporter, OutputMode};
@@ -35,7 +35,7 @@ pub async fn run(args: ExportArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let modlist = load_modlist(input)?;
+    let modlist = load_modlist_with_docs(input)?;
     for warning in validate(&modlist)? {
         tracing::warn!("{warning}");
     }
