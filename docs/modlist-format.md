@@ -59,6 +59,7 @@ that table.
 | `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
 | `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
 | `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs, applied to the MO2 profile's copy. |
+| `manual-steps` | When something has to be done by hand after installing (building a Bashed Patch in Wrye Bash): `install` lists it at the end until it is done. See [Steps by hand](#steps-by-hand). |
 | `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
@@ -372,6 +373,32 @@ Because sources are hidden, the modlist's `plugins` list must contain the merge'
 `output` and must **not** contain any source plugin. `mudcrab validate` enforces that,
 along with: every source mod exists, no plugin is merged twice, and a merge mod
 declares no archives of its own.
+
+## Steps by hand
+
+Some steps no command can take: Wrye Bash builds a Bashed Patch only from its
+own window. Say so in the list, and `install` ends every run by listing what is
+still to do:
+
+```toml
+[[manual-steps]]
+title = "build the Bashed Patch in Wrye Bash"
+done_when_plugin = "Bashed Patch, 0.esp"
+steps = """
+1. Start Wrye Bash from MO2.
+2. Right-click Bashed Patch, 0.esp and choose Rebuild Patch.
+3. Build Patch, close Wrye Bash, and move the patch from Overwrite into its mod.
+"""
+```
+
+`steps` is printed line by line. With `done_when_plugin`, the step stops being
+listed once a plugin of that name is in a mod folder or in MO2's `overwrite/`;
+without it, it is listed after every install. Put these tables after the
+top-level keys, like `[[mods]]` -- at the end of the file is simplest.
+
+A list whose `plugins` include a `Bashed Patch, N.esp` and that declares no
+step for it still gets a general one from `install`; a step of the list's own
+can say more (which configuration to import, which plugins to tick).
 
 ## Docs: prose for `export`
 

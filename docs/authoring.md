@@ -217,6 +217,12 @@ order. Conditions can also ask about other mods (`if = 'mod:"HD Septim"'`) and
 combine with `&&`, `||` and `!`; see
 [modlist-format.md](modlist-format.md#optional-mods-and-inputs).
 
+If your guide has a step no command can take -- building the Bashed Patch in
+Wrye Bash is the usual one -- write it down as a `[[manual-steps]]` table, and
+`install` tells whoever installs the list what is left to do, at the end of
+every run, until it is done. See
+[modlist-format.md](modlist-format.md#steps-by-hand).
+
 ## 6. Build it
 
 Check and build the list as you go, not only at the end. `validate` is

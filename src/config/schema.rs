@@ -34,6 +34,10 @@ pub struct SourceModlist {
     pub inactive_plugins: Vec<String>,
     #[serde(default, rename = "post-install-actions")]
     pub post_install_actions: Vec<PostInstallAction>,
+    /// What has to be done by hand after `install`, which it lists at the end
+    /// until each is done.
+    #[serde(default, rename = "manual-steps")]
+    pub manual_steps: Vec<ManualStep>,
     /// The guide's own prose, for `export`. See [`crate::config::docs`].
     #[serde(default)]
     pub docs: Docs,
@@ -909,9 +913,26 @@ pub struct CompiledModlist {
     pub inactive_plugins: Vec<String>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub manual_steps: Vec<ManualStep>,
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<CompiledMod>,
+}
+
+/// A step `install` cannot take -- building a Bashed Patch in Wrye Bash, say
+/// -- listed at the end of every install until it is done.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct ManualStep {
+    /// What to do, in a few words.
+    pub title: String,
+    /// How, one step per line.
+    pub steps: String,
+    /// Done once a plugin of this name is in a mod folder or in MO2's
+    /// `overwrite/`. Without it, the step is listed after every install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_when_plugin: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1008,6 +1029,8 @@ pub struct PersonalizedPlan {
     pub actions: Vec<ModAction>,
     #[serde(default)]
     pub post_install_actions: Vec<PostInstallAction>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub manual_steps: Vec<ManualStep>,
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<PersonalizedMod>,

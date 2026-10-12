@@ -164,6 +164,7 @@ pub fn build_plan(
         selected_mods,
         actions: compiled.actions.clone(),
         post_install_actions: compiled.post_install_actions.clone(),
+        manual_steps: compiled.manual_steps.clone(),
         mo2_modlist_entries: compiled.mo2_modlist_entries.clone(),
         mods,
         plugins,

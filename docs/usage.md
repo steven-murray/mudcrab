@@ -415,6 +415,10 @@ downloads folder. Game INI edits go into the profile's own copy of
 folder is `--game-dir`, else `GAME_DIR`, else the one the MO2 instance was set
 up with.
 
+When the list declares steps to take by hand (`[[manual-steps]]`, such as
+building a Bashed Patch in Wrye Bash), `install` ends by listing those not yet
+done; see [modlist-format.md](modlist-format.md#steps-by-hand).
+
 `--redo-action <action>` reinstalls just the mods that have that action
 (`--redo-action qac`, say), when something outside the list changed what it
 does -- a tool that was misconfigured, or mudcrab itself.

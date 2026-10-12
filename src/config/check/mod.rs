@@ -135,7 +135,7 @@ impl Findings {
 /// A plugin Wrye Bash writes after the install: `Bashed Patch, 0.esp`. A list
 /// declares and orders it ahead of time, so it lands in place when it appears;
 /// no archive ships it.
-fn made_by_wrye_bash(plugin: &str) -> bool {
+pub(crate) fn made_by_wrye_bash(plugin: &str) -> bool {
     let lower = plugin.to_ascii_lowercase();
     lower.starts_with("bashed patch, ") && lower.ends_with(".esp")
 }

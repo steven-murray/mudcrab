@@ -14,6 +14,12 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
     if modlist.name.trim().is_empty() {
         anyhow::bail!("modlist name must not be empty");
     }
+    for step in &modlist.manual_steps {
+        anyhow::ensure!(
+            !step.title.trim().is_empty() && !step.steps.trim().is_empty(),
+            "a manual step needs a title and its steps"
+        );
+    }
 
     for (id, spec) in &modlist.inputs {
         if spec.query.trim().is_empty() {

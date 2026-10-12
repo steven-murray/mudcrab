@@ -1,6 +1,8 @@
 use crate::config::filter::ModFilter;
 use crate::config::mo2::{export_mo2_instance, prepare_mo2_profile};
-use crate::config::schema::{ModAction, PersonalizedMod, PersonalizedPlan, PostInstallAction};
+use crate::config::schema::{
+    ManualStep, ModAction, PersonalizedMod, PersonalizedPlan, PostInstallAction,
+};
 use crate::config::tools::ToolsConfig;
 use crate::config::tools::loot::run_loot_sort;
 use std::collections::{HashMap, HashSet};
@@ -501,7 +503,90 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             }
         ),
     );
+    for step in outstanding_steps(plan, settings) {
+        crate::ui::heading(
+            crate::ui::Tone::Warning,
+            format!("Still to do by hand: {}", step.title),
+        );
+        for line in step
+            .steps
+            .lines()
+            .map(str::trim_end)
+            .filter(|l| !l.trim().is_empty())
+        {
+            crate::ui::say(format!("  {line}"));
+        }
+    }
     Ok(())
+}
+
+/// The list's manual steps not yet done, plus a Bashed Patch the load order
+/// expects that nothing has built and no step covers.
+fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<ManualStep> {
+    let exists = |plugin: &str| plugin_exists(plugin, settings);
+    let mut out: Vec<ManualStep> = plan
+        .manual_steps
+        .iter()
+        .filter(|step| step.done_when_plugin.as_deref().is_none_or(|p| !exists(p)))
+        .cloned()
+        .collect();
+    let covered = |plugin: &str| {
+        plan.manual_steps.iter().any(|step| {
+            step.done_when_plugin
+                .as_deref()
+                .is_some_and(|p| p.eq_ignore_ascii_case(plugin))
+        })
+    };
+    for plugin in plan
+        .plugins
+        .iter()
+        .filter(|p| crate::config::check::made_by_wrye_bash(p))
+        .filter(|p| !covered(p) && !exists(p))
+    {
+        let wrye_bash = settings
+            .game_dir
+            .as_ref()
+            .map(|dir| dir.join("Mopy").join("Wrye Bash.exe"))
+            .filter(|exe| exe.is_file())
+            .map(|exe| exe.display().to_string())
+            .unwrap_or_else(|| "Wrye Bash.exe, in the game folder's Mopy folder".to_string());
+        out.push(ManualStep {
+            title: format!("build {plugin} with Wrye Bash"),
+            steps: format!(
+                "The list orders a Bashed Patch, and only Wrye Bash can build one (it has no \
+                 command line). Until it is built, the game runs without the list's patch.\n\
+                 1. In MO2, add Wrye Bash as an executable if it is not one yet (the Executables \
+                 window, +, then \"Add from file\": {wrye_bash}), and start it from MO2, so it \
+                 sees the installed mods.\n\
+                 2. Right-click {plugin}, choose Rebuild Patch, and accept the plugins it offers \
+                 to deactivate.\n\
+                 3. Build Patch, then close Wrye Bash.\n\
+                 4. In MO2 the patch is now in Overwrite: right-click Overwrite, \"Create \
+                 mod...\", to keep it in a mod of its own."
+            ),
+            done_when_plugin: Some(plugin.clone()),
+        });
+    }
+    out
+}
+
+/// Whether a plugin of this name is at the top of any mod folder, or in MO2's
+/// `overwrite/`, where a tool run from MO2 writes.
+fn plugin_exists(plugin: &str, settings: &InstallSettings) -> bool {
+    let has = |dir: &Path| {
+        std::fs::read_dir(dir).is_ok_and(|entries| {
+            entries
+                .flatten()
+                .any(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(plugin))
+        })
+    };
+    let in_mods = std::fs::read_dir(&settings.mods_dir)
+        .is_ok_and(|entries| entries.flatten().any(|e| has(&e.path())));
+    in_mods
+        || settings
+            .mo2_instance_dir
+            .as_ref()
+            .is_some_and(|dir| has(&dir.join("overwrite")))
 }
 
 /// Everything the manifest should claim right now: what this run has settled,
@@ -717,6 +802,58 @@ mod tests {
         .unwrap();
         let order: Vec<&str> = install_order(&plan).iter().map(|m| m.id.as_str()).collect();
         assert_eq!(order, ["A", "B", "Later", "Yields", "C1", "C2"]);
+    }
+
+    #[test]
+    fn a_manual_step_is_listed_until_its_plugin_exists() {
+        use super::{InstallSettings, outstanding_steps};
+        use crate::config::schema::PersonalizedPlan;
+        let root = tempfile::tempdir().unwrap();
+        let mods = root.path().join("mods");
+        std::fs::create_dir_all(mods.join("Some Mod")).unwrap();
+        let plan: PersonalizedPlan = serde_json::from_value(serde_json::json!({
+            "schema_version": 1, "name": "L", "responses": {}, "mod_order": [],
+            "selected_mods": [], "mods": [],
+            "plugins": ["A.esp", "Bashed Patch, 0.esp", "Other Patch.esp"],
+            "manual_steps": [
+                {"title": "build Other Patch", "steps": "1. Do it.", "done_when_plugin": "Other Patch.esp"},
+                {"title": "read the readme", "steps": "Every time."}
+            ]
+        }))
+        .unwrap();
+        let settings = InstallSettings {
+            cache_dir: root.path().join("downloads"),
+            mods_dir: mods.clone(),
+            mo2_instance_dir: Some(root.path().to_path_buf()),
+            profile_name: "Default".to_string(),
+            game_dir: None,
+            execute_actions: true,
+            dry_run: false,
+            tools: Default::default(),
+            filter: Default::default(),
+            force_merges: false,
+            force: false,
+            redo_actions: Vec::new(),
+        };
+        let titles = |plan: &PersonalizedPlan| -> Vec<String> {
+            outstanding_steps(plan, &settings)
+                .into_iter()
+                .map(|s| s.title)
+                .collect()
+        };
+        assert_eq!(
+            titles(&plan),
+            [
+                "build Other Patch",
+                "read the readme",
+                "build Bashed Patch, 0.esp with Wrye Bash"
+            ]
+        );
+        // Built: one in a mod, the other in MO2's overwrite.
+        std::fs::write(mods.join("Some Mod/other patch.esp"), b"").unwrap();
+        std::fs::create_dir_all(root.path().join("overwrite")).unwrap();
+        std::fs::write(root.path().join("overwrite/Bashed Patch, 0.esp"), b"").unwrap();
+        assert_eq!(titles(&plan), ["read the readme"]);
     }
 
     #[test]

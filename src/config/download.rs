@@ -1103,6 +1103,7 @@ mod tests {
             }],
             plugins: vec![],
             inactive_plugins: vec![],
+            manual_steps: vec![],
         };
 
         download_all(&plan, &settings)
@@ -1193,6 +1194,7 @@ mod tests {
             }],
             plugins: vec![],
             inactive_plugins: vec![],
+            manual_steps: vec![],
         };
 
         let unfetched = download_report(&plan, &settings).await.unwrap();
