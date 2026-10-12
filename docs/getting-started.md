@@ -156,24 +156,25 @@ When `download` reports nothing missing, check what you have:
 mudcrab check plan.json
 ```
 
-`check` works on the downloads folder, where `download` has put everything.
-For every archive the plan needs, it:
+`check` works on the downloads folder, where `download` has put everything,
+and finds everything about the list it can without installing it:
 
-- finds it (by name or, for a hand download that records them, by size and
-  MD5), and opens it to read its list of files -- which catches a download
-  that stopped partway, or a file that is not the archive it is named as;
-- works out what `install` would take from it, as `install` does: the
-  installer options and BAIN subpackages the list chose must exist, and
-  files the list says belong next to `Oblivion.exe` must be there;
-- reads the header of each plugin it would install, and checks every
-  master that plugin needs is in the load order, active, and loaded before
-  it. (Plugins made during the install -- merges, dummy plugins -- are not
-  read; the summary says how many.)
+- every archive is there and opens (a download cut short fails here), and
+  matches its recorded MD5 if the list gives one;
+- `install` could lay each one out: the installer options and BAIN
+  subpackages the list chose exist, and the files it names are there;
+- the list's edits to each mod's files -- files to delete, hide or move --
+  each find what they name, rehearsed on placeholder files exactly as
+  `install` would run them;
+- every plugin's masters are in the load order, active and earlier; every
+  plugin in the load order is installed by some mod; every BSA has an active
+  plugin to load it.
 
 It reports every problem together, with what the list says about getting any
-archive that is missing, and changes nothing. Only plugin headers are
-unpacked, so on a large list it takes a minute or two. What it cannot see is
-anything an action does to the files during the install.
+archive that is missing. Warnings (a plugin two mods both install, one a mod
+installs that the load order leaves out) do not fail it. It changes nothing,
+and takes a minute or two on a large list. See
+[usage.md](usage.md#check) for the details.
 
 ## 4. Install
 

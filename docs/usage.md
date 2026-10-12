@@ -696,21 +696,47 @@ linking in those it finds in a search path, so that is where they are. Run
 
 For each archive:
 
-- **present and readable**: found by name (or by `size` and `md5`), and opened
-  to read its file list, which fails for a truncated or mislabelled download;
+- **present and readable**: found by name (or by `size` and `md5`), opened to
+  read its file list, which fails for a truncated or mislabelled download, and,
+  where the list records an `md5`, hashed and compared;
 - **installable**: the layout `install` would use is worked out from that
   list, exactly as `install` does it, so a FOMOD option or BAIN subpackage the
   archive lacks, or an archive whose layout cannot be told, fails here;
-  `game_root_files` patterns must each match a file;
-- **masters**: each plugin it would install is unpacked (only those) and its
-  header read. Every master must be in the load order, active, and earlier.
-  The game's own plugins count as present unless the list orders them. A
-  master merged away by a `hide_sources` merge is named with the merge.
+  `game_root_files` patterns must each match a file; an `include` that matches
+  nothing, or an `exclude` that leaves nothing out, is a warning.
 
-Plugins made during the install (merge outputs, `create_dummy_plugin`) and
-those inside an `inner_archive` are not read; the summary counts them.
-Build layers are checked for presence and readability. Every problem is
-reported together, and the summary is printed even when the check fails.
+For each mod with actions that change its files (`file_prune`, `file_hide`,
+`file_move`, `pack_bsa`, `extract_bsa`, `create_dummy_plugin`, `write_file`),
+those actions are **rehearsed**: run, by the same code `install` uses, on a
+stand-in of the mod's folder made of placeholder files (under
+`~/.cache/mudcrab`, removed afterwards). A prune pattern that matches nothing,
+a path to hide or move that is not there, an `except` nothing picks, a
+`conflicts_with` whose mods share no file: each fails here as it would at
+install. A mod whose action compares with a mod whose own files are only known
+once installed is noted, not rehearsed.
+
+Then, across the finished folders:
+
+- **masters**: each plugin's header is read (only plugins are unpacked), and
+  every master must be in the load order, active, and earlier. The game's own
+  plugins count as present unless the list orders them. A master merged away
+  by a `hide_sources` merge is named with the merge.
+- **load order**: a plugin in `plugins` that no mod installs is an error (a
+  merge's output and Wrye Bash's `Bashed Patch, 0.esp` are made later), as is
+  a plugin a mod declares but does not install. A plugin a mod installs that
+  `plugins` does not list is a warning: MO2 shows it unticked.
+- **BSAs**: Oblivion loads a BSA only when an active plugin's name begins its
+  own (`Foo.esp` loads `Foo.bsa` and `Foo - Textures.bsa`). A BSA no active
+  plugin loads, and no INI action names, is an error: its contents would never
+  reach the game.
+- **duplicates**: the same plugin from two mods is a warning. It is allowed --
+  the copy from the mod lowest in MO2's list wins -- but worth knowing.
+
+Plugins made during the install (merge outputs) and mods built from layers,
+inside an `inner_archive`, or installed into MO2 itself are checked as far as
+they can be; the summary says how many plugins it could not read. Every
+problem is reported together, and the summary and warnings are printed even
+when the check fails. On a 700-mod list it takes a couple of minutes.
 
 ## conflicts
 

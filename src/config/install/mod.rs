@@ -18,9 +18,6 @@ pub struct InstallSettings {
     pub tools: ToolsConfig,
     /// Which mods this run installs. Empty means the whole plan.
     pub filter: ModFilter,
-    /// Read-only directories holding archives already on this machine. An
-    /// archive found here is adopted into the cache instead of downloaded, so a
-    /// list can be installed with no network access at all.
     /// Rebuild every merge in scope even when its recorded inputs still match.
     pub force_merges: bool,
     /// Reinstall every mod in scope even when its recorded definition matches.

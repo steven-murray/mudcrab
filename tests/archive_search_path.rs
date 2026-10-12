@@ -73,8 +73,14 @@ fn build_plan(game_dir: &Path, modlist: &Path, compiled: &Path, plan: &Path) {
 fn download_from(plan: &Path, cache: &Path, search: &[&Path]) {
     let mut command = Command::cargo_bin("mudcrab").unwrap();
     command
-        .env("XDG_STATE_HOME", std::env::temp_dir().join("mudcrab-test-state"))
-        .env("LOCALAPPDATA", std::env::temp_dir().join("mudcrab-test-state"))
+        .env(
+            "XDG_STATE_HOME",
+            std::env::temp_dir().join("mudcrab-test-state"),
+        )
+        .env(
+            "LOCALAPPDATA",
+            std::env::temp_dir().join("mudcrab-test-state"),
+        )
         .env_remove("NEXUS_API_KEY")
         .args(["download", plan.to_str().unwrap(), "--no-browser"])
         .args(["--downloads", cache.to_str().unwrap()]);

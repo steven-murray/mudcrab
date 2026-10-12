@@ -140,3 +140,183 @@ file_name = "Absent-3-1-0.zip"
     );
     assert!(said.contains("3 issue(s)"), "{said}");
 }
+
+/// Compile, query and check `list` against `downloads`; (success, stdout,
+/// stderr).
+fn check_list(root: &Path, list: &str, downloads: &Path) -> (bool, String, String) {
+    let path = root.join("list.toml");
+    std::fs::write(&path, list).unwrap();
+    let compiled = root.join("compiled.json");
+    let plan = root.join("plan.json");
+    mudcrab(root)
+        .args(["compile", path.to_str().unwrap(), "--output"])
+        .arg(&compiled)
+        .assert()
+        .success();
+    mudcrab(root)
+        .args(["query", compiled.to_str().unwrap(), "--headless", "--output"])
+        .arg(&plan)
+        .assert()
+        .success();
+    let output = mudcrab(root)
+        .args(["check", plan.to_str().unwrap(), "--downloads"])
+        .arg(downloads)
+        .output()
+        .unwrap();
+    (
+        output.status.success(),
+        String::from_utf8_lossy(&output.stdout).into_owned(),
+        String::from_utf8_lossy(&output.stderr).into_owned(),
+    )
+}
+
+#[test]
+fn check_compares_the_load_order_bsas_and_actions_with_what_the_mods_install() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    let plain = plugin(&["Oblivion.esm"]);
+    // Ships A.esp, an unordered Extra.esp, a BSA no plugin loads, and a
+    // texture for a prune to remove.
+    make_zip(
+        &downloads.join("A-1-1-0.zip"),
+        &[
+            ("A.esp", &plain),
+            ("Extra.esp", &plain),
+            ("Orphan.bsa", b"BSA"),
+            ("A.bsa", b"BSA"),
+            ("textures/a.dds", b"dds"),
+        ],
+    );
+    // Ships Shared.esp, as does C.
+    make_zip(&downloads.join("B-2-1-0.zip"), &[("Shared.esp", &plain)]);
+    make_zip(&downloads.join("C-3-1-0.zip"), &[("Shared.esp", &plain)]);
+    // Recorded with an MD5 it does not have.
+    make_zip(&downloads.join("D.zip"), &[("readme.txt", b"d")]);
+    let list = r#"name = "L"
+plugins = ["A.esp", "Renamed.esp", "Shared.esp", "Ghost.esp"]
+
+[[mods]]
+id = "A"
+plugins = ["A.esp", "Renamed.esp"]
+[[mods.archives]]
+path = "nexus:oblivion/1/10"
+file_name = "A-1-1-0.zip"
+exclude = ["nothing-here/*"]
+[[mods.actions]]
+action = "file_prune"
+paths = ["textures/missing.dds"]
+
+[[mods]]
+id = "B"
+plugins = ["Shared.esp"]
+[[mods.archives]]
+path = "nexus:oblivion/2/20"
+file_name = "B-2-1-0.zip"
+
+[[mods]]
+id = "C"
+[[mods.archives]]
+path = "nexus:oblivion/3/30"
+file_name = "C-3-1-0.zip"
+
+[[mods]]
+id = "D"
+[[mods.archives]]
+path = "manual:D.zip"
+size = 1
+md5 = "00000000000000000000000000000000"
+"#;
+    let (ok, out, err) = check_list(root, list, &downloads);
+    assert!(!ok);
+    // Errors.
+    assert!(
+        err.contains("A: install would fail") && err.contains("textures/missing.dds"),
+        "{err}"
+    );
+    assert!(err.contains("Ghost.esp is in the load order, but no mod installs it"), "{err}");
+    assert!(err.contains("is not the file the list records"), "{err}");
+    // A's rehearsal failed, so its folder is not concluded from.
+    assert!(!err.contains("Renamed.esp"), "{err}");
+
+    // Without the bad prune, A's folder is known.
+    let list = list.replace(
+        "[[mods.actions]]\naction = \"file_prune\"\npaths = [\"textures/missing.dds\"]\n",
+        "",
+    );
+    let (ok, out2, err) = check_list(root, &list, &downloads);
+    assert!(!ok);
+    assert!(err.contains("A: declares Renamed.esp, which it does not install"), "{err}");
+    assert!(err.contains("A: installs orphan.bsa, which no active plugin loads"), "{err}");
+    assert!(!err.contains("a.bsa,"), "A.esp loads A.bsa: {err}");
+    // Warnings, which do not fail the check by themselves.
+    assert!(out2.contains("warning: A: installs extra.esp, which the load order does not list"), "{out2}");
+    assert!(out2.contains("warning: Shared.esp is installed by 2 mods (B, C)"), "{out2}");
+    assert!(out2.contains("warning: A: exclude 'nothing-here/*' leaves nothing out"), "{out2}");
+    let _ = out;
+}
+
+#[test]
+fn a_plugin_from_a_mod_that_moves_it_is_traced_through_the_move() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    make_zip(
+        &downloads.join("M-1-1-0.zip"),
+        &[("optional/Moved.esp", &plugin(&["Oblivion.esm", "Nowhere.esm"]))],
+    );
+    let list = r#"name = "L"
+plugins = ["Moved.esp"]
+
+[[mods]]
+id = "M"
+plugins = ["Moved.esp"]
+[[mods.archives]]
+path = "nexus:oblivion/1/10"
+file_name = "M-1-1-0.zip"
+layout = "simple"
+[[mods.actions]]
+action = "file_move"
+from = "optional/Moved.esp"
+to = "Moved.esp"
+"#;
+    let (ok, _, err) = check_list(root, list, &downloads);
+    assert!(!ok);
+    assert!(
+        err.contains("M (Moved.esp): needs Nowhere.esm, which is not in the list"),
+        "the moved plugin's masters come from its archive: {err}"
+    );
+    assert!(!err.contains("declares Moved.esp"), "{err}");
+}
+
+#[test]
+fn a_declared_conflict_that_overlaps_nothing_fails_as_install_would() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    make_zip(&downloads.join("X-1-1-0.zip"), &[("textures/x.dds", b"x")]);
+    make_zip(&downloads.join("Y-2-1-0.zip"), &[("textures/y.dds", b"y")]);
+    let list = r#"name = "L"
+
+[[mods]]
+id = "X"
+[[mods.archives]]
+path = "nexus:oblivion/1/10"
+file_name = "X-1-1-0.zip"
+[[mods.actions]]
+action = "file_hide"
+conflicts_with = ["Y"]
+
+[[mods]]
+id = "Y"
+[[mods.archives]]
+path = "nexus:oblivion/2/20"
+file_name = "Y-2-1-0.zip"
+"#;
+    let (ok, _, err) = check_list(root, list, &downloads);
+    assert!(!ok);
+    assert!(
+        err.contains("X: install would fail") && err.contains("selected no files"),
+        "{err}"
+    );
+}

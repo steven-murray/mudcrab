@@ -145,6 +145,25 @@ drop `P.esp`. *Loads after it*: move `P.esp` below `M.esp` in `plugins`.
 the merge hides `M.esp`, so `P.esp` must join the merge too. The game would
 otherwise crash at the main menu, or the plugin would silently not load.
 
+### `P.esp is in the load order, but no mod installs it`
+
+From `check`: `plugins` orders a plugin no mod ships. Usually a plugin renamed
+by a mod update (the next message, about the mod that declares it, says
+which), or one a layout leaves out.
+
+### `X: installs Name.bsa, which no active plugin loads`
+
+From `check`: Oblivion only loads a BSA when an active plugin's name begins
+its own. Give the mod a plugin of that name (`create_dummy_plugin`, as the
+guides do for packed textures), or rename the BSA with `file_move`.
+
+### `... is not the file the list records: its MD5 is ...`
+
+From `check`: a hand download with the right name but different contents --
+usually a newer version the host put up under the old name. Download the
+version the list names; if you are the list's author, record the new one with
+`mudcrab downloads record`.
+
 ### `install would fail: ...`
 
 From `check`: working out what `install` takes from an archive failed, as it

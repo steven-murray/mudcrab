@@ -122,19 +122,16 @@ fn from_plan(
             );
         }
 
-        let source = archive_store::find(
-            &settings.cache_dir,
-            &[],
-            &ArchiveRef::for_archive(archive),
-        )
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "cannot predict the files mod '{}' contributes: archive {} is not in the \
+        let source =
+            archive_store::find(&settings.cache_dir, &[], &ArchiveRef::for_archive(archive))
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "cannot predict the files mod '{}' contributes: archive {} is not in the \
                      downloads folder. Run `mudcrab download` first.",
-                mod_entry.id,
-                archive_index
-            )
-        })?;
+                        mod_entry.id,
+                        archive_index
+                    )
+                })?;
 
         // `game_root_files` land outside the mod folder, so they are not part
         // of what this mod contributes to the VFS -- and install excludes them

@@ -55,6 +55,27 @@ pub fn apply_all(actions: &[ModAction], cx: &ActionCx<'_>) -> anyhow::Result<()>
     Ok(())
 }
 
+/// Whether `action` changes which files a mod has, rather than what is in
+/// them: the actions `check` rehearses on a stand-in of the mod's folder.
+pub fn changes_files(action: &ModAction) -> bool {
+    matches!(
+        action,
+        ModAction::PackBsa(_)
+            | ModAction::CreateDummyPlugin(_)
+            | ModAction::FilePrune(_)
+            | ModAction::FileHide(_)
+            | ModAction::FileMove(_)
+            | ModAction::ExtractBsa(_)
+            | ModAction::WriteFile(_)
+    )
+}
+
+/// Apply one action, as `apply_all` would.
+pub fn apply_action(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
+    apply_one(action, cx)
+        .map_err(|err| err.context(format!("{}: action '{}'", cx.owner, action.name())))
+}
+
 fn apply_one(action: &ModAction, cx: &ActionCx<'_>) -> anyhow::Result<()> {
     match action {
         ModAction::IniSet(spec) => ini_set::apply(spec, cx),
