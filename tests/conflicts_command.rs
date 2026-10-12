@@ -129,6 +129,6 @@ fn a_sweep_names_every_mod_that_shares_files_and_who_wins() {
     let report = String::from_utf8(output.stdout).unwrap();
     assert_eq!(
         report,
-        "Patch  [Looks]\n  wins 2 files over: Base (1), Retexture (1)\n"
+        "\nPatch  [Looks]\n  wins 2 files over: Base (1), Retexture (1)\n"
     );
 }

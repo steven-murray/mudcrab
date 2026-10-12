@@ -428,23 +428,26 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         .merges()
         .filter(|(entry, _)| settings.filter.matches(&entry.section, &entry.id))
         .count();
-    crate::ui::say(format!(
-        "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}{}",
-        if settings.dry_run { "Dry run: " } else { "" },
-        if merges > 0 {
-            format!(", {merges} merge(s) checked")
-        } else {
-            String::new()
-        },
-        match &settings.mo2_instance_dir {
-            Some(dir) if !settings.dry_run => format!(
-                "; MO2 profile '{}' in {} written",
-                settings.profile_name,
-                dir.display()
-            ),
-            _ => String::new(),
-        }
-    ));
+    crate::ui::status(
+        crate::ui::Tone::Good,
+        format!(
+            "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}{}",
+            if settings.dry_run { "Dry run: " } else { "" },
+            if merges > 0 {
+                format!(", {merges} merge(s) checked")
+            } else {
+                String::new()
+            },
+            match &settings.mo2_instance_dir {
+                Some(dir) if !settings.dry_run => format!(
+                    "; MO2 profile '{}' in {} written",
+                    settings.profile_name,
+                    crate::ui::dim(dir.display())
+                ),
+                _ => String::new(),
+            }
+        ),
+    );
     Ok(())
 }
 

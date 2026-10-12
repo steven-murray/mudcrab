@@ -85,26 +85,38 @@ pub async fn run(args: MergeArgs) -> anyhow::Result<()> {
             &merge::run::map_json(&built.allocation),
         )?;
 
-        println!("{id}");
-        println!("  output     {}", plugin_path.display());
-        println!("  sources    {}", report.source_count);
-        println!(
-            "  masters    {} ({})",
-            report.masters.len(),
-            report.masters.join(", ")
+        crate::ui::status(crate::ui::Tone::Good, crate::ui::name(id));
+        let row = |label: &str, value: String| {
+            crate::ui::say(format!(
+                "  {} {value}",
+                crate::ui::dim(format!("{label:<10}"))
+            ))
+        };
+        row("output", plugin_path.display().to_string());
+        row("sources", report.source_count.to_string());
+        row(
+            "masters",
+            format!(
+                "{} {}",
+                report.masters.len(),
+                crate::ui::dim(format!("({})", report.masters.join(", ")))
+            ),
         );
-        println!("  records    {}", report.record_count);
-        println!("  groups     {}", report.group_count);
-        println!("  renumbered {}", report.remapped);
-        println!("  clobbered  {}", report.clobbered);
+        row("records", report.record_count.to_string());
+        row("groups", report.group_count.to_string());
+        row("renumbered", report.remapped.to_string());
+        row("clobbered", report.clobbered.to_string());
         if report.non_canonical_inputs > 0 {
-            println!(
-                "  note       {} source reference(s) used a mod index past their own",
-                report.non_canonical_inputs
+            row(
+                "note",
+                format!(
+                    "{} source reference(s) used a mod index past their own master list; \
+                     translated as own-record references",
+                    report.non_canonical_inputs
+                ),
             );
-            println!("             master list; translated as own-record references");
         }
-        println!();
+        crate::ui::say("");
 
         tracing::info!(
             merge = id,

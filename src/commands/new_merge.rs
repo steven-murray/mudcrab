@@ -113,14 +113,20 @@ pub async fn run(args: NewMergeArgs) -> anyhow::Result<()> {
                 load_order = %load_order_path.display(),
                 "wrote a merge modlist"
             );
-            println!(
-                "Wrote {} — {} sources, load order from {}.\n\nBuild it with:\n  mudcrab merge {} \\\n    --mods-dir {} \\\n    --output <somewhere new>",
-                path.display(),
-                sources.len(),
-                load_order_path.display(),
+            crate::ui::status(
+                crate::ui::Tone::Good,
+                format!(
+                    "Wrote {} -- {} sources, load order from {}.",
+                    path.display(),
+                    sources.len(),
+                    crate::ui::dim(load_order_path.display()),
+                ),
+            );
+            crate::ui::say(format!(
+                "\nBuild it with:\n  mudcrab merge {} \\\n    --mods-dir {} \\\n    --output <somewhere new>",
                 path.display(),
                 args.mods_dir.display(),
-            );
+            ));
         }
         None => print!("{rendered}"),
     }

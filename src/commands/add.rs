@@ -79,23 +79,32 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
     }
 
     if new_mod.section.is_empty() {
-        eprintln!(
-            "warning: no --section given, so '{}' is being added with no section; \
+        crate::ui::status_err(
+            crate::ui::Tone::Warning,
+            format!(
+                "no --section given, so '{}' is being added with no section; \
              it will not sit under any MO2 separator.",
-            new_mod.id
+                new_mod.id
+            ),
         );
     }
     match (new_mod.non_nexus, new_mod.known_mod_id) {
-        (true, Some(mod_id)) => eprintln!(
-            "warning: '{}' is Nexus mod {mod_id}, but its meta.ini records no file id, so the \
+        (true, Some(mod_id)) => crate::ui::status_err(
+            crate::ui::Tone::Warning,
+            format!(
+                "'{}' is Nexus mod {mod_id}, but its meta.ini records no file id, so the \
              descriptor cannot be built. Written as a manual archive with a TODO; resolve the \
              file id and replace the `path`.",
-            new_mod.id
+                new_mod.id
+            ),
         ),
-        (true, None) => eprintln!(
-            "warning: '{}' has modid=0 in its meta.ini, so it did not come from Nexus. \
+        (true, None) => crate::ui::status_err(
+            crate::ui::Tone::Warning,
+            format!(
+                "'{}' has modid=0 in its meta.ini, so it did not come from Nexus. \
              The block is written with no `path` and a TODO; fill in the source yourself.",
-            new_mod.id
+                new_mod.id
+            ),
         ),
         (false, _) => {}
     }
@@ -105,11 +114,14 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
     }
 
     if args.dry_run {
-        println!(
-            "would insert into {} at line {}, {}:\n",
-            args.input.display(),
-            plan.line,
-            plan.anchor
+        crate::ui::status(
+            crate::ui::Tone::Note,
+            format!(
+                "Would insert into {} at line {}, {}:\n",
+                crate::ui::dim(args.input.display()),
+                plan.line,
+                plan.anchor
+            ),
         );
         println!("{}", plan.block);
         if let (Some(position), false) = (&position, unplaced.is_empty()) {
@@ -119,7 +131,7 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
             };
             println!("\nand {} into the load order {at}", unplaced.join(", "));
         }
-        println!("\n(--dry-run: nothing written)");
+        crate::ui::say(crate::ui::dim("\n(--dry-run: nothing written)"));
         return Ok(());
     }
 
@@ -142,12 +154,15 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
         );
     }
 
-    println!(
-        "added '{}' to {} at line {}, {}",
-        new_mod.id,
-        args.input.display(),
-        plan.line,
-        plan.anchor
+    crate::ui::status(
+        crate::ui::Tone::Good,
+        format!(
+            "Added {} to {} at line {}, {}",
+            crate::ui::name(&new_mod.id),
+            crate::ui::dim(args.input.display()),
+            plan.line,
+            plan.anchor
+        ),
     );
 
     Ok(())
@@ -171,14 +186,22 @@ async fn nexus_file_name(path: Option<&str>) -> Option<String> {
     let files =
         crate::config::identify::nexus_files(&client, api_base.as_deref(), &api_key, game, mod_id)
             .await
-            .map_err(|err| eprintln!("note: could not ask Nexus for the file's name ({err})"))
+            .map_err(|err| {
+                crate::ui::status_err(
+                    crate::ui::Tone::Note,
+                    format!("could not ask Nexus for the file's name ({err})"),
+                )
+            })
             .ok()?;
     let name = files
         .into_iter()
         .find(|file| file.file_id == file_id)
         .and_then(|file| file.file_name);
     if name.is_none() {
-        eprintln!("note: Nexus does not list file {file_id} for mod {mod_id}");
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!("Nexus does not list file {file_id} for mod {mod_id}"),
+        );
     }
     name
 }
@@ -287,13 +310,19 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
 
     match &report.layout {
         _ if chosen.is_some() => {}
-        LayoutGuess::Fomod { .. } => eprintln!(
-            "note: '{id}' has a FOMOD installer; the entry picks each group's default. \
+        LayoutGuess::Fomod { .. } => crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!(
+                "'{id}' has a FOMOD installer; the entry picks each group's default. \
              `mudcrab inspect` lists the options, to change `fomod_selections`."
+            ),
         ),
-        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => eprintln!(
-            "note: '{id}' is a BAIN package and every subpackage is listed; delete from \
+        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!(
+                "'{id}' is a BAIN package and every subpackage is listed; delete from \
              `bain_subpackages` the ones that are alternatives to each other."
+            ),
         ),
         _ => {}
     }
@@ -306,7 +335,10 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
         })
         .collect();
     if !unlisted.is_empty() {
-        eprintln!("note: the archive holds plugins not given with --plugin:");
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            "the archive holds plugins not given with --plugin:".to_string(),
+        );
         for path in unlisted {
             eprintln!("  {path}");
         }

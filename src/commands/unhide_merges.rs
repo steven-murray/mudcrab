@@ -25,14 +25,20 @@ pub async fn run(args: UnhideMergesArgs) -> anyhow::Result<()> {
     );
 
     if recorded == 0 {
-        println!(
-            "No hidden plugins recorded for profile {}.",
-            args.profile_name
+        crate::ui::status(
+            crate::ui::Tone::Note,
+            format!(
+                "No hidden plugins recorded for profile {}.",
+                args.profile_name
+            ),
         );
     } else {
-        println!(
-            "Restored {restored} of {recorded} recorded plugin(s); \
-             the rest were already visible."
+        crate::ui::status(
+            crate::ui::Tone::Good,
+            format!(
+                "Restored {restored} of {recorded} recorded plugin(s); the rest were already \
+                 visible."
+            ),
         );
     }
 

@@ -37,7 +37,7 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         .collect();
     answers.sort();
     let summary = format!(
-        "Plan: {} of {} mod(s) selected{} -> {}",
+        "Plan: {} of {} mod(s) selected{} {} {}",
         plan.selected_mods.len(),
         plan.mod_order.len(),
         if answers.is_empty() {
@@ -45,7 +45,8 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         } else {
             format!(" ({})", answers.join(", "))
         },
-        args.output.display()
+        crate::ui::arrow(),
+        crate::ui::dim(args.output.display())
     );
     let data = serde_json::to_string_pretty(&plan)
         .map_err(|err| anyhow::anyhow!("failed to serialize query output: {err}"))?;
@@ -58,7 +59,7 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         headless = args.headless,
         "query requested"
     );
-    crate::ui::say(summary);
+    crate::ui::status(crate::ui::Tone::Good, summary);
 
     Ok(())
 }

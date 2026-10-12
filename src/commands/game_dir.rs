@@ -27,20 +27,28 @@ pub fn run(args: GameDirArgs) -> anyhow::Result<()> {
         println!("{}", as_mo2_sees_it(&first.path));
         return Ok(());
     }
-    for (index, candidate) in found.iter().enumerate() {
-        if index > 0 {
-            println!();
-        }
-        println!("{} ({})", candidate.path.display(), candidate.why);
+    for candidate in &found {
+        crate::ui::status(
+            crate::ui::Tone::Good,
+            format!(
+                "{} {}",
+                candidate.path.display(),
+                crate::ui::dim(format!("({})", candidate.why))
+            ),
+        );
         if !cfg!(windows) {
-            println!(
-                "  in MO2's setup (under Proton): {}",
-                as_mo2_sees_it(&candidate.path)
-            );
+            crate::ui::say(format!(
+                "  {} {}",
+                crate::ui::dim("in MO2's setup (under Proton):"),
+                crate::ui::name(as_mo2_sees_it(&candidate.path))
+            ));
         }
     }
     if found.len() > 1 {
-        println!("\nMore than one copy: give MO2 the one you play.");
+        crate::ui::status(
+            crate::ui::Tone::Note,
+            "More than one copy: give MO2 the one you play.",
+        );
     }
     Ok(())
 }

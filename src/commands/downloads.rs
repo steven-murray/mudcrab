@@ -53,7 +53,14 @@ fn locate(args: DownloadsLocateArgs) -> anyhow::Result<()> {
             }
         }
     }
-    eprintln!("{found} found, {missing} missing");
+    crate::ui::status_err(
+        if missing > 0 {
+            crate::ui::Tone::Warning
+        } else {
+            crate::ui::Tone::Good
+        },
+        format!("{found} found, {missing} missing"),
+    );
     Ok(())
 }
 
@@ -169,24 +176,30 @@ fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
     }
 
     for item in &missing {
-        eprintln!("not on disk, so not recorded: {item}");
+        crate::ui::status_err(
+            crate::ui::Tone::Warning,
+            format!("not on disk, so not recorded: {item}"),
+        );
     }
-    eprintln!(
-        "{recorded} archive(s) recorded{}{}",
-        if already > 0 {
-            format!(", {already} already were")
-        } else {
-            String::new()
-        },
-        if missing.is_empty() {
-            String::new()
-        } else {
-            format!(", {} not found", missing.len())
-        },
+    crate::ui::status_err(
+        crate::ui::Tone::Good,
+        format!(
+            "{recorded} archive(s) recorded{}{}",
+            if already > 0 {
+                format!(", {already} already were")
+            } else {
+                String::new()
+            },
+            if missing.is_empty() {
+                String::new()
+            } else {
+                format!(", {} not found", missing.len())
+            },
+        ),
     );
     if args.dry_run || recorded == 0 {
         if args.dry_run {
-            eprintln!("(--dry-run: nothing written)");
+            eprintln!("{}", crate::ui::dim("(--dry-run: nothing written)"));
         }
         return Ok(());
     }
@@ -212,10 +225,13 @@ async fn nexus_names(
         return Ok(HashMap::new());
     }
     let Some(key) = crate::config::tools::ToolsConfig::nexus_api_key() else {
-        eprintln!(
-            "note: {} archive(s) have no recorded name; set a Nexus API key \
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!(
+                "{} archive(s) have no recorded name; set a Nexus API key \
              (NEXUS_API_KEY, or nexus_api_key in tools.toml) to look them up",
-            wanted.len()
+                wanted.len()
+            ),
         );
         return Ok(HashMap::new());
     };
@@ -244,7 +260,7 @@ async fn nexus_names(
                     by_mod.insert(key_pair.clone(), files);
                 }
                 Err(err) => {
-                    eprintln!("note: {source}: {err}");
+                    crate::ui::status_err(crate::ui::Tone::Note, format!("{source}: {err}"));
                     by_mod.insert(key_pair.clone(), HashMap::new());
                 }
             }
@@ -283,32 +299,56 @@ async fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
         match step {
             Step::Delete { derived, real } => {
                 deletes += 1;
-                println!("delete   {}  (same file as {})", name(derived), name(real));
+                println!(
+                    "{} {}  {}",
+                    console::style("delete  ").red(),
+                    name(derived),
+                    crate::ui::dim(format!("(same file as {})", name(real)))
+                );
             }
             Step::Rename { derived, real } => {
                 renames += 1;
-                println!("rename   {}  ->  {}", name(derived), name(real));
+                println!(
+                    "{} {}  {}  {}",
+                    console::style("rename  ").cyan(),
+                    name(derived),
+                    crate::ui::arrow(),
+                    name(real)
+                );
             }
             Step::Conflict { derived, real } => {
                 println!(
-                    "CONFLICT {}  ({} is a different file; left alone)",
+                    "{} {}  {}",
+                    console::style("CONFLICT").yellow().bold(),
                     name(derived),
-                    name(real)
+                    crate::ui::dim(format!("({} is a different file; left alone)", name(real)))
                 );
             }
             Step::Unknown { derived } => {
                 println!(
-                    "unknown  {}  (no real name recorded; left alone)",
-                    name(derived)
+                    "{} {}  {}",
+                    crate::ui::dim("unknown "),
+                    name(derived),
+                    crate::ui::dim("(no real name recorded; left alone)")
                 );
             }
             Step::WriteMeta { archive, source } => {
                 metas += 1;
-                println!("meta     {}  ({source})", name(archive));
+                println!(
+                    "{} {}  {}",
+                    console::style("meta    ").green(),
+                    name(archive),
+                    crate::ui::dim(format!("({source})"))
+                );
             }
             Step::DeleteSidecar { sidecar } => {
                 sidecars += 1;
-                println!("delete   {}  (no archive beside it)", name(sidecar));
+                println!(
+                    "{} {}  {}",
+                    console::style("delete  ").red(),
+                    name(sidecar),
+                    crate::ui::dim("(no archive beside it)")
+                );
             }
         }
     }
@@ -316,16 +356,26 @@ async fn tidy(args: DownloadsTidyArgs) -> anyhow::Result<()> {
         .iter()
         .filter(|s| matches!(s, Step::Conflict { .. } | Step::Unknown { .. }))
         .count();
-    eprintln!(
-        "{deletes} duplicate name(s) to delete, {renames} to rename, {metas} .meta to write, \
-         {sidecars} stray sidecar(s); {left} left for you"
+    crate::ui::status_err(
+        if left > 0 {
+            crate::ui::Tone::Warning
+        } else {
+            crate::ui::Tone::Good
+        },
+        format!(
+            "{deletes} duplicate name(s) to delete, {renames} to rename, {metas} .meta to \
+             write, {sidecars} stray sidecar(s); {left} left for you"
+        ),
     );
 
     if args.apply {
         downloads_tidy::apply(&steps)?;
-        eprintln!("applied");
+        crate::ui::status_err(crate::ui::Tone::Good, "Applied.");
     } else if !steps.is_empty() {
-        eprintln!("nothing changed; re-run with --apply to do this");
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            "Nothing changed; run again with --apply to do this.",
+        );
     }
     Ok(())
 }

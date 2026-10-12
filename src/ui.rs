@@ -148,17 +148,94 @@ pub fn init(command: &str, verbose: bool, log_file: Option<PathBuf>) {
     } else {
         EnvFilter::new("mudcrab=warn")
     };
-    let console_layer = tracing_subscriber::fmt::layer()
-        .with_target(false)
-        .compact()
-        .with_ansi(std::io::stderr().is_terminal())
-        .with_writer(|| ConsoleWriter)
-        .with_filter(console_filter);
+    // Verbose mirrors the log as it is; otherwise a warning reads like the
+    // rest of the output.
+    let console_layer = if verbose {
+        tracing_subscriber::fmt::layer()
+            .with_target(false)
+            .compact()
+            .with_ansi(std::io::stderr().is_terminal())
+            .with_writer(|| ConsoleWriter)
+            .with_filter(console_filter)
+            .boxed()
+    } else {
+        tracing_subscriber::fmt::layer()
+            .event_format(Plain)
+            .with_writer(|| ConsoleWriter)
+            .with_filter(console_filter)
+            .boxed()
+    };
 
     let _ = tracing_subscriber::registry()
         .with(file_layer)
         .with(console_layer)
         .try_init();
+}
+
+/// A warning or error as a person reads it: a symbol, the message, and its
+/// details dimmed after it.
+struct Plain;
+
+impl<S, N> tracing_subscriber::fmt::FormatEvent<S, N> for Plain
+where
+    S: tracing::Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    N: for<'a> tracing_subscriber::fmt::FormatFields<'a> + 'static,
+{
+    fn format_event(
+        &self,
+        _ctx: &tracing_subscriber::fmt::FmtContext<'_, S, N>,
+        mut writer: tracing_subscriber::fmt::format::Writer<'_>,
+        event: &tracing::Event<'_>,
+    ) -> std::fmt::Result {
+        #[derive(Default)]
+        struct Fields {
+            message: String,
+            rest: Vec<String>,
+        }
+        impl tracing::field::Visit for Fields {
+            fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+                if field.name() == "message" {
+                    self.message = format!("{value:?}");
+                } else {
+                    self.rest.push(format!("{}={value:?}", field.name()));
+                }
+            }
+            fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+                if field.name() == "message" {
+                    self.message = value.to_string();
+                } else {
+                    self.rest.push(format!("{}={value}", field.name()));
+                }
+            }
+        }
+        let mut fields = Fields::default();
+        event.record(&mut fields);
+        let tone = if *event.metadata().level() == tracing::Level::ERROR {
+            Tone::Problem
+        } else if *event.metadata().level() == tracing::Level::WARN {
+            Tone::Warning
+        } else {
+            Tone::Note
+        };
+        let colour = std::io::stderr().is_terminal() && console::colors_enabled_stderr();
+        let symbol = tone.symbol().to_string();
+        let details = if fields.rest.is_empty() {
+            String::new()
+        } else {
+            format!(" ({})", fields.rest.join(", "))
+        };
+        if colour {
+            writeln!(
+                writer,
+                "{} {}{}",
+                tone.paint(symbol).bold().force_styling(true),
+                tone.paint(fields.message).force_styling(true),
+                console::style(details).dim().force_styling(true)
+            )
+        } else {
+            writeln!(writer, "{symbol} {}{details}", fields.message)
+        }
+    }
 }
 
 /// A progress bar for `len` steps of `label`. Hidden when stderr is not a
@@ -220,6 +297,18 @@ pub fn status(tone: Tone, message: impl std::fmt::Display) {
     ));
 }
 
+/// `status`, on stderr: for a command whose stdout is data to pipe or paste
+/// (a list of files, a TOML snippet), so its messages stay out of it.
+pub fn status_err(tone: Tone, message: impl std::fmt::Display) {
+    multi().suspend(|| {
+        eprintln!(
+            "{} {}",
+            tone.paint(tone.symbol()).bold().for_stderr(),
+            tone.paint(message.to_string()).for_stderr()
+        )
+    });
+}
+
 /// A titled list: a heading with its symbol and count, then one bullet per
 /// item, blank line before. Nothing for an empty list.
 pub fn section(tone: Tone, heading: &str, items: &[String]) {
@@ -238,6 +327,55 @@ pub fn section(tone: Tone, heading: &str, items: &[String]) {
         let item = item.replace('\n', "\n    ");
         say(format!("  {} {item}", tone.paint(console::Emoji("•", "-"))));
     }
+}
+
+/// A question put to the user, ready for `print!`: a bold cyan `?` and the
+/// question in bold.
+pub fn question(text: impl std::fmt::Display) -> String {
+    format!(
+        "{} {}",
+        console::style("?").cyan().bold(),
+        console::style(text.to_string()).bold()
+    )
+}
+
+/// Secondary text -- a path, a hint, a default -- dimmed.
+pub fn dim(text: impl std::fmt::Display) -> String {
+    console::style(text.to_string()).dim().to_string()
+}
+
+/// "Goes to": an arrow, or `->` where Unicode will not show.
+pub fn arrow() -> String {
+    dim(console::Emoji("→", "->"))
+}
+
+/// A numbered option in a list to pick from: the number set off, the default
+/// marked.
+pub fn option(number: usize, text: impl std::fmt::Display, default: bool) -> String {
+    format!(
+        "  {} {text}{}",
+        console::style(format!("{number:>2}.")).cyan(),
+        if default {
+            format!(" {}", dim("(default)"))
+        } else {
+            String::new()
+        }
+    )
+}
+
+/// A line under a heading: a bullet, then the text.
+pub fn bullet(tone: Tone, text: impl std::fmt::Display) {
+    say(format!("  {} {text}", tone.paint(console::Emoji("•", "-"))));
+}
+
+/// A heading on its own, with its symbol, after a blank line.
+pub fn heading(tone: Tone, text: impl std::fmt::Display) {
+    say("");
+    say(format!(
+        "{} {}",
+        tone.paint(tone.symbol()).bold(),
+        console::style(text.to_string()).bold()
+    ));
 }
 
 /// A name the user might look for -- a mod, a plugin, a file -- set off from

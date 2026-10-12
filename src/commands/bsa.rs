@@ -60,9 +60,12 @@ fn extract(args: BsaExtractArgs) -> anyhow::Result<()> {
             .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", target.display()))?;
         written += 1;
     }
-    println!(
-        "extracted {written} file(s) to {}",
-        args.destination.display()
+    crate::ui::status(
+        crate::ui::Tone::Good,
+        format!(
+            "Extracted {written} file(s) to {}",
+            crate::ui::dim(args.destination.display())
+        ),
     );
     Ok(())
 }

@@ -9,12 +9,15 @@ use std::path::Path;
 pub async fn run(args: ExportArgs) -> anyhow::Result<()> {
     if let Some(dir) = &args.eject {
         let count = Exporter::eject(&args.exporter, dir)?;
-        crate::ui::say(format!(
-            "Copied the {} exporter ({count} file(s)) to {}; export with --to {}",
-            args.exporter,
-            dir.display(),
-            dir.display()
-        ));
+        crate::ui::status(
+            crate::ui::Tone::Good,
+            format!(
+                "Copied the {} exporter ({count} file(s)) to {}; export with --to {}",
+                args.exporter,
+                dir.display(),
+                dir.display()
+            ),
+        );
         return Ok(());
     }
     let input = args
@@ -67,11 +70,15 @@ pub async fn run(args: ExportArgs) -> anyhow::Result<()> {
             Some(path) => {
                 std::fs::write(path, text)
                     .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))?;
-                crate::ui::say(format!(
-                    "Exported {} mod(s) as json -> {}",
-                    document.mod_count,
-                    path.display()
-                ));
+                crate::ui::status(
+                    crate::ui::Tone::Good,
+                    format!(
+                        "Exported {} mod(s) as json {} {}",
+                        document.mod_count,
+                        crate::ui::arrow(),
+                        crate::ui::dim(path.display())
+                    ),
+                );
             }
             None => print!("{text}"),
         }
@@ -88,17 +95,25 @@ pub async fn run(args: ExportArgs) -> anyhow::Result<()> {
             OutputMode::File => "file",
             OutputMode::Site => "site",
         };
-        crate::ui::say(format!(
-            "Exported {} mod(s) with {} -> {} ({what}){}",
-            document.mod_count,
-            exporter.name,
-            path.display(),
+        crate::ui::status(
             if warnings.is_empty() {
-                String::new()
+                crate::ui::Tone::Good
             } else {
-                format!(", {} warning(s)", warnings.len())
-            }
-        ));
+                crate::ui::Tone::Warning
+            },
+            format!(
+                "Exported {} mod(s) with {} {} {} ({what}){}",
+                document.mod_count,
+                exporter.name,
+                crate::ui::arrow(),
+                crate::ui::dim(path.display()),
+                if warnings.is_empty() {
+                    String::new()
+                } else {
+                    format!(", {} warning(s)", warnings.len())
+                }
+            ),
+        );
     }
     Ok(())
 }

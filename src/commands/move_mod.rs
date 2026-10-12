@@ -31,12 +31,17 @@ pub fn run(args: MoveArgs) -> anyhow::Result<()> {
     let plan = plan_move(&original, &source.mods, &args.mod_id, &section, &placement)?;
 
     if args.dry_run {
-        println!(
-            "would move '{}' to line {}, {}:\n",
-            args.mod_id, plan.line, plan.anchor
+        crate::ui::status(
+            crate::ui::Tone::Note,
+            format!(
+                "Would move {} to line {}, {}:\n",
+                crate::ui::name(&args.mod_id),
+                plan.line,
+                plan.anchor
+            ),
         );
         println!("{}", plan.block);
-        println!("\n(--dry-run: nothing written)");
+        crate::ui::say(crate::ui::dim("\n(--dry-run: nothing written)"));
         return Ok(());
     }
 
@@ -49,9 +54,14 @@ pub fn run(args: MoveArgs) -> anyhow::Result<()> {
             args.mod_id
         );
     }
-    crate::ui::say(format!(
-        "moved '{}' to line {}, {}",
-        args.mod_id, plan.line, plan.anchor
-    ));
+    crate::ui::status(
+        crate::ui::Tone::Good,
+        format!(
+            "Moved {} to line {}, {}",
+            crate::ui::name(&args.mod_id),
+            plan.line,
+            plan.anchor
+        ),
+    );
     Ok(())
 }

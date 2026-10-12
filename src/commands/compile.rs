@@ -28,11 +28,12 @@ pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
     }
 
     let summary = format!(
-        "Compiled {} mod(s), {} plugin(s), {} input(s) -> {}",
+        "Compiled {} mod(s), {} plugin(s), {} input(s) {} {}",
         compiled.mod_count,
         compiled.plugin_count,
         compiled.input_count,
-        args.output.display()
+        crate::ui::arrow(),
+        crate::ui::dim(args.output.display())
     );
     let data = serde_json::to_string_pretty(&compiled)
         .map_err(|err| anyhow::anyhow!("failed to serialize compiled artifact: {err}"))?;
@@ -47,7 +48,7 @@ pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
         offline = args.offline,
         "compile requested"
     );
-    crate::ui::say(summary);
+    crate::ui::status(crate::ui::Tone::Good, summary);
 
     Ok(())
 }

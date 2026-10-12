@@ -15,6 +15,7 @@ use super::choose::{Availability, Choice, Question, Rule, ask};
 use crate::cli::BrowserDownloads;
 use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::download::Unfetched;
+use crate::ui::Tone;
 use std::collections::HashMap;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
@@ -231,10 +232,11 @@ fn ask_policy(watch: &Path, downloads: &Path) -> anyhow::Result<BrowserDownloads
 
 /// Say whether MO2 can take the "Mod Manager Download" clicks.
 fn mo2_advice(downloads: &Path) {
+    let note = |text: &str| crate::ui::status(Tone::Note, text);
     if !MOD_MANAGER_LINKS {
-        println!(
+        note(
             "On each page, click \"Slow download\" (or \"Manual download\"): your browser \
-             saves the file, and it is picked up from there."
+             saves the file, and it is picked up from there.",
         );
         return;
     }
@@ -245,20 +247,23 @@ fn mo2_advice(downloads: &Path) {
         })
     };
     match running {
-        Some(instances) if instances.iter().any(saving_here) => println!(
+        Some(instances) if instances.iter().any(saving_here) => note(
             "MO2 is running and saves into the downloads folder: on each page, \"Mod Manager \
-             Download\" sends the file straight there."
+             Download\" sends the file straight there.",
         ),
-        Some(instances) if !instances.is_empty() => println!(
-            "MO2 is running, but saves its downloads somewhere other than {}; files from \
+        Some(instances) if !instances.is_empty() => crate::ui::status(
+            Tone::Warning,
+            format!(
+                "MO2 is running, but saves its downloads somewhere other than {}; files from \
              \"Mod Manager Download\" will not be seen. Use \"Manual Download\", or point that \
              MO2 at the downloads folder.",
-            downloads.display()
+                downloads.display()
+            ),
         ),
-        _ => println!(
+        _ => note(
             "To use the \"Mod Manager Download\" button (MO2 fetches the file into the downloads \
              folder), open MO2 now, if it is not already open. Otherwise use \"Manual \
-             Download\": your browser saves the file, and it is picked up from there."
+             Download\": your browser saves the file, and it is picked up from there.",
         ),
     }
 }
@@ -280,31 +285,50 @@ pub(crate) async fn run(
     let interactive = std::io::stdin().is_terminal();
     let total = unfetched.len();
 
-    println!(
-        "\n{total} archive(s) to download by hand. Their pages open {} at a time; each file is \
-         picked up as it arrives{}.",
+    crate::ui::heading(
+        Tone::Note,
+        format!("{total} archive(s) to download by hand"),
+    );
+    crate::ui::say(format!(
+        "  Their pages open {} at a time; each file is picked up as it arrives{}.",
         batch.max(1),
         watch
             .as_ref()
-            .map(|dir| format!(" in the downloads folder or in {}", dir.display()))
+            .map(|dir| format!(
+                " in the downloads folder or in {}",
+                crate::ui::dim(dir.display())
+            ))
             .unwrap_or_default()
-    );
+    ));
     mo2_advice(downloads);
     if let Some(warning) = profile_warning() {
-        println!("{warning}");
+        crate::ui::status(Tone::Warning, warning);
     }
     let no_page: Vec<&Unfetched> = unfetched.iter().filter(|u| page_of(u).is_none()).collect();
     if !no_page.is_empty() {
-        println!("These have no page to open; download them by hand:");
-        for item in &no_page {
-            println!("  {} ({})", item.mod_id, item.label);
-            match &item.note {
-                Some(note) => println!("    {}", note.trim()),
-                None => println!("    (the list does not say where from)"),
-            }
-        }
+        let items: Vec<String> = no_page
+            .iter()
+            .map(|item| {
+                format!(
+                    "{} ({})\n{}",
+                    item.mod_id,
+                    crate::ui::name(&item.label),
+                    item.note
+                        .as_deref()
+                        .map(str::trim)
+                        .unwrap_or("(the list does not say where from)")
+                )
+            })
+            .collect();
+        crate::ui::section(
+            Tone::Warning,
+            "No page to open: download these by hand",
+            &items,
+        );
     }
-    println!("Ctrl-C stops; running the same command again carries on.\n");
+    crate::ui::say(crate::ui::dim(
+        "\nCtrl-C stops; running the same command again carries on.\n",
+    ));
 
     let mut pending: Vec<Unfetched> = unfetched;
     // Sources whose page is open, and those still to open, first last.
@@ -329,13 +353,13 @@ pub(crate) async fn run(
                 break;
             };
             if !open_url(&url) {
-                println!("  open this page yourself: {url}");
+                crate::ui::bullet(Tone::Warning, format!("open this page yourself: {url}"));
             }
             // A hand download's page is not a Nexus file page: say what to get.
             if let Some(item) = pending.iter().find(|u| u.source == source)
                 && let Some(note) = &item.note
             {
-                println!("  {}: {}", item.mod_id, note.trim());
+                crate::ui::bullet(Tone::Note, format!("{}: {}", item.mod_id, note.trim()));
             }
             opened.push(source);
             // A browser handed many tabs in the same instant drops some.
@@ -370,11 +394,14 @@ pub(crate) async fn run(
                     how
                 }
                 None => {
-                    println!(
-                        "note: {} arrived in {}; it is left there (--browser-downloads move \
-                         takes such files in)",
-                        file.display(),
-                        watch.display()
+                    crate::ui::status(
+                        Tone::Note,
+                        format!(
+                            "{} arrived in {}; it is left there (--browser-downloads move \
+                             takes such files in)",
+                            file.display(),
+                            watch.display()
+                        ),
                     );
                     policy = Some(BrowserDownloads::Leave);
                     BrowserDownloads::Leave
@@ -382,10 +409,13 @@ pub(crate) async fn run(
             };
             if how == BrowserDownloads::Leave {
                 if !told_left.contains(&file) {
-                    println!(
-                        "  {} is in {}; waiting for it in the downloads folder",
-                        item.label,
-                        watch.display()
+                    crate::ui::bullet(
+                        Tone::Note,
+                        format!(
+                            "{} is in {}; waiting for it in the downloads folder",
+                            crate::ui::name(&item.label),
+                            crate::ui::dim(watch.display())
+                        ),
                     );
                     told_left.push(file);
                 }
@@ -399,14 +429,23 @@ pub(crate) async fn run(
         for (index, path) in arrived {
             let item = pending.remove(index);
             done += 1;
-            println!(
-                "  [{done}/{total}] {} -- {}",
+            crate::ui::say(format!(
+                "  {} {} {} {}",
+                crate::ui::dim(format!("[{done}/{total}]")),
+                console::style(console::Emoji("✔", "ok")).green(),
                 item.mod_id,
-                path.file_name().unwrap_or_default().to_string_lossy()
-            );
+                crate::ui::dim(path.file_name().unwrap_or_default().to_string_lossy())
+            ));
         }
         if pending.is_empty() {
-            println!("\nAll {total} archive(s) are in {}.", downloads.display());
+            crate::ui::say("");
+            crate::ui::status(
+                Tone::Good,
+                format!(
+                    "All {total} archive(s) are in {}.",
+                    crate::ui::dim(downloads.display())
+                ),
+            );
             return Ok(());
         }
         tokio::time::sleep(POLL).await;

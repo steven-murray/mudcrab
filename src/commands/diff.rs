@@ -64,10 +64,13 @@ pub async fn run(args: DiffArgs) -> anyhow::Result<()> {
             if report.has_differences() {
                 match crate::ui::log_path() {
                     Some(path) => println!(
-                        "details: --details, or the full report in {}",
-                        path.display()
+                        "{}",
+                        crate::ui::dim(format!(
+                            "details: --details, or the full report in {}",
+                            path.display()
+                        ))
                     ),
-                    None => println!("details: --details"),
+                    None => println!("{}", crate::ui::dim("details: --details")),
                 }
             }
         }

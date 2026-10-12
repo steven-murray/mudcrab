@@ -42,16 +42,22 @@ pub async fn run(args: NexusFilesArgs) -> anyhow::Result<()> {
 
     for file in &files {
         println!(
-            "{:<13} {}  {}{}",
-            file.category_name.as_deref().unwrap_or("?"),
-            file.name.as_deref().unwrap_or("(untitled)"),
+            "{} {}  {}{}",
+            console::style(format!(
+                "{:<13}",
+                file.category_name.as_deref().unwrap_or("?")
+            ))
+            .cyan(),
+            crate::ui::name(file.name.as_deref().unwrap_or("(untitled)")),
             file.version
                 .as_deref()
                 .map(|v| format!("v{v}"))
                 .unwrap_or_default(),
-            file.size_kb
-                .map(|kb| format!("  {:.1} MB", kb as f64 / 1024.0))
-                .unwrap_or_default(),
+            crate::ui::dim(
+                file.size_kb
+                    .map(|kb| format!("  {:.1} MB", kb as f64 / 1024.0))
+                    .unwrap_or_default()
+            ),
         );
         println!(
             "              path = \"nexus:{}/{}/{}\"",
@@ -66,8 +72,11 @@ pub async fn run(args: NexusFilesArgs) -> anyhow::Result<()> {
     }
     if files.len() < total {
         println!(
-            "({} old or archived file(s) not shown; --all lists them)",
-            total - files.len()
+            "{}",
+            crate::ui::dim(format!(
+                "({} old or archived file(s) not shown; --all lists them)",
+                total - files.len()
+            ))
         );
     }
     Ok(())

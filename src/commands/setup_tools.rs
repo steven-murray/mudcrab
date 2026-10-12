@@ -20,20 +20,29 @@ fn pick(
     if !interactive {
         return Ok(found.first().map(|c| c.path.clone()));
     }
-    writeln!(output, "\n{question}")?;
+    writeln!(output, "\n{}", crate::ui::question(question))?;
     if found.is_empty() {
         writeln!(
             output,
-            "  (nothing found; type a path, or - to fill it in later)"
+            "  {}",
+            crate::ui::dim("(nothing found; type a path, or - to fill it in later)")
         )?;
     }
     for (index, candidate) in found.iter().enumerate() {
-        writeln!(output, "  {}. {}", index + 1, candidate.path.display())?;
-        writeln!(output, "       {}", candidate.why)?;
+        writeln!(
+            output,
+            "{}",
+            crate::ui::option(index + 1, candidate.path.display(), index == 0)
+        )?;
+        writeln!(output, "      {}", crate::ui::dim(&candidate.why))?;
     }
     loop {
         let hint = if found.is_empty() { "path or -" } else { "1" };
-        write!(output, "  Your choice [{hint}]: ")?;
+        write!(
+            output,
+            "  {} ",
+            crate::ui::dim(format!("Your choice [{hint}]:"))
+        )?;
         output.flush()?;
         let mut line = String::new();
         if input.read_line(&mut line)? == 0 {
@@ -80,19 +89,30 @@ fn ask_api_key(
     }
     writeln!(
         output,
-        "\nNexus API key, from https://next.nexusmods.com/settings/api-keys. Kept here, \
-         every command finds it without NEXUS_API_KEY being set; this file is yours \
-         alone, so do not share or commit it. Premium accounts download directly; \
-         free accounts use it to name and recognise files."
+        "\n{}",
+        crate::ui::question("Your Nexus API key (https://next.nexusmods.com/settings/api-keys)")
+    )?;
+    writeln!(
+        output,
+        "  {}",
+        crate::ui::dim(
+            "Kept here, every command finds it without NEXUS_API_KEY being set; this file is \
+             yours alone, so do not share or commit it. Premium accounts download directly; \
+             free accounts use it to name and recognise files."
+        )
     )?;
     let hint = match from_env {
         Some(_) => {
-            writeln!(output, "  Enter stores the key NEXUS_API_KEY holds now.")?;
+            writeln!(
+                output,
+                "  {}",
+                crate::ui::dim("Enter stores the key NEXUS_API_KEY holds now.")
+            )?;
             "Enter, a key, or -"
         }
         None => "a key, or Enter to leave it out",
     };
-    write!(output, "  Key [{hint}]: ")?;
+    write!(output, "  {} ", crate::ui::dim(format!("Key [{hint}]:")))?;
     output.flush()?;
     let mut line = String::new();
     input.read_line(&mut line)?;
@@ -190,7 +210,10 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
             output_path.display()
         );
     }
-    println!("{}", explain_location(&output_path, args.output.is_some()));
+    crate::ui::status(
+        crate::ui::Tone::Note,
+        explain_location(&output_path, args.output.is_some()),
+    );
 
     // Each value the list needs, from what is found where such things usually
     // live; asked for in a terminal, the best guess otherwise.
@@ -269,9 +292,16 @@ pub async fn run(args: SetupToolsArgs) -> anyhow::Result<()> {
 
     tracing::info!(path = %output_path.display(), "setup-tools: wrote tools.toml template");
 
-    println!("\nWrote {}.", output_path.display());
+    crate::ui::say("");
+    crate::ui::status(
+        crate::ui::Tone::Good,
+        format!("Wrote {}.", crate::ui::dim(output_path.display())),
+    );
     if content.contains("/path/to/") || content.contains("C:\\\\tools") {
-        println!("Some values were left as placeholders; edit the file to fill them in.");
+        crate::ui::status(
+            crate::ui::Tone::Warning,
+            "Some values were left as placeholders; edit the file to fill them in.",
+        );
     }
 
     Ok(())

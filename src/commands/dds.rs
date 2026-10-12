@@ -35,9 +35,12 @@ fn audit(args: DdsAuditArgs) -> anyhow::Result<()> {
                 println!("{shown}\t{}x{}", texture.width, texture.height);
             }
             Ok(_) => {}
-            Err(err) => eprintln!("warning: {shown}: {err}"),
+            Err(err) => crate::ui::status_err(crate::ui::Tone::Warning, format!("{shown}: {err}")),
         }
     }
-    eprintln!("{flagged} of {scanned} texture(s) use DXT1 punch-through transparency");
+    crate::ui::status_err(
+        crate::ui::Tone::Good,
+        format!("{flagged} of {scanned} texture(s) use DXT1 punch-through transparency"),
+    );
     Ok(())
 }

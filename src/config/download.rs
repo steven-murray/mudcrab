@@ -75,13 +75,23 @@ pub async fn download_all(
 ) -> anyhow::Result<()> {
     let unfetched = download_report(plan, settings).await?;
     if !unfetched.is_empty() {
-        let joined = unfetched
+        let items: Vec<String> = unfetched
             .iter()
-            .map(|u| format!("{} ({}): {}", u.mod_id, u.label, u.describe()))
-            .collect::<Vec<_>>()
-            .join("\n");
+            .map(|u| {
+                format!(
+                    "{} ({}): {}",
+                    u.mod_id,
+                    crate::ui::name(&u.label),
+                    u.describe()
+                )
+            })
+            .collect();
+        for item in &items {
+            tracing::info!(item, "not downloaded");
+        }
+        crate::ui::section(crate::ui::Tone::Problem, "Not downloaded", &items);
         anyhow::bail!(
-            "download failed for {} archive(s):\n{joined}",
+            "{} archive(s) could not be downloaded, listed above",
             unfetched.len()
         );
     }
@@ -206,15 +216,22 @@ pub async fn download_report(
     // should not be.
     errors.sort_by(|a, b| (&a.mod_id, &a.label).cmp(&(&b.mod_id, &b.label)));
 
-    crate::ui::say(format!(
-        "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
-        settings.cache_dir.display(),
+    crate::ui::status(
         if errors.is_empty() {
-            String::new()
+            crate::ui::Tone::Good
         } else {
-            format!("; {} failed", errors.len())
-        }
-    ));
+            crate::ui::Tone::Warning
+        },
+        format!(
+            "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
+            crate::ui::dim(settings.cache_dir.display()),
+            if errors.is_empty() {
+                String::new()
+            } else {
+                format!("; {} not downloaded", errors.len())
+            }
+        ),
+    );
     // Emitted before the bail, as in `check`: the run that fails is the run
     // whose summary is worth having, because it is the one naming dead links.
     tracing::info!(
@@ -1178,9 +1195,16 @@ mod tests {
             inactive_plugins: vec![],
         };
 
+        let unfetched = download_report(&plan, &settings).await.unwrap();
+        assert_eq!(unfetched.len(), 1);
+        assert!(
+            unfetched[0].error.contains("NEXUS_API_KEY"),
+            "{}",
+            unfetched[0].error
+        );
         let err = download_all(&plan, &settings)
             .await
             .expect_err("missing key should fail");
-        assert!(err.to_string().contains("NEXUS_API_KEY"));
+        assert!(err.to_string().contains("could not be downloaded"), "{err}");
     }
 }

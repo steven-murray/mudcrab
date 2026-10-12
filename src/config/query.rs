@@ -367,7 +367,7 @@ fn prompt_input(spec: &InputSpec) -> anyhow::Result<InputValue> {
 fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
     let hint = if default { "[Y/n]" } else { "[y/N]" };
     loop {
-        print!("{query} {hint}: ");
+        print!("{} {}: ", crate::ui::question(query), crate::ui::dim(hint));
         io::stdout().flush()?;
 
         let mut buf = String::new();
@@ -384,7 +384,7 @@ fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
             return Ok(true);
         }
 
-        eprintln!("Please answer with y/yes or n/no.");
+        crate::ui::status(crate::ui::Tone::Warning, "Please answer y or n.");
     }
 }
 
@@ -401,18 +401,19 @@ fn prompt_choice(query: &str, choices: &[String], default: Option<&str>) -> anyh
         anyhow::bail!("choice input is missing available choices");
     }
 
-    println!("{query}");
+    println!("{}", crate::ui::question(query));
     for (idx, choice) in choices.iter().enumerate() {
-        let marker = if Some(choice.as_str()) == default {
-            " (default)"
-        } else {
-            ""
-        };
-        println!("  {}. {choice}{marker}", idx + 1);
+        println!(
+            "{}",
+            crate::ui::option(idx + 1, choice, Some(choice.as_str()) == default)
+        );
     }
 
     loop {
-        print!("Select [1-{}]: ", choices.len());
+        print!(
+            "  {} ",
+            crate::ui::dim(format!("Select [1-{}]:", choices.len()))
+        );
         io::stdout().flush()?;
 
         let mut buf = String::new();
@@ -421,7 +422,10 @@ fn prompt_choice(query: &str, choices: &[String], default: Option<&str>) -> anyh
             return Ok(choice);
         }
 
-        eprintln!("Please enter a valid selection index.");
+        crate::ui::status(
+            crate::ui::Tone::Warning,
+            format!("Please enter a number from 1 to {}.", choices.len()),
+        );
     }
 }
 
@@ -438,8 +442,12 @@ fn pick_choice(answer: &str, choices: &[String], default: Option<&str>) -> Optio
 
 fn prompt_text(query: &str, default: Option<&str>) -> anyhow::Result<String> {
     match default {
-        Some(default) => print!("{query} [{default}]: "),
-        None => print!("{query}: "),
+        Some(default) => print!(
+            "{} {}: ",
+            crate::ui::question(query),
+            crate::ui::dim(format!("[{default}]"))
+        ),
+        None => print!("{}: ", crate::ui::question(query)),
     }
     io::stdout().flush()?;
 

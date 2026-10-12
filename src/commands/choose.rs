@@ -90,19 +90,23 @@ pub(crate) fn ask(
 
     writeln!(
         output,
-        "\n{} ({})",
-        question.title,
-        question.rule.instruction()
+        "\n{} {}",
+        crate::ui::question(&question.title),
+        crate::ui::dim(format!("({})", question.rule.instruction()))
     )?;
     for (index, choice) in question.choices.iter().enumerate() {
         let mut marks = Vec::new();
         if question.default.contains(&index) {
-            marks.push("default");
+            marks.push(crate::ui::dim("default"));
         }
         match choice.availability {
-            Availability::Recommended => marks.push("recommended"),
-            Availability::Required => marks.push("always installed"),
-            Availability::Unavailable => marks.push("not available"),
+            Availability::Recommended => {
+                marks.push(console::style("recommended").green().to_string())
+            }
+            Availability::Required => marks.push(crate::ui::dim("always installed")),
+            Availability::Unavailable => {
+                marks.push(console::style("not available").red().to_string())
+            }
             Availability::Free => {}
         }
         let marks = if marks.is_empty() {
@@ -110,9 +114,18 @@ pub(crate) fn ask(
         } else {
             format!("  ({})", marks.join(", "))
         };
-        writeln!(output, "  {}. {}{marks}", index + 1, choice.name)?;
+        let name = if choice.availability == Availability::Unavailable {
+            crate::ui::dim(&choice.name)
+        } else {
+            choice.name.clone()
+        };
+        writeln!(
+            output,
+            "  {} {name}{marks}",
+            console::style(format!("{:>2}.", index + 1)).cyan()
+        )?;
         if let Some(line) = summary(&choice.description) {
-            writeln!(output, "       {line}")?;
+            writeln!(output, "      {}", crate::ui::dim(line))?;
         }
     }
 
@@ -124,7 +137,12 @@ pub(crate) fn ask(
         _ => None,
     };
     if let Some(chosen) = settled {
-        writeln!(output, "  -> {}", names(question, &chosen))?;
+        writeln!(
+            output,
+            "  {} {}",
+            crate::ui::arrow(),
+            names(question, &chosen)
+        )?;
         return Ok(chosen);
     }
 
@@ -139,7 +157,11 @@ pub(crate) fn ask(
             .join(" ")
     };
     loop {
-        write!(output, "  Your choice [{default_label}]: ")?;
+        write!(
+            output,
+            "  {} ",
+            crate::ui::dim(format!("Your choice [{default_label}]:"))
+        )?;
         output.flush()?;
         let mut line = String::new();
         if input.read_line(&mut line)? == 0 {
@@ -147,7 +169,7 @@ pub(crate) fn ask(
         }
         match parse(line.trim(), question, &free, &required) {
             Ok(chosen) => return Ok(chosen),
-            Err(problem) => writeln!(output, "  {problem}")?,
+            Err(problem) => writeln!(output, "  {}", console::style(problem).yellow())?,
         }
     }
 }
@@ -289,7 +311,10 @@ mod tests {
         let q = question(Rule::ExactlyOne, &[Free, Unavailable], &[0]);
         let (result, shown) = answer(&q, "");
         assert_eq!(result.unwrap(), [0]);
-        assert!(shown.contains("-> Option 1"), "{shown}");
+        assert!(
+            shown.contains(&format!("{} Option 1", crate::ui::arrow())),
+            "{shown}"
+        );
         let q = question(Rule::All, &[Free, Free], &[0, 1]);
         assert_eq!(answer(&q, "").0.unwrap(), [0, 1]);
     }

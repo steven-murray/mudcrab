@@ -225,13 +225,13 @@ instant and silent when all is well:
 ```console
 $ mudcrab validate little.toml
 $ mudcrab compile little.toml --output build/compiled.json
-Compiled 4 mod(s), 3 plugin(s), 1 input(s) -> build/compiled.json
+✔ Compiled 4 mod(s), 3 plugin(s), 1 input(s) → build/compiled.json
 $ mudcrab query build/compiled.json --output build/plan.json --set butterflies=false
-Plan: 3 of 4 mod(s) selected (butterflies=false) -> build/plan.json
+✔ Plan: 3 of 4 mod(s) selected (butterflies=false) → build/plan.json
 $ mudcrab download build/plan.json
-4 archive(s) ready in /home/you/Games/OblivionModDownloads (0 downloaded now)
+✔ 4 archive(s) ready in /home/you/Games/OblivionModDownloads (0 downloaded now)
 $ mudcrab check build/plan.json
-Checked 4 archive(s) in 4 mod(s), and the masters of 3 plugin(s)
+✔ Checked 4 archive(s) in 4 mod(s), and the masters of 3 plugin(s): 0 problem(s), 0 warning(s)
 ```
 
 To see the result without an MO2 instance, install into a plain folder and

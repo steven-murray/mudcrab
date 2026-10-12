@@ -69,7 +69,10 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         for path in &mine {
             println!("{path}");
         }
-        eprintln!("{}: {} files", subject.id, mine.len());
+        crate::ui::status_err(
+            crate::ui::Tone::Good,
+            format!("{}: {} files", subject.id, mine.len()),
+        );
         return Ok(());
     }
 
@@ -82,7 +85,10 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
             &settings,
             &active_plugins,
         )?;
-        eprintln!("{id}: {} files", paths.visible.len());
+        eprintln!(
+            "{}",
+            crate::ui::dim(format!("{id}: {} files", paths.visible.len()))
+        );
         theirs.extend(paths.visible);
     }
 
@@ -106,12 +112,19 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     for path in &overlap {
         println!("{path}");
     }
-    eprintln!(
-        "{} of {}'s {} files are also provided by [{}]",
-        overlap.len(),
-        subject.id,
-        mine.len(),
-        args.with.join(", ")
+    crate::ui::status_err(
+        if overlap.is_empty() {
+            crate::ui::Tone::Note
+        } else {
+            crate::ui::Tone::Warning
+        },
+        format!(
+            "{} of {}'s {} files are also provided by [{}]",
+            overlap.len(),
+            subject.id,
+            mine.len(),
+            args.with.join(", ")
+        ),
     );
 
     // Without this, asking about a row whose `file_hide` has already run answers
@@ -125,13 +138,16 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         .filter(|path| theirs.contains(*path))
         .count();
     if already > 0 {
-        eprintln!(
-            "note: {already} further file{} {} already hidden in {}, so out of the \
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!(
+                "{already} further file{} {} already hidden in {}, so out of the \
              virtual file system and not counted above. Re-install the mod to see \
              the selection as it was first made.",
-            if already == 1 { "" } else { "s" },
-            if already == 1 { "is" } else { "are" },
-            subject.id,
+                if already == 1 { "" } else { "s" },
+                if already == 1 { "is" } else { "are" },
+                subject.id,
+            ),
         );
     }
     Ok(())
@@ -219,37 +235,58 @@ fn sweep(
         let section = if entry.section.is_empty() {
             String::new()
         } else {
-            format!("  [{}]", entry.section.join(" - "))
+            format!(
+                "  {}",
+                crate::ui::dim(format!("[{}]", entry.section.join(" - ")))
+            )
         };
-        println!("{}{section}", entry.id);
+        println!("\n{}{section}", crate::ui::name(&entry.id));
         if let Some(won) = won {
             let total: usize = won.values().sum();
-            println!("  wins {total} {} over: {}", files(total), partners(won));
+            println!(
+                "  {} {total} {} over: {}",
+                console::style("wins").green(),
+                files(total),
+                partners(won)
+            );
         }
         if let Some(lost) = lost {
             let total: usize = lost.values().sum();
-            println!("  loses {total} {} to: {}", files(total), partners(lost));
+            println!(
+                "  {} {total} {} to: {}",
+                console::style("loses").yellow(),
+                files(total),
+                partners(lost)
+            );
         }
     }
 
-    eprintln!(
-        "\n{reported} of {} installed mods share files with another (loose files and BSA \
+    eprintln!();
+    crate::ui::status_err(
+        crate::ui::Tone::Good,
+        format!(
+            "{reported} of {} installed mods share files with another (loose files and BSA \
          contents; a later mod wins){}.",
-        installed.len(),
-        if missing > 0 {
-            format!(
-                "; {missing} in the plan {} not installed, so not compared",
-                if missing == 1 { "is" } else { "are" }
-            )
-        } else {
-            String::new()
-        }
+            installed.len(),
+            if missing > 0 {
+                format!(
+                    "; {missing} in the plan {} not installed, so not compared",
+                    if missing == 1 { "is" } else { "are" }
+                )
+            } else {
+                String::new()
+            }
+        ),
     );
     if reported > 0 {
         eprintln!(
-            "To see the files: mudcrab conflicts --plan {} --mods-dir {} --mod <id> --with <other>",
-            args.plan.display(),
-            args.mods_dir.display()
+            "{}",
+            crate::ui::dim(format!(
+                "To see the files: mudcrab conflicts --plan {} --mods-dir {} --mod <id> --with \
+                 <other>",
+                args.plan.display(),
+                args.mods_dir.display()
+            ))
         );
     }
     Ok(())

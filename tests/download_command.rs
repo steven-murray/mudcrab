@@ -119,9 +119,13 @@ download_handler = "local"
         .assert()
         .failure();
 
-    let stderr = String::from_utf8(assert.get_output().stderr.clone()).expect("utf-8 stderr");
+    let stderr = format!(
+        "{}{}",
+        String::from_utf8_lossy(&assert.get_output().stdout),
+        String::from_utf8_lossy(&assert.get_output().stderr)
+    );
     assert!(
-        stderr.contains("download failed for 2 archive(s)"),
+        stderr.contains("2 archive(s) could not be downloaded"),
         "both failures should be counted:\n{stderr}"
     );
     assert!(

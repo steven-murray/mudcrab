@@ -2,6 +2,7 @@
 
 use crate::cli::AssetsArgs;
 use crate::config::assets;
+use crate::ui::Tone;
 
 /// Shown per plugin unless `--all`.
 const EXAMPLES: usize = 5;
@@ -15,34 +16,60 @@ pub fn run(args: AssetsArgs) -> anyhow::Result<()> {
     let report = assets::check(&active, &data)?;
 
     let missing: usize = report.missing.iter().map(|(_, m)| m.len()).sum();
-    crate::ui::say(format!(
-        "Read {} plugin(s), naming {} mesh and sound file(s): {missing} not found, in {} \
-         plugin(s) ({} more the game's own plugins already lack are left out)",
-        report.plugins_read,
-        report.references,
-        report.missing.len(),
-        report.missing_in_game,
-    ));
     for (plugin, files) in &report.missing {
         tracing::info!(plugin = %plugin, missing = ?files.iter().map(|m| &m.path).collect::<Vec<_>>(), "assets: missing");
-        crate::ui::say(format!("\n{plugin}: {} missing", files.len()));
         let shown = if args.all { files.len() } else { EXAMPLES };
-        for file in files.iter().take(shown) {
-            crate::ui::say(format!("  {}  ({})", file.path, file.record));
-        }
+        let mut items: Vec<String> = files
+            .iter()
+            .take(shown)
+            .map(|file| format!("{}  {}", file.path, crate::ui::dim(&file.record)))
+            .collect();
         if files.len() > shown {
-            crate::ui::say(format!(
-                "  ... and {} more (--all lists them)",
+            items.push(crate::ui::dim(format!(
+                "... and {} more (--all lists them)",
                 files.len() - shown
-            ));
+            )));
+        }
+        crate::ui::heading(
+            Tone::Warning,
+            format!(
+                "{} {}",
+                crate::ui::name(plugin),
+                crate::ui::dim(format!("({} missing)", files.len()))
+            ),
+        );
+        for item in items {
+            crate::ui::bullet(Tone::Warning, item);
         }
     }
-    let shared = assets::most_named(&report);
-    if !shared.is_empty() {
-        crate::ui::say("\nNamed by more than one plugin (often one mod left out):");
-        for (path, count) in shared.iter().take(10) {
-            crate::ui::say(format!("  {path}  ({count} plugins)"));
-        }
-    }
+    let shared: Vec<String> = assets::most_named(&report)
+        .into_iter()
+        .take(10)
+        .map(|(path, count)| format!("{path}  {}", crate::ui::dim(format!("({count} plugins)"))))
+        .collect();
+    crate::ui::section(
+        Tone::Note,
+        "Named by more than one plugin (often one mod left out)",
+        &shared,
+    );
+    crate::ui::say("");
+    crate::ui::status(
+        if missing > 0 {
+            Tone::Warning
+        } else {
+            Tone::Good
+        },
+        format!(
+            "Read {} plugin(s), naming {} mesh and sound file(s): {missing} not found, in {} \
+             plugin(s) {}",
+            report.plugins_read,
+            report.references,
+            report.missing.len(),
+            crate::ui::dim(format!(
+                "({} more the game's own plugins already lack are left out)",
+                report.missing_in_game
+            )),
+        ),
+    );
     Ok(())
 }

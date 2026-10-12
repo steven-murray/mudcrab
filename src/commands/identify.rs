@@ -18,7 +18,10 @@ pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
     let mut failures = 0usize;
     for archive in &args.archives {
         if !archive.is_file() {
-            eprintln!("{}: not a file", archive.display());
+            crate::ui::status_err(
+                crate::ui::Tone::Problem,
+                format!("{}: not a file", archive.display()),
+            );
             failures += 1;
             continue;
         }
@@ -40,22 +43,32 @@ pub async fn run(args: IdentifyArgs) -> anyhow::Result<()> {
                 if found.method == Method::FileList {
                     // Say so: the hash was not the thing that matched, so this
                     // rests on the filename still being the one Nexus serves.
-                    eprintln!(
-                        "{}: not in the MD5 index; matched by filename against mod {}'s file list",
-                        found.file_name, found.mod_id
+                    crate::ui::status_err(
+                        crate::ui::Tone::Warning,
+                        format!(
+                            "{}: not in the MD5 index; matched by filename against mod {}'s \
+                             file list",
+                            found.file_name, found.mod_id
+                        ),
                     );
                 }
                 print!("{}", found.toml_snippet());
 
                 if args.write_meta {
                     let sidecar = write_meta_sidecar(archive, &found)?;
-                    eprintln!("wrote {}", sidecar.display());
+                    crate::ui::status_err(
+                        crate::ui::Tone::Good,
+                        format!("Wrote {}", sidecar.display()),
+                    );
                 }
                 println!();
             }
             Err(err) => {
                 // One unrecognised archive should not cost the rest of the batch.
-                eprintln!("{}: {err}", archive.display());
+                crate::ui::status_err(
+                    crate::ui::Tone::Problem,
+                    format!("{}: {err}", archive.display()),
+                );
                 failures += 1;
             }
         }
