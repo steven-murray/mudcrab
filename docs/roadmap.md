@@ -197,10 +197,8 @@ How an export of MOFAM differs from the guide, on purpose:
 
 ## Phase D — User-facing documentation
 
-Currently: `docs/usage.md` (command reference, good),
-`docs/mo2-output-structure.md`, and a readme carrying half a format reference.
-
-Needed:
+Getting started, writing a list, the format, the commands and
+troubleshooting each have a page now; what is left is keeping them true.
 
 1. ~~**Getting started**~~ — done: [getting-started.md](getting-started.md).
    Writing it turned up six rough edges, fixed in the commands rather than
@@ -222,9 +220,11 @@ Needed:
    the author and records the answers, running a BAIN wizard as Wrye Bash
    would (subpackages, left-out plugins, renames, `EditINI` as `ini_tweak`);
    and `conflicts` with no `--mod` sweeps the list for mods that share files.
-3. **Format reference** — [modlist-format.md](modlist-format.md) covers the
-   shape; it needs to stay in step with the schema, and every field wants a
-   one-line "when you need this".
+3. ~~**Format reference**~~ — done: [modlist-format.md](modlist-format.md)
+   lists every key the schema accepts -- top level, mods, archives, actions --
+   each with a line on when you need it, from a complete example that
+   validates. Keeping it in step with the schema is a standing job: a new
+   field is documented there in the same change.
 4. ~~**Troubleshooting**~~ — done: [troubleshooting.md](troubleshooting.md),
    quoting the messages from real runs. Writing it improved several: `check`
    names similarly named archives on disk and says whether `download` can

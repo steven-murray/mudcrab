@@ -24,6 +24,14 @@ modding tool, and the comment saying *why* a line is the way it is is usually
 worth more than the line. Match that density. When a decision rests on evidence
 rather than on reasoning, put the evidence in `docs/design/` and cite it.
 
+## User docs
+
+A change people can see updates its page in the same commit: a new modlist
+field in [docs/modlist-format.md](docs/modlist-format.md) (with a line on when
+it is needed), a new flag or command in [docs/usage.md](docs/usage.md), a new
+error people will meet in [docs/troubleshooting.md](docs/troubleshooting.md).
+Examples in user docs are generic, never MOFAM's.
+
 ## The MOFAM workspace
 
 The development case study -- a real ~700-mod list -- lives in its own

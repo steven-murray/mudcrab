@@ -1,158 +1,314 @@
 # The modlist format
 
-A modlist is a single TOML file. This is the reference for what it may contain;
-[usage.md](usage.md) covers the commands that consume it, and
-[known-issues.md](known-issues.md) covers what is not implemented.
+A modlist is a TOML file: which mods, where each comes from, how to unpack
+it, what to change afterwards, and the order everything loads in. This page
+lists everything a modlist can contain, with a line on when you need each
+field. [authoring.md](authoring.md) walks through writing one, and
+[usage.md](usage.md) covers the commands that read it.
+
+Most of a list is written by `mudcrab add`, which inserts lines without
+disturbing anything else, so comments you write are kept. Use them: a list's
+comments are where its reasons live. `mudcrab validate` checks a list in
+seconds.
+
+## A small, complete list
+
+```toml
+name = "Little Oblivion"
+
+# The load order, top to bottom.
+plugins = [
+    "Oblivion.esm",
+    "BettysButterflies.esp",
+]
+
+[inputs.butterflies]
+type = "bool"
+query = "Add more butterflies to the wilderness?"
+default = true
+
+[[mods]]
+id = "Engine Bug Fixes"
+section = ["Fixes"]
+
+[[mods.archives]]
+path = "nexus:oblivion/47085/1000022995"
+file_name = "EngineBugFixes v2.22-47085-2-22-1569169531.7z"
+
+[[mods]]
+id = "More Butterflies"
+section = ["Creatures"]
+if = "butterflies"
+plugins = ["BettysButterflies.esp"]
+
+[[mods.archives]]
+path = "nexus:oblivion/46785/1000013111"
+file_name = "More New Butterflies-46785-.zip"
+```
+
+TOML puts every `[table]` after the plain keys at the top of the file, so
+`name` and `plugins` come first; a key written after a table header belongs to
+that table.
 
 ## Top level
 
-* `name`: the name of modlist
-* `inputs`: a table where each table entry has a key corresponding to a variable name
-  that is able to be used throughout the rest of the modlist, and values that specify
-  how the input data is to be captured:
-  * `type`: either `bool`, `choice` or `text`
-  * `query`: a string specifying the question to put to the user
-  * `choices`: (if the type is `choice`) specifying the possible choices.
-* `ini`: an optional table of game-scope `Oblivion.ini` edits to apply independently
-   of any specific mod. Values must be scalar TOML values. Keys containing spaces must
-   be quoted.
-* `mods`: an ordered array of mod entries. Each entry has an `id` (unique; also the
-   mod's directory name) and an optional `section`, a list naming its MO2 separator
-   path from outermost to innermost. Every level of the path becomes a separator.
-* `plugins`: an ordered list of plugins. Each entry should be an exact filename. 
-* `inactive-plugins`: a subset of `plugins` that is installed and ordered but
-   **not active**. They keep their slot in `loadorder.txt` and are left out of
-   `plugins.txt`. This is for plugins another tool has absorbed — Wrye Bash
-   unticks whatever it merges into the Bashed Patch — so that reinstalling the
-   list does not re-activate them and force the patch to be rebuilt. 
-* `post-install-actions`: optional ordered list of install-wide actions to run after
-   extraction and MO2 export. Currently supports `"loot-sort"`.
+| Key | When you need it |
+| --- | --- |
+| `name` | Always: the list's name. |
+| `plugins` | Whenever a mod ships a plugin: the load order, top to bottom. See [Load order](#load-order). |
+| `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
+| `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
+| `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs, applied to the MO2 profile's copy. |
+| `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
+| `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
+| `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
+| `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [exporters.md](exporters.md). |
+| `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
 
-Example with nested sections:
-
-```toml
-name = "Nested Sections Example"
-
-[[mods]]
-id = "base"
-section = ["foundation"]
-dependencies = []
-
-[[mods]]
-id = "combat"
-section = ["gameplay"]
-dependencies = ["base"]
-
-[[mods]]
-id = "magic"
-section = ["gameplay"]
-dependencies = ["base"]
-```
-
-Example top-level ini edits:
+`ini` keys are matched anywhere in `Oblivion.ini`, with no section, so they
+must be keys that occur once (all of the usual ones do); an `ini_set` action
+with `scope = "game"` can name a section.
 
 ```toml
 [ini]
-"bFull Screen" = 0
-"iSize W" = 1920
-"iSize H" = 1080
+SIntroSequence = ""
+bAllowScriptedAutosave = 0
 ```
 
-Example top-level post-install actions:
+## Mods
+
+Each `[[mods]]` table is one mod folder in MO2.
+
+| Key | When you need it |
+| --- | --- |
+| `id` | Always. Unique; also the mod's folder name in MO2. |
+| `section` | Nearly always: the MO2 separator it sits under, as a list from outermost in (`["Visuals", "Textures"]`). Every level becomes a separator. |
+| `archives` | For any mod made from downloads: one `[[mods.archives]]` per archive, installed in order, later ones overwriting earlier. See [Archives](#archives). |
+| `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged). |
+| `if` | When the mod is optional: a condition. See [Optional mods and inputs](#optional-mods-and-inputs). |
+| `dependencies` | When the mod needs others to work: their ids. `query` refuses a plan that includes this mod but not them. |
+| `actions` | To change the mod after unpacking it: INI edits, files left out, plugins cleaned, BSAs packed. See [Actions](#actions). |
+| `type` | When the mod is not made from archives. See below. |
+| `merge` | With `type = "merge"`: what to merge. See [Merges](#merges). |
+| `files` | With `type = "build-from-files"`: the files to assemble it from. |
+| `docs` | For `export`: prose and pictures for this mod. |
+| `oracle_name` | Only for `diff`: the mod's folder name in a reference instance, when it differs from `id`. Has no effect on installing. |
+
+### Kinds of mod (`type`)
+
+Without `type`, a mod is installed from its archives. Otherwise:
+
+| `type` | What it is |
+| --- | --- |
+| `"merge"` | One plugin merged from other mods' plugins, built by `install`: a headless replacement for zEdit's zMerge. |
+| `"build-from-files"` | Assembled from files already on disk, named in `files` (globs; `%GAME_DIR%` is the game folder). |
+| `"empty"` | A deliberately empty folder, for a tool's output to land in rather than in Overwrite. |
+| `"generated"` | Holds only what its own actions write: `write_file` authors a file (`path`, `content`). |
+| `"mo2-plugin"` | An MO2 plugin such as Root Builder: installed into the instance's `plugins/<id>`, not `mods/`, and left out of the mod list. |
+
+### Game-root files
+
+Files that belong beside `Oblivion.exe` -- a script extender's loader, a
+`dxvk.conf` -- go in a mod's `root/` folder: `game_root_files = ["*.dll"]` on an
+archive stages matching files there, or a `generated` mod writes one with
+`write_file`. The Root Builder MO2 plugin (installed as a `mo2-plugin` mod)
+deploys `root/` to the game folder when MO2 launches the game and restores the
+folder afterwards. mudcrab never writes the game folder.
+
+## Archives
+
+Each `[[mods.archives]]` table is one download. `mudcrab add --archive` writes
+these from the archive itself.
+
+| Key | When you need it |
+| --- | --- |
+| `path` | Always: where the archive comes from. See below. |
+| `file_name` | Nearly always: the archive's name as the host serves it. It is how a copy already on disk is found, and how `check` names a missing one. |
+| `layout` | When the archive needs telling how it is laid out: `"fomod"`, `"bain"` or `"custom-data-folder"`. Without it the layout is detected (data at the top, or in one folder MO2 would unwrap). |
+| `data_folder` | With `layout = "custom-data-folder"`: the folder inside the archive that holds the data. |
+| `target_subdir` | When the files belong in a folder the archive lacks: where in the mod to put them (`"obse/plugins"`). |
+| `fomod_selections` | With `layout = "fomod"`: the option chosen in each group. A group left out gets the installer's default. |
+| `bain_subpackages` | With `layout = "bain"`: the subpackages to install, merged in order. |
+| `include`, `exclude` | To install only some of the files, or leave some out: globs matched against paths inside the mod's data (for BAIN, inside each subpackage), case-sensitively; `*` crosses folders. |
+| `game_root_files` | When some files belong next to `Oblivion.exe`: globs; matches go to the mod's `root/`. See [Game-root files](#game-root-files). |
+| `inner_archive` | When the download is a wrapper around the real archive: the inner one's path, which is unpacked as the mod. |
+| `if` | When the archive only applies for some answers: a condition. |
+| `download_handler` | Rarely: `"nexus"`, `"http"`, `"manual"` or `"local"`, when it cannot be told from `path`. |
+| `build` | Rarely, for `build-from-files` mods: layers (`path`, `dest_prefix`) overlaid in order. |
+
+### Where an archive comes from (`path`)
+
+| Form | Means |
+| --- | --- |
+| `nexus:oblivion/<mod id>/<file id>` | A file on Nexus Mods. Downloaded through the API (premium accounts), or by hand. `mudcrab nexus-files <mod id>` lists a mod's files with this line ready to paste. |
+| `https://...` | Any other direct download. |
+| `manual:<file name>` | A file no download link can reach (a forum host behind a login, say): whoever installs the list downloads it by hand. Say where in a comment. |
+| a file path | A file on this machine. Ties the list to one computer, so mostly for testing. |
+
+Archives are kept in one downloads folder under their real names; see
+[usage.md](usage.md#the-downloads-folder).
+
+### Installers
+
+A FOMOD installer is answered group by group; `mudcrab inspect` lists the
+steps, groups and options:
 
 ```toml
-post-install-actions = ["loot-sort"]
-```
-
-## Archive layouts
-
-`mudcrab` supports a few common archive layouts.
-
-For a normal archive where the mod data is already at the archive root, no layout field is required.
-
-For archives where the real data lives under a known subdirectory, use `data_folder` and optionally `target_subdir`.
-
-For BAIN-style archives, use `layout = "bain"` and list the top-level package directories you want to install in `bain_subpackages`. The contents of each selected package are merged into the mod root in the order listed.
-
-Example:
-
-```toml
-[[mods]]
-id = "DLC Lore Books"
-section = ["example"]
-
 [[mods.archives]]
-path = "nexus:oblivion/46715/1000012857"
-layout = "bain"
-bain_subpackages = ["00 Merged"]
-```
-
-If a BAIN archive contains:
-
-- `00 Option1/plugin1.esp`
-- `01 Option2/plugin2.esp`
-- `01 Option2/Textures/...`
-
-then selecting both `00 Option1` and `01 Option2` produces a mod root containing `plugin1.esp`, `plugin2.esp`, and `Textures/...` directly, without preserving the `00 ...` and `01 ...` folder names.
-
-Each entry in `mods` has the following format:
-
-```toml
-[[mods]]
-id = "modname"
-if = "<conditional>"  # only install this mod if conditional is true
-
-[[mods.archives]]
-path = "nexus:oblivion/<mod_id>/<file_id>"
-download_handler = "nexus"
-layout = "fomod"  # or omit for a plain archive, or "custom-data-folder"/"bain"
-include = ["Textures/*"]
-exclude = ["Meshes/*"]
+path = "nexus:oblivion/49017/1000020879"
+file_name = "HD Septims-49017-1-4a-1543613153.zip"
+layout = "fomod"
 
 [[mods.archives.fomod_selections]]
+step = "Step1"
+group = "Meshes"
+options = ["Normal Size Mesh"]
+```
+
+A BAIN package names the subpackages (its numbered top-level folders) to
+install; their contents are merged into the mod in the order given:
+
+```toml
+[[mods.archives]]
+path = "nexus:oblivion/21104/1000025650"
+file_name = "Cobl-21104-174-1598559328.7z"
+layout = "bain"
+bain_subpackages = ["00 Cobl Core", "01 StableCore"]
+```
+
+A BAIN wizard's choices are recorded the same way: the subpackages it selects,
+plugins it leaves unselected as `exclude`, and its INI edits as `ini_tweak`
+actions. `mudcrab add --archive` runs the wizard and writes them.
+
+## Load order
+
+`plugins` is the whole load order, top to bottom, and mudcrab applies it as
+written -- it never sorts. Every plugin a mod declares must be in it, except
+one consumed by a merge (whose output is listed instead). A plugin listed here
+that no installed mod provides and the game does not have is simply skipped,
+so a list can name the game's own plugins (`Oblivion.esm`, the DLCs).
+
+`inactive-plugins` is a subset of `plugins`: installed and placed, but not
+ticked in MO2. It is for what another tool takes over -- the plugins Wrye Bash
+merges into the Bashed Patch -- so reinstalling does not tick them again.
+
+## Optional mods and inputs
+
+An input is a question the list leaves to whoever installs it. `query` asks it;
+`query --headless` takes the declared `default` (and fails if there is none,
+rather than guessing); `--set name=value` answers it on the command line and
+beats both.
+
+```toml
+[inputs.use_hd_textures]
+type = "bool"        # or "choice" (with `choices`) / "text"
+query = "Install HD textures?"
+default = false      # must match the type; a choice's must be one of its choices
+
+[[mods]]
+id = "hd_pack"
+if = "use_hd_textures"          # whole mod
+
+[[mods]]
+id = "some_ui"
+
+[[mods.actions]]
+if = "!use_hd_textures"         # just this action
+action = "file_prune"
+paths = ["textures/menus/big.dds"]
+```
+
+Since TOML puts every table after the top-level keys, an input declared with a
+`[inputs.*]` header lands below `plugins`. Dotted keys
+(`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top
+of the file instead.
+
+A condition is one or more terms joined by `&&` and `||` (`&&` binds tighter;
+no parentheses). Each term may be negated with `!` and is one of:
+
+| Term | True when |
+|---|---|
+| `flag` | the bool input is true, or the text input is non-empty |
+| `key == value`, `key != value` | the input's answer is (not) `value`; quotes optional |
+| `mod:id` | mod `id` is in the resolved list; `mod:"Some Mod"` when the id has spaces |
+
+```toml
+[[mods]]
+id = "HD Pack Compatibility Patch"
+if = 'mod:"HD Pack" && !mod:"Other Overhaul"'   # follows whichever way HD Pack went
+```
+
+A mod condition may name a mod declared further down the file: `query` answers
+each mod's condition when it is first needed. `validate` rejects a condition
+naming an undeclared input or a mod that does not exist, a mod whose `if` asks
+about itself, and mod conditions that ask about each other in a loop (which
+have no answer, or two). A mod listed in another's `dependencies` must be
+included whenever that one is; `query` refuses a plan where a condition left
+it out, and says which `mod:` condition would keep the two together.
+
+### Conditions inside a mod
+
+`if` also sits on an archive, a FOMOD selection row and a BAIN subpackage, so
+one answer can reach every place a choice shows up:
+
+```toml
+[[mods.archives]]
+if = "res == 2k"                # only fetch and install this archive for 2K
+path = "nexus:oblivion/123/456"
+
+[[mods.archives.fomod_selections]]
+if = "res == 1k"
+step = "Textures"
+group = "Resolution"
+options = ["1K"]
+
+[[mods.archives.fomod_selections]]
+if = "res == 2k"
 step = "Textures"
 group = "Resolution"
 options = ["2K"]
 
-[[mods.archives.fomod_selections]]
-step = "Options"
-group = "Style"
-options = ["Orange Styling"]
-
 [[mods.archives]]
-download_handler = "nexus"
-layout = "custom-data-folder"
-data_folder = "."  # e.g. if layout='custom-data-folder' and the data/ folder is the root
-include = ["Meshes/arg*"]
+layout = "bain"
+bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
 ```
 
-Post-install actions on a mod (e.g. Quick Auto Clean) are declared per-archive/per-mod
-via the `actions` machinery in `src/config/actions/`; see [Actions](#actions).
+A FOMOD group whose rows are all left out gets the installer's own default, as
+if it had no row. A mod whose archives are all left out, or a BAIN archive
+whose subpackages all are, is refused by `query`: it would install nothing, and
+the condition belongs on the mod (or the archive) instead.
+
+Conditions are resolved by `query`: the plan holds only the mods, actions,
+archives and selections that apply, with no conditions left in it, so
+`download` fetches only what applies, and a changed answer changes the
+affected mods' definitions and `install` restages them.
 
 ## Actions
 
-`actions` is an **ordered** list; each entry runs in the order it is declared. The
-`action` key selects which one, and the rest of the table carries its parameters. An
-unrecognised name is a parse error naming the supported values, not a silent skip.
+`[[mods.actions]]` change a mod after its archives are unpacked. They run **in
+the order written**, and each may carry an `if`. Paths are relative to the
+mod's own folder and cannot leave it. An unknown `action` is an error, not a
+silent skip. [usage.md](usage.md#actions) has each action in full, with
+examples.
 
-| `action` | What it does |
-| --- | --- |
-| `ini_set` | Set a key in an INI file (`scope = "mod"` or `"game"`, optional `section`). |
-| `ini_append_block` | Append a verbatim block of lines to an INI, for the guide's "paste this in" rows. |
-| `ini_tweak` | Write a Wrye Bash INI Tweak fragment under `ini tweaks/`, as a BAIN wizard's `EditINI` does. |
-| `qac` | Run xEdit's Quick Auto Clean over the named plugins. |
-| `delete_records` | Remove records or whole groups from a plugin, replacing a hand pass in xEdit. |
-| `pack_bsa` | Pack the mod's staged files into a BSA. |
-| `extract_bsa` | Unpack a BSA the mod ships, leaving its contents loose. |
-| `create_dummy_plugin` | Write an empty `.esp` so Oblivion loads a BSA of the same name. |
-| `file_prune` | Delete staged files, by glob or by `conflicts_with` another mod. |
-| `file_hide` | Rename to `.mohidden`, MO2's way of dropping a file out of the VFS. |
-| `file_move` | Move a staged file, e.g. a plugin into `optional/`. |
+| `action` | Fields | When you need it |
+| --- | --- | --- |
+| `ini_set` | `file`, `key`, `value`, `section`, `format`, `scope` | To change a setting: in an INI the mod ships (`scope = "mod"`, the default) or in the game's `Oblivion.ini` (`scope = "game"`). `section` when the key occurs in more than one; `format = "set-to"` for script INIs written `set key to value`. |
+| `ini_comment` | `file`, `key`, `format` | To comment a setting out, so the mod's script falls back to its own default. |
+| `ini_append_block` | `file`, `block` | When a guide says "paste these lines into the INI": appended verbatim, order and repeats kept. |
+| `ini_tweak` | `file`, `key`, `value`, `format` | For a Wrye Bash INI Tweak, as a BAIN wizard's `EditINI` writes: a fragment under `ini tweaks/<file>`, applied from Wrye Bash. |
+| `file_prune` | `paths` or `conflicts_with` (+ `under`), `except`; or `keep` alone | To delete files: by glob (`paths`, with exceptions); every file another mod also provides (`conflicts_with`, optionally `under` one folder); or everything except a few (`keep`). |
+| `file_hide` | `paths` or `conflicts_with` (+ `under`), `except` | To hide files from MO2 (renamed `.mohidden`) rather than delete them. Same selectors as `file_prune`; paths are literal, not globs. |
+| `file_move` | `from`, `to` | To move a file within the mod, e.g. a plugin into `optional/` so it is kept but not loaded. |
+| `write_file` | `path`, `content` | To add a file no archive has, such as a `dxvk.conf`; never overwrites one. |
+| `qac` | `plugins` | To clean plugins with xEdit's Quick Auto Clean. Needs xEdit set up in `tools.toml`. |
+| `delete_records` | `plugin`, `groups`, `form_ids` | When a guide says "remove these records in xEdit": whole groups (`WRLD`) or records (`xx010F43`). |
+| `pack_bsa` | `output`, `include`, `exclude`, `prune_packed` | To pack loose files into a BSA; `prune_packed` deletes what went in. |
+| `create_dummy_plugin` | `output` | For a BSA with no plugin of the same name, which Oblivion would otherwise not load. |
+| `extract_bsa` | `archive`, `keep_archive` | To unpack a BSA the mod ships, to change what is in it. |
+| `dds_decompress` | `paths` | On Linux/Proton: menu textures with DXT1 transparency, which DXVK draws black. See [known-issues.md](known-issues.md#linux--proton). |
 
-Full per-action reference, with examples and the reasoning behind each, is in
-[usage.md](usage.md#actions).
-
-The last three exist to be composed, in this order, for mods that ship loose assets
+`pack_bsa`, `create_dummy_plugin` and `file_prune` exist to be composed, in this order, for mods that ship loose assets
 the guide wants archived:
 
 ```toml
@@ -181,35 +337,12 @@ mod (a readme, a plugin) is left loose and logged rather than packed.
 
 Packing and unpacking are native -- see `src/bsa/` -- so no BSArch.exe under Wine.
 
-Along with standard archive-based mods, `type` selects a few other kinds:
-
-- `"build-from-files"` assembles a mod's contents from local files and layers instead
-  of a downloaded archive (see `BuildLayer` in `src/config/schema.rs`).
-- `"merge"` produces a single merged plugin from several other mods' `.esp` files --
-  a headless, native replacement for zEdit's zMerge, so a modlist requiring merges can
-  be installed without driving a GUI tool.
-- `"empty"` is a deliberately empty folder, for a tool's output to land in.
-- `"generated"` holds only what its actions write: `write_file` authors a file
-  (`path`, `content`), refusing to overwrite one.
-- `"mo2-plugin"` installs into the MO2 instance's `plugins/<id>` rather than
-  `mods/`, and stays out of the profile's mod list and `diff`. The id
-  is the plugin's folder name. It is rebuilt on every install.
-
-### Game-root files
-
-Files that belong beside `Oblivion.exe` -- a script extender's loader, a
-`dxvk.conf` -- go in a mod's `root/` folder: `game_root_files = ["*.dll"]` on an
-archive stages matching files there, or a `generated` mod writes one with
-`write_file`. The Root Builder MO2 plugin (itself a `mo2-plugin` entry in MOFAM)
-deploys `root/` to the game folder when MO2 launches the game and restores the
-folder afterwards. mudcrab never writes the game folder.
-
 ## Merges
 
 ```toml
 [[mods]]
 id      = "Unique Forts Merged"
-section = ["36 - zMERGED PLUGINS"]
+section = ["Merges"]
 type    = "merge"
 
   [mods.merge]
@@ -288,11 +421,11 @@ and an image whose `path` does not exist.
 A long list can keep its prose apart from its install data:
 
 ```toml
-docs_file = "mofam.docs.toml"   # relative to the modlist
+docs_file = "mylist.docs.toml"   # relative to the modlist
 ```
 
 ```toml
-# mofam.docs.toml
+# mylist.docs.toml
 [docs]
 summary = "..."
 
@@ -310,106 +443,5 @@ places.
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the roadmap, not in the
-schema:
-
-```toml
-# NOT SUPPORTED -- see docs/roadmap.md, Phase F
-[[mods]]
-id = "modname"
-type = "custom"
-actions = ["my-custom-script --mod A"]
-```
-
-So is `include`-ing one modlist from another. Every modlist today is one flat
-file.
-
-## Optional mods and inputs
-
-An input is a question the list leaves to whoever installs it. `query` asks it;
-`query --headless` takes the declared `default` (and fails if there is none,
-rather than guessing); `--set name=value` answers it on the command line and
-beats both.
-
-```toml
-[inputs.use_hd_textures]
-type = "bool"        # or "choice" (with `choices`) / "text"
-query = "Install HD textures?"
-default = false      # must match the type; a choice's must be one of its choices
-
-[[mods]]
-id = "hd_pack"
-if = "use_hd_textures"          # whole mod
-
-[[mods]]
-id = "some_ui"
-
-[[mods.actions]]
-if = "!use_hd_textures"         # just this action
-action = "file_prune"
-paths = ["textures/menus/big.dds"]
-```
-
-Since TOML puts every table after the top-level keys, an input declared with a
-`[inputs.*]` header lands below `plugins`. Dotted keys
-(`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top
-of the file instead; MOFAM does this.
-
-A condition is one or more terms joined by `&&` and `||` (`&&` binds tighter;
-no parentheses). Each term may be negated with `!` and is one of:
-
-| Term | True when |
-|---|---|
-| `flag` | the bool input is true, or the text input is non-empty |
-| `key == value`, `key != value` | the input's answer is (not) `value`; quotes optional |
-| `mod:id` | mod `id` is in the resolved list; `mod:"Some Mod"` when the id has spaces |
-
-```toml
-[[mods]]
-id = "HD Pack Compatibility Patch"
-if = 'mod:"HD Pack" && !mod:"Other Overhaul"'   # follows whichever way HD Pack went
-```
-
-A mod condition may name a mod declared further down the file: `query` answers
-each mod's condition when it is first needed. `validate` rejects a condition
-naming an undeclared input or a mod that does not exist, a mod whose `if` asks
-about itself, and mod conditions that ask about each other in a loop (which
-have no answer, or two). A mod listed in another's `dependencies` must be
-included whenever that one is; `query` refuses a plan where a condition left
-it out, and says which `mod:` condition would keep the two together.
-
-### Conditions inside a mod
-
-`if` also sits on an archive, a FOMOD selection row and a BAIN subpackage, so
-one answer can reach every place a choice shows up:
-
-```toml
-[[mods.archives]]
-if = "res == 2k"                # only fetch and install this archive for 2K
-path = "nexus:oblivion/123/456"
-
-[[mods.archives.fomod_selections]]
-if = "res == 1k"
-step = "Textures"
-group = "Resolution"
-options = ["1K"]
-
-[[mods.archives.fomod_selections]]
-if = "res == 2k"
-step = "Textures"
-group = "Resolution"
-options = ["2K"]
-
-[[mods.archives]]
-layout = "bain"
-bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
-```
-
-A FOMOD group whose rows are all left out gets the installer's own default, as
-if it had no row. A mod whose archives are all left out, or a BAIN archive
-whose subpackages all are, is refused by `query`: it would install nothing, and
-the condition belongs on the mod (or the archive) instead.
-
-Conditions are resolved by `query`: the plan holds only the mods, actions,
-archives and selections that apply, with no conditions left in it, so
-`download` fetches only what applies, and a changed answer changes the
-affected mods' definitions and `install` restages them.
+schema, and so is `include`-ing one modlist from another: every modlist today
+is one file. See [roadmap.md](roadmap.md), Phase F.
