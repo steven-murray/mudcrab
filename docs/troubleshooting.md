@@ -109,7 +109,8 @@ The key is wrong or has been revoked. Copy it again from the API keys page.
 
 The browser was started with a different `XDG_CONFIG_HOME` from usual, so it
 opened a fresh profile. `download` warns when it is set. Unset it for that
-command.
+command; if you set it to keep a separate `tools.toml`, use
+`MUDCRAB_TOOLS_CONFIG` for that instead.
 
 ### `archive 'A' must be downloaded by hand -- it is not fetchable from any automated source`
 

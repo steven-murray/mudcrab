@@ -121,7 +121,8 @@ fn profile_warning() -> Option<String> {
     Some(format!(
         "note: XDG_CONFIG_HOME is {}, so the browser opened from here looks for its \
          profile there and may start fresh, as a second window without your Nexus \
-         login. If it does, run this command with XDG_CONFIG_HOME unset.",
+         login. If it does, run this command with XDG_CONFIG_HOME unset (to keep a \
+         separate tools.toml, MUDCRAB_TOOLS_CONFIG names one without moving anything else).",
         config.display()
     ))
 }

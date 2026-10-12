@@ -21,7 +21,7 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
 
     // A sweep reads installed folders only; one mod may be read from its
     // archives when it is not installed, which needs the downloads folder.
-    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None, None);
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None);
     let downloads = match (&args.mod_id, downloads) {
         (None, downloads) => downloads.unwrap_or_default(),
         (Some(_), downloads) => downloads?,

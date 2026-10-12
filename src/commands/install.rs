@@ -33,11 +33,8 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = super::resolve_downloads_dir(
-        args.downloads.clone(),
-        args.tools_config.as_deref(),
-        args.mo2_instance_dir.as_deref(),
-    )?;
+    let cache_dir =
+        super::resolve_downloads_dir(args.downloads.clone(), args.mo2_instance_dir.as_deref())?;
     let mods_dir = match (&args.mods_dir, &args.mo2_instance_dir) {
         (Some(path), _) => path.clone(),
         (None, Some(instance_dir)) => instance_dir.join("mods"),
@@ -57,11 +54,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         execute_actions: !args.skip_actions,
         dry_run: args.dry_run,
         tools: {
-            let path = args
-                .tools_config
-                .clone()
-                .or_else(ToolsConfig::default_path)
-                .unwrap_or_else(|| PathBuf::from("tools.toml"));
+            let path = ToolsConfig::default_path().unwrap_or_else(|| PathBuf::from("tools.toml"));
             ToolsConfig::load(&path)?
         },
         filter: args.filter.to_mod_filter(),

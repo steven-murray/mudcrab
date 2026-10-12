@@ -11,7 +11,7 @@ pub async fn run(args: DownloadArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let settings = config::download::DownloadSettings {
         cache_dir,
         retry: args.retry,

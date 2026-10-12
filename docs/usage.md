@@ -225,12 +225,14 @@ archive's page is the list's `download_page`, opened like the rest, with its
 `download_note` printed beside it; one with no page is listed, with its note,
 for you to fetch, and waited for too.
 
+Ctrl-C stops; running the command again carries on with what is still
+missing. The click is always yours: nothing presses a download button for you.
+
 On Linux the browser takes its profile from `XDG_CONFIG_HOME`. If that is set
 somewhere unusual in the shell you run `download` from, the pages open in a
 fresh browser profile -- a second window without your Nexus login -- and the
-command says so. Ctrl-C stops; running the command again
-carries on with what is still missing. The click is always yours: nothing
-presses a download button for you.
+command says so. To use a different `tools.toml`, set `MUDCRAB_TOOLS_CONFIG`
+instead (see [setup-tools](#setup-tools)).
 
 ## The downloads folder
 
@@ -945,10 +947,17 @@ Enter takes the first suggestion, a number another, `-` leaves a placeholder
 to fill in later, and anything else is a path. With `--defaults`, or when
 input is not a terminal, the first suggestion is taken for each.
 
-The file goes where every command looks when not given `--tools-config`:
-`$XDG_CONFIG_HOME/mudcrab/tools.toml`, else `~/.config/mudcrab/tools.toml`
-(`%APPDATA%\mudcrab\tools.toml` on Windows); the command says which, and why.
-`--force` overwrites an existing one.
+The file goes where every command looks: `$XDG_CONFIG_HOME/mudcrab/tools.toml`,
+else `~/.config/mudcrab/tools.toml` (`%APPDATA%\mudcrab\tools.toml` on
+Windows); the command says which, and why. `--force` overwrites an existing
+one.
+
+To keep a second `tools.toml` -- for a test install, say -- name it with
+`MUDCRAB_TOOLS_CONFIG`, which every mudcrab command then uses (setup-tools
+included) while it is set, or with `--tools-config <file>`, which any command
+takes for one run. Commands print which file they used when it is not the
+usual one. Prefer these to changing `XDG_CONFIG_HOME`, which moves every
+program's settings, your browser's included.
 
 ## Nexus Sources
 

@@ -19,6 +19,12 @@ pub struct Cli {
     /// (~/.local/state/mudcrab/logs/<command>-<time>.log).
     #[arg(long, global = true, value_name = "FILE")]
     pub log_file: Option<PathBuf>,
+    /// Use this tools.toml instead of the usual one
+    /// (~/.config/mudcrab/tools.toml, or %APPDATA%\mudcrab\tools.toml on
+    /// Windows). MUDCRAB_TOOLS_CONFIG does the same for every command run
+    /// while it is set.
+    #[arg(long, global = true, value_name = "FILE")]
+    pub tools_config: Option<PathBuf>,
 }
 
 /// `--help` groups the commands by who reaches for them; clap lists them in
@@ -646,10 +652,6 @@ pub struct InstallArgs {
     /// its own copy of the profile back on exit, undoing the install's.
     #[arg(long)]
     pub ignore_running_mo2: bool,
-    /// Path to tools.toml machine-local tool configuration.
-    /// Defaults to ~/.config/mudcrab/tools.toml (or %APPDATA%\mudcrab\tools.toml on Windows).
-    #[arg(long)]
-    pub tools_config: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
     #[command(flatten)]

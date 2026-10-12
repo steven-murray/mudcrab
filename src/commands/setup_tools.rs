@@ -116,6 +116,12 @@ fn explain_location(path: &Path, explicit: bool) -> String {
     if explicit {
         return format!("Writing {} (--output).", path.display());
     }
+    if let Some((_, from)) = ToolsConfig::chosen_path() {
+        return format!(
+            "Writing {} ({from}; other commands use it only while that is given too).",
+            path.display()
+        );
+    }
     if cfg!(windows) {
         return format!("Writing {} (%APPDATA%\\mudcrab).", path.display());
     }
@@ -126,8 +132,8 @@ fn explain_location(path: &Path, explicit: bool) -> String {
             PathBuf::from(dir).display()
         ),
         None => format!(
-            "Writing {} (XDG_CONFIG_HOME is not set in mudcrab's environment, so ~/.config; \
-             in fish, `set -x` exports it).",
+            "Writing {} (XDG_CONFIG_HOME is not set in mudcrab's environment, so ~/.config). \
+             To keep a separate one for a test, set MUDCRAB_TOOLS_CONFIG instead.",
             path.display()
         ),
     }

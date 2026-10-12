@@ -11,6 +11,9 @@ async fn main() -> ExitCode {
         Err(err) => err.exit(),
     };
     mudcrab::ui::init(&command, cli.verbose, cli.log_file.clone());
+    if let Some(path) = &cli.tools_config {
+        mudcrab::config::tools::ToolsConfig::set_path_override(path.clone());
+    }
 
     match mudcrab::commands::execute(cli).await {
         Ok(()) => ExitCode::SUCCESS,

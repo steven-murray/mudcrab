@@ -11,7 +11,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         )
     })?;
 
-    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let settings = config::check::CheckSettings {
         cache_dir,
         filter: args.filter.to_mod_filter(),

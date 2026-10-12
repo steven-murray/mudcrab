@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+static PATH_OVERRIDE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+
 /// Machine-local tool configuration.  Loaded from a `tools.toml` file whose
 /// path is passed on the command line or defaults to
 /// `~/.config/mudcrab/tools.toml`.  Missing files are treated as an empty
@@ -121,8 +123,40 @@ impl ToolsConfig {
         })
     }
 
-    /// Return the default tools.toml path: `~/.config/mudcrab/tools.toml`.
+    /// The tools.toml every command uses: `--tools-config`, else
+    /// `MUDCRAB_TOOLS_CONFIG`, else the standard place. The first time it is
+    /// not the standard place, says so, so a forgotten variable is visible.
     pub fn default_path() -> Option<PathBuf> {
+        match Self::chosen_path() {
+            Some((path, from)) => {
+                static TOLD: std::sync::Once = std::sync::Once::new();
+                TOLD.call_once(|| eprintln!("note: using {} ({from})", path.display()));
+                Some(path)
+            }
+            None => Self::standard_path(),
+        }
+    }
+
+    /// The tools.toml named by `--tools-config` or `MUDCRAB_TOOLS_CONFIG`, and
+    /// which one named it; `None` for the standard place.
+    pub fn chosen_path() -> Option<(PathBuf, &'static str)> {
+        match PATH_OVERRIDE.get() {
+            Some(path) => Some((path.clone(), "--tools-config")),
+            None => std::env::var_os("MUDCRAB_TOOLS_CONFIG")
+                .filter(|value| !value.is_empty())
+                .map(|value| (PathBuf::from(value), "MUDCRAB_TOOLS_CONFIG")),
+        }
+    }
+
+    /// Point every command at this tools.toml (the global `--tools-config`).
+    /// Only the first call counts.
+    pub fn set_path_override(path: PathBuf) {
+        let _ = PATH_OVERRIDE.set(path);
+    }
+
+    /// Where tools.toml lives when nothing says otherwise:
+    /// `~/.config/mudcrab/tools.toml`.
+    pub fn standard_path() -> Option<PathBuf> {
         // Use $XDG_CONFIG_HOME if set, otherwise fall back to $HOME/.config on
         // non-Windows, and %APPDATA% on Windows.
         #[cfg(target_os = "windows")]

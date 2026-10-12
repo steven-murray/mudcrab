@@ -60,15 +60,12 @@ pub fn resolve_game_dir(
 /// else an MO2 instance's own `downloads/`.
 pub fn resolve_downloads_dir(
     explicit: Option<PathBuf>,
-    tools_config: Option<&std::path::Path>,
     mo2_instance: Option<&std::path::Path>,
 ) -> anyhow::Result<PathBuf> {
     if let Some(dir) = explicit {
         return Ok(dir);
     }
-    let tools_path = tools_config
-        .map(std::path::Path::to_path_buf)
-        .or_else(crate::config::tools::ToolsConfig::default_path);
+    let tools_path = crate::config::tools::ToolsConfig::default_path();
     if let Some(path) = tools_path
         && let Some(dir) = crate::config::tools::ToolsConfig::load(&path)?.downloads_dir
     {

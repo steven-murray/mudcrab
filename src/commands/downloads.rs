@@ -20,7 +20,7 @@ fn locate(args: DownloadsLocateArgs) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.plan.display()))?;
     let plan: crate::config::schema::PersonalizedPlan = serde_json::from_str(&raw)
         .map_err(|err| anyhow::anyhow!("failed to parse plan {}: {err}", args.plan.display()))?;
-    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let search = &args.archive_sources.archive_search_paths;
     let (mut found, mut missing) = (0usize, 0usize);
     for entry in &plan.mods {
@@ -63,7 +63,7 @@ fn locate(args: DownloadsLocateArgs) -> anyhow::Result<()> {
 fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
     use crate::config::archive_store::{ArchiveRef, find};
 
-    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None, None)?;
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let search = &args.archive_sources.archive_search_paths;
     let original = std::fs::read_to_string(&args.modlist)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.modlist.display()))?;
