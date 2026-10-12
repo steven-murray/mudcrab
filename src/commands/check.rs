@@ -15,7 +15,6 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
     let settings = config::check::CheckSettings {
         cache_dir,
         filter: args.filter.to_mod_filter(),
-        archive_search_paths: args.archive_sources.archive_search_paths.clone(),
     };
 
     let report = config::check::check_all(&plan, &settings)?;
@@ -25,10 +24,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         downloads = %settings.cache_dir.display(),
         mods_checked = report.mods_checked,
         archives_checked = report.archives_checked,
-        references_checked = report.file_references_checked,
-        cached = report.archives_cached,
-        resolvable_locally = report.archives_local,
-        must_be_downloaded = report.archives_must_download,
+        plugins_checked = report.plugins_checked,
         "check completed"
     );
 

@@ -20,7 +20,10 @@ fn write_mod_archive(path: &Path, plugin_name: &str) {
 
     zip.start_file(format!("Data/{plugin_name}"), options)
         .expect("plugin entry");
-    zip.write_all(b"TES4").expect("plugin bytes");
+    // A TES4 header record with an empty body: the smallest real plugin.
+    let mut header = b"TES4".to_vec();
+    header.extend_from_slice(&[0u8; 16]);
+    zip.write_all(&header).expect("plugin bytes");
 
     zip.start_file("Data/marker.txt", options)
         .expect("marker entry");

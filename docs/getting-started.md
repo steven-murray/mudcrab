@@ -156,19 +156,24 @@ When `download` reports nothing missing, check what you have:
 mudcrab check plan.json
 ```
 
-`check` looks for every archive the plan needs -- in the downloads folder and
-any `--archive-search-path` folder, by name or, for a hand download that
-records them, by size and MD5 -- and opens each one to read its list of
-files, which catches a download that stopped partway or a file that is not
-the archive it is named as. Where the list says certain files must be in an
-archive (files for the game's own folder, next to `Oblivion.exe`), it checks
-they are. It reports every problem together, with what the list says about
-getting any archive that is missing, and changes nothing.
+`check` works on the downloads folder, where `download` has put everything.
+For every archive the plan needs, it:
 
-It does not unpack anything, so some problems only show at `install`: an
-installer option or BAIN subpackage the archive does not have, or a file the
-list's edits expect that is not there. Neither command checks that each
-plugin's masters are present; MO2 flags a missing master in its plugin list.
+- finds it (by name or, for a hand download that records them, by size and
+  MD5), and opens it to read its list of files -- which catches a download
+  that stopped partway, or a file that is not the archive it is named as;
+- works out what `install` would take from it, as `install` does: the
+  installer options and BAIN subpackages the list chose must exist, and
+  files the list says belong next to `Oblivion.exe` must be there;
+- reads the header of each plugin it would install, and checks every
+  master that plugin needs is in the load order, active, and loaded before
+  it. (Plugins made during the install -- merges, dummy plugins -- are not
+  read; the summary says how many.)
+
+It reports every problem together, with what the list says about getting any
+archive that is missing, and changes nothing. Only plugin headers are
+unpacked, so on a large list it takes a minute or two. What it cannot see is
+anything an action does to the files during the install.
 
 ## 4. Install
 

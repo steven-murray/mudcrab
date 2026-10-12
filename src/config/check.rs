@@ -1,59 +1,69 @@
-use crate::archive;
-use crate::config::archive_store::{self, ArchiveRef, Found};
+//! `check`: everything about a plan that can be known before installing it,
+//! with every archive in the downloads folder.
+//!
+//! `download` leaves every archive in the downloads folder -- found in a search
+//! path, it is linked in -- so that is the one place looked in. Each archive is
+//! opened and its file list read, which catches a download cut short. Then the
+//! layout `install` would use is planned from that list, which catches an
+//! installer option or subpackage the archive does not have, and the plugins
+//! it would install are read for their masters, which are checked against the
+//! load order. Nothing is unpacked but plugin headers, and nothing is changed.
+
+use crate::archive::{self, ArchiveFilters};
+use crate::config::archive_store::{self, ArchiveRef};
 use crate::config::filter::ModFilter;
-use crate::config::schema::{CompiledArchive, PersonalizedPlan};
+use crate::config::install::layout::{self, EntryReader};
+use crate::config::schema::{CompiledArchive, ModType, PersonalizedMod, PersonalizedPlan};
 use globset::{GlobBuilder, GlobMatcher};
-use std::path::PathBuf;
+use std::collections::{BTreeSet, HashMap, HashSet};
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Default)]
 pub struct CheckSettings {
     pub cache_dir: PathBuf,
     /// Which mods to check. Empty means the whole plan.
     pub filter: ModFilter,
-    /// Read-only directories holding archives already on this machine. An
-    /// archive found here needs no download, so `check` must count it as
-    /// satisfied or it would send the author hunting for links they already have.
-    pub archive_search_paths: Vec<PathBuf>,
-}
-
-/// Where an archive can be had from, best case first.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ArchiveAvailability {
-    /// Already in the downloads folder.
-    Cached,
-    /// Not in the downloads folder, but sitting in one of the search paths.
-    Local,
-    /// Neither -- the network is the only way to get it.
-    MustDownload,
-}
-
-impl ArchiveAvailability {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Cached => "cached",
-            Self::Local => "resolvable locally",
-            Self::MustDownload => "MUST BE DOWNLOADED",
-        }
-    }
 }
 
 pub struct CheckReport {
     pub mods_checked: usize,
     pub archives_checked: usize,
-    pub file_references_checked: usize,
-    pub archives_cached: usize,
-    pub archives_local: usize,
-    pub archives_must_download: usize,
+    pub plugins_checked: usize,
+}
+
+/// The plugins shipped by the game itself. A master among these is present
+/// unless the list's load order says otherwise.
+const GAME_PLUGINS: &[&str] = &[
+    "oblivion.esm",
+    "dlcshiveringisles.esp",
+    "knights.esp",
+    "dlcbattlehorncastle.esp",
+    "dlcfrostcrag.esp",
+    "dlchorsearmor.esp",
+    "dlcmehrunesrazor.esp",
+    "dlcorrery.esp",
+    "dlcspelltomes.esp",
+    "dlcthievesden.esp",
+    "dlcvilelair.esp",
+];
+
+/// A plugin a mod's archives would install, and its masters.
+struct Shipped {
+    mod_id: String,
+    masters: Vec<String>,
 }
 
 pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::Result<CheckReport> {
     let mut mods_checked = 0usize;
     let mut archives_checked = 0usize;
-    let mut file_references_checked = 0usize;
-    let mut archives_cached = 0usize;
-    let mut archives_local = 0usize;
-    let mut archives_must_download = 0usize;
     let mut errors = Vec::new();
+    // Lowercased plugin name -> what ships it.
+    let mut shipped: HashMap<String, Shipped> = HashMap::new();
+    let active_plugins: HashSet<String> = plan
+        .plugins
+        .iter()
+        .map(|plugin| plugin.to_ascii_lowercase())
+        .collect();
 
     let in_scope = || {
         plan.mods
@@ -71,33 +81,22 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
         for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
             archives_checked += 1;
             bar.inc(1);
-
-            let availability =
-                archive_availability(mod_entry.id.as_str(), archive_index, archive, settings);
-            match availability {
-                ArchiveAvailability::Cached => archives_cached += 1,
-                ArchiveAvailability::Local => archives_local += 1,
-                ArchiveAvailability::MustDownload => archives_must_download += 1,
-            }
-
-            tracing::info!(
-                mod_id = %mod_entry.id,
-                archive_index,
-                source = %archive.path.as_deref().unwrap_or("<build>"),
-                file_name = %archive.file_name.as_deref().unwrap_or("<unset>"),
-                availability = availability.label(),
-                "check: archive availability"
-            );
-
             let result = if archive.build.is_empty() {
-                check_single_archive(archive, settings)
+                check_single_archive(mod_entry, archive, settings, &active_plugins)
             } else {
-                check_build_archive(archive, settings)
+                check_build_archive(archive, settings).map(|()| Vec::new())
             };
-
             match result {
-                Ok(reference_count) => {
-                    file_references_checked += reference_count;
+                Ok(plugins) => {
+                    for (name, masters) in plugins {
+                        shipped.insert(
+                            name.to_ascii_lowercase(),
+                            Shipped {
+                                mod_id: mod_entry.id.clone(),
+                                masters,
+                            },
+                        );
+                    }
                 }
                 Err(err) => {
                     // Counted from 1, as a person counts a mod's archives.
@@ -115,13 +114,34 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
             }
         }
     }
-
     bar.finish_and_clear();
+
+    let (master_errors, plugins_checked) = master_problems(plan, &shipped);
+    errors.extend(master_errors);
+    let unread: Vec<&String> = plan
+        .plugins
+        .iter()
+        .filter(|plugin| {
+            let key = plugin.to_ascii_lowercase();
+            !shipped.contains_key(&key) && !GAME_PLUGINS.contains(&key.as_str())
+        })
+        .collect();
+    tracing::info!(plugins = ?unread, "check: masters not read");
+    let unread = unread.len();
+
     // Emitted before the bail: the run that fails is exactly the run whose
-    // summary the author needs, since it is the one that names a dead link.
+    // summary the author needs.
     crate::ui::say(format!(
-        "Checked {archives_checked} archive(s) in {mods_checked} mod(s): {archives_cached} in the \
-         downloads folder, {archives_local} in search paths, {archives_must_download} to download{}",
+        "Checked {archives_checked} archive(s) in {mods_checked} mod(s), and the masters of \
+         {plugins_checked} plugin(s){}{}",
+        if unread > 0 && settings.filter.is_empty() {
+            format!(
+                " ({unread} more are made at install -- merges, dummy plugins -- or come \
+                 from an archive inside an archive)"
+            )
+        } else {
+            String::new()
+        },
         if errors.is_empty() {
             String::new()
         } else {
@@ -131,9 +151,7 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
     tracing::info!(
         mods_checked,
         archives_checked,
-        cached = archives_cached,
-        resolvable_locally = archives_local,
-        must_be_downloaded = archives_must_download,
+        plugins_checked,
         "check summary"
     );
 
@@ -145,162 +163,227 @@ pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::R
     Ok(CheckReport {
         mods_checked,
         archives_checked,
-        file_references_checked,
-        archives_cached,
-        archives_local,
-        archives_must_download,
+        plugins_checked,
     })
 }
 
-/// Classify one archive without fetching or adopting anything.
-///
-/// `check` is a read-only report, so a locally resolvable archive is *not*
-/// linked into the cache here -- doing so would make a diagnostic command
-/// silently mutate the cache it is reporting on.
-fn archive_availability(
-    _mod_id: &str,
-    _archive_index: usize,
-    archive: &CompiledArchive,
-    settings: &CheckSettings,
-) -> ArchiveAvailability {
-    let locate = |source: &str, file_name: Option<&str>| {
-        archive_store::locate(
-            &settings.cache_dir,
-            &settings.archive_search_paths,
-            &ArchiveRef::new(source, file_name),
-        )
-    };
+/// Every active plugin whose masters are known: each master must load before
+/// it, and be active. Returns the problems and how many plugins were checked.
+fn master_problems(
+    plan: &PersonalizedPlan,
+    shipped: &HashMap<String, Shipped>,
+) -> (Vec<String>, usize) {
+    let inactive: HashSet<String> = plan
+        .inactive_plugins
+        .iter()
+        .map(|p| p.to_ascii_lowercase())
+        .collect();
+    let position: HashMap<String, usize> = plan
+        .plugins
+        .iter()
+        .enumerate()
+        .map(|(index, p)| (p.to_ascii_lowercase(), index))
+        .collect();
+    // A merge that hides its sources takes them out of the load order.
+    let merged_into: HashMap<String, &str> = plan
+        .merges()
+        .filter(|(_, spec)| spec.hide_sources)
+        .flat_map(|(_, spec)| {
+            spec.sources
+                .iter()
+                .map(|source| (source.plugin.to_ascii_lowercase(), spec.output.as_str()))
+        })
+        .collect();
 
-    if !archive.build.is_empty() {
-        let found: Vec<_> = archive
-            .build
-            .iter()
-            .map(|layer| locate(&layer.path, layer.file_name.as_deref()))
-            .collect();
-        return if found.iter().all(|f| matches!(f, Some(Found::Downloads(_)))) {
-            ArchiveAvailability::Cached
-        } else if found.iter().all(Option::is_some) {
-            ArchiveAvailability::Local
-        } else {
-            ArchiveAvailability::MustDownload
+    let mut errors = Vec::new();
+    let mut checked = 0usize;
+    for (index, plugin) in plan.plugins.iter().enumerate() {
+        let key = plugin.to_ascii_lowercase();
+        if inactive.contains(&key) {
+            continue;
+        }
+        let Some(shipped) = shipped.get(&key) else {
+            continue;
         };
+        checked += 1;
+        for master in &shipped.masters {
+            let wanted = master.to_ascii_lowercase();
+            let problem = match position.get(&wanted) {
+                Some(_) if inactive.contains(&wanted) => Some(format!(
+                    "needs {master}, which the list orders but leaves inactive"
+                )),
+                Some(&at) if at > index => Some(format!(
+                    "needs {master}, which loads after it (move {plugin} below {master} in \
+                     `plugins`)"
+                )),
+                Some(_) => None,
+                None => match merged_into.get(&wanted) {
+                    Some(output) => Some(format!(
+                        "needs {master}, which is merged into {output} and so not loaded; merge \
+                         {plugin} too, or leave {master} out of the merge"
+                    )),
+                    None if GAME_PLUGINS.contains(&wanted.as_str()) => None,
+                    None => Some(format!("needs {master}, which is not in the list")),
+                },
+            };
+            if let Some(problem) = problem {
+                errors.push(format!("{} ({plugin}): {problem}", shipped.mod_id));
+            }
+        }
     }
-
-    match archive_store::locate(
-        &settings.cache_dir,
-        &settings.archive_search_paths,
-        &ArchiveRef::for_archive(archive),
-    ) {
-        Some(Found::Downloads(_)) => ArchiveAvailability::Cached,
-        Some(Found::SearchPath(_)) => ArchiveAvailability::Local,
-        None => ArchiveAvailability::MustDownload,
-    }
+    (errors, checked)
 }
 
-/// Where an archive is, in the downloads folder or a search path. A search
-/// path copy is validated in place: `check` only ever reads.
-fn located(settings: &CheckSettings, archive: &ArchiveRef<'_>) -> Option<PathBuf> {
-    archive_store::locate(&settings.cache_dir, &settings.archive_search_paths, archive).map(
-        |found| match found {
-            Found::Downloads(path) | Found::SearchPath(path) => path,
-        },
-    )
-}
-
+/// The archive is in the downloads folder and opens; its game-root files are
+/// there; `install` could plan its layout. Returns the plugins it would
+/// install, with their masters.
 fn check_single_archive(
+    mod_entry: &PersonalizedMod,
     archive: &CompiledArchive,
     settings: &CheckSettings,
-) -> anyhow::Result<usize> {
-    let path = archive.path.as_deref().unwrap_or_default();
-    let reference = ArchiveRef::for_archive(archive);
-    let Some(source) = located(settings, &reference) else {
-        let how = if path.starts_with("manual:") {
-            "it is downloaded by hand (`manual:`), so put it there yourself"
-        } else {
-            "`mudcrab download` fetches it"
-        };
-        let mut searched = vec![settings.cache_dir.clone()];
-        searched.extend(settings.archive_search_paths.iter().cloned());
-        let similar = crate::config::download::similar_archives(reference.describe(), &searched);
-        let hint = if similar.is_empty() {
-            String::new()
-        } else {
-            format!(
-                "; similarly named, if one is this file renamed: {}",
-                similar
-                    .iter()
-                    .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                    .collect::<Vec<_>>()
-                    .join(", ")
-            )
-        };
-        let by_hand = crate::config::download::how_to_get(
-            archive.download_page.as_deref(),
-            archive.download_note.as_deref(),
-        )
-        .map(|how| format!("\n{how}"))
-        .unwrap_or_default();
-        anyhow::bail!(
-            "{} is not in the downloads folder ({}) or any search path; {how}{hint}{by_hand}",
-            reference.describe(),
-            settings.cache_dir.display(),
-        );
-    };
-    if source.is_dir() {
-        anyhow::bail!("archive path is a directory: {}", source.display());
-    }
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<Vec<(String, Vec<String>)>> {
+    let source = present(archive, &ArchiveRef::for_archive(archive), settings)?;
 
-    // Listing the archive is what actually proves it is readable and not a
-    // truncated or misnamed download. This previously claimed to "verify the
-    // archive is openable" in a comment and then returned without opening it,
-    // so `check` only stat'd files unless game_root_files was set.
-    let file_paths = archive::list_archive_paths(&source)
+    // Listing the archive is what proves it is readable and not a truncated
+    // or misnamed download.
+    let paths = archive::list_archive_paths(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
-
-    if archive.game_root_files.is_empty() {
-        return Ok(0);
+    if !archive.game_root_files.is_empty() {
+        validate_file_references(&paths, &archive.game_root_files)?;
     }
 
-    validate_file_references(&file_paths, &archive.game_root_files)
+    // Installed some other way than by laying out an archive: an MO2 plugin
+    // goes into the instance, and a container's content is a second archive
+    // only unpacking reaches.
+    if matches!(
+        mod_entry.mod_type,
+        Some(ModType::Mo2Plugin | ModType::BuildFromFiles)
+    ) || archive.inner_archive.is_some()
+    {
+        return Ok(Vec::new());
+    }
+
+    let effective_exclude: Vec<String> = archive
+        .exclude
+        .iter()
+        .chain(archive.game_root_files.iter())
+        .cloned()
+        .collect();
+    let filters = ArchiveFilters::new(&archive.include, &effective_exclude)?;
+    let scratch = crate::util::fs::cache_scratch_dir("check");
+    let label = source.display().to_string();
+    let reader = EntryReader::new(&source, scratch.join("entry"));
+    let planned = layout::plan_archive(
+        &label,
+        &paths,
+        &reader,
+        &mod_entry.id,
+        archive,
+        &filters,
+        active_plugins,
+    );
+    let result = (|| {
+        let planned = planned.map_err(|err| anyhow::anyhow!("install would fail: {err:#}"))?;
+        // Plugins land at the top of the mod folder; a `target_subdir` puts
+        // everything below it, so nothing there is a plugin the game loads.
+        if archive
+            .target_subdir
+            .as_deref()
+            .is_some_and(|dir| !dir.trim().is_empty())
+        {
+            return Ok(Vec::new());
+        }
+        let plugins: Vec<(String, String)> = planned
+            .files
+            .iter()
+            .filter(|file| !file.destination.contains('/'))
+            .filter(|file| layout::plan::is_plugin_name(&file.destination))
+            .map(|file| (file.source.clone(), file.destination.clone()))
+            .collect();
+        if plugins.is_empty() {
+            return Ok(Vec::new());
+        }
+        let out = scratch.join("plugins");
+        std::fs::create_dir_all(&out)
+            .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", out.display()))?;
+        let wanted: BTreeSet<String> = plugins.iter().map(|(from, _)| from.clone()).collect();
+        archive::extract_entries(&source, &out, &wanted)?;
+        plugins
+            .into_iter()
+            .map(|(from, name)| {
+                let bytes = std::fs::read(out.join(&from))
+                    .map_err(|err| anyhow::anyhow!("failed to read {from}: {err}"))?;
+                let masters = crate::plugin::Plugin::masters_of(&bytes)
+                    .map_err(|err| anyhow::anyhow!("{name} is not a readable plugin: {err}"))?;
+                Ok((name, masters))
+            })
+            .collect()
+    })();
+    let _ = std::fs::remove_dir_all(&scratch);
+    result
 }
 
-fn check_build_archive(
+/// Where an archive is in the downloads folder, or why it is not there.
+fn present(
     archive: &CompiledArchive,
+    reference: &ArchiveRef<'_>,
     settings: &CheckSettings,
-) -> anyhow::Result<usize> {
+) -> anyhow::Result<PathBuf> {
+    if let Some(found) = archive_store::find(&settings.cache_dir, &[], reference) {
+        if found.is_dir() {
+            anyhow::bail!("archive path is a directory: {}", found.display());
+        }
+        return Ok(found);
+    }
+    let path = archive.path.as_deref().unwrap_or_default();
+    let how = if path.starts_with("manual:") {
+        "it is downloaded by hand (`manual:`): put it there, or run `mudcrab download`, which \
+         opens its page"
+    } else {
+        "run `mudcrab download`"
+    };
+    let similar = crate::config::download::similar_archives(
+        reference.describe(),
+        std::slice::from_ref(&settings.cache_dir),
+    );
+    let hint = if similar.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "; similarly named, if one is this file renamed: {}",
+            similar
+                .iter()
+                .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .collect::<Vec<_>>()
+                .join(", ")
+        )
+    };
+    let by_hand = crate::config::download::how_to_get(
+        archive.download_page.as_deref(),
+        archive.download_note.as_deref(),
+    )
+    .map(|how| format!("\n{how}"))
+    .unwrap_or_default();
+    anyhow::bail!(
+        "{} is not in the downloads folder ({}); {how}{hint}{by_hand}",
+        reference.describe(),
+        settings.cache_dir.display(),
+    );
+}
+
+fn check_build_archive(archive: &CompiledArchive, settings: &CheckSettings) -> anyhow::Result<()> {
     // Collect all paths from every layer, prefixing with dest_prefix where set.
     let mut merged_paths: Vec<String> = Vec::new();
 
     for (layer_index, layer) in archive.build.iter().enumerate() {
-        let Some(source) = located(
-            settings,
-            &ArchiveRef::new(&layer.path, layer.file_name.as_deref()),
-        ) else {
-            anyhow::bail!(
-                "build layer {} ({}) is not in \
-                 {} or any search path",
-                layer_index + 1,
-                layer.path,
-                settings.cache_dir.display()
-            );
-        };
-        if source.is_dir() {
-            anyhow::bail!(
-                "cached archive path is a directory for build layer {}: {}",
-                layer_index,
-                source.display()
-            );
-        }
-
-        if archive.game_root_files.is_empty() {
-            // Only existence was needed; no need to list.
-            continue;
-        }
-
+        let reference = ArchiveRef::new(&layer.path, layer.file_name.as_deref());
+        let source = present(archive, &reference, settings)
+            .map_err(|err| anyhow::anyhow!("build layer {}: {err}", layer_index + 1))?;
         let layer_paths = archive::list_archive_paths(&source).map_err(|err| {
             anyhow::anyhow!(
-                "unable to list build layer {} archive {}: {err}",
-                layer_index,
+                "build layer {} is not readable ({}): {err}",
+                layer_index + 1,
                 source.display()
             )
         })?;
@@ -315,29 +398,23 @@ fn check_build_archive(
         }
     }
 
-    if archive.game_root_files.is_empty() {
-        return Ok(0);
+    if !archive.game_root_files.is_empty() {
+        validate_file_references(&merged_paths, &archive.game_root_files)?;
     }
-
-    validate_file_references(&merged_paths, &archive.game_root_files)
+    Ok(())
 }
 
-fn validate_file_references(paths: &[String], refs: &[String]) -> anyhow::Result<usize> {
-    let mut checked = 0usize;
-
+fn validate_file_references(paths: &[String], refs: &[String]) -> anyhow::Result<()> {
     for reference in refs {
         let matcher = compile_case_insensitive_glob(reference)?;
-        let matched = paths.iter().any(|p| matcher.is_match(p));
-        checked += 1;
-        if !matched {
+        if !paths.iter().any(|p| matcher.is_match(p)) {
             anyhow::bail!(
                 "file reference matched no files in archive contents: {}",
                 reference
             );
         }
     }
-
-    Ok(checked)
+    Ok(())
 }
 
 fn compile_case_insensitive_glob(pattern: &str) -> anyhow::Result<GlobMatcher> {
@@ -349,9 +426,93 @@ fn compile_case_insensitive_glob(pattern: &str) -> anyhow::Result<GlobMatcher> {
 }
 
 fn normalize_prefix(value: &str) -> anyhow::Result<String> {
-    let normalized = archive::normalize_archive_path(std::path::Path::new(value))?;
+    let normalized = archive::normalize_archive_path(Path::new(value))?;
     if normalized.is_empty() {
         anyhow::bail!("destination prefix cannot be empty");
     }
     Ok(normalized)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plan(plugins: &[&str], inactive: &[&str], mods: serde_json::Value) -> PersonalizedPlan {
+        serde_json::from_value(serde_json::json!({
+            "schema_version": 1,
+            "name": "t",
+            "responses": {},
+            "mod_order": [],
+            "selected_mods": [],
+            "mods": mods,
+            "plugins": plugins,
+            "inactive_plugins": inactive,
+        }))
+        .unwrap()
+    }
+
+    fn ships(entries: &[(&str, &[&str])]) -> HashMap<String, Shipped> {
+        entries
+            .iter()
+            .map(|(name, masters)| {
+                (
+                    name.to_ascii_lowercase(),
+                    Shipped {
+                        mod_id: format!("mod of {name}"),
+                        masters: masters.iter().map(|m| m.to_string()).collect(),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_master_must_be_in_the_list_and_active() {
+        let plan = plan(
+            &["A.esm", "B.esp", "Late.esp", "Off.esp", "C.esp"],
+            &["Off.esp"],
+            serde_json::json!([]),
+        );
+        let shipped = ships(&[
+            ("A.esm", &["Oblivion.esm"]),
+            ("B.esp", &["Oblivion.esm", "a.esm"]),
+            (
+                "C.esp",
+                &["Late.esp", "Off.esp", "Missing.esp", "Knights.esp"],
+            ),
+            ("Late.esp", &[]),
+            ("Off.esp", &[]),
+        ]);
+        let (errors, checked) = master_problems(&plan, &shipped);
+        assert_eq!(checked, 4, "the inactive plugin's masters do not matter");
+        assert_eq!(errors.len(), 2, "{errors:#?}");
+        assert!(errors[0].contains("Off.esp") && errors[0].contains("inactive"));
+        assert!(errors[1].contains("Missing.esp") && errors[1].contains("not in the list"));
+    }
+
+    #[test]
+    fn a_master_must_load_first() {
+        let plan = plan(&["C.esp", "Late.esp"], &[], serde_json::json!([]));
+        let (errors, _) = master_problems(&plan, &ships(&[("C.esp", &["Late.esp"])]));
+        assert!(errors[0].contains("loads after it"), "{errors:#?}");
+    }
+
+    #[test]
+    fn a_master_merged_away_is_named_with_its_merge() {
+        let plan = plan(
+            &["Merged.esp", "Patch.esp"],
+            &[],
+            serde_json::json!([{
+                "id": "Merge",
+                "mod_type": "merge",
+                "archives": [],
+                "merge": {
+                    "output": "Merged.esp",
+                    "sources": [{"mod": "Src", "plugin": "Src.esp"}]
+                }
+            }]),
+        );
+        let (errors, _) = master_problems(&plan, &ships(&[("Patch.esp", &["Src.esp"])]));
+        assert!(errors[0].contains("merged into Merged.esp"), "{errors:#?}");
+    }
 }

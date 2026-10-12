@@ -74,6 +74,11 @@ impl Plugin {
         reader::parse(data)
     }
 
+    /// The masters of the plugin in `data`, reading only its header.
+    pub fn masters_of(data: &[u8]) -> Result<Vec<String>, PluginError> {
+        reader::masters(data)
+    }
+
     pub fn read(path: &Path) -> Result<Self, PluginError> {
         let data = std::fs::read(path).map_err(|source| PluginError::Io {
             path: path.display().to_string(),

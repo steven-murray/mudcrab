@@ -126,14 +126,30 @@ them.)
 
 ## Checking
 
-### `A is not in the downloads folder (...) or any search path`
+### `A is not in the downloads folder (...)`
 
-From `check`: the archive has not been downloaded yet. The message says
+From `check`: the archive has not been downloaded yet (or is only in a
+search path: `download` links those in). The message says
 whether `mudcrab download` can fetch it or it is a hand download, and names
 similarly named files on disk if there are any -- the commonest cause is a mod
 updated since the list was written, so the file you have is a different
 version. Either get the version the list names, or (if you are the list's
 author) update the entry.
+
+### `X (P.esp): needs M.esp, which ...`
+
+From `check`: plugin `P.esp` names `M.esp` as a master, and the load order
+does not satisfy it. *Is not in the list*: add the mod that ships it, or
+drop `P.esp`. *Loads after it*: move `P.esp` below `M.esp` in `plugins`.
+*Leaves inactive*: take `M.esp` out of `inactive-plugins`. *Is merged into*:
+the merge hides `M.esp`, so `P.esp` must join the merge too. The game would
+otherwise crash at the main menu, or the plugin would silently not load.
+
+### `install would fail: ...`
+
+From `check`: working out what `install` takes from an archive failed, as it
+would at install -- usually an installer option or subpackage the archive
+does not have (see the entries above).
 
 ### `archive is not readable (...)`
 

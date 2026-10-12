@@ -540,8 +540,6 @@ pub struct CheckArgs {
     pub downloads: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
-    #[command(flatten)]
-    pub archive_sources: ArchiveSourceArgs,
 }
 
 /// Read an archive and print what its `[[mods.archives]]` block needs to say.

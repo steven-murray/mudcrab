@@ -274,7 +274,7 @@ name with a `.meta` written as MO2 would.
 
 ## Using archives you already have
 
-`--archive-search-path` points `download`, `check` and `install` at other
+`--archive-search-path` points `download` and `install` at other
 folders that may hold archives -- another instance's downloads, a Wabbajack
 folder. Each archive is resolved in this order:
 
@@ -680,36 +680,35 @@ mudcrab unhide-merges --mo2-instance-dir ~/Games/MO2 --profile-name Default
 
 ## check
 
-Confirm every archive the plan needs is present and readable, without
-installing or changing anything.
+Everything about the plan that can be known before installing, with every
+archive in the downloads folder. Changes nothing.
 
 ```bash
 mudcrab check <plan.json> [--downloads <dir>] [--section <name>]... [--only <mod id>]...
-              [--archive-search-path <dir>]...
 ```
 
-Example:
+It looks only in the downloads folder: `download` puts every archive there,
+linking in those it finds in a search path, so that is where they are. Run
+`download` first; an archive still missing is reported with the list's
+`download_page` and `download_note`.
 
-```bash
-mudcrab check build/plan.json --downloads ~/Games/OblivionModDownloads \
-  --archive-search-path ~/Games/Wabbajack/Oblivion/MudCrab/downloads
-```
+For each archive:
 
-Each archive is looked for in the downloads folder and the search paths (by
-name, or by size and MD5 where the list records them) and opened to read its
-file list, which fails for a truncated or mislabelled download. Where an
-archive has `game_root_files`, each pattern must match a file in it. Build
-layers are checked for presence. A missing archive is reported with the
-list's `download_page` and `download_note`, and every problem is reported
-together. Nothing is unpacked: installer options, BAIN subpackages and the
-files an action names are only checked by `install`.
+- **present and readable**: found by name (or by `size` and `md5`), and opened
+  to read its file list, which fails for a truncated or mislabelled download;
+- **installable**: the layout `install` would use is worked out from that
+  list, exactly as `install` does it, so a FOMOD option or BAIN subpackage the
+  archive lacks, or an archive whose layout cannot be told, fails here;
+  `game_root_files` patterns must each match a file;
+- **masters**: each plugin it would install is unpacked (only those) and its
+  header read. Every master must be in the load order, active, and earlier.
+  The game's own plugins count as present unless the list orders them. A
+  master merged away by a `hide_sources` merge is named with the merge.
 
-Every archive is reported as one of `cached`, `resolvable locally` (present in a
-search path) or `MUST BE DOWNLOADED`, followed by a summary count. The summary is
-printed even when the check fails, since a failing run is the one whose report
-matters -- it is how a dead link is found before a later section depends on it.
-`check` only reports: it never links a search-path archive into the downloads
-folder.
+Plugins made during the install (merge outputs, `create_dummy_plugin`) and
+those inside an `inner_archive` are not read; the summary counts them.
+Build layers are checked for presence and readability. Every problem is
+reported together, and the summary is printed even when the check fails.
 
 ## conflicts
 

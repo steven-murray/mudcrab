@@ -42,6 +42,27 @@ pub fn parse(data: &[u8]) -> Result<Plugin, PluginError> {
     })
 }
 
+/// A plugin's masters, in order, from its TES4 header alone: nothing past the
+/// header is read, so a 100 MB plugin costs no more than an empty one.
+pub fn masters(data: &[u8]) -> Result<Vec<String>, PluginError> {
+    if data.len() < RECORD_HEADER_LEN || &data[0..4] != b"TES4" {
+        return Err(PluginError::NotAPlugin);
+    }
+    let header = read_record(data, 0)?;
+    Ok(header
+        .record
+        .fields_with(b"MAST")
+        .map(|field| {
+            let end = field
+                .data
+                .iter()
+                .position(|b| *b == 0)
+                .unwrap_or(field.data.len());
+            String::from_utf8_lossy(&field.data[..end]).into_owned()
+        })
+        .collect())
+}
+
 struct ReadRecord {
     record: Record,
     next_offset: usize,
