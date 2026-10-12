@@ -197,6 +197,7 @@ fn check_in(
         filter: ModFilter::default(),
         force_merges: false,
         force: false,
+        redo_actions: Vec::new(),
     };
 
     let in_scope = || {

@@ -43,6 +43,15 @@ profile and makes its edits there; the original is never changed.
 your `PATH`. Install either (on Linux, `p7zip` or `libarchive`; on Windows,
 7-Zip, and add its folder to `PATH`).
 
+### `qac: xEdit stopped cleaning X.esp: Fatal: ...` or `qac: xEdit closed before it finished cleaning X.esp`
+
+xEdit could not clean the plugin, and the install stops rather than carry on
+with it uncleaned. The message gives xEdit's last log lines. mudcrab hands
+xEdit the game's `Oblivion.ini` (the MO2 profile's copy, else the game's), so
+"Could not find ini" should not happen; anything else is usually a missing
+master or a broken xEdit setup in `tools.toml`. Closing xEdit's window by hand
+also stops the install. Once fixed, `install --redo-action qac` cleans again.
+
 ### `... qac action requires [tes4edit] configuration in tools.toml`
 
 The list cleans plugins with xEdit, and `tools.toml` does not say where xEdit
@@ -192,7 +201,9 @@ install, or switch to another profile and back.
 
 A mod is reinstalled when its entry changes. If what changed is mudcrab itself
 (a newer version installs differently), `install --force` reinstalls
-everything in scope; combine it with `--only <mod id>` to redo one mod.
+everything in scope; combine it with `--only <mod id>` to redo one mod, or use
+`--redo-action <action>` to redo every mod with that action (`qac` after
+fixing xEdit's setup, say).
 
 ### `this plugin uses Oblivion Magic Extender (OBME): ...`
 

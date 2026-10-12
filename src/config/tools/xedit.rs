@@ -138,10 +138,26 @@ pub(crate) fn apply_qac_action(
             // -QAC        : Quick Auto Clean
             // -autoload   : automatically load the specified plugin
             // -D:<path>   : data directory (Windows-style path when via Wine)
-            #[cfg(not(target_os = "windows"))]
-            let data_arg = format!("-D:{}", ToolsConfig::unix_path_to_wine(&temp_data));
-            #[cfg(target_os = "windows")]
-            let data_arg = format!("-D:{}", temp_data.display());
+            let tool_path = |path: &Path| {
+                if cfg!(target_os = "windows") {
+                    path.display().to_string()
+                } else {
+                    ToolsConfig::unix_path_to_wine(path)
+                }
+            };
+            let data_arg = format!("-D:{}", tool_path(&temp_data));
+            // The game's INI, handed over rather than looked for: xEdit
+            // otherwise wants one in the prefix's Documents, and a prefix the
+            // game has never run in has none ("Fatal: Could not find ini").
+            let ini = temp_root.join("Oblivion.ini");
+            write_game_ini(settings, game_dir, &ini)?;
+            let ini_arg = format!("-I:{}", tool_path(&ini));
+            // A log of its own, so this run's lines are the only ones in it.
+            let own_log = temp_root.join("xedit-log.txt");
+            let log_arg = format!("-R:{}", tool_path(&own_log));
+            // What Wine and xEdit print to the console is noise on the
+            // terminal; it is kept, for when something goes wrong.
+            let console = temp_root.join("console.txt");
 
             let qac_exe = tes4edit_config.qac_executable();
 
@@ -171,6 +187,9 @@ pub(crate) fn apply_qac_action(
                 use std::os::unix::process::CommandExt;
                 command.process_group(0);
             }
+            let console_file = std::fs::File::create(&console).map_err(|err| {
+                anyhow::anyhow!("qac: failed to create {}: {err}", console.display())
+            })?;
             let mut child = command
                 .args([
                     "-TES4",
@@ -179,10 +198,17 @@ pub(crate) fn apply_qac_action(
                     "-autoexit",
                     "-save",
                     &data_arg,
+                    &ini_arg,
+                    &log_arg,
                     &plugin_name,
                 ])
+                .stdin(std::process::Stdio::null())
+                .stdout(console_file.try_clone()?)
+                .stderr(console_file)
                 .spawn()
                 .map_err(|err| anyhow::anyhow!("qac: failed to launch xEdit: {err}"))?;
+            // Its own log if it honours `-R:`, else the shared one beside it.
+            let finished_in = |log: &Path, from: u64| log_says_finished(Some(log), from);
 
             // Wait for xEdit to say it is finished, then close it. Polling the
             // log from the offset it had at launch, so a previous run's
@@ -190,18 +216,35 @@ pub(crate) fn apply_qac_action(
             let start = std::time::Instant::now();
             let mut finished = false;
             loop {
-                if let Some(status) = child
+                let done =
+                    finished_in(&own_log, 0) || log_says_finished(log_path.as_deref(), log_offset);
+                if let Some(fatal) = fatal_line(&own_log, 0)
+                    .or_else(|| log_path.as_deref().and_then(|p| fatal_line(p, log_offset)))
+                {
+                    close_process_tree(&mut child);
+                    anyhow::bail!("qac: xEdit stopped cleaning {plugin_name}: {fatal}");
+                }
+                if child
                     .try_wait()
                     .map_err(|err| anyhow::anyhow!("qac: failed to poll xEdit: {err}"))?
+                    .is_some()
                 {
-                    // Closed on its own, or someone closed it. Either way the
-                    // work is over; the save file below is the evidence.
-                    let _ = status;
+                    // Closed -- on its own, or by someone -- without saying it
+                    // had finished: nothing says the plugin was cleaned.
+                    if !done {
+                        anyhow::bail!(
+                            "qac: xEdit closed before it finished cleaning {plugin_name}{}",
+                            tail(&own_log)
+                                .or_else(|| tail(&console))
+                                .map(|t| format!(". Its last words:\n{t}"))
+                                .unwrap_or_default()
+                        );
+                    }
                     finished = true;
                     break;
                 }
 
-                if log_says_finished(log_path.as_deref(), log_offset) {
+                if done {
                     tracing::debug!(
                         owner = owner_label,
                         plugin = plugin_name,
@@ -264,6 +307,56 @@ pub(crate) fn apply_qac_action(
     }
 
     Ok(())
+}
+
+/// The game INI xEdit reads, written to `to`: the MO2 profile's own copy (the
+/// one the game uses under MO2), else the game's, else a minimal one naming
+/// the game's archives -- all xEdit wants from it.
+fn write_game_ini(settings: &InstallSettings, game_dir: &Path, to: &Path) -> anyhow::Result<()> {
+    let source = crate::config::mo2::mo2_profile_dir(settings)
+        .map(|dir| dir.join("Oblivion.ini"))
+        .filter(|path| path.is_file())
+        .or_else(|| crate::config::mo2::locate_game_ini_source(game_dir, "Oblivion.ini"));
+    match source {
+        Some(source) => std::fs::copy(&source, to).map(|_| ()),
+        None => std::fs::write(
+            to,
+            "[Archive]\r\nSArchiveList=Oblivion - Meshes.bsa, Oblivion - Textures - Compressed.bsa, \
+             Oblivion - Sounds.bsa, Oblivion - Voices1.bsa, Oblivion - Voices2.bsa, Oblivion - \
+             Misc.bsa\r\n",
+        ),
+    }
+    .map_err(|err| anyhow::anyhow!("qac: failed to write {}: {err}", to.display()))
+}
+
+/// The first `Fatal:` line xEdit has logged since `from`.
+fn fatal_line(log: &Path, from: u64) -> Option<String> {
+    let text = read_from(log, from)?;
+    text.lines()
+        .find(|line| line.contains("Fatal:"))
+        .map(|line| line.trim().to_string())
+}
+
+/// The last few lines of a log, for an error message.
+fn tail(log: &Path) -> Option<String> {
+    let text = read_from(log, 0)?;
+    let lines: Vec<&str> = text.lines().filter(|l| !l.trim().is_empty()).collect();
+    (!lines.is_empty()).then(|| {
+        lines[lines.len().saturating_sub(8)..]
+            .iter()
+            .map(|line| format!("  {}", line.trim_end()))
+            .collect::<Vec<_>>()
+            .join("\n")
+    })
+}
+
+fn read_from(path: &Path, from: u64) -> Option<String> {
+    use std::io::{Read, Seek, SeekFrom};
+    let mut file = std::fs::File::open(path).ok()?;
+    file.seek(SeekFrom::Start(from)).ok()?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes).ok()?;
+    Some(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 /// Which staged files a `qac` action's patterns name.
@@ -538,6 +631,24 @@ fn locate_plugin(name: &str, game_data: &Path, mods_dir: &Path) -> Option<PathBu
 mod tests {
     use super::*;
     use std::io::Write;
+
+    #[test]
+    fn a_fatal_line_and_the_last_words_are_read_from_the_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let log = dir.path().join("log.txt");
+        std::fs::write(
+            &log,
+            "Using Oblivion Data Path: Z:\\tmp\\Data\\\nUsing ini: C:\\Oblivion.ini\nFatal: Could not find ini\n",
+        )
+        .unwrap();
+        assert_eq!(
+            fatal_line(&log, 0).as_deref(),
+            Some("Fatal: Could not find ini")
+        );
+        assert!(fatal_line(&log, std::fs::metadata(&log).unwrap().len()).is_none());
+        assert!(tail(&log).unwrap().ends_with("Fatal: Could not find ini"));
+        assert!(tail(&dir.path().join("none")).is_none());
+    }
 
     /// The pattern that made this necessary. Oblivion filenames contain
     /// brackets, and a glob reads `[Flora]` as a character class, so the name

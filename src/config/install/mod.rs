@@ -1,6 +1,6 @@
 use crate::config::filter::ModFilter;
 use crate::config::mo2::{export_mo2_instance, prepare_mo2_profile};
-use crate::config::schema::{PersonalizedPlan, PostInstallAction};
+use crate::config::schema::{ModAction, PersonalizedMod, PersonalizedPlan, PostInstallAction};
 use crate::config::tools::ToolsConfig;
 use crate::config::tools::loot::run_loot_sort;
 use std::collections::{HashMap, HashSet};
@@ -22,6 +22,9 @@ pub struct InstallSettings {
     pub force_merges: bool,
     /// Reinstall every mod in scope even when its recorded definition matches.
     pub force: bool,
+    /// Reinstall the mods in scope that have an action of one of these names
+    /// (`qac`, say), even when their recorded definition matches.
+    pub redo_actions: Vec<String>,
 }
 
 pub mod index;
@@ -59,6 +62,50 @@ pub(crate) fn safe_mod_dir_name(mod_id: &str) -> anyhow::Result<&str> {
         anyhow::bail!("mod id '{mod_id}' must not be an absolute path");
     }
     Ok(mod_id)
+}
+
+/// The order to install mods in: the plan's, except that a mod whose
+/// `file_prune` or `file_hide` yields to another (`conflicts_with`) comes after
+/// that one. Its selection reads the other mod's installed folder, and on a
+/// fresh install a mod later in the list is not there yet -- nor, when its own
+/// actions change its files, predictable from its archives. MO2's priority
+/// order is written from the plan, so this changes nothing but the sequence.
+/// Mods yielding to each other in a circle keep the plan's order.
+pub(crate) fn install_order(mods: &[PersonalizedMod]) -> Vec<&PersonalizedMod> {
+    let index: HashMap<&str, usize> = mods
+        .iter()
+        .enumerate()
+        .map(|(i, m)| (m.id.as_str(), i))
+        .collect();
+    let after: Vec<Vec<usize>> = mods
+        .iter()
+        .enumerate()
+        .map(|(i, m)| {
+            m.actions
+                .iter()
+                .flat_map(|action| match action {
+                    ModAction::FilePrune(spec) => spec.conflicts_with.as_slice(),
+                    ModAction::FileHide(spec) => spec.conflicts_with.as_slice(),
+                    _ => &[],
+                })
+                .filter_map(|id| index.get(id.as_str()).copied())
+                .filter(|&j| j != i)
+                .collect()
+        })
+        .collect();
+    let mut placed = vec![false; mods.len()];
+    let mut order = Vec::with_capacity(mods.len());
+    // Repeatedly take the first mod, in plan order, whose partners are all
+    // placed; when none can go, the first unplaced one goes anyway (a cycle).
+    while order.len() < mods.len() {
+        let next = (0..mods.len())
+            .find(|&i| !placed[i] && after[i].iter().all(|&j| placed[j]))
+            .or_else(|| (0..mods.len()).find(|&i| !placed[i]))
+            .expect("an unplaced mod remains");
+        placed[next] = true;
+        order.push(&mods[next]);
+    }
+    order
 }
 
 pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
@@ -164,7 +211,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         "installing",
     );
     let (mut changed, mut unchanged) = (0usize, 0usize);
-    for mod_entry in &plan.mods {
+    for mod_entry in install_order(&plan.mods) {
         // Whatever happens to this mod below, this run now owns its record:
         // the copy the previous manifest holds must not also be carried
         // forward, or a mod that is cleared and then fails to extract would
@@ -222,7 +269,13 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             &definition_hash,
             previous,
             settings.dry_run,
-            settings.force,
+            settings.force
+                || mod_entry.actions.iter().any(|action| {
+                    settings
+                        .redo_actions
+                        .iter()
+                        .any(|name| name == action.name())
+                }),
         ) {
             let previous_extracted = previous.map(|entry| entry.extracted_files).unwrap_or(0);
             let mut actions_applied = previous.map(|entry| entry.actions_applied).unwrap_or(false);
@@ -643,6 +696,28 @@ fn run_post_install_actions(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_mod_yielding_to_a_later_one_is_installed_after_it() {
+        use super::{PersonalizedMod, install_order};
+        let plan: Vec<PersonalizedMod> = serde_json::from_value(serde_json::json!([
+            {"id": "A", "archives": []},
+            {"id": "Yields", "archives": [], "actions": [
+                {"action": "file_prune", "conflicts_with": ["Later"]}
+            ]},
+            {"id": "B", "archives": []},
+            {"id": "Later", "archives": []},
+            {"id": "C1", "archives": [], "actions": [
+                {"action": "file_hide", "conflicts_with": ["C2"]}
+            ]},
+            {"id": "C2", "archives": [], "actions": [
+                {"action": "file_hide", "conflicts_with": ["C1"]}
+            ]}
+        ]))
+        .unwrap();
+        let order: Vec<&str> = install_order(&plan).iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(order, ["A", "B", "Later", "Yields", "C1", "C2"]);
+    }
 
     #[test]
     fn rejects_mod_ids_that_would_escape_the_mods_directory() {

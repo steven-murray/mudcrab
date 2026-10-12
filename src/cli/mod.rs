@@ -646,6 +646,11 @@ pub struct InstallArgs {
     /// a new layout, a fixed action. Implies --force-merges.
     #[arg(long)]
     pub force: bool,
+    /// Reinstall the mods that have an action of this name -- `qac`, say --
+    /// even though their entries are unchanged. Repeatable; combines with
+    /// --section and --only.
+    #[arg(long = "redo-action", value_name = "ACTION")]
+    pub redo_actions: Vec<String>,
     /// Print planned operations without applying them.
     #[arg(long)]
     pub dry_run: bool,

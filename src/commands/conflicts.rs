@@ -38,6 +38,7 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         filter: Default::default(),
         force_merges: false,
         force: false,
+        redo_actions: Vec::new(),
     };
 
     let active_plugins: std::collections::HashSet<String> = plan

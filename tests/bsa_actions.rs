@@ -28,6 +28,7 @@ fn settings(root: &Path) -> InstallSettings {
         filter: Default::default(),
         force_merges: false,
         force: false,
+        redo_actions: Vec::new(),
     }
 }
 

@@ -62,6 +62,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         // the sources and leave merges built from the old ones.
         force_merges: args.force_merges || args.force,
         force: args.force,
+        redo_actions: args.redo_actions.clone(),
     };
 
     config::install::install_all(&plan, &settings)?;

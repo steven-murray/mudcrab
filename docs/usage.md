@@ -396,7 +396,7 @@ Install from a personalized plan and the downloads folder into an MO2 instance
 ```bash
 mudcrab install <plan.json> [--downloads <dir>] (--mo2-instance-dir <dir> | --mods-dir <mods_dir>)
                 [--profile-name <name>] [--game-dir <dir>] [--dry-run] [--skip-actions]
-                [--force-merges]
+                [--force-merges] [--force] [--redo-action <action>]...
                 [--section <name>]... [--only <mod id>]...
 ```
 
@@ -414,6 +414,15 @@ downloads folder. Game INI edits go into the profile's own copy of
 "profile-specific game INI files" for the profile so they take effect. The game
 folder is `--game-dir`, else `GAME_DIR`, else the one the MO2 instance was set
 up with.
+
+`--redo-action <action>` reinstalls just the mods that have that action
+(`--redo-action qac`, say), when something outside the list changed what it
+does -- a tool that was misconfigured, or mudcrab itself.
+
+Mods are installed in the plan's order, except that a mod whose `file_prune` or
+`file_hide` yields to another (`conflicts_with`) is installed after that one,
+since its selection reads the other mod's installed files. MO2's priority order
+is the plan's either way.
 
 Current behavior:
 
