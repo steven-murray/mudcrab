@@ -1,0 +1,135 @@
+:root {
+  --bg: #15171c;
+  --panel: #1b1e24;
+  --card: #20242c;
+  --card-hi: #262b35;
+  --line: #2d323c;
+  --text: #e6e8ec;
+  --dim: #8a919e;
+  --faint: #5c6370;
+  --accent: #e8743b;
+  --accent-soft: rgba(232, 116, 59, 0.14);
+  --good: #5fbf7a;
+  --warning: #e0b35a;
+  --problem: #e0605a;
+  --note: #6aa7d8;
+  --mono: ui-monospace, "Cascadia Mono", "DejaVu Sans Mono", Menlo, monospace;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --card: #ffffff;
+    --card-hi: #f0f2f5;
+    --line: #dde1e7;
+    --text: #1d2129;
+    --dim: #5b6372;
+    --faint: #98a0ad;
+    --accent: #c95a22;
+    --accent-soft: rgba(201, 90, 34, 0.1);
+    --good: #2f8f4e;
+    --warning: #a87a12;
+    --problem: #c23b35;
+    --note: #2e6fa8;
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Cantarell, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: var(--card-hi);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--dim);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+}
+
+input[type="text"],
+select {
+  font: inherit;
+  color: inherit;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 4px 8px;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+a {
+  color: var(--accent);
+}
+
+.dim {
+  color: var(--dim);
+}
+
+.prose :first-child {
+  margin-top: 0;
+}
+
+.prose :last-child {
+  margin-bottom: 0;
+}
+
+.prose p {
+  margin: 0.5em 0;
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+  margin: 0.4em 0;
+}
+
+.prose img {
+  max-width: 100%;
+  border-radius: 6px;
+}

@@ -1,8 +1,14 @@
 # A GUI, alongside the CLI
 
-**Status: phases 1-3 done.** The library API and CLI parity are in, and the
-framework spike ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes))
-chose **Tauri**. Next is phase 4, install mode.
+**Status: phases 1-3 done; phase 4, install mode, has its first cut.** The
+library API and CLI parity are in, the framework spike
+([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes)) chose
+**Tauri**, and `gui/` has install mode: open a list, read it, answer its
+questions, choose where things go, and install, step by step, with
+downloads by hand and the manual-step checklist (user docs:
+[docs/gui.md](../gui.md)). Still to do in phase 4: cancelling a run, the
+GUI's own release artifacts (phase 7), and opening a list from a URL (with
+composability).
 
 ## Why, and the rule it lives under
 

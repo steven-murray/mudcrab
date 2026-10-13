@@ -351,7 +351,7 @@ pub(crate) fn point_at_downloads(
 /// Where an MO2 instance saves downloads: `download_directory` in its
 /// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
 /// a Wine drive other than `Z:`.
-pub(crate) fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
+pub fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
     let mut in_settings = false;
     for line in text.lines() {
@@ -861,7 +861,7 @@ pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
 /// The game folder an MO2 instance was set up with: `gamePath` in its
 /// `ModOrganizer.ini`. `None` when the instance has none, or names it by a
 /// Wine drive this side cannot see.
-pub(crate) fn instance_game_path(instance: &Path) -> Option<PathBuf> {
+pub fn instance_game_path(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).ok()?;
     parse_game_path(&text, cfg!(windows))
 }

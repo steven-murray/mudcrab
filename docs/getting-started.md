@@ -242,6 +242,8 @@ Bash Bashed Patch.
 
 ## Where to next
 
+- [Installing with the GUI](gui.md) (preview): the same steps from one
+  window.
 - [Commands](usage.md): every command and flag, including installing one
   section of a large list at a time (`--section`, `--only`).
 - [The modlist format](modlist-format.md): writing or changing a list.

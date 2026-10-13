@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The main window: mudcrab's own commands, events, and the file pickers.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}

@@ -519,12 +519,27 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
 /// The list's manual steps not yet done, plus a Bashed Patch the load order
 /// expects that nothing has built and no step covers.
 fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<ManualStep> {
+    manual_steps(plan, settings)
+        .into_iter()
+        .filter(|(_, done)| !done)
+        .map(|(step, _)| step)
+        .collect()
+}
+
+/// Every step left to do by hand after an install, and whether it is done:
+/// the list's own `[[manual-steps]]`, plus building any Bashed Patch the load
+/// order expects that no step covers. A step is done once its
+/// `done_when_plugin` exists; one without is never known to be.
+pub fn manual_steps(
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+) -> Vec<(ManualStep, bool)> {
     let exists = |plugin: &str| plugin_exists(plugin, settings);
-    let mut out: Vec<ManualStep> = plan
+    let done = |step: &ManualStep| step.done_when_plugin.as_deref().is_some_and(exists);
+    let mut out: Vec<(ManualStep, bool)> = plan
         .manual_steps
         .iter()
-        .filter(|step| step.done_when_plugin.as_deref().is_none_or(|p| !exists(p)))
-        .cloned()
+        .map(|step| (step.clone(), done(step)))
         .collect();
     let covered = |plugin: &str| {
         plan.manual_steps.iter().any(|step| {
@@ -537,7 +552,7 @@ fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec
         .plugins
         .iter()
         .filter(|p| crate::config::check::made_by_wrye_bash(p))
-        .filter(|p| !covered(p) && !exists(p))
+        .filter(|p| !covered(p))
     {
         let wrye_bash = settings
             .game_dir
@@ -546,7 +561,7 @@ fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec
             .filter(|exe| exe.is_file())
             .map(|exe| exe.display().to_string())
             .unwrap_or_else(|| "Wrye Bash.exe, in the game folder's Mopy folder".to_string());
-        out.push(ManualStep {
+        let step = ManualStep {
             title: format!("build {plugin} with Wrye Bash"),
             steps: format!(
                 "The list orders a Bashed Patch, and only Wrye Bash can build one (it has no \
@@ -561,7 +576,9 @@ fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec
                  mod...\", to keep it in a mod of its own."
             ),
             done_when_plugin: Some(plugin.clone()),
-        });
+        };
+        let built = done(&step);
+        out.push((step, built));
     }
     out
 }
