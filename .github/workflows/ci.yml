@@ -20,6 +20,17 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
 
+  windows:
+    # The release ships a Windows build; its tests should run there too, path
+    # handling and all. 7-Zip and bsdtar (as tar.exe) come with the runner.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+
   msrv:
     # Cargo.toml claims 1.88 because of let-chains. Claiming it without checking
     # is how a floor drifts.
