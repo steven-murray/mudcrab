@@ -116,7 +116,7 @@ fn load_tree(app: &App, session: &Session, files: &Arc<Mutex<Files>>) {
                                 Ticked::All => 2,
                             },
                             open: open.contains(&row.path),
-                            offered: row.tickable,
+                            offered: row.offered || row.package,
                             detail: if row.folder {
                                 if row.offered && row.files > 0 {
                                     format!("{} of {}", row.taken, row.files).into()

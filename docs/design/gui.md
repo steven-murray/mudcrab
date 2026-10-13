@@ -68,10 +68,31 @@ would be built:
   live).
 - **A mod's files**: the archive's contents as a tree, with what `install`
   would take from it highlighted (the layout planner `check` already runs).
-  Tick and untick files and folders to write `include`/`exclude`; drag a
-  folder to a new place to write a `file_move`; mark files for the game
-  folder (`game_root_files`). The tree updates from the planner, so what is
-  shown is what will be installed.
+  The tree updates from the planner, so what is shown is what will be
+  installed. What a tick means follows the archive's layout, so an author
+  sees the installer they already know:
+  - **BAIN**: ticks are packages, at the top level only, as in Wrye Bash's
+    installer tab, writing `bain_subpackages`. The files inside are shown
+    read-only, marked installed or not. A `wizard.txt` can be run, as `add`
+    runs it.
+  - **FOMOD**: the installer's steps and options, writing
+    `fomod_selections`, not a file tree to tick.
+  - **Simple, data folder, auto**: ticks on files and folders, writing
+    `exclude` (and dropping it to tick back).
+
+  Separately, for any layout, an expert override: **Exclude from install** on
+  a file or folder's context menu writes an `exclude` for the path the
+  filters see it as (inside the data folder, BAIN package or FOMOD folder;
+  the planner reports it as `filtered_as`). It is visibly an override, not a
+  tick, and says what it covers -- under BAIN one exclude applies to every
+  package, so `Docs/readme.txt` hits each package's copy. (The spike tried
+  letting a file inside an unchosen BAIN package be ticked, choosing the
+  package and excluding the rest of it; it worked, but it is not how BAIN
+  thinks, and the shared excludes made it refuse often. A filter per package
+  in the format would be the cleaner way, if authors ask for it.)
+
+  Also here: drag a folder to a new place to write a `file_move`; mark files
+  for the game folder (`game_root_files`).
 - **Conflicts**: the `conflicts` sweep as a matrix or list -- who wins, who
   loses -- with a mod's overwritten files one click away, and "hide these in
   that mod" writing the `file_hide` with `conflicts_with`.
