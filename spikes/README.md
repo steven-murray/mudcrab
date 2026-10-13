@@ -35,6 +35,15 @@ cargo run --release -p spike-tauri -- /tmp/spike-list.toml --mod "Some Mod"
 cargo run --release -p spike-slint -- /tmp/spike-list.toml --mod "Some Mod"
 ```
 
+`sample/` is a small list with its archives (one BAIN, one with a data
+folder, and a 60-plugin load order), for trying the spikes anywhere without
+a real list:
+
+```bash
+cp -r sample /tmp/spike-sample
+cargo run --release -p spike-tauri -- /tmp/spike-sample/list.toml --downloads /tmp/spike-sample/downloads --mod "Sample BAIN"
+```
+
 `--downloads <dir>` overrides `downloads_dir` from tools.toml; `--mod` opens
 on that mod's files. Linux needs WebKitGTK 4.1 to build and run the Tauri one
 (`webkit2gtk-4.1` on Arch, `libwebkit2gtk-4.1-dev` on Debian/Ubuntu). The

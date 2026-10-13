@@ -46,4 +46,5 @@ jobs:
             spikes/target/release/spike-slint
             spikes/target/release/spike-tauri.exe
             spikes/target/release/spike-slint.exe
+            spikes/sample/
           if-no-files-found: error
