@@ -19,7 +19,8 @@ badly packaged mod, or a core group of mods several lists share. Plan:
 
 An authoring mode (drag mods into order, pick a mod's files, move folders) and
 an install mode (view the list, one button from compile to install). The CLI
-stays complete: nothing will ever need the GUI. Plan:
+stays complete: nothing will ever need the GUI. The library API and the CLI
+commands it needs are done; next is the framework spike. Plan:
 [design/gui.md](design/gui.md).
 
 ## Open

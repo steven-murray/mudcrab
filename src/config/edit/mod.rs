@@ -9,6 +9,8 @@
 //! the text before and after, so a caller can show the diff, write it, or
 //! both.
 
+pub mod doc;
+
 use crate::config::loader::parse_modlist;
 use crate::config::schema::SourceModlist;
 use std::path::{Path, PathBuf};
@@ -45,7 +47,7 @@ impl Edit {
         similar::TextDiff::from_lines(&self.before, &self.after)
             .unified_diff()
             .context_radius(3)
-            .header(&format!("a/{name}"), &format!("b/{name}"))
+            .header(&name, &name)
             .to_string()
     }
 

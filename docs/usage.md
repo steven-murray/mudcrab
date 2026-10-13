@@ -102,9 +102,10 @@ array gets one.
 Safety:
 
 - an id that already exists in the file is refused;
-- the file is written via a temp file next to it, then renamed;
-- after writing, the modlist is re-parsed and validated, and the original is
-  restored if either fails;
+- the new text is parsed and validated before anything is written; an edit
+  that would leave the list invalid is refused, and the file is untouched;
+- the file is written via a temp file next to it, then renamed, and only if
+  nobody changed it since it was read;
 - `--dry-run` prints the block and its destination and changes nothing.
 
 Example:
@@ -124,8 +125,99 @@ comments, archives and actions; only its `section` line changes.
 mudcrab move <modlist.toml> --mod "<mod id>" [--section "<name>"]... [--before-mod "<mod id>"] [--dry-run]
 ```
 
-As with `add`, the file is validated after the move and restored if it no
-longer validates.
+As with `add`, the result is validated before it is written.
+
+## Editing a list
+
+`add` and `move` have siblings for the rest of what an author changes by hand.
+All of them edit the file in place the way `add` does: only the lines that
+change are touched, comments stay where they are (a replaced value keeps its
+end-of-line comment), the result is validated before anything is written, and
+`--dry-run` prints the change as a diff instead. A GUI built on mudcrab makes
+its edits through these same commands, so anything it can do, they can.
+
+### set
+
+```bash
+mudcrab set <modlist.toml> --mod "<mod id>" [--archive <n>] [key=value]... [--unset <key>]... [--dry-run]
+```
+
+Sets or removes fields of a mod, or with `--archive` (counting from 1) of one
+of its archives: `if=butterflies`, `layout=bain`, `data_folder="Data Files"`,
+`merge.output=Merged.esp`. A value is read as TOML when it is one (`true`,
+`3`, `["a.esp", "b.esp"]`) and as text otherwise; quote it to force text
+(`version='"1.0"'`). `id`, `section`, `archives` and `actions` are refused,
+naming the command that changes them.
+
+### remove
+
+```bash
+mudcrab remove <modlist.toml> --mod "<mod id>" [--dry-run]
+```
+
+Removes the mod's block -- its comments, archives and actions -- and its
+plugins from `plugins` and `inactive-plugins` (unless another mod declares
+them too). Refused while anything still refers to the mod, such as another
+mod's `conflicts_with`; `check` afterwards finds any plugin that needed one of
+its plugins as a master. A docs file that still documents it is pointed out.
+
+### plugins
+
+```bash
+mudcrab plugins list <modlist.toml>
+mudcrab plugins move <modlist.toml> <plugin> (--after <plugin> | --before <plugin> | --first | --last) [--dry-run]
+```
+
+`list` prints the load order, a plugin a line, tab-separated: the plugin, the
+mods that declare it (or make it, for a merge; `-` when none does, `(the
+game)` for the game's own), and `inactive` for one the list leaves unticked.
+
+`move` moves one plugin. Comment lines in the array stay put, so a heading
+such as `# Part 3` stays above whatever followed it; `--before` puts the
+plugin directly above the named one, below any heading over it, and the
+plugin's own end-of-line comment goes with it.
+
+### files
+
+```bash
+mudcrab files <modlist.toml> --mod "<mod id>" [--archive <n>] [--downloads <dir>] [--set key=value]...
+mudcrab files <modlist.toml> --mod "<mod id>" [--include <glob>]... [--exclude <glob>]...
+                             [--drop-include <glob>]... [--drop-exclude <glob>]... [--dry-run]
+```
+
+Without filters to change, prints the files `install` would take from the
+archive (the first, unless `--archive`), before the mod's actions run: the
+same plan `check` makes, from the archive in the downloads folder. With
+filters, edits the archive's `include` and `exclude`, and shows which files
+that adds and drops. `--set` answers the list's questions where they decide
+which archives a mod has; the rest take their defaults.
+
+### action
+
+```bash
+mudcrab action list <modlist.toml> --mod "<mod id>"
+mudcrab action add <modlist.toml> --mod "<mod id>" <action> [key=value]... [--if <condition>] [--dry-run]
+mudcrab action remove <modlist.toml> --mod "<mod id>" <n> [--dry-run]
+```
+
+`list` numbers a mod's actions, one a line. `add` appends one as a
+`[[mods.actions]]` table, with its fields as `key=value` read as `set` reads
+them -- `mudcrab action add list.toml --mod "WAC" file_hide 'paths=["meshes/x.nif"]'`.
+A field the action does not have is refused. See [Actions](#actions) for each
+action's fields.
+
+### input
+
+```bash
+mudcrab input list <modlist.toml>
+mudcrab input add <modlist.toml> <name> --type bool|choice|text --query "<question>" [--choice <c>]... [--default <answer>] [--dry-run]
+mudcrab input set <modlist.toml> <name> [key=value]... [--unset <key>]... [--dry-run]
+mudcrab input remove <modlist.toml> <name> [--dry-run]
+```
+
+The list's questions. `add` writes them the way the list already does (dotted
+`inputs.<name>.<key>` lines at the top, if it has none yet). `remove` is
+refused while a condition still uses the question.
 
 ## compile
 

@@ -450,20 +450,7 @@ pub fn plan_move(
         anyhow::bail!("cannot move '{id}' before itself");
     }
 
-    // The block runs from its own comment run to wherever the next block's
-    // comment run starts.
-    let mut start = headers[index];
-    while start > 0 && kinds[start - 1] == LineKind::Comment {
-        start -= 1;
-    }
-    let next = kinds[headers[index] + 1..]
-        .iter()
-        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
-        .map(|offset| headers[index] + 1 + offset);
-    let end = match next {
-        Some(next) => back_up_to_content(&kinds, next, true),
-        None => back_up_to_content(&kinds, kinds.len(), false),
-    };
+    let (start, end) = block_span(&kinds, headers[index]);
 
     let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
     let mut block: Vec<String> = lines[start..end].to_vec();
@@ -489,14 +476,7 @@ pub fn plan_move(
             block.insert(header + 2, format!("{new_section}{carriage}"));
         }
     }
-    // Take the block out, with the blank line that separated it from the one
-    // before, so the gap does not double up.
-    let cut_from = if start > 0 && kinds[start - 1] == LineKind::Blank {
-        start - 1
-    } else {
-        start
-    };
-    lines.drain(cut_from..end);
+    lines.drain(cut_span(&kinds, start)..end);
     let without = lines.join("\n");
 
     let remaining: Vec<ModEntry> = mods
@@ -510,6 +490,62 @@ pub fn plan_move(
         .collect::<Vec<_>>()
         .join("\n");
     splice_block(&without, &remaining, section, &block, placement)
+}
+
+/// The lines of the mod block whose header is line `header`: from its own
+/// comment run to wherever the next block's comment run starts.
+fn block_span(kinds: &[LineKind], header: usize) -> (usize, usize) {
+    let mut start = header;
+    while start > 0 && kinds[start - 1] == LineKind::Comment {
+        start -= 1;
+    }
+    let next = kinds[header + 1..]
+        .iter()
+        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
+        .map(|offset| header + 1 + offset);
+    let end = match next {
+        Some(next) => back_up_to_content(kinds, next, true),
+        None => back_up_to_content(kinds, kinds.len(), false),
+    };
+    (start, end)
+}
+
+/// Where to cut a block starting at `start` out: with the blank line that
+/// separated it from the one before, so the gap does not double up.
+fn cut_span(kinds: &[LineKind], start: usize) -> usize {
+    if start > 0 && kinds[start - 1] == LineKind::Blank {
+        start - 1
+    } else {
+        start
+    }
+}
+
+/// `text` without mod `id`'s block -- its own comments, archives, actions and
+/// any trailing note -- as `move` takes it out. `mods` must come from parsing
+/// `text`.
+pub fn plan_removal(text: &str, mods: &[ModEntry], id: &str) -> anyhow::Result<String> {
+    let kinds = classify_lines(text);
+    let headers: Vec<usize> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| **kind == LineKind::ModHeader)
+        .map(|(index, _)| index)
+        .collect();
+    anyhow::ensure!(
+        headers.len() == mods.len(),
+        "line scan found {} `[[mods]]` headers but the parsed modlist has {} mods; \
+         refusing to edit a file this tool cannot read reliably",
+        headers.len(),
+        mods.len()
+    );
+    let index = mods
+        .iter()
+        .position(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the modlist has no mod with id '{id}'"))?;
+    let (start, end) = block_span(&kinds, headers[index]);
+    let mut lines: Vec<&str> = text.split('\n').collect();
+    lines.drain(cut_span(&kinds, start)..end);
+    Ok(lines.join("\n"))
 }
 
 /// Walk back from a block boundary to the last line that belongs to the block.

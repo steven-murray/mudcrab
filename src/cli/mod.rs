@@ -48,13 +48,18 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
         &[
             "inspect",
             "add",
-            "move",
             "nexus-files",
             "identify",
             "validate",
             "conflicts",
             "diff",
             "export",
+        ],
+    ),
+    (
+        "Editing a modlist",
+        &[
+            "move", "set", "remove", "plugins", "files", "action", "input",
         ],
     ),
     (
@@ -103,6 +108,21 @@ pub enum Command {
     Add(AddArgs),
     /// Move a mod to another section or position, comments and all.
     Move(MoveArgs),
+    /// Set or clear fields of a mod, or of one of its archives.
+    Set(SetArgs),
+    /// Remove a mod, and its plugins from the load order.
+    Remove(RemoveArgs),
+    /// The load order: list it, or move a plugin within it.
+    #[command(subcommand)]
+    Plugins(PluginsCommand),
+    /// What an archive installs, and its include and exclude filters.
+    Files(FilesArgs),
+    /// List, add or remove a mod's actions.
+    #[command(subcommand)]
+    Action(ActionCommand),
+    /// List, declare, change or remove the list's questions.
+    #[command(subcommand)]
+    Input(InputCommand),
     /// Validate and compile a source modlist into a machine-friendly artifact.
     Compile(CompileArgs),
     /// Resolve interactive inputs into a personalized install plan.
@@ -160,7 +180,7 @@ pub enum Command {
 /// parse-and-rewrite would delete all of it.
 /// Move a mod's block within a source modlist: to another section, or before
 /// another mod. Its comments, archives and actions go with it; only its
-/// `section` line changes. Validated afterwards, and undone if that fails.
+/// `section` line changes. Validated before anything is written.
 #[derive(Debug, Args)]
 pub struct MoveArgs {
     /// Path to the source modlist TOML to edit in place.
@@ -951,4 +971,249 @@ mod help_tests {
             super::Cli::command().get_subcommands().count()
         );
     }
+}
+
+/// Set or clear fields of a mod, or with --archive of one of its archives:
+/// `layout=bain`, `if=some_input`, `data_folder="Data Files"`,
+/// `merge.output=Merged.esp`. A value is read as TOML when it is one
+/// (`true`, `3`, `["a", "b"]`) and as text otherwise; quote it to force text
+/// (`version='"1.0"'`). Comments, and a replaced value's own comment, are
+/// kept. The list is validated before anything is written.
+#[derive(Debug, Args)]
+pub struct SetArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod to change.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// Change this archive of the mod (counting from 1) instead of the mod.
+    #[arg(long, value_name = "N")]
+    pub archive: Option<usize>,
+    /// `key=value` to set.
+    #[arg(value_name = "KEY=VALUE")]
+    pub sets: Vec<String>,
+    /// A key to remove; repeat for more.
+    #[arg(long = "unset", value_name = "KEY")]
+    pub unsets: Vec<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+/// Remove a mod's block -- its comments, archives and actions -- and its
+/// plugins from `plugins` and `inactive-plugins`. Refused, naming what is in
+/// the way, if anything else still refers to it.
+#[derive(Debug, Args)]
+pub struct RemoveArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod to remove.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum PluginsCommand {
+    /// Print the load order, one plugin a line, tab-separated: the plugin,
+    /// the mods that declare it in their `plugins` (or make it, for a merge;
+    /// `-` when none does), and `inactive` for one the list leaves unticked.
+    List(PluginsListArgs),
+    /// Move a plugin within the load order. Comment lines in the array stay
+    /// where they are: a heading above the plugin stays with what follows it.
+    Move(PluginsMoveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct PluginsListArgs {
+    /// The modlist.
+    pub input: PathBuf,
+}
+
+#[derive(Debug, Args)]
+#[command(group(clap::ArgGroup::new("to").required(true).args(["after", "before", "first", "last"])))]
+pub struct PluginsMoveArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The plugin to move.
+    pub plugin: String,
+    /// Put it directly after this plugin.
+    #[arg(long, value_name = "PLUGIN")]
+    pub after: Option<String>,
+    /// Put it directly before this plugin (below any heading comment above it).
+    #[arg(long, value_name = "PLUGIN")]
+    pub before: Option<String>,
+    /// Put it first.
+    #[arg(long)]
+    pub first: bool,
+    /// Put it last.
+    #[arg(long)]
+    pub last: bool,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+/// What one of a mod's archives installs: the files `install` would take
+/// from it, before the mod's actions, as `check` plans them. With filters to
+/// add or drop, the list is edited and what that changes is shown.
+#[derive(Debug, Args)]
+pub struct FilesArgs {
+    /// The modlist.
+    pub input: PathBuf,
+    /// The mod.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// Which of the mod's archives, counting from 1.
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    pub archive: usize,
+    /// Add an `include` glob: only matching files are taken.
+    #[arg(long = "include", value_name = "GLOB")]
+    pub include: Vec<String>,
+    /// Add an `exclude` glob: matching files are left out.
+    #[arg(long = "exclude", value_name = "GLOB")]
+    pub exclude: Vec<String>,
+    /// Take an `include` glob out.
+    #[arg(long = "drop-include", value_name = "GLOB")]
+    pub drop_include: Vec<String>,
+    /// Take an `exclude` glob out.
+    #[arg(long = "drop-exclude", value_name = "GLOB")]
+    pub drop_exclude: Vec<String>,
+    /// The downloads folder. Defaults to `downloads_dir` in tools.toml.
+    #[arg(long = "downloads", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
+    /// Answer the list's questions for this (`key=value`), where they decide
+    /// the mod's archives; the rest take their defaults.
+    #[arg(long = "set", value_name = "KEY=VALUE")]
+    pub set: Vec<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ActionCommand {
+    /// Print a mod's actions, numbered.
+    List(ActionListArgs),
+    /// Add an action to the end of a mod's actions: its name, then its fields
+    /// as `key=value` (`paths='["a/b"]'`, `conflicts_with='["Other Mod"]'`).
+    /// See the modlist format for each action's fields.
+    Add(ActionAddArgs),
+    /// Remove a mod's action by its number from `action list`.
+    Remove(ActionRemoveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct ActionListArgs {
+    /// The modlist.
+    pub input: PathBuf,
+    /// The mod.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+}
+
+#[derive(Debug, Args)]
+pub struct ActionAddArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// The action: `file_hide`, `file_move`, `ini_set`, ...
+    pub action: String,
+    /// The action's fields, `key=value`.
+    #[arg(value_name = "KEY=VALUE")]
+    pub fields: Vec<String>,
+    /// Only when this condition holds.
+    #[arg(long = "if", value_name = "CONDITION")]
+    pub condition: Option<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct ActionRemoveArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// The action's number, from `action list`.
+    pub number: usize,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum InputCommand {
+    /// Print the list's questions: name, type, default, and the question.
+    List(InputListArgs),
+    /// Declare a question.
+    Add(InputAddArgs),
+    /// Change a question's fields (`query=...`, `default=...`,
+    /// `choices='["a", "b"]'`).
+    Set(InputSetArgs),
+    /// Remove a question. Refused, by validation, while a condition uses it.
+    Remove(InputRemoveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct InputListArgs {
+    /// The modlist.
+    pub input: PathBuf,
+}
+
+#[derive(Debug, Args)]
+pub struct InputAddArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The question's name, as conditions use it.
+    pub name: String,
+    /// What kind of answer it takes.
+    #[arg(long = "type", value_name = "TYPE", value_parser = ["bool", "choice", "text"])]
+    pub input_type: String,
+    /// The question as the player sees it.
+    #[arg(long)]
+    pub query: String,
+    /// One of the answers to a `choice`; repeat for each.
+    #[arg(long = "choice", value_name = "CHOICE")]
+    pub choices: Vec<String>,
+    /// The answer when nobody is asked (`query --headless`).
+    #[arg(long)]
+    pub default: Option<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct InputSetArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The question.
+    pub name: String,
+    /// `key=value` to set.
+    #[arg(value_name = "KEY=VALUE")]
+    pub sets: Vec<String>,
+    /// A key to remove; repeat for more.
+    #[arg(long = "unset", value_name = "KEY")]
+    pub unsets: Vec<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
+#[derive(Debug, Args)]
+pub struct InputRemoveArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The question.
+    pub name: String,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
 }

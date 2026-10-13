@@ -447,6 +447,36 @@ pub fn heading(tone: Tone, text: impl std::fmt::Display) {
     ));
 }
 
+/// A line of data on stdout, for reading or piping on: a pipe closed early
+/// (`| head`) ends the run quietly, as it would any Unix tool.
+pub fn data(line: impl std::fmt::Display) {
+    let mut out = std::io::stdout().lock();
+    if let Err(err) = writeln!(out, "{line}")
+        && err.kind() == std::io::ErrorKind::BrokenPipe
+    {
+        std::process::exit(0);
+    }
+}
+
+/// A unified diff, coloured: added lines green, removed red, hunk headers
+/// cyan.
+pub fn diff(text: &str) {
+    for line in text.lines() {
+        let styled = if line.starts_with("+++") || line.starts_with("---") {
+            console::style(line).bold().to_string()
+        } else if line.starts_with('+') {
+            console::style(line).green().to_string()
+        } else if line.starts_with('-') {
+            console::style(line).red().to_string()
+        } else if line.starts_with("@@") {
+            console::style(line).cyan().to_string()
+        } else {
+            line.to_string()
+        };
+        say(styled);
+    }
+}
+
 /// A name the user might look for -- a mod, a plugin, a file -- set off from
 /// the words around it.
 pub fn name(text: impl std::fmt::Display) -> String {

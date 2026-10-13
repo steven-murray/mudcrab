@@ -32,6 +32,17 @@ pub fn compile(input: &Path, strict: bool) -> anyhow::Result<Compiled> {
     })
 }
 
+/// As [`compile`], for `text` read as the modlist at `path`: for a list being
+/// edited, before it is written.
+pub fn compile_text(text: &str, path: &Path) -> anyhow::Result<Compiled> {
+    let source = crate::config::loader::parse_modlist(text, path)?;
+    let warnings = crate::config::validator::validate(&source)?;
+    Ok(Compiled {
+        modlist: crate::config::compiler::compile(source)?,
+        warnings,
+    })
+}
+
 /// The compiled list `compile` wrote to `path`.
 pub fn read_compiled(path: &Path) -> anyhow::Result<CompiledModlist> {
     let raw = std::fs::read_to_string(path)

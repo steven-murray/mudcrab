@@ -543,6 +543,66 @@ fn add_plugin(folder: &mut ModFolder, destination: &str, masters: Option<&Vec<St
     }
 }
 
+/// The files `install` would take from `archive` for `mod_entry`, before the
+/// mod's actions: each one's path in the mod's folder, sorted. `None` when
+/// that is only known at install (an archive inside an archive, an MO2
+/// plugin, a build from files).
+pub fn planned_files(
+    mod_entry: &PersonalizedMod,
+    archive: &CompiledArchive,
+    cache_dir: &Path,
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<Option<Vec<String>>> {
+    let settings = CheckSettings {
+        cache_dir: cache_dir.to_path_buf(),
+        filter: ModFilter::default(),
+    };
+    let source = present(archive, &ArchiveRef::for_archive(archive), &settings)?;
+    if matches!(
+        mod_entry.mod_type,
+        Some(ModType::Mo2Plugin | ModType::BuildFromFiles)
+    ) || archive.inner_archive.is_some()
+    {
+        return Ok(None);
+    }
+    let paths = archive::list_archive_paths(&source)
+        .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
+    let scratch = crate::util::fs::cache_scratch_dir("files");
+    let reader = EntryReader::new(&source, scratch.join("entry"));
+    let exclude: Vec<String> = archive
+        .exclude
+        .iter()
+        .chain(archive.game_root_files.iter())
+        .cloned()
+        .collect();
+    let planned = ArchiveFilters::new(&archive.include, &exclude).and_then(|filters| {
+        layout::plan_archive(
+            &source.display().to_string(),
+            &paths,
+            &reader,
+            &mod_entry.id,
+            archive,
+            &filters,
+            active_plugins,
+        )
+    });
+    let _ = std::fs::remove_dir_all(&scratch);
+    let prefix = archive
+        .target_subdir
+        .as_deref()
+        .map(|value| value.replace('\\', "/").trim_matches('/').to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("{value}/"))
+        .unwrap_or_default();
+    let mut files: Vec<String> = planned?
+        .files
+        .iter()
+        .map(|file| format!("{prefix}{}", file.destination))
+        .collect();
+    files.sort();
+    Ok(Some(files))
+}
+
 /// What one archive contributes: each planned file (with the real bytes for
 /// those that need them), and the masters of each plugin among them.
 struct Contents {
