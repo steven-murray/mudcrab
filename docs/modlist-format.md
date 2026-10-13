@@ -59,6 +59,7 @@ that table.
 | `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
 | `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
 | `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs, applied to the MO2 profile's copy. |
+| `mo2` | To set up MO2 itself: `[mo2]` with `theme = "vs15 Dark"`, one of the themes MO2 ships (Settings > Theme), applied to an instance that has none chosen yet. |
 | `manual-steps` | When something has to be done by hand after installing (building a Bashed Patch in Wrye Bash): `install` lists it at the end until it is done. See [Steps by hand](#steps-by-hand). |
 | `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |

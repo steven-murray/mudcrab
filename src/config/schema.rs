@@ -38,6 +38,9 @@ pub struct SourceModlist {
     /// until each is done.
     #[serde(default, rename = "manual-steps")]
     pub manual_steps: Vec<ManualStep>,
+    /// Settings for the MO2 instance itself, applied by `install`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mo2: Option<Mo2Settings>,
     /// The guide's own prose, for `export`. See [`crate::config::docs`].
     #[serde(default)]
     pub docs: Docs,
@@ -915,9 +918,22 @@ pub struct CompiledModlist {
     pub post_install_actions: Vec<PostInstallAction>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub manual_steps: Vec<ManualStep>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mo2: Option<Mo2Settings>,
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<CompiledMod>,
+}
+
+/// How the list would like Mod Organizer 2 itself set up.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct Mo2Settings {
+    /// The theme (MO2 calls it a style): one of the stylesheets MO2 ships,
+    /// as Settings > Theme names it -- `"vs15 Dark"`. Applied only while the
+    /// instance has none chosen, so one picked in MO2 later is kept.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<String>,
 }
 
 /// A step `install` cannot take -- building a Bashed Patch in Wrye Bash, say
@@ -1031,6 +1047,8 @@ pub struct PersonalizedPlan {
     pub post_install_actions: Vec<PostInstallAction>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub manual_steps: Vec<ManualStep>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mo2: Option<Mo2Settings>,
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<PersonalizedMod>,

@@ -420,6 +420,8 @@ building a Bashed Patch in Wrye Bash), `install` ends by listing those not yet
 done; see [modlist-format.md](modlist-format.md#steps-by-hand). For a list
 with a Bashed Patch, it also adds Wrye Bash to the MO2 instance's executables,
 when the game folder has `Mopy/Wrye Bash.exe` and MO2 does not list it yet.
+A list's `[mo2] theme` is set while the instance has no theme chosen; one you
+pick in MO2 afterwards is kept.
 
 `--redo-action <action>` reinstalls just the mods that have that action
 (`--redo-action qac`, say), when something outside the list changed what it

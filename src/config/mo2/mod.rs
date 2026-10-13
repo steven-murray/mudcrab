@@ -205,6 +205,9 @@ pub(crate) fn export_mo2_instance(
     {
         add_executable(root, "Wrye Bash", &exe, settings.dry_run)?;
     }
+    if let Some(theme) = plan.mo2.as_ref().and_then(|mo2| mo2.theme.as_deref()) {
+        apply_theme(root, theme, settings.dry_run)?;
+    }
     ensure_mo2_section_folders(plan, settings, scope)?;
 
     let profile_dir =
@@ -376,6 +379,72 @@ pub(crate) fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
         return Some(PathBuf::from(unix.replace('\\', "/")));
     }
     Some(instance.join("downloads"))
+}
+
+/// Set MO2's theme to the list's, unless one is already chosen: a theme picked
+/// in MO2 is the user's, and a reinstall must not undo it. A theme MO2 does
+/// not have is reported, with the ones it does.
+pub(crate) fn apply_theme(instance: &Path, theme: &str, dry_run: bool) -> anyhow::Result<()> {
+    let file = if theme.to_ascii_lowercase().ends_with(".qss") {
+        theme.to_string()
+    } else {
+        format!("{theme}.qss")
+    };
+    let stylesheets = instance.join("stylesheets");
+    if stylesheets.is_dir() && !stylesheets.join(&file).is_file() {
+        let mut available: Vec<String> = std::fs::read_dir(&stylesheets)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .filter_map(|e| {
+                        e.file_name()
+                            .to_string_lossy()
+                            .strip_suffix(".qss")
+                            .map(str::to_string)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        available.sort();
+        tracing::warn!(
+            "the list asks for MO2's \"{theme}\" theme, which this MO2 does not have; it has: {}",
+            available.join(", ")
+        );
+        return Ok(());
+    }
+    let ini_path = instance.join("ModOrganizer.ini");
+    let existing = std::fs::read_to_string(&ini_path).unwrap_or_default();
+    if ini_value(&existing, "Settings", "style").is_some_and(|v| !v.trim().is_empty()) {
+        return Ok(());
+    }
+    if dry_run {
+        tracing::info!(theme = %file, "install dry-run: would set MO2's theme");
+        return Ok(());
+    }
+    let updated = set_ini_key(&existing, "Settings", "style", &file);
+    std::fs::write(&ini_path, updated)
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", ini_path.display()))?;
+    tracing::info!(theme = %file, "set MO2's theme");
+    Ok(())
+}
+
+/// The value of `key` in `[section]`, if set.
+fn ini_value<'a>(ini: &'a str, section: &str, key: &str) -> Option<&'a str> {
+    let mut inside = false;
+    for line in ini.lines() {
+        let line = line.trim();
+        if line.starts_with('[') {
+            inside = line.eq_ignore_ascii_case(&format!("[{section}]"));
+            continue;
+        }
+        if inside
+            && let Some((k, v)) = line.split_once('=')
+            && k.trim().eq_ignore_ascii_case(key)
+        {
+            return Some(v);
+        }
+    }
+    None
 }
 
 /// Add `binary` to MO2's list of executables under `title`, unless an entry
@@ -911,6 +980,37 @@ mod tests {
     /// As MO2 wrote it for a new instance: Windows line endings, three
     /// executables, then the next section.
     const NEW_INSTANCE: &str = "[General]\r\ngameName=Oblivion\r\n\r\n[customExecutables]\r\nsize=3\r\n1\\arguments=\r\n1\\binary=Z:/game/Oblivion.exe\r\n1\\hide=false\r\n1\\ownicon=true\r\n1\\steamAppID=\r\n1\\title=Oblivion\r\n1\\toolbar=false\r\n1\\workingDirectory=Z:/game\r\n2\\binary=Z:/game/OblivionLauncher.exe\r\n2\\title=Oblivion Launcher\r\n3\\binary=Z:/list/explorer++/Explorer++.exe\r\n3\\title=Explore Virtual Folder\r\n\r\n[recentDirectories]\r\nsize=0\r\n";
+
+    #[test]
+    fn the_theme_is_set_once_and_a_chosen_one_is_kept() {
+        let instance = tempfile::tempdir().unwrap();
+        let root = instance.path();
+        std::fs::create_dir_all(root.join("stylesheets")).unwrap();
+        std::fs::write(root.join("stylesheets/vs15 Dark.qss"), b"").unwrap();
+        let ini = root.join("ModOrganizer.ini");
+        let read = || std::fs::read_to_string(&ini).unwrap();
+
+        // MO2 has none chosen: the list's is set.
+        std::fs::write(&ini, "[Settings]\r\ndownload_directory=Z:/d\r\n").unwrap();
+        apply_theme(root, "vs15 Dark", false).unwrap();
+        assert_eq!(
+            ini_value(&read(), "Settings", "style"),
+            Some("vs15 Dark.qss")
+        );
+
+        // One MO2 does not have: nothing changes.
+        std::fs::write(&ini, "[Settings]\r\n").unwrap();
+        apply_theme(root, "Nonesuch", false).unwrap();
+        assert_eq!(ini_value(&read(), "Settings", "style"), None);
+
+        // Chosen in MO2 since: kept.
+        std::fs::write(&ini, "[Settings]\r\nstyle=Paper Dark.qss\r\n").unwrap();
+        apply_theme(root, "vs15 Dark.qss", false).unwrap();
+        assert_eq!(
+            ini_value(&read(), "Settings", "style"),
+            Some("Paper Dark.qss")
+        );
+    }
 
     #[test]
     fn an_executable_is_added_after_the_others_once() {

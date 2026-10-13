@@ -1104,6 +1104,7 @@ mod tests {
             plugins: vec![],
             inactive_plugins: vec![],
             manual_steps: vec![],
+            mo2: None,
         };
 
         download_all(&plan, &settings)
@@ -1195,6 +1196,7 @@ mod tests {
             plugins: vec![],
             inactive_plugins: vec![],
             manual_steps: vec![],
+            mo2: None,
         };
 
         let unfetched = download_report(&plan, &settings).await.unwrap();
