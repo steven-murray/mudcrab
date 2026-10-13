@@ -36,7 +36,7 @@ fn install_exports_modorganizer2_instance_structure() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install MO2 Test\"\nplugins = [\"Core.esm\"]\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods.actions]]\naction = \"ini_set\"\nscope = \"game\"\nfile = \"OBLIVION.INI\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
+        "name = \"Install MO2 Test\"\nplugins = [\"Core.esm\"]\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods.actions]]\naction = \"ini_set\"\nscope = \"game\"\nfile = \"OBLIVION.INI\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -260,7 +260,7 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install MO2 Top Level Ini Test\"\nplugins = [\"Core.esm\"]\n\n[ini]\n\"bFull Screen\" = 0\n\"iSize W\" = 1920\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Install MO2 Top Level Ini Test\"\nplugins = [\"Core.esm\"]\n\n[ini]\n\"bFull Screen\" = 0\n\"iSize W\" = 1920\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -399,7 +399,7 @@ fn install_exports_modlist_txt_in_reverse_order() {
     }
 
     let source = format!(
-        "name = \"Install MO2 Reverse Order Test\"\n\n[[mods]]\nid = \"alpha\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"beta\"\ndependencies = [\"alpha\"]\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Install MO2 Reverse Order Test\"\n\n[[mods]]\nid = \"alpha\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"beta\"\ndependencies = [\"alpha\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive_a.display(),
         archive_b.display()
     );
@@ -526,7 +526,7 @@ fn install_exports_mo2_sections_and_flattens_nested_section_names() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install MO2 Sections Test\"\n\n[[mods]]\nid = \"alpha\"\nsection = [\"OBSE PLUGINS\", \"Core\"]\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Install MO2 Sections Test\"\n\n[[mods]]\nid = \"alpha\"\nsection = [\"OBSE PLUGINS\", \"Core\"]\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -657,7 +657,7 @@ fn an_mo2_plugin_goes_into_the_instances_plugins_folder_not_the_mod_list() {
     std::fs::write(
         &modlist,
         format!(
-            "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\nlayout = \"custom-data-folder\"\ndata_folder = \"rootbuilder\"\n",
+            "name = \"P\"\n\n[[mods]]\nid = \"rootbuilder\"\ntype = \"mo2-plugin\"\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\nlayout = \"custom-data-folder\"\ndata_folder = \"rootbuilder\"\n",
             archive.display()
         ),
     )

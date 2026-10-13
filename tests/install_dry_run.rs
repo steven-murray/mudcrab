@@ -39,7 +39,7 @@ plugins = []
 id = "core"
 section = ["A"]
 [[mods.archives]]
-path = "{}"
+path = '{}'
 download_handler = "local"
 "#,
             archive.display()

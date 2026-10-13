@@ -69,7 +69,7 @@ name = "Partial Failure"
 id = "first"
 dependencies = []
 [[mods.archives]]
-path = "{first}"
+path = '{first}'
 download_handler = "local"
 
 [[mods]]
@@ -222,7 +222,7 @@ fn a_failed_reinstall_does_not_leave_the_mod_recorded_as_installed() {
             &modlist,
             format!(
                 "name = \"Reinstall Failure\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n\
-                 [[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\
+                 [[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\
                  exclude = [\"nothing{suffix}\"]\n",
                 archive.display()
             ),
