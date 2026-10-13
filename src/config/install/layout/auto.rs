@@ -300,7 +300,7 @@ pub(crate) fn plan_auto(
     let listing = Listing::new(paths);
     let root = detect_auto_root(&listing, mod_id, source_label)?;
 
-    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut pairs: Vec<(String, String, String)> = Vec::new();
 
     // The content itself.
     for path in paths {
@@ -314,7 +314,7 @@ pub(crate) fn plan_auto(
         if !filters.should_extract(&rest) {
             continue;
         }
-        pairs.push((path.clone(), folded_destination(&rest)));
+        pairs.push((path.clone(), folded_destination(&rest), rest));
     }
 
     // Files that sat beside the folder we descended into. MO2's installer keeps
@@ -331,7 +331,7 @@ pub(crate) fn plan_auto(
                     format!("{level}/{file}")
                 };
                 if filters.should_extract(&file) {
-                    pairs.push((full, file));
+                    pairs.push((full, file.clone(), file));
                 }
             }
             level = if level.is_empty() {
@@ -342,7 +342,7 @@ pub(crate) fn plan_auto(
         }
     }
 
-    Ok(LayoutPlan::from_pairs(pairs))
+    Ok(LayoutPlan::from_planned(pairs))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -14,7 +14,9 @@
 //! Every edit is validated and written as the CLI writes it, and comes back
 //! with the CLI command that does the same and the diff it made.
 
+use mudcrab::config::check::ArchiveContents;
 use mudcrab::config::edit::{self, doc};
+use mudcrab::config::schema::ArchiveLayout;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::time::Instant;
@@ -53,16 +55,19 @@ pub struct FileRow {
     pub depth: usize,
     pub folder: bool,
     /// For a file, whether `install` takes it; for a folder, whether it takes
-    /// all, some or none of what is inside.
+    /// all, some or none of what the layout offers inside it.
     pub state: Ticked,
+    /// Whether the layout offers it at all. A file it does not is left out by
+    /// the layout (a BAIN package or FOMOD option not chosen), not by a
+    /// filter, and only changing that choice brings it in.
+    pub offered: bool,
+    /// A BAIN package: ticking it chooses the package.
+    pub package: bool,
     /// Where a taken file goes in the mod's folder.
     pub destination: Option<String>,
-    /// Files inside a folder, and how many of them are taken.
+    /// Inside a folder: the files the layout offers, and how many are taken.
     pub files: usize,
     pub taken: usize,
-    /// Whether the user can tick it back: an exclude this list wrote for
-    /// exactly this path can be dropped; anything else is the layout's doing.
-    pub excluded_here: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -198,10 +203,11 @@ impl Session {
             .collect())
     }
 
-    /// Mod `id`'s first archive as a tree, folders before files, with folders
-    /// in `open` shown open (all of them, with `None`).
-    pub fn tree(&self, id: &str, open: Option<&BTreeSet<String>>) -> anyhow::Result<Tree> {
-        let started = Instant::now();
+    /// Mod `id`'s first archive, planned as `install` would.
+    fn contents(
+        &self,
+        id: &str,
+    ) -> anyhow::Result<(mudcrab::config::pipeline::PlannedArchive, ArchiveContents)> {
         let text = self.text()?;
         let planned = mudcrab::config::pipeline::planned_archive(
             &text,
@@ -217,39 +223,54 @@ impl Session {
             &planned.active_plugins,
         )?
         .ok_or_else(|| {
-            anyhow::anyhow!("what '{id}' installs is only known at install (an archive inside an archive, or similar)")
+            anyhow::anyhow!(
+                "what '{id}' installs is only known at install (an archive inside an archive, \
+                 or similar)"
+            )
         })?;
+        Ok((planned, contents))
+    }
+
+    /// Mod `id`'s first archive as a tree, folders before files, with folders
+    /// in `open` shown open (all of them, with `None`).
+    pub fn tree(&self, id: &str, open: Option<&BTreeSet<String>>) -> anyhow::Result<Tree> {
+        let started = Instant::now();
+        let (planned, contents) = self.contents(id)?;
         let taken: BTreeMap<&str, &str> = contents
             .taken
             .iter()
-            .map(|(from, to)| (from.as_str(), to.as_str()))
+            .map(|t| (t.source.as_str(), t.destination.as_str()))
             .collect();
-        let excluded: BTreeSet<&str> = planned.archive.exclude.iter().map(String::as_str).collect();
+        let offered: BTreeSet<&str> = contents
+            .available
+            .iter()
+            .map(|t| t.source.as_str())
+            .collect();
+        let bain = planned.archive.layout == Some(ArchiveLayout::Bain);
 
-        // Folder -> (files inside, taken inside), for every folder on a path.
+        // Folder -> (files offered inside, taken inside), for every folder on
+        // a path.
         let mut folders: BTreeMap<String, (usize, usize)> = BTreeMap::new();
         for entry in &contents.entries {
             let mut at = 0;
             while let Some(slash) = entry[at..].find('/') {
-                let folder = &entry[..at + slash];
-                let counts = folders.entry(folder.to_string()).or_default();
-                counts.0 += 1;
+                let counts = folders.entry(entry[..at + slash].to_string()).or_default();
+                counts.0 += usize::from(offered.contains(entry.as_str()));
                 counts.1 += usize::from(taken.contains_key(entry.as_str()));
                 at += slash + 1;
             }
         }
 
         let mut rows = Vec::new();
-        self.walk(
-            "",
-            0,
-            &contents.entries,
-            &folders,
-            &taken,
-            &excluded,
+        let cx = Walk {
+            entries: &contents.entries,
+            folders: &folders,
+            taken: &taken,
+            offered: &offered,
+            bain,
             open,
-            &mut rows,
-        );
+        };
+        cx.walk("", 0, &mut rows);
         Ok(Tree {
             label: planned
                 .archive
@@ -264,24 +285,153 @@ impl Session {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
-    fn walk(
-        &self,
-        under: &str,
-        depth: usize,
-        entries: &[String],
-        folders: &BTreeMap<String, (usize, usize)>,
-        taken: &BTreeMap<&str, &str>,
-        excluded: &BTreeSet<&str>,
-        open: Option<&BTreeSet<String>>,
-        rows: &mut Vec<FileRow>,
-    ) {
+    /// Untick (`keep` false) or tick back a file or folder of mod `id`'s
+    /// first archive: an `exclude` for what the filters see it as, or for a
+    /// BAIN package, a change to `bain_subpackages`.
+    pub fn toggle(&self, id: &str, path: &str, folder: bool, keep: bool) -> anyhow::Result<Edited> {
+        let started = Instant::now();
+        let (planned, contents) = self.contents(id)?;
+        let archive = &planned.archive;
+
+        let (key, value) = if folder
+            && !path.contains('/')
+            && archive.layout == Some(ArchiveLayout::Bain)
+        {
+            ("bain_subpackages", path.to_string())
+        } else {
+            let filtered_as = if folder {
+                let under = format!("{path}/");
+                let inside = contents
+                    .available
+                    .iter()
+                    .find(|t| t.source.replace('\\', "/").starts_with(&under))
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "the layout takes nothing from {path}, so there is nothing to filter"
+                        )
+                    })?;
+                let tail = &inside.source.replace('\\', "/")[under.len()..];
+                let folder_as = inside
+                    .filtered_as
+                    .strip_suffix(tail)
+                    .map(|rest| rest.trim_end_matches('/'))
+                    .unwrap_or_default();
+                anyhow::ensure!(
+                    !folder_as.is_empty(),
+                    "{path} is the mod's data folder itself; untick what is in it instead"
+                );
+                folder_glob(folder_as)
+            } else {
+                let offered = contents
+                    .available
+                    .iter()
+                    .find(|t| t.source == path)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "{path} is left out by the archive's layout (a package or option not \
+                             chosen), not by a filter"
+                        )
+                    })?;
+                globset::escape(&offered.filtered_as)
+            };
+            ("exclude", filtered_as)
+        };
+
+        // Ticking a package adds it; for a filter, ticking takes the exclude out.
+        let adding = (key == "bain_subpackages") == keep;
+        if !adding {
+            let listed = if key == "exclude" {
+                &archive.exclude
+            } else {
+                &bain_names(archive)
+            };
+            anyhow::ensure!(
+                listed.iter().any(|v| v.eq_ignore_ascii_case(&value)),
+                "{path} is left out by {} rather than by an exclude of its own, so it cannot be \
+                 ticked back here",
+                if archive.include.is_empty() {
+                    format!("the excludes {:?}", archive.exclude)
+                } else {
+                    format!(
+                        "the includes {:?} or excludes {:?}",
+                        archive.include, archive.exclude
+                    )
+                }
+            );
+        }
+        let (add, drop) = if adding {
+            (vec![value.clone()], vec![])
+        } else {
+            (vec![], vec![value.clone()])
+        };
+        let planned_edit = edit::plan(&self.list, |text, _| {
+            doc::edit_strings(text, id, Some(1), key, &add, &drop)
+        })?;
+        planned_edit.write()?;
+        let command = if key == "exclude" {
+            format!(
+                "mudcrab files {} --mod {} --{} {}",
+                quote(&self.list.display().to_string()),
+                quote(id),
+                if adding { "exclude" } else { "drop-exclude" },
+                quote(&value)
+            )
+        } else {
+            let mut packages = bain_names(archive);
+            if adding {
+                packages.push(value.clone());
+            } else {
+                packages.retain(|p| !p.eq_ignore_ascii_case(&value));
+            }
+            format!(
+                "mudcrab set {} --mod {} --archive 1 {}",
+                quote(&self.list.display().to_string()),
+                quote(id),
+                quote(&format!(
+                    "bain_subpackages=[{}]",
+                    packages
+                        .iter()
+                        .map(|p| format!("{p:?}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            )
+        };
+        Ok(Edited {
+            command,
+            diff: planned_edit.diff(),
+            millis: started.elapsed().as_millis(),
+        })
+    }
+}
+
+fn bain_names(archive: &mudcrab::config::schema::CompiledArchive) -> Vec<String> {
+    archive
+        .bain_subpackages
+        .iter()
+        .map(|p| p.name().to_string())
+        .collect()
+}
+
+/// What a tree is walked over.
+struct Walk<'a> {
+    entries: &'a [String],
+    folders: &'a BTreeMap<String, (usize, usize)>,
+    taken: &'a BTreeMap<&'a str, &'a str>,
+    offered: &'a BTreeSet<&'a str>,
+    bain: bool,
+    open: Option<&'a BTreeSet<String>>,
+}
+
+impl Walk<'_> {
+    fn walk(&self, under: &str, depth: usize, rows: &mut Vec<FileRow>) {
         let prefix = if under.is_empty() {
             String::new()
         } else {
             format!("{under}/")
         };
-        let child_folders: BTreeSet<&str> = folders
+        let child_folders: BTreeSet<&str> = self
+            .folders
             .keys()
             .filter_map(|folder| {
                 let rest = folder.strip_prefix(&prefix)?;
@@ -289,7 +439,8 @@ impl Session {
             })
             .collect();
         for folder in child_folders {
-            let (files, inside) = folders[folder];
+            let (files, inside) = self.folders[folder];
+            let package = self.bain && depth == 0;
             rows.push(FileRow {
                 path: folder.to_string(),
                 name: folder[prefix.len()..].to_string(),
@@ -300,32 +451,24 @@ impl Session {
                     n if n == files => Ticked::All,
                     _ => Ticked::Some,
                 },
+                offered: files > 0 || package,
+                package,
                 destination: None,
                 files,
                 taken: inside,
-                excluded_here: excluded.contains(folder_glob(folder).as_str()),
             });
-            if open.is_none_or(|open| open.contains(folder)) {
-                self.walk(
-                    folder,
-                    depth + 1,
-                    entries,
-                    folders,
-                    taken,
-                    excluded,
-                    open,
-                    rows,
-                );
+            if self.open.is_none_or(|open| open.contains(folder)) {
+                self.walk(folder, depth + 1, rows);
             }
         }
-        for entry in entries {
+        for entry in self.entries {
             let Some(name) = entry.strip_prefix(&prefix) else {
                 continue;
             };
             if name.contains('/') {
                 continue;
             }
-            let destination = taken.get(entry.as_str()).map(|to| to.to_string());
+            let destination = self.taken.get(entry.as_str()).map(|to| to.to_string());
             rows.push(FileRow {
                 path: entry.clone(),
                 name: name.to_string(),
@@ -336,52 +479,13 @@ impl Session {
                 } else {
                     Ticked::None
                 },
+                offered: self.offered.contains(entry.as_str()),
+                package: false,
                 destination,
                 files: 1,
-                taken: usize::from(taken.contains_key(entry.as_str())),
-                excluded_here: excluded.contains(globset::escape(entry).as_str()),
+                taken: usize::from(self.taken.contains_key(entry.as_str())),
             });
         }
-    }
-
-    /// Untick (`keep` false) or tick back a file or folder of mod `id`'s
-    /// first archive.
-    pub fn toggle(&self, id: &str, path: &str, folder: bool, keep: bool) -> anyhow::Result<Edited> {
-        let started = Instant::now();
-        let glob = if folder {
-            folder_glob(path)
-        } else {
-            globset::escape(path)
-        };
-        let (add, drop) = if keep {
-            (vec![], vec![glob.clone()])
-        } else {
-            (vec![glob.clone()], vec![])
-        };
-        let planned = edit::plan(&self.list, |text, _| {
-            doc::edit_strings(text, id, Some(1), "exclude", &add, &drop).map_err(|err| {
-                if keep {
-                    anyhow::anyhow!(
-                        "{path} is left out by the archive's layout or by a broader filter, not \
-                         by an exclude of its own ({err})"
-                    )
-                } else {
-                    err
-                }
-            })
-        })?;
-        planned.write()?;
-        Ok(Edited {
-            command: format!(
-                "mudcrab files {} --mod {} --{} {}",
-                quote(&self.list.display().to_string()),
-                quote(id),
-                if keep { "drop-exclude" } else { "exclude" },
-                quote(&glob)
-            ),
-            diff: planned.diff(),
-            millis: started.elapsed().as_millis(),
-        })
     }
 }
 
@@ -500,24 +604,85 @@ path = "manual:A.zip"
             (textures.state, textures.taken, textures.files),
             (Ticked::Some, 2, 3)
         );
-        assert!(tree.rows[4].excluded_here);
 
         session.toggle("A", "textures/b [1]", true, true).unwrap();
         assert_eq!(session.tree("A", None).unwrap().taken, 6);
         // Ticking back what no exclude of its own left out is refused.
-        session
-            .toggle("A", "textures/a/x.dds", false, false)
-            .unwrap();
-        assert!(session.toggle("A", "textures/a", true, true).is_err());
+        session.toggle("A", "textures/a", true, false).unwrap();
+        assert!(
+            session
+                .toggle("A", "textures/a/x.dds", false, true)
+                .is_err()
+        );
     }
 
+    const BAIN: &str = r#"name = "Spike"
+plugins = ["Oblivion.esm", "Core.esp"]
+
+[[mods]]
+id = "P"
+plugins = ["Core.esp"]
+
+[[mods.archives]]
+path = "manual:P.zip"
+layout = "bain"
+bain_subpackages = ["00 Core"]
+"#;
+
     #[test]
-    fn a_name_with_brackets_is_quoted_for_the_shell_and_escaped_as_a_glob() {
-        assert_eq!(quote("Harvest [Flora].esp"), "'Harvest [Flora].esp'");
-        assert_eq!(
-            globset::escape("Harvest [Flora].esp"),
-            "Harvest [[]Flora[]].esp"
+    fn in_a_bain_archive_filters_see_paths_inside_the_package_and_packages_tick() {
+        let dir = tempfile::tempdir().unwrap();
+        let list = dir.path().join("list.toml");
+        std::fs::write(&list, BAIN).unwrap();
+        let downloads = dir.path().join("downloads");
+        std::fs::create_dir_all(&downloads).unwrap();
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(downloads.join("P.zip")).unwrap());
+        let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+        for name in [
+            "00 Core/Core.esp",
+            "00 Core/Docs/readme.txt",
+            "01 Extra/textures/e.dds",
+        ] {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(b"x").unwrap();
+        }
+        zip.finish().unwrap();
+        let session = Session::new(&list, Some(downloads)).unwrap();
+
+        let tree = session.tree("P", None).unwrap();
+        assert_eq!(tree.taken, 2);
+        let extra = tree
+            .rows
+            .iter()
+            .find(|r| r.path == "01 Extra/textures/e.dds")
+            .unwrap();
+        assert!(!extra.offered);
+        assert!(session.toggle("P", &extra.path, false, true).is_err());
+
+        // A folder inside the package is excluded as the filters see it.
+        let edited = session.toggle("P", "00 Core/Docs", true, false).unwrap();
+        assert!(
+            edited.command.ends_with("--exclude 'Docs/**'"),
+            "{}",
+            edited.command
         );
-        assert_eq!(quote("Oblivion.esm"), "Oblivion.esm");
+        assert_eq!(session.tree("P", None).unwrap().taken, 1);
+        session
+            .toggle("P", "00 Core/Docs/readme.txt", false, true)
+            .unwrap_err();
+        session.toggle("P", "00 Core/Docs", true, true).unwrap();
+
+        // A package is chosen and unchosen.
+        let edited = session.toggle("P", "01 Extra", true, true).unwrap();
+        assert!(
+            edited
+                .command
+                .contains(r#"bain_subpackages=["00 Core", "01 Extra"]"#),
+            "{}",
+            edited.command
+        );
+        assert_eq!(session.tree("P", None).unwrap().taken, 3);
+        session.toggle("P", "01 Extra", true, false).unwrap();
+        assert_eq!(std::fs::read_to_string(&list).unwrap(), BAIN);
     }
 }

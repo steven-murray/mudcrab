@@ -76,6 +76,24 @@ What building them showed:
 - Both run planning off the UI thread, and both edit through the same
   library calls, so the CLI-parity rule held without effort.
 
+What the first hands-on run (Tauri, Linux) found, now fixed:
+
+- **The drag selected text** instead of moving smoothly: WebKitGTK needs
+  `-webkit-user-select: none` and a `preventDefault` on the press, and moving
+  the dragged row in the page dropped its pointer capture. The drag now
+  listens on the window, leaves the row in the list as the placeholder, and
+  scrolls the list when the pointer nears its edge.
+- **Unticking wrote an exclude that did nothing.** `include` and `exclude`
+  match paths inside the data folder, BAIN package or FOMOD folder a file
+  comes from, not its path in the archive; the spike was writing archive
+  paths. The planner now records, for each file, the path it tested against
+  the filters (`filtered_as`), and `archive_contents` also reports what the
+  layout offers before any filter, so the tree tells three things apart:
+  taken, left out by a filter (struck through; ticking it back drops the
+  exclude), and not chosen by the layout (dim). A BAIN package's folder ticks
+  by editing `bain_subpackages`, as MO2's installer does. The GUI proper will
+  need exactly this, so it lives in mudcrab's library.
+
 ## What is left to try (by hand)
 
 On each machine, with each spike, on a copy of a real list:

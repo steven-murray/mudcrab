@@ -548,9 +548,24 @@ fn add_plugin(folder: &mut ModFolder, destination: &str, masters: Option<&Vec<St
 pub struct ArchiveContents {
     /// Every file in the archive, as the archive names it.
     pub entries: Vec<String>,
-    /// The entries `install` takes, each with its path in the mod's folder
-    /// (before the mod's actions run), by destination.
-    pub taken: Vec<(String, String)>,
+    /// The entries `install` takes, by destination.
+    pub taken: Vec<Taken>,
+    /// What the layout would take with no `include` or `exclude`: `taken`,
+    /// plus what the archive's filters leave out. An entry in neither is one
+    /// the layout does not choose (a BAIN package or FOMOD option not picked).
+    pub available: Vec<Taken>,
+}
+
+/// An archive entry `install` takes.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Taken {
+    /// As the archive names it.
+    pub source: String,
+    /// Its path in the mod's folder, before the mod's actions run.
+    pub destination: String,
+    /// The path the archive's `include` and `exclude` match it as: inside the
+    /// data folder, BAIN subpackage or FOMOD folder it came from.
+    pub filtered_as: String,
 }
 
 /// What `install` would do with `archive` for `mod_entry`. `None` when that
@@ -584,17 +599,21 @@ pub fn archive_contents(
         .chain(archive.game_root_files.iter())
         .cloned()
         .collect();
-    let planned = ArchiveFilters::new(&archive.include, &exclude).and_then(|filters| {
-        layout::plan_archive(
-            &source.display().to_string(),
-            &paths,
-            &reader,
-            &mod_entry.id,
-            archive,
-            &filters,
-            active_plugins,
-        )
-    });
+    let plan = |include: &[String], exclude: &[String]| {
+        ArchiveFilters::new(include, exclude).and_then(|filters| {
+            layout::plan_archive(
+                &source.display().to_string(),
+                &paths,
+                &reader,
+                &mod_entry.id,
+                archive,
+                &filters,
+                active_plugins,
+            )
+        })
+    };
+    let planned = plan(&archive.include, &exclude);
+    let unfiltered = plan(&[], &archive.game_root_files);
     let _ = std::fs::remove_dir_all(&scratch);
     let prefix = archive
         .target_subdir
@@ -603,14 +622,20 @@ pub fn archive_contents(
         .filter(|value| !value.is_empty())
         .map(|value| format!("{value}/"))
         .unwrap_or_default();
-    let taken = planned?
-        .files
-        .iter()
-        .map(|file| (file.source.clone(), format!("{prefix}{}", file.destination)))
-        .collect();
+    let taken = |plan: layout::plan::LayoutPlan| -> Vec<Taken> {
+        plan.files
+            .into_iter()
+            .map(|file| Taken {
+                source: file.source,
+                destination: format!("{prefix}{}", file.destination),
+                filtered_as: file.filtered_as,
+            })
+            .collect()
+    };
     Ok(Some(ArchiveContents {
         entries: paths,
-        taken,
+        taken: taken(planned?),
+        available: taken(unfiltered?),
     }))
 }
 
@@ -624,7 +649,11 @@ pub fn planned_files(
 ) -> anyhow::Result<Option<Vec<String>>> {
     Ok(
         archive_contents(mod_entry, archive, cache_dir, active_plugins)?.map(|contents| {
-            let mut files: Vec<String> = contents.taken.into_iter().map(|(_, to)| to).collect();
+            let mut files: Vec<String> = contents
+                .taken
+                .into_iter()
+                .map(|taken| taken.destination)
+                .collect();
             files.sort();
             files
         }),

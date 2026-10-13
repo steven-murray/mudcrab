@@ -61,63 +61,87 @@ async function loadOrder() {
 
 // Dragging with pointer events: WebKitGTK (Tauri on Linux) does not deliver
 // HTML5 drag-and-drop events reliably, and pointer events work everywhere.
+// The row itself stays in the list as the placeholder, moving to where it
+// would land, while a copy follows the pointer. The listeners are on the
+// window, so the pointer is never lost when rows move under it.
 function startDrag(down) {
   if (down.button !== 0) return;
+  down.preventDefault(); // no text selection
   const row = down.currentTarget;
   const list = $("lo-list");
   const from = Number(row.dataset.index);
-  const height = row.getBoundingClientRect().height;
-  const top0 = row.offsetTop;
-  let moved = false;
-  let target = from;
+  const startY = down.clientY;
+  const grabOffset = startY - row.getBoundingClientRect().top;
+  let ghost = null;
+  let scrollTimer = null;
+  let lastY = startY;
 
-  const gap = el("div", "row gap");
-  row.setPointerCapture(down.pointerId);
-
-  const onMove = (move) => {
-    const dy = move.clientY - down.clientY;
-    if (!moved) {
-      if (Math.abs(dy) < 4) return;
-      moved = true;
-      row.after(gap);
-      row.classList.add("dragging");
-      list.append(row);
-    }
-    row.style.top = `${top0 + dy}px`;
-    // Where the dragged row's middle is, as a row index.
-    target = Math.max(0, Math.min(plugins.length - 1, Math.round((top0 + dy) / height)));
-    const rows = [...list.children].filter((r) => r !== row && r !== gap);
-    const before = rows[target];
-    if (before) before.before(gap); else list.append(gap);
-    // Keep the dragged row in view near the edges.
+  const place = () => {
     const box = list.getBoundingClientRect();
-    if (move.clientY < box.top + 30) list.scrollTop -= 12;
-    if (move.clientY > box.bottom - 30) list.scrollTop += 12;
+    ghost.style.top = `${lastY - box.top + list.scrollTop - grabOffset}px`;
+    // The placeholder goes before the first row whose middle is below the
+    // pointer.
+    const rows = [...list.children].filter((r) => r !== ghost && r !== row);
+    const before = rows.find((r) => {
+      const b = r.getBoundingClientRect();
+      return lastY < b.top + b.height / 2;
+    });
+    if (before) {
+      if (row.nextSibling !== before) list.insertBefore(row, before);
+    } else if (list.lastElementChild !== row) {
+      list.insertBefore(row, ghost);
+    }
+  };
+  const autoScroll = () => {
+    const box = list.getBoundingClientRect();
+    const edge = 40;
+    let step = 0;
+    if (lastY < box.top + edge) step = -Math.ceil((box.top + edge - lastY) / 3);
+    if (lastY > box.bottom - edge) step = Math.ceil((lastY - box.bottom + edge) / 3);
+    if (step) {
+      list.scrollTop += step;
+      place();
+    }
+  };
+  const onMove = (move) => {
+    lastY = move.clientY;
+    if (!ghost) {
+      if (Math.abs(lastY - startY) < 4) return;
+      ghost = row.cloneNode(true);
+      ghost.classList.add("dragging");
+      list.append(ghost);
+      row.classList.add("gap");
+      scrollTimer = setInterval(autoScroll, 16);
+    }
+    place();
   };
   const onUp = async () => {
-    row.removeEventListener("pointermove", onMove);
-    row.removeEventListener("pointerup", onUp);
-    if (!moved || target === from) {
-      row.classList.remove("dragging");
-      row.style.top = "";
-      gap.remove();
-      if (moved) await loadOrder();
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    if (!ghost) return;
+    clearInterval(scrollTimer);
+    ghost.remove();
+    row.classList.remove("gap");
+    const to = [...list.children].indexOf(row);
+    const scroll = list.scrollTop;
+    if (to === from) {
+      await loadOrder();
+      list.scrollTop = scroll;
       return;
     }
-    const scroll = list.scrollTop;
     try {
-      const edited = await invoke("move_plugin", { from, to: target });
+      const edited = await invoke("move_plugin", { from, to });
       showEdit(edited);
       await loadOrder();
-      status(`Moved ${plugins[target].name} in ${edited.millis} ms (validated and written).`);
+      status(`Moved ${plugins[to].name} in ${edited.millis} ms (validated and written).`);
     } catch (err) {
       await loadOrder();
       status(String(err), true);
     }
     list.scrollTop = scroll;
   };
-  row.addEventListener("pointermove", onMove);
-  row.addEventListener("pointerup", onUp);
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
 }
 
 // --- A mod's files ---------------------------------------------------------------
@@ -150,7 +174,12 @@ async function loadTree() {
 }
 
 function treeRow(r) {
-  const row = el("div", `row ${r.folder ? "folder" : "file"} ${r.state === "none" ? "off" : ""}`);
+  // Three ways a row reads: taken, left out by a filter (struck through, can
+  // be ticked back), or not chosen by the layout (dim; only a package can be
+  // ticked).
+  const chosen = r.package ? r.files > 0 : r.offered;
+  const cls = r.state === "none" ? (chosen ? "excluded" : "unchosen") : "";
+  const row = el("div", `row ${r.folder ? "folder" : "file"} ${cls}`);
   const name = el("span", "name");
   name.style.paddingLeft = `${r.depth * 18}px`;
   const twisty = el("span", "twisty", r.folder ? (open.has(r.path) ? "▾" : "▸") : "");
@@ -164,6 +193,8 @@ function treeRow(r) {
   box.type = "checkbox";
   box.checked = r.state === "all";
   box.indeterminate = r.state === "some";
+  box.disabled = !r.offered && !r.package;
+  if (box.disabled) box.title = "Not chosen by the archive's layout (a package or option)";
   box.addEventListener("change", async () => {
     const keep = r.state !== "all";
     try {
@@ -176,11 +207,13 @@ function treeRow(r) {
       status(String(err), true);
     }
   });
-  name.append(twisty, box, el("span", "label", r.name));
+  name.append(twisty, box, el("span", "label", r.name + (r.package ? "  · package" : "")));
   row.append(name);
-  row.append(r.folder
-    ? el("span", "count", `${r.taken} of ${r.files}`)
-    : el("span", "dest", r.destination ? `→ ${r.destination}` : ""));
+  let detail = "";
+  if (r.folder) detail = chosen && r.files ? `${r.taken} of ${r.files}` : "not chosen";
+  else if (r.destination) detail = `→ ${r.destination}`;
+  else if (r.offered) detail = "excluded";
+  row.append(el("span", r.folder ? "count" : "dest", detail));
   return row;
 }
 

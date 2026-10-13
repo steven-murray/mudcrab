@@ -15,6 +15,8 @@ export struct FileItem {
     // 0 none, 1 some, 2 all
     state: int,
     open: bool,
+    // Offered by the layout (or a package, which can be chosen).
+    offered: bool,
     detail: string,
 }
 
@@ -62,7 +64,9 @@ component Tab inherits Rectangle {
 // A tri-state tick box.
 component Tick inherits Rectangle {
     in property <int> state;
+    in property <bool> enabled: true;
     callback toggled;
+    opacity: enabled ? 1 : 0.35;
     width: 15px;
     height: 15px;
     border-radius: 3px;
@@ -76,8 +80,9 @@ component Tick inherits Rectangle {
         font-weight: 700;
     }
     TouchArea {
+        enabled: root.enabled;
         clicked => { root.toggled(); }
-        mouse-cursor: pointer;
+        mouse-cursor: root.enabled ? pointer : not-allowed;
     }
 }
 
@@ -321,12 +326,13 @@ export component App inherits Window {
                             alignment: center;
                             Tick {
                                 state: file.state;
+                                enabled: file.offered;
                                 toggled => { root.toggle-file(i); }
                             }
                         }
                         Text {
                             text: file.name;
-                            color: file.state == 0 ? Palette.dim : Palette.text;
+                            color: !file.offered ? #5c6370 : file.state == 0 ? Palette.dim : Palette.text;
                             font-weight: file.folder ? 600 : 400;
                             vertical-alignment: center;
                             overflow: elide;

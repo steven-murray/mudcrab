@@ -40,7 +40,7 @@ pub(crate) fn plan_bain(
     filters: &ArchiveFilters,
     source_label: &str,
 ) -> anyhow::Result<LayoutPlan> {
-    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut pairs: Vec<(String, String, String)> = Vec::new();
 
     for subpackage in archive.bain_subpackages.iter().map(BainSubpackage::name) {
         let mut matched = 0usize;
@@ -52,7 +52,7 @@ pub(crate) fn plan_bain(
             if !filters.should_extract(&rest) {
                 continue;
             }
-            pairs.push((path.clone(), folded_destination(&rest)));
+            pairs.push((path.clone(), folded_destination(&rest), rest));
         }
 
         // A subpackage naming nothing is a typo in the modlist, and silence
@@ -67,7 +67,7 @@ pub(crate) fn plan_bain(
         }
     }
 
-    Ok(LayoutPlan::from_pairs(pairs))
+    Ok(LayoutPlan::from_planned(pairs))
 }
 
 /// Every file under `root`, as `/`-separated paths relative to it.

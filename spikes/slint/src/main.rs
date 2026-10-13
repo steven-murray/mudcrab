@@ -103,7 +103,11 @@ fn load_tree(app: &App, session: &Session, files: &Arc<Mutex<Files>>) {
                         .rows
                         .iter()
                         .map(|row| FileItem {
-                            name: row.name.clone().into(),
+                            name: if row.package {
+                                format!("{}  · package", row.name).into()
+                            } else {
+                                row.name.clone().into()
+                            },
                             depth: row.depth as i32,
                             folder: row.folder,
                             state: match row.state {
@@ -112,14 +116,19 @@ fn load_tree(app: &App, session: &Session, files: &Arc<Mutex<Files>>) {
                                 Ticked::All => 2,
                             },
                             open: open.contains(&row.path),
+                            offered: row.offered || row.package,
                             detail: if row.folder {
-                                format!("{} of {}", row.taken, row.files).into()
+                                if row.offered && row.files > 0 {
+                                    format!("{} of {}", row.taken, row.files).into()
+                                } else {
+                                    "not chosen".into()
+                                }
+                            } else if let Some(to) = &row.destination {
+                                format!("→ {to}").into()
+                            } else if row.offered {
+                                "excluded".into()
                             } else {
-                                row.destination
-                                    .as_ref()
-                                    .map(|to| format!("→ {to}"))
-                                    .unwrap_or_default()
-                                    .into()
+                                "".into()
                             },
                         })
                         .collect();
