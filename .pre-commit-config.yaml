@@ -1,0 +1,26 @@
+# File hygiene, run by pre-commit.ci on every PR (and locally with
+# `pre-commit install`). Rust formatting and lints run in GitHub CI
+# (`cargo fmt --check`, `cargo clippy`), which has the toolchain.
+ci:
+  autofix_commit_msg: "pre-commit: fix file hygiene"
+  autoupdate_schedule: quarterly
+
+# Test fixtures are byte-exact inputs: archives, plugins, and modlists whose
+# whitespace and line endings are part of what is tested.
+exclude: ^tests/fixtures/
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-toml
+      - id: check-yaml
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
