@@ -82,6 +82,8 @@ pub fn running_instances() -> Option<Vec<PathBuf>> {
 
 /// The folder `ModOrganizer.exe` runs from, when a command line's program is
 /// MO2.
+// Read on Linux only, where `/proc` is; parsed and tested everywhere.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn mo2_instance_of(cmdline: &[u8]) -> Option<PathBuf> {
     let program = cmdline
         .split(|byte| *byte == 0)
@@ -102,6 +104,7 @@ fn mo2_instance_of(cmdline: &[u8]) -> Option<PathBuf> {
 ///
 /// Only the first argument: Steam's launcher and runtime wrappers also carry
 /// MO2's path, further along, and are not MO2.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn cmdline_runs_instance(cmdline: &[u8], instance: &Path) -> bool {
     let instance = normalise(&instance.to_string_lossy());
     cmdline
@@ -118,6 +121,7 @@ fn cmdline_runs_instance(cmdline: &[u8], instance: &Path) -> bool {
 
 /// `Z:\home\x` -> `/home/x`; a Unix path as-is; anything else (another drive,
 /// a bare name) is not something this can place.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn as_unix_path(arg: &str) -> Option<PathBuf> {
     if let Some(rest) = arg
         .strip_prefix("Z:\\")
@@ -130,6 +134,7 @@ fn as_unix_path(arg: &str) -> Option<PathBuf> {
 
 /// Compared case-insensitively, since Wine hands paths around in whatever case
 /// the Windows side chose.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
 fn normalise(path: &str) -> String {
     path.trim_end_matches('/').to_lowercase()
 }

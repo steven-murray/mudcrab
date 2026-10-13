@@ -24,6 +24,7 @@
 
 use crate::config::install::InstallSettings;
 use crate::config::schema::QacAction;
+#[cfg(not(target_os = "windows"))]
 use crate::config::tools::ToolsConfig;
 use crate::util::fs::link_or_copy;
 use std::path::{Path, PathBuf};

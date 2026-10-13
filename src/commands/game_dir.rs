@@ -53,12 +53,12 @@ pub fn run(args: GameDirArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(test)]
+// The Z: drive is Wine's; on Windows a path is passed as it is.
+#[cfg(all(test, not(windows)))]
 mod tests {
     use super::*;
 
     #[test]
-    #[cfg(not(windows))]
     fn a_linux_folder_is_on_drive_z() {
         assert_eq!(
             as_mo2_sees_it(Path::new(
