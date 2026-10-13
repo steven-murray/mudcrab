@@ -193,7 +193,7 @@ function treeRow(r) {
   box.type = "checkbox";
   box.checked = r.state === "all";
   box.indeterminate = r.state === "some";
-  box.disabled = !r.offered && !r.package;
+  box.disabled = !r.tickable;
   if (box.disabled) box.title = "Not chosen by the archive's layout (a package or option)";
   box.addEventListener("change", async () => {
     const keep = r.state !== "all";

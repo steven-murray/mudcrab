@@ -63,6 +63,10 @@ pub struct FileRow {
     pub offered: bool,
     /// A BAIN package: ticking it chooses the package.
     pub package: bool,
+    /// Whether ticking or unticking it can do anything: what the layout
+    /// offers, and in a BAIN archive anything inside a package (ticking it
+    /// chooses the package, keeping only that).
+    pub tickable: bool,
     /// Where a taken file goes in the mod's folder.
     pub destination: Option<String>,
     /// Inside a folder: the files the layout offers, and how many are taken.
@@ -208,7 +212,16 @@ impl Session {
         &self,
         id: &str,
     ) -> anyhow::Result<(mudcrab::config::pipeline::PlannedArchive, ArchiveContents)> {
-        let text = self.text()?;
+        self.contents_of(&self.text()?, id)
+    }
+
+    /// As [`Session::contents`], for the list as `text` has it.
+    fn contents_of(
+        &self,
+        text: &str,
+        id: &str,
+    ) -> anyhow::Result<(mudcrab::config::pipeline::PlannedArchive, ArchiveContents)> {
+        let text = text.to_string();
         let planned = mudcrab::config::pipeline::planned_archive(
             &text,
             &self.list,
@@ -293,15 +306,25 @@ impl Session {
         let (planned, contents) = self.contents(id)?;
         let archive = &planned.archive;
 
-        let (key, value) = if folder
-            && !path.contains('/')
-            && archive.layout == Some(ArchiveLayout::Bain)
-        {
-            ("bain_subpackages", path.to_string())
-        } else {
-            let filtered_as = if folder {
-                let under = format!("{path}/");
-                let inside = contents
+        // Ticking something inside a BAIN package not yet chosen: choose the
+        // package, keeping only that.
+        if keep && archive.layout == Some(ArchiveLayout::Bain) {
+            let package = path.split('/').next().unwrap_or_default();
+            let chosen = bain_names(archive)
+                .iter()
+                .any(|name| name.eq_ignore_ascii_case(package));
+            if !chosen && package != path {
+                return self.choose_part_of_package(id, package, path, folder, &contents, started);
+            }
+        }
+
+        let (key, value) =
+            if folder && !path.contains('/') && archive.layout == Some(ArchiveLayout::Bain) {
+                ("bain_subpackages", path.to_string())
+            } else {
+                let filtered_as = if folder {
+                    let under = format!("{path}/");
+                    let inside = contents
                     .available
                     .iter()
                     .find(|t| t.source.replace('\\', "/").starts_with(&under))
@@ -310,19 +333,19 @@ impl Session {
                             "the layout takes nothing from {path}, so there is nothing to filter"
                         )
                     })?;
-                let tail = &inside.source.replace('\\', "/")[under.len()..];
-                let folder_as = inside
-                    .filtered_as
-                    .strip_suffix(tail)
-                    .map(|rest| rest.trim_end_matches('/'))
-                    .unwrap_or_default();
-                anyhow::ensure!(
-                    !folder_as.is_empty(),
-                    "{path} is the mod's data folder itself; untick what is in it instead"
-                );
-                folder_glob(folder_as)
-            } else {
-                let offered = contents
+                    let tail = &inside.source.replace('\\', "/")[under.len()..];
+                    let folder_as = inside
+                        .filtered_as
+                        .strip_suffix(tail)
+                        .map(|rest| rest.trim_end_matches('/'))
+                        .unwrap_or_default();
+                    anyhow::ensure!(
+                        !folder_as.is_empty(),
+                        "{path} is the mod's data folder itself; untick what is in it instead"
+                    );
+                    folder_glob(folder_as)
+                } else {
+                    let offered = contents
                     .available
                     .iter()
                     .find(|t| t.source == path)
@@ -332,10 +355,10 @@ impl Session {
                              chosen), not by a filter"
                         )
                     })?;
-                globset::escape(&offered.filtered_as)
+                    globset::escape(&offered.filtered_as)
+                };
+                ("exclude", filtered_as)
             };
-            ("exclude", filtered_as)
-        };
 
         // Ticking a package adds it; for a filter, ticking takes the exclude out.
         let adding = (key == "bain_subpackages") == keep;
@@ -405,6 +428,125 @@ impl Session {
     }
 }
 
+impl Session {
+    /// Choose BAIN package `package` of mod `id`, keeping only `path` (a file,
+    /// or with `folder` everything in it): the package is added, and the rest
+    /// of it excluded -- a whole folder at a time where `path` is not inside
+    /// it. Refused when an exclude would also leave out a file another chosen
+    /// package installs, since filters apply to every package alike.
+    fn choose_part_of_package(
+        &self,
+        id: &str,
+        package: &str,
+        path: &str,
+        folder: bool,
+        now: &ArchiveContents,
+        started: Instant,
+    ) -> anyhow::Result<Edited> {
+        let text = self.text()?;
+        let with_package = doc::edit_strings(
+            &text,
+            id,
+            Some(1),
+            "bain_subpackages",
+            &[package.to_string()],
+            &[],
+        )?;
+        let (_, then) = self.contents_of(&with_package, id)?;
+        let under = format!("{package}/");
+        let wanted = |source: &str| {
+            let source = source.replace('\\', "/");
+            if folder {
+                source.starts_with(&format!("{path}/"))
+            } else {
+                source == path
+            }
+        };
+        let inside: Vec<&mudcrab::config::check::Taken> = then
+            .taken
+            .iter()
+            .filter(|t| t.source.replace('\\', "/").starts_with(&under))
+            .collect();
+        let keep: Vec<&str> = inside
+            .iter()
+            .filter(|t| wanted(&t.source))
+            .map(|t| t.filtered_as.as_str())
+            .collect();
+        anyhow::ensure!(
+            !keep.is_empty(),
+            "{path} is not something package {package} installs"
+        );
+        // The folders on the way to what is kept, as the filters see them.
+        let kept_dirs: BTreeSet<String> = keep
+            .iter()
+            .flat_map(|f| {
+                let parts: Vec<&str> = f.split('/').collect();
+                (1..parts.len())
+                    .map(move |n| parts[..n].join("/"))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        let mut excludes: BTreeSet<String> = BTreeSet::new();
+        for other in inside.iter().filter(|t| !wanted(&t.source)) {
+            let parts: Vec<&str> = other.filtered_as.split('/').collect();
+            // The outermost folder of it that leads nowhere kept, or the file.
+            let glob = (1..parts.len())
+                .map(|n| parts[..n].join("/"))
+                .find(|dir| !kept_dirs.contains(dir))
+                .map(|dir| folder_glob(&dir))
+                .unwrap_or_else(|| globset::escape(&other.filtered_as));
+            excludes.insert(glob);
+        }
+        // What the excludes would also take from the packages already chosen.
+        let globs = mudcrab::archive::ArchiveFilters::new(
+            &[],
+            &excludes.iter().cloned().collect::<Vec<_>>(),
+        )?;
+        let hit: Vec<&str> = now
+            .taken
+            .iter()
+            .filter(|t| !globs.should_extract(&t.filtered_as))
+            .map(|t| t.source.as_str())
+            .collect();
+        anyhow::ensure!(
+            hit.is_empty(),
+            "choosing only {path} from {package} means excluding paths that another chosen \
+             package installs too ({}), since excludes apply to every package; tick the whole \
+             package instead",
+            hit.iter().take(3).copied().collect::<Vec<_>>().join(", ")
+        );
+
+        let excludes: Vec<String> = excludes.into_iter().collect();
+        let edit = edit::plan(&self.list, |text, _| {
+            let text = doc::edit_strings(
+                text,
+                id,
+                Some(1),
+                "bain_subpackages",
+                &[package.to_string()],
+                &[],
+            )?;
+            doc::edit_strings(&text, id, Some(1), "exclude", &excludes, &[])
+        })?;
+        edit.write()?;
+        let list = quote(&self.list.display().to_string());
+        let mut command = format!(
+            "mudcrab set {list} --mod {} --archive 1 'bain_subpackages=[...{package:?}]' && \
+             mudcrab files {list} --mod {}",
+            quote(id),
+            quote(id)
+        );
+        for glob in &excludes {
+            command.push_str(&format!(" --exclude {}", quote(glob)));
+        }
+        Ok(Edited {
+            command,
+            diff: edit.diff(),
+            millis: started.elapsed().as_millis(),
+        })
+    }
+}
+
 fn bain_names(archive: &mudcrab::config::schema::CompiledArchive) -> Vec<String> {
     archive
         .bain_subpackages
@@ -453,6 +595,7 @@ impl Walk<'_> {
                 },
                 offered: files > 0 || package,
                 package,
+                tickable: files > 0 || (self.bain && !under.is_empty()) || package,
                 destination: None,
                 files,
                 taken: inside,
@@ -481,6 +624,7 @@ impl Walk<'_> {
                 },
                 offered: self.offered.contains(entry.as_str()),
                 package: false,
+                tickable: self.offered.contains(entry.as_str()) || (self.bain && depth > 0),
                 destination,
                 files: 1,
                 taken: usize::from(self.taken.contains_key(entry.as_str())),
@@ -657,7 +801,6 @@ bain_subpackages = ["00 Core"]
             .find(|r| r.path == "01 Extra/textures/e.dds")
             .unwrap();
         assert!(!extra.offered);
-        assert!(session.toggle("P", &extra.path, false, true).is_err());
 
         // A folder inside the package is excluded as the filters see it.
         let edited = session.toggle("P", "00 Core/Docs", true, false).unwrap();
@@ -684,5 +827,53 @@ bain_subpackages = ["00 Core"]
         assert_eq!(session.tree("P", None).unwrap().taken, 3);
         session.toggle("P", "01 Extra", true, false).unwrap();
         assert_eq!(std::fs::read_to_string(&list).unwrap(), BAIN);
+    }
+
+    #[test]
+    fn ticking_a_file_in_an_unchosen_package_chooses_the_package_with_only_that() {
+        let dir = tempfile::tempdir().unwrap();
+        let list = dir.path().join("list.toml");
+        std::fs::write(&list, BAIN).unwrap();
+        let downloads = dir.path().join("downloads");
+        std::fs::create_dir_all(&downloads).unwrap();
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(downloads.join("P.zip")).unwrap());
+        let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+        for name in [
+            "00 Core/Core.esp",
+            "00 Core/Docs/readme.txt",
+            "01 Extra/textures/a/keep.dds",
+            "01 Extra/textures/a/other.dds",
+            "01 Extra/textures/b/x.dds",
+            "01 Extra/meshes/m.nif",
+            "02 Clash/Docs/readme.txt",
+            "02 Clash/c.esp",
+        ] {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(b"x").unwrap();
+        }
+        zip.finish().unwrap();
+        let session = Session::new(&list, Some(downloads)).unwrap();
+
+        let edited = session
+            .toggle("P", "01 Extra/textures/a/keep.dds", false, true)
+            .unwrap();
+        let text = std::fs::read_to_string(&list).unwrap();
+        assert!(
+            text.contains(r#"bain_subpackages = ["00 Core", "01 Extra"]"#),
+            "{text}"
+        );
+        assert!(
+            text.contains(r#"exclude = ["meshes/**", "textures/a/other.dds", "textures/b/**"]"#),
+            "{text}\n{}",
+            edited.command
+        );
+        let tree = session.tree("P", None).unwrap();
+        assert_eq!(tree.taken, 3);
+
+        // Keeping only c.esp would exclude Docs/readme.txt, which 00 Core installs.
+        let err = session
+            .toggle("P", "02 Clash/c.esp", false, true)
+            .unwrap_err();
+        assert!(err.to_string().contains("00 Core/Docs/readme.txt"), "{err}");
     }
 }
