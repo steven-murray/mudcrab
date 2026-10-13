@@ -1,0 +1,403 @@
+// The spike in Slint: the same two views as the Tauri one, drawn natively.
+
+import { ListView, LineEdit, ScrollView } from "std-widgets.slint";
+
+export struct PluginItem {
+    name: string,
+    mods: string,
+    inactive: bool,
+}
+
+export struct FileItem {
+    name: string,
+    depth: int,
+    folder: bool,
+    // 0 none, 1 some, 2 all
+    state: int,
+    open: bool,
+    detail: string,
+}
+
+export struct DiffLine {
+    text: string,
+    // 0 plain, 1 added, 2 removed, 3 hunk
+    kind: int,
+}
+
+global Palette {
+    out property <color> bg: #15171c;
+    out property <color> panel: #1d2027;
+    out property <color> row: #20242c;
+    out property <color> row-alt: #1b1e25;
+    out property <color> line: #2d323c;
+    out property <color> text: #e6e8ec;
+    out property <color> dim: #8a919e;
+    out property <color> accent: #e8743b;
+    out property <color> good: #5fbf7a;
+    out property <color> bad: #e0605a;
+    out property <color> hunk: #6aa7d8;
+}
+
+component Tab inherits Rectangle {
+    in property <string> label;
+    in property <bool> on;
+    callback clicked;
+    height: 32px;
+    width: t.preferred-width + 24px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: on ? Palette.line : transparent;
+    background: on ? Palette.row : transparent;
+    t := Text {
+        text: label;
+        color: on ? Palette.text : Palette.dim;
+        font-size: 14px;
+    }
+    TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+}
+
+// A tri-state tick box.
+component Tick inherits Rectangle {
+    in property <int> state;
+    callback toggled;
+    width: 15px;
+    height: 15px;
+    border-radius: 3px;
+    border-width: 1px;
+    border-color: state == 0 ? Palette.dim : Palette.accent;
+    background: state == 0 ? transparent : Palette.accent;
+    Text {
+        text: state == 2 ? "✓" : state == 1 ? "–" : "";
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    TouchArea {
+        clicked => { root.toggled(); }
+        mouse-cursor: pointer;
+    }
+}
+
+export component App inherits Window {
+    title: "mudcrab spike (Slint)";
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    background: Palette.bg;
+    default-font-size: 14px;
+
+    in property <string> list-path;
+    in property <[PluginItem]> plugins;
+    in property <[FileItem]> files;
+    in property <[DiffLine]> diff;
+    in property <string> command;
+    in property <string> status;
+    in property <bool> status-bad;
+    in property <string> tree-label;
+    in-out property <int> view: 0;
+
+    // Move plugin `from` so it ends up at index `to`.
+    callback move-plugin(int, int);
+    callback choose-mod(string);
+    callback toggle-file(int);
+    callback twisty(int);
+
+    property <length> row-height: 30px;
+    property <int> drag-from: -1;
+    property <length> drag-dy: 0px;
+    property <int> drop-at: drag-from < 0 ? -1 : max(0, min(plugins.length - 1, drag-from + round(drag-dy / row-height)));
+
+    VerticalLayout {
+        // Header
+        Rectangle {
+            height: 52px;
+            background: Palette.panel;
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                spacing: 16px;
+                alignment: stretch;
+                Text {
+                    text: "mudcrab spike · Slint";
+                    color: Palette.text;
+                    font-weight: 600;
+                    font-size: 15px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: list-path;
+                    color: Palette.dim;
+                    font-size: 12px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                    horizontal-alignment: left;
+                    horizontal-stretch: 1;
+                }
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: end;
+                    VerticalLayout {
+                        alignment: center;
+                        Tab {
+                            label: "Load order";
+                            on: view == 0;
+                            clicked => { view = 0; }
+                        }
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        Tab {
+                            label: "A mod's files";
+                            on: view == 1;
+                            clicked => { view = 1; }
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: Palette.line;
+            }
+        }
+
+        // The load order
+        if view == 0: VerticalLayout {
+            Rectangle {
+                height: 36px;
+                HorizontalLayout {
+                    padding-left: 16px;
+                    spacing: 10px;
+                    Text {
+                        text: plugins.length + " plugins";
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        horizontal-alignment: left;
+                        text: "Drag a plugin to move it.";
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+            ListView {
+                vertical-stretch: 1;
+                for plugin[i] in plugins: Rectangle {
+                    height: row-height;
+                    background: i == drag-from ? #2a2f3a : mod(i, 2) == 0 ? Palette.row : Palette.row-alt;
+                    // Where the dragged plugin would land.
+                    Rectangle {
+                        visible: drop-at == i && drop-at != drag-from;
+                        y: drop-at > drag-from ? parent.height - 2px : 0px;
+                        height: 2px;
+                        background: Palette.accent;
+                    }
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        spacing: 0px;
+                        Text {
+                            width: 22px;
+                            text: "⠿";
+                            color: Palette.dim;
+                            vertical-alignment: center;
+                        }
+                        Text {
+                            width: 44px;
+                            text: i + 1;
+                            color: Palette.dim;
+                            horizontal-alignment: right;
+                            vertical-alignment: center;
+                        }
+                        Rectangle { width: 12px; }
+                        Text {
+                            text: plugin.name;
+                            color: Palette.text;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-width: 0px;
+                        }
+                        Text {
+                            text: plugin.mods;
+                            color: Palette.dim;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-width: 0px;
+                        }
+                        Text {
+                            width: 70px;
+                            text: plugin.inactive ? "inactive" : "";
+                            color: Palette.dim;
+                            font-size: 11px;
+                            horizontal-alignment: right;
+                            vertical-alignment: center;
+                        }
+                    }
+                    TouchArea {
+                        mouse-cursor: drag-from == i ? grabbing : grab;
+                        pointer-event(event) => {
+                            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                                drag-from = i;
+                                drag-dy = 0px;
+                            } else if (event.kind == PointerEventKind.up && drag-from == i) {
+                                if (drop-at != drag-from && drop-at >= 0) {
+                                    root.move-plugin(drag-from, drop-at);
+                                }
+                                drag-from = -1;
+                                drag-dy = 0px;
+                            }
+                        }
+                        moved => {
+                            if (drag-from == i) {
+                                drag-dy = self.mouse-y - self.pressed-y;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // A mod's files
+        if view == 1: VerticalLayout {
+            Rectangle {
+                height: 44px;
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 10px;
+                    Text {
+                        text: "Mod";
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                    }
+                    VerticalLayout {
+                        alignment: center;
+                        LineEdit {
+                            width: 420px;
+                            placeholder-text: "type a mod id, then Enter";
+                            accepted(text) => { root.choose-mod(text); }
+                        }
+                    }
+                    Text {
+                        text: tree-label;
+                        color: Palette.dim;
+                        vertical-alignment: center;
+                        overflow: elide;
+                        horizontal-alignment: left;
+                        horizontal-stretch: 1;
+                    }
+                }
+            }
+            ListView {
+                vertical-stretch: 1;
+                for file[i] in files: Rectangle {
+                    height: row-height;
+                    background: mod(i, 2) == 0 ? Palette.row : Palette.row-alt;
+                    HorizontalLayout {
+                        padding-left: 16px + file.depth * 18px;
+                        padding-right: 16px;
+                        spacing: 6px;
+                        Text {
+                            width: 14px;
+                            text: file.folder ? (file.open ? "▾" : "▸") : "";
+                            color: Palette.dim;
+                            vertical-alignment: center;
+                            TouchArea {
+                                clicked => { root.twisty(i); }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            Tick {
+                                state: file.state;
+                                toggled => { root.toggle-file(i); }
+                            }
+                        }
+                        Text {
+                            text: file.name;
+                            color: file.state == 0 ? Palette.dim : Palette.text;
+                            font-weight: file.folder ? 600 : 400;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-width: 0px;
+                        }
+                        Text {
+                            text: file.detail;
+                            color: Palette.dim;
+                            font-size: 12px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            preferred-width: 0px;
+                            min-width: 0px;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The status, and the last edit as a command and a diff
+        Rectangle {
+            height: command == "" ? 30px : 220px;
+            background: Palette.panel;
+            Rectangle {
+                y: 0;
+                height: 1px;
+                background: Palette.line;
+            }
+            VerticalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-top: 6px;
+                padding-bottom: 6px;
+                spacing: 6px;
+                Text {
+                    text: status;
+                    color: status-bad ? Palette.bad : Palette.dim;
+                    font-size: 12px;
+                    overflow: elide;
+                    horizontal-alignment: left;
+                }
+                if command != "": Rectangle {
+                    background: #0f1115;
+                    border-radius: 6px;
+                    height: 26px;
+                    Text {
+                        x: 10px;
+                        text: "$ " + command;
+                        color: Palette.text;
+                        font-family: "monospace";
+                        font-size: 12px;
+                        overflow: elide;
+                        horizontal-alignment: left;
+                        width: parent.width - 20px;
+                    }
+                }
+                if command != "": ListView {
+                    vertical-stretch: 1;
+                    for line in diff: Text {
+                        text: line.text;
+                        font-family: "monospace";
+                        font-size: 12px;
+                        color: line.kind == 1 ? Palette.good : line.kind == 2 ? Palette.bad : line.kind == 3 ? Palette.hunk : Palette.dim;
+                    }
+                }
+            }
+        }
+    }
+}

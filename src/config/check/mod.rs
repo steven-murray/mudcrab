@@ -543,16 +543,25 @@ fn add_plugin(folder: &mut ModFolder, destination: &str, masters: Option<&Vec<St
     }
 }
 
-/// The files `install` would take from `archive` for `mod_entry`, before the
-/// mod's actions: each one's path in the mod's folder, sorted. `None` when
-/// that is only known at install (an archive inside an archive, an MO2
-/// plugin, a build from files).
-pub fn planned_files(
+/// An archive as `install` sees it: every entry, and the entries it takes.
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize)]
+pub struct ArchiveContents {
+    /// Every file in the archive, as the archive names it.
+    pub entries: Vec<String>,
+    /// The entries `install` takes, each with its path in the mod's folder
+    /// (before the mod's actions run), by destination.
+    pub taken: Vec<(String, String)>,
+}
+
+/// What `install` would do with `archive` for `mod_entry`. `None` when that
+/// is only known at install (an archive inside an archive, an MO2 plugin, a
+/// build from files).
+pub fn archive_contents(
     mod_entry: &PersonalizedMod,
     archive: &CompiledArchive,
     cache_dir: &Path,
     active_plugins: &HashSet<String>,
-) -> anyhow::Result<Option<Vec<String>>> {
+) -> anyhow::Result<Option<ArchiveContents>> {
     let settings = CheckSettings {
         cache_dir: cache_dir.to_path_buf(),
         filter: ModFilter::default(),
@@ -594,13 +603,32 @@ pub fn planned_files(
         .filter(|value| !value.is_empty())
         .map(|value| format!("{value}/"))
         .unwrap_or_default();
-    let mut files: Vec<String> = planned?
+    let taken = planned?
         .files
         .iter()
-        .map(|file| format!("{prefix}{}", file.destination))
+        .map(|file| (file.source.clone(), format!("{prefix}{}", file.destination)))
         .collect();
-    files.sort();
-    Ok(Some(files))
+    Ok(Some(ArchiveContents {
+        entries: paths,
+        taken,
+    }))
+}
+
+/// The files `install` would take from `archive`: each one's path in the
+/// mod's folder, sorted. `None` as for [`archive_contents`].
+pub fn planned_files(
+    mod_entry: &PersonalizedMod,
+    archive: &CompiledArchive,
+    cache_dir: &Path,
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<Option<Vec<String>>> {
+    Ok(
+        archive_contents(mod_entry, archive, cache_dir, active_plugins)?.map(|contents| {
+            let mut files: Vec<String> = contents.taken.into_iter().map(|(_, to)| to).collect();
+            files.sort();
+            files
+        }),
+    )
 }
 
 /// What one archive contributes: each planned file (with the real bytes for

@@ -5,7 +5,8 @@
 //! `config::check::check_all`, `config::download::download_all` and
 //! `config::install::install_all`.
 
-use crate::config::schema::{CompiledModlist, PersonalizedPlan};
+use crate::config::schema::{CompiledArchive, CompiledModlist, PersonalizedMod, PersonalizedPlan};
+use std::collections::HashSet;
 use std::path::Path;
 
 /// A compiled list, and the validator's warnings about its source.
@@ -83,4 +84,65 @@ pub fn write_json(path: &Path, value: &impl serde::Serialize) -> anyhow::Result<
         .map_err(|err| anyhow::anyhow!("failed to serialize {}: {err}", path.display()))?;
     std::fs::write(path, data)
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
+}
+
+/// One of a mod's archives as a plan would have it.
+pub struct PlannedArchive {
+    pub entry: PersonalizedMod,
+    pub archive: CompiledArchive,
+    /// The plan's load order, lowercased: what a layout needs to choose a
+    /// FOMOD's plugin-dependent files.
+    pub active_plugins: HashSet<String>,
+}
+
+/// Mod `id`'s `number`th archive (counting from 1) in `text`, read as the
+/// modlist at `path`, compiled and planned with `overrides` answering its
+/// questions (the rest take their defaults).
+pub fn planned_archive(
+    text: &str,
+    path: &Path,
+    id: &str,
+    number: usize,
+    overrides: &crate::config::query::Overrides,
+) -> anyhow::Result<PlannedArchive> {
+    let source = crate::config::loader::parse_modlist(text, path)?;
+    let spec = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?
+        .archives
+        .get(number.wrapping_sub(1))
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has no archive {number}"))?
+        .clone();
+    let compiled = compile_text(text, path)?;
+    let plan = crate::config::query::build_plan(&compiled.modlist, overrides, None)?;
+    let entry = plan
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| {
+            anyhow::anyhow!("the list's answers leave '{id}' out; answer for it with --set")
+        })?
+        .clone();
+    // An archive whose condition is not met is not in the plan.
+    let archive = entry
+        .archives
+        .iter()
+        .find(|a| {
+            a.path == spec.path && (spec.file_name.is_none() || a.file_name == spec.file_name)
+        })
+        .ok_or_else(|| {
+            anyhow::anyhow!("the list's answers leave this archive out; answer for it with --set")
+        })?
+        .clone();
+    Ok(PlannedArchive {
+        entry,
+        archive,
+        active_plugins: plan
+            .plugins
+            .iter()
+            .map(|p| p.to_ascii_lowercase())
+            .collect(),
+    })
 }

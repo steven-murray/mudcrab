@@ -292,36 +292,12 @@ fn taken(
     overrides: &crate::config::query::Overrides,
     downloads: &Path,
 ) -> anyhow::Result<Option<(String, Vec<String>)>> {
-    let source = crate::config::loader::parse_modlist(text, path)?;
-    let spec = find_mod(&source, id)?
-        .archives
-        .get(number.wrapping_sub(1))
-        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has no archive {number}"))?
-        .clone();
-    let compiled = crate::config::pipeline::compile_text(text, path)?;
-    let plan = crate::config::query::build_plan(&compiled.modlist, overrides, None)?;
-    let entry = plan
-        .mods
-        .iter()
-        .find(|entry| entry.id == id)
-        .ok_or_else(|| {
-            anyhow::anyhow!("the list's answers leave '{id}' out; answer for it with --set")
-        })?;
-    // An archive whose condition is not met is not in the plan.
-    let archive = entry
-        .archives
-        .iter()
-        .find(|a| {
-            a.path == spec.path && (spec.file_name.is_none() || a.file_name == spec.file_name)
-        })
-        .ok_or_else(|| {
-            anyhow::anyhow!("the list's answers leave this archive out; answer for it with --set")
-        })?;
-    let active: std::collections::HashSet<String> = plan
-        .plugins
-        .iter()
-        .map(|p| p.to_ascii_lowercase())
-        .collect();
+    let crate::config::pipeline::PlannedArchive {
+        entry,
+        archive,
+        active_plugins: active,
+    } = crate::config::pipeline::planned_archive(text, path, id, number, overrides)?;
+    let (entry, archive) = (&entry, &archive);
     let label = archive
         .file_name
         .clone()

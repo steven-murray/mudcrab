@@ -1,0 +1,12 @@
+# The GUI framework spike (phase 3 of docs/design/gui.md): the same two views
+# in Tauri and in Slint, over the same core. Not part of mudcrab's build or
+# release; see README.md.
+[workspace]
+resolver = "2"
+members = ["core", "tauri", "slint"]
+
+[workspace.dependencies]
+mudcrab = { path = ".." }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
