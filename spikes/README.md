@@ -142,7 +142,22 @@ What trying both by hand found (Linux, Wayland):
 - Both kept only the last edit's diff; an undo history and a view of the
   session's changes are now in the plan.
 
-## The decision so far
+## The decision: Tauri
+
+Both started on Windows (Edge WebView2 for Tauri), and Tauri's drag was
+smooth there as on Linux. By the test set above, that decides it: Tauri,
+for how quickly good views are built in it, accepting
+
+- **NVIDIA under Wayland**: the GUI sets `WEBKIT_DISABLE_DMABUF_RENDERER`
+  itself on Linux, as the spike does;
+- **memory**: a few hundred megabytes more than Slint, for a tool run while
+  building a list, not while playing;
+- **the Steam Deck and Linux generally**: shipped as a Flatpak (bringing
+  WebKitGTK) and an AppImage built on an old base, in phase 7.
+
+Slint stays the fallback if WebKitGTK proves troublesome where it matters.
+
+## How it was weighed
 
 Both are viable. The trade is:
 

@@ -1,8 +1,8 @@
 # A GUI, alongside the CLI
 
-**Status: phases 1 and 2 done** (the library API and CLI parity). Phase 3,
-the framework spike, is built and measured on Linux ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes));
-the decision waits on trying it by hand on Windows and the Steam Deck.
+**Status: phases 1-3 done.** The library API and CLI parity are in, and the
+framework spike ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes))
+chose **Tauri**. Next is phase 4, install mode.
 
 ## Why, and the rule it lives under
 
@@ -224,9 +224,11 @@ Still printing directly, for later phases: `conflicts`' sweep and `assets`
 2. **CLI parity.** Done: the commands above, documented and tested.
 3. **Framework spike.** The two views in Tauri and Slint, on the four
    platforms; decide. Built: see [spikes/README.md](https://github.com/steven-murray/mudcrab/blob/main/spikes/README.md)
-   for what was measured. On Linux both work; Tauri needs a workaround to
-   start on NVIDIA under Wayland and uses about five times the memory, Slint
-   needs its tree and tri-state widgets built by hand.
+   for what was measured. Both worked on Linux (Wayland and X11, Intel and
+   NVIDIA) and Windows; Tauri needed a workaround to start on NVIDIA under
+   Wayland and uses about five times the memory, Slint needed its tree,
+   tri-state boxes and fonts built in. **Decided: Tauri**, for how quickly
+   good views are built in it; on the Steam Deck it ships as a Flatpak.
 4. **Install mode.** Read-only list view from the export document, questions,
    locations, the Install timeline, manual-step checklist. Ship it: it is
    useful to players on its own.
