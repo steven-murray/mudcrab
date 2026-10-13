@@ -53,10 +53,9 @@ fn mudcrab(root: &Path) -> Command {
     command
 }
 
-#[test]
-fn check_reads_inside_archives_and_checks_masters_against_the_load_order() {
-    let dir = tempdir().unwrap();
-    let root = dir.path();
+/// Base, and Patch needing Base (ordered after it) and Elsewhere (not in
+/// the list); Absent's archive is not downloaded.
+fn masters_fixture(root: &Path) -> (std::path::PathBuf, std::path::PathBuf) {
     let downloads = root.join("downloads");
     make_zip(
         &downloads.join("Base-1-1-0.zip"),
@@ -97,6 +96,61 @@ file_name = "Absent-3-1-0.zip"
 "#,
     )
     .unwrap();
+    (list, downloads)
+}
+
+#[test]
+fn check_as_a_library_returns_its_findings_and_reports_them_as_events() {
+    use mudcrab::events::{Collect, Event, Tone};
+    let dir = tempdir().unwrap();
+    let (list, downloads) = masters_fixture(dir.path());
+    let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+    let plan =
+        mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    let sink = std::sync::Arc::new(Collect::default());
+    mudcrab::events::set_sink(sink.clone());
+
+    let report = mudcrab::config::check::check_all(
+        &plan,
+        &mudcrab::config::check::CheckSettings {
+            cache_dir: downloads,
+            filter: Default::default(),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.problems, 3);
+    let masters: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.kind == mudcrab::config::check::Kind::Masters)
+        .collect();
+    assert_eq!(masters.len(), 2);
+    assert!(
+        masters
+            .iter()
+            .all(|f| f.item.mod_id.as_deref() == Some("Patch"))
+    );
+    let events = sink.events();
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::Section { tone: Tone::Problem, heading, items }
+            if heading.starts_with("Plugins whose masters") && items.len() == 2
+    )));
+    assert!(matches!(
+        events.last(),
+        Some(Event::Status {
+            tone: Tone::Problem,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn check_reads_inside_archives_and_checks_masters_against_the_load_order() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let (list, downloads) = masters_fixture(root);
     let compiled = root.join("compiled.json");
     let plan = root.join("plan.json");
     mudcrab(root)

@@ -1,6 +1,7 @@
 # A GUI, alongside the CLI
 
-**Status: plan.** Nothing here is implemented yet.
+**Status: phases 1 and 2 done** (the library API and CLI parity); the GUI
+itself starts at phase 3, the framework spike.
 
 ## Why, and the rule it lives under
 
@@ -53,7 +54,8 @@ itself when, say, the Bashed Patch appears.
 
 ### Author mode
 
-The same window, with editing switched on. Views, roughly in the order they
+The same window, with editing switched on: a switch, not a second window or a
+tab, so there is one set of views to build and learn. Views, roughly in the order they
 would be built:
 
 - **The list**: sections as a tree and mods as a table (MO2's layout, so it
@@ -138,28 +140,53 @@ tree with checkboxes over a real MOFAM archive -- and run them on Linux
 (Wayland and X11, AMD and NVIDIA), the Steam Deck and Windows. A week, and the
 choice is then evidence.
 
-## CLI parity: commands to write first
+## CLI parity
 
-Edits an author would make in the GUI that the CLI cannot make today:
+Every edit the GUI makes is one of these commands (documented in
+[usage.md](../usage.md#editing-a-list)):
 
-| Command (sketch) | Does |
+| Command | Does |
 | --- | --- |
-| `mudcrab set <list> <mod> <key>=<value>` | Set or replace a field on a mod (`layout`, `if`, `data_folder`, ...). |
-| `mudcrab remove <list> <mod>` | Remove a mod, its plugins from the load order, and references to it. |
-| `mudcrab plugins <list> move <plugin> --after <plugin>` | Reorder the load order. |
-| `mudcrab files <list> <mod> include\|exclude <glob>` | Edit a mod's file filters, printing what the planner then takes. |
-| `mudcrab action <list> <mod> add <action> ...` | Add an action (`file_move`, `file_hide`, ...). |
-| `mudcrab input <list> add\|set ...` | Declare or change a question. |
+| `set <list> --mod <id> [--archive N] key=value... [--unset key]` | Set or remove fields of a mod or one of its archives. |
+| `remove <list> --mod <id>` | Remove a mod and its plugins from the load order; refused while anything refers to it. |
+| `plugins list <list>` / `plugins move <list> <plugin> --after/--before/--first/--last` | Read and reorder the load order. |
+| `files <list> --mod <id> [--include/--exclude/--drop-... <glob>]` | What an archive installs, from the planner; edit its filters and see what changes. |
+| `action list/add/remove <list> --mod <id> ...` | A mod's actions. |
+| `input list/add/set/remove <list> ...` | The list's questions. |
 
-Each one splices lines (comments survive), validates the result, and restores
-the file if it would not validate -- as `add` and `move` do now.
+Each plans its change as text, validates it in memory, and writes it only if
+valid and only if the file has not changed on disk since it was read; with
+`--dry-run` it prints the diff instead. Fields and arrays are edited with
+`toml_edit`, which leaves every byte it is not asked to change alone (MOFAM's
+10,000 lines round-trip identically); whole mod blocks are still moved and
+removed by the line splicer `add` and `move` use, which knows which comments
+belong to a block.
+
+## The library API (phase 1)
+
+- **`mudcrab::events`**: `Event` (a status line, a titled group of items, a
+  step by hand), `Text` with names marked rather than styled, `Item` with the
+  mod it is about, progress bars, and `set_sink` for the front end's own
+  `Sink`. Events serialise to JSON for a web front end.
+- **`config::check::check_all`** returns its `findings` (kind, text, mod) and
+  counts in the report; the CLI, not the library, fails on problems.
+- **`config::query::build_plan`** takes the answers and an optional `ask`
+  callback; the GUI collects answers in a form and passes none.
+- **`config::edit`**: `plan(path, change) -> Edit`, `Edit::diff`,
+  `Edit::write`, and the operations in `config::edit::doc` and
+  `config::add` (`plan_add`, `plan_move`, `plan_removal`).
+- **`config::pipeline`**: `compile`, `compile_text`, `read_compiled`,
+  `read_plan`, `write_json`.
+
+Still printing directly, for later phases: `conflicts`' sweep and `assets`
+(their logic sits in the command; it moves to the library with phase 5), and
+`download`'s browser mode.
 
 ## Phases
 
-1. **Library API and events.** Command implementations become library
-   functions reporting through an event sink; the CLI renders the events as
-   today. Nothing visible changes.
-2. **CLI parity.** The commands above, each documented and tested.
+1. **Library API and events.** Done: see above. MOFAM's `check` output is
+   byte-identical before and after.
+2. **CLI parity.** Done: the commands above, documented and tested.
 3. **Framework spike.** The two views in Tauri and Slint, on the four
    platforms; decide.
 4. **Install mode.** Read-only list view from the export document, questions,
@@ -172,16 +199,14 @@ the file if it would not validate -- as `add` and `move` do now.
 7. **Packaging.** AppImage (and Flatpak) for Linux, an installer or zip for
    Windows, the Deck checked; the GUI as a separate release artifact.
 
-## Questions to settle
+## Settled
 
-- **One window or two?** Install and author modes as tabs of one window, or
-  author mode as a switch that unlocks editing in the same views. The second
-  keeps one set of views to build and learn.
-- **Where the GUI keeps its settings** (recent lists, window layout): beside
+- **One window, with a switch** that turns author mode's editing on in the
+  same views.
+- **The GUI's own settings** (recent lists, window layout) live beside
   `tools.toml`, never in the list.
-- **Live `check`.** Re-run affected parts of `check` as the author edits, or
-  only on demand? On demand first: it is under a minute, and incremental
-  checking is its own project.
+- **`check` runs on demand.** Live checking as the author edits is a later
+  feature, its own project.
 
 ## Sources
 

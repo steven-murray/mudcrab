@@ -14,10 +14,7 @@ use crate::config::tools::ToolsConfig;
 use std::collections::BTreeSet;
 
 pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
-    let raw = std::fs::read_to_string(&args.plan)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.plan.display()))?;
-    let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw)
-        .map_err(|err| anyhow::anyhow!("failed to parse plan {}: {err}", args.plan.display()))?;
+    let plan = config::pipeline::read_plan(&args.plan)?;
 
     // A sweep reads installed folders only; one mod may be read from its
     // archives when it is not installed, which needs the downloads folder.

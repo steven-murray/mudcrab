@@ -256,18 +256,17 @@ pub fn say(message: impl std::fmt::Display) {
     multi().suspend(|| println!("{message}"));
 }
 
-/// How a line or a section reads: a symbol and a colour. Colour and the
+pub use crate::events::Tone;
+
+/// How a tone looks on a terminal: a symbol and a colour. Colour and the
 /// symbols' Unicode forms follow the terminal -- none when output is piped,
 /// `NO_COLOR` is set, or the terminal cannot show them.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Tone {
-    Good,
-    Warning,
-    Problem,
-    Note,
+trait Look {
+    fn symbol(self) -> console::Emoji<'static, 'static>;
+    fn paint<D>(self, text: D) -> console::StyledObject<D>;
 }
 
-impl Tone {
+impl Look for Tone {
     fn symbol(self) -> console::Emoji<'static, 'static> {
         match self {
             Tone::Good => console::Emoji("✔", "ok"),
@@ -285,6 +284,76 @@ impl Tone {
             Tone::Problem => styled.red(),
             Tone::Note => styled.cyan(),
         }
+    }
+}
+
+/// A message as the terminal shows it: names bold, secondary text dim.
+pub fn render(text: &crate::events::Text) -> String {
+    use crate::events::Span;
+    text.0
+        .iter()
+        .map(|span| match span {
+            Span::Plain(text) => text.clone(),
+            Span::Name(text) => name(text),
+            Span::Dim(text) => dim(text),
+        })
+        .collect()
+}
+
+/// The CLI's [`crate::events::Sink`]: events as styled lines on stdout, progress
+/// as bars on stderr.
+pub struct Terminal;
+
+impl crate::events::Sink for Terminal {
+    fn event(&self, event: crate::events::Event) {
+        use crate::events::Event;
+        // A status after a group stands apart from it.
+        let after_group = AFTER_GROUP.swap(
+            matches!(event, Event::Section { .. } | Event::ManualStep { .. }),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        match event {
+            Event::Status { tone, text } => {
+                if after_group {
+                    say("");
+                }
+                status(tone, render(&text))
+            }
+            Event::Section {
+                tone,
+                heading,
+                items,
+            } => {
+                let items: Vec<String> = items.iter().map(|item| render(&item.text)).collect();
+                section(tone, &heading, &items);
+            }
+            Event::ManualStep { title, steps } => {
+                self::heading(Tone::Warning, format!("Still to do by hand: {title}"));
+                for line in steps {
+                    say(format!("  {line}"));
+                }
+            }
+        }
+    }
+
+    fn progress(&self, len: u64, label: &str) -> crate::events::Progress {
+        crate::events::Progress::new(Bar(progress(len, label)))
+    }
+}
+
+static AFTER_GROUP: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+struct Bar(ProgressBar);
+
+impl crate::events::ProgressSink for Bar {
+    fn inc(&self, steps: u64) {
+        self.0.inc(steps);
+    }
+    fn set_message(&self, message: &str) {
+        self.0.set_message(message.to_string());
+    }
+    fn finish(&self) {
+        self.0.finish_and_clear();
     }
 }
 
@@ -376,6 +445,36 @@ pub fn heading(tone: Tone, text: impl std::fmt::Display) {
         tone.paint(tone.symbol()).bold(),
         console::style(text.to_string()).bold()
     ));
+}
+
+/// A line of data on stdout, for reading or piping on: a pipe closed early
+/// (`| head`) ends the run quietly, as it would any Unix tool.
+pub fn data(line: impl std::fmt::Display) {
+    let mut out = std::io::stdout().lock();
+    if let Err(err) = writeln!(out, "{line}")
+        && err.kind() == std::io::ErrorKind::BrokenPipe
+    {
+        std::process::exit(0);
+    }
+}
+
+/// A unified diff, coloured: added lines green, removed red, hunk headers
+/// cyan.
+pub fn diff(text: &str) {
+    for line in text.lines() {
+        let styled = if line.starts_with("+++") || line.starts_with("---") {
+            console::style(line).bold().to_string()
+        } else if line.starts_with('+') {
+            console::style(line).green().to_string()
+        } else if line.starts_with('-') {
+            console::style(line).red().to_string()
+        } else if line.starts_with("@@") {
+            console::style(line).cyan().to_string()
+        } else {
+            line.to_string()
+        };
+        say(styled);
+    }
 }
 
 /// A name the user might look for -- a mod, a plugin, a file -- set off from

@@ -16,17 +16,23 @@ pub fn load_modlist_with_docs(path: &Path) -> anyhow::Result<SourceModlist> {
 fn load(path: &Path, with_docs: bool) -> anyhow::Result<SourceModlist> {
     let raw = std::fs::read_to_string(path)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    let mut parsed = parse_modlist(&raw, path)?;
 
-    let mut parsed = toml::from_str::<SourceModlist>(&raw)
-        .map_err(|err| anyhow::anyhow!("failed to parse TOML {}: {err}", path.display()))?;
-
-    let base_dir = path.parent().map(Path::to_path_buf).unwrap_or_default();
     if with_docs && let Some(docs_file) = parsed.docs_file.clone() {
+        let base_dir = parsed.base_dir.clone().unwrap_or_default();
         let docs = DocsFile::load(&base_dir.join(&docs_file))?;
         merge_docs(&mut parsed, docs).map_err(|err| anyhow::anyhow!("{docs_file}: {err}"))?;
     }
-    parsed.base_dir = Some(base_dir);
 
+    Ok(parsed)
+}
+
+/// `text` as the modlist at `path` (without its docs file): for checking an
+/// edit before it is written.
+pub fn parse_modlist(text: &str, path: &Path) -> anyhow::Result<SourceModlist> {
+    let mut parsed = toml::from_str::<SourceModlist>(text)
+        .map_err(|err| anyhow::anyhow!("failed to parse TOML {}: {err}", path.display()))?;
+    parsed.base_dir = Some(path.parent().map(Path::to_path_buf).unwrap_or_default());
     Ok(parsed)
 }
 

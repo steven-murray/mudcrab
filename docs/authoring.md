@@ -192,30 +192,43 @@ A few more ways in:
 
 Some things no command asks, and the file is plain text.
 
-To make a mod optional, declare a question under `[inputs]` and give the mod
-an `if`. Tables go after the top-level keys (`name`, `plugins`), or TOML reads
-what follows as part of the table:
+To make a mod optional, declare a question and give the mod an `if`:
+
+```console
+$ mudcrab input add little.toml butterflies --type bool \
+    --query "Add more butterflies to the wilderness?" --default true
+✔ Declared input butterflies
+$ mudcrab set little.toml --mod "More Butterflies" if=butterflies
+✔ Set on More Butterflies: if = "butterflies"
+```
+
+which writes, at the top of the file and in the mod's block:
 
 ```toml
-# Questions to ask whoever installs the list.
-[inputs.butterflies]
-type = "bool"
-query = "Add more butterflies to the wilderness?"
-default = true
+inputs.butterflies.type = "bool"
+inputs.butterflies.query = "Add more butterflies to the wilderness?"
+inputs.butterflies.default = true
 ```
 
 ```toml
 [[mods]]
 id = "More Butterflies"
 section = ["Creatures"]
-if = "butterflies"
 plugins = ["BettysButterflies.esp"]
+if = "butterflies"
 ```
 
 When the answer is no, the mod is left out and its plugin leaves the load
 order. Conditions can also ask about other mods (`if = 'mod:"HD Septim"'`) and
 combine with `&&`, `||` and `!`; see
 [modlist-format.md](modlist-format.md#optional-mods-and-inputs).
+
+The rest of what you would otherwise change by hand has a command too, each
+keeping your comments and refusing an edit that would not validate: `set` for
+any field of a mod or archive, `remove`, `plugins move` for the load order,
+`files` to see what an archive installs and change its filters, `action add`
+and `action remove`. See [Editing a list](usage.md#editing-a-list). The file
+is still plain text, and editing it by hand is always fine.
 
 If your guide has a step no command can take -- building the Bashed Patch in
 Wrye Bash is the usual one -- write it down as a `[[manual-steps]]` table, and

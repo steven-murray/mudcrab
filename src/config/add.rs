@@ -107,6 +107,74 @@ pub struct Insertion {
     pub new_text: String,
 }
 
+/// What [`plan_add`] would do.
+#[derive(Debug, Clone)]
+pub struct Added {
+    /// Where the block goes, and the whole new text.
+    pub insertion: Insertion,
+    /// The mod's plugins that the load order did not list yet, now placed.
+    pub placed: Vec<String>,
+}
+
+/// Add `new_mod` to `text` (whose parsed list is `source`): its block where
+/// `placement` says, and any of its plugins the load order does not list yet
+/// at `position`. A plugin in the wrong place fails silently in game, so a
+/// new plugin with no `position` is refused rather than guessed at.
+pub fn plan_add(
+    text: &str,
+    source: &crate::config::schema::SourceModlist,
+    new_mod: &NewMod,
+    placement: &Placement,
+    position: Option<&LoadPosition>,
+) -> anyhow::Result<Added> {
+    if let Some(existing) = source.mods.iter().find(|entry| entry.id == new_mod.id) {
+        anyhow::bail!(
+            "the list already contains a mod with id '{}' (section {}); \
+             pass --id to add this one under a different name",
+            existing.id,
+            if existing.section.is_empty() {
+                "<none>".to_string()
+            } else {
+                existing.section.join(" - ")
+            }
+        );
+    }
+    let mut insertion = plan_insertion_at(text, &source.mods, new_mod, placement)?;
+
+    let unplaced: Vec<String> = new_mod
+        .plugins
+        .iter()
+        .filter(|plugin| {
+            !source
+                .plugins
+                .iter()
+                .any(|listed| listed.eq_ignore_ascii_case(plugin))
+        })
+        .cloned()
+        .collect();
+    match (position, unplaced.is_empty()) {
+        (Some(position), false) => {
+            let placed = place_plugins(&insertion.new_text, &unplaced, position)?;
+            // The load order sits above every mod, so the block moves down by
+            // however many lines went into it.
+            insertion.line += placed.lines().count() - insertion.new_text.lines().count();
+            insertion.new_text = placed;
+        }
+        (None, false) => anyhow::bail!(
+            "{} {} not in the load order yet; say where with --load-after <plugin> or \
+             --load-last (or add {} to `plugins` yourself first)",
+            unplaced.join(", "),
+            if unplaced.len() == 1 { "is" } else { "are" },
+            if unplaced.len() == 1 { "it" } else { "them" },
+        ),
+        (_, true) => {}
+    }
+    Ok(Added {
+        insertion,
+        placed: unplaced,
+    })
+}
+
 /// Render a mod entry as the TOML text that will be spliced into the file.
 ///
 /// No leading or trailing newline: the caller decides the separators, because
@@ -382,20 +450,7 @@ pub fn plan_move(
         anyhow::bail!("cannot move '{id}' before itself");
     }
 
-    // The block runs from its own comment run to wherever the next block's
-    // comment run starts.
-    let mut start = headers[index];
-    while start > 0 && kinds[start - 1] == LineKind::Comment {
-        start -= 1;
-    }
-    let next = kinds[headers[index] + 1..]
-        .iter()
-        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
-        .map(|offset| headers[index] + 1 + offset);
-    let end = match next {
-        Some(next) => back_up_to_content(&kinds, next, true),
-        None => back_up_to_content(&kinds, kinds.len(), false),
-    };
+    let (start, end) = block_span(&kinds, headers[index]);
 
     let mut lines: Vec<String> = text.split('\n').map(str::to_string).collect();
     let mut block: Vec<String> = lines[start..end].to_vec();
@@ -421,14 +476,7 @@ pub fn plan_move(
             block.insert(header + 2, format!("{new_section}{carriage}"));
         }
     }
-    // Take the block out, with the blank line that separated it from the one
-    // before, so the gap does not double up.
-    let cut_from = if start > 0 && kinds[start - 1] == LineKind::Blank {
-        start - 1
-    } else {
-        start
-    };
-    lines.drain(cut_from..end);
+    lines.drain(cut_span(&kinds, start)..end);
     let without = lines.join("\n");
 
     let remaining: Vec<ModEntry> = mods
@@ -442,6 +490,62 @@ pub fn plan_move(
         .collect::<Vec<_>>()
         .join("\n");
     splice_block(&without, &remaining, section, &block, placement)
+}
+
+/// The lines of the mod block whose header is line `header`: from its own
+/// comment run to wherever the next block's comment run starts.
+fn block_span(kinds: &[LineKind], header: usize) -> (usize, usize) {
+    let mut start = header;
+    while start > 0 && kinds[start - 1] == LineKind::Comment {
+        start -= 1;
+    }
+    let next = kinds[header + 1..]
+        .iter()
+        .position(|kind| matches!(kind, LineKind::ModHeader | LineKind::ForeignHeader))
+        .map(|offset| header + 1 + offset);
+    let end = match next {
+        Some(next) => back_up_to_content(kinds, next, true),
+        None => back_up_to_content(kinds, kinds.len(), false),
+    };
+    (start, end)
+}
+
+/// Where to cut a block starting at `start` out: with the blank line that
+/// separated it from the one before, so the gap does not double up.
+fn cut_span(kinds: &[LineKind], start: usize) -> usize {
+    if start > 0 && kinds[start - 1] == LineKind::Blank {
+        start - 1
+    } else {
+        start
+    }
+}
+
+/// `text` without mod `id`'s block -- its own comments, archives, actions and
+/// any trailing note -- as `move` takes it out. `mods` must come from parsing
+/// `text`.
+pub fn plan_removal(text: &str, mods: &[ModEntry], id: &str) -> anyhow::Result<String> {
+    let kinds = classify_lines(text);
+    let headers: Vec<usize> = kinds
+        .iter()
+        .enumerate()
+        .filter(|(_, kind)| **kind == LineKind::ModHeader)
+        .map(|(index, _)| index)
+        .collect();
+    anyhow::ensure!(
+        headers.len() == mods.len(),
+        "line scan found {} `[[mods]]` headers but the parsed modlist has {} mods; \
+         refusing to edit a file this tool cannot read reliably",
+        headers.len(),
+        mods.len()
+    );
+    let index = mods
+        .iter()
+        .position(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the modlist has no mod with id '{id}'"))?;
+    let (start, end) = block_span(&kinds, headers[index]);
+    let mut lines: Vec<&str> = text.split('\n').collect();
+    lines.drain(cut_span(&kinds, start)..end);
+    Ok(lines.join("\n"))
 }
 
 /// Walk back from a block boundary to the last line that belongs to the block.

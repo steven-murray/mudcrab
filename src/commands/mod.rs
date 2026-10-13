@@ -11,6 +11,7 @@ pub mod diff;
 pub mod download;
 mod download_browser;
 mod downloads;
+mod edit;
 pub mod export;
 mod game_dir;
 pub mod identify;
@@ -20,6 +21,7 @@ pub mod merge;
 pub mod move_mod;
 mod new_merge;
 pub mod nexus_files;
+pub mod prompt;
 pub mod query;
 pub mod setup_tools;
 pub mod unhide_merges;
@@ -83,6 +85,12 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Add(args) => add::run(args).await,
         Command::Move(args) => move_mod::run(args),
+        Command::Set(args) => edit::set(args),
+        Command::Remove(args) => edit::remove(args),
+        Command::Plugins(command) => edit::plugins(command),
+        Command::Files(args) => edit::files(args),
+        Command::Action(command) => edit::action(command),
+        Command::Input(command) => edit::input(command),
         Command::Compile(args) => compile::run(args).await,
         Command::Conflicts(args) => conflicts::run(args).await,
         Command::Query(args) => query::run(args).await,

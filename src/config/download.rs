@@ -75,21 +75,22 @@ pub async fn download_all(
 ) -> anyhow::Result<()> {
     let unfetched = download_report(plan, settings).await?;
     if !unfetched.is_empty() {
-        let items: Vec<String> = unfetched
+        let items: Vec<crate::events::Item> = unfetched
             .iter()
             .map(|u| {
-                format!(
-                    "{} ({}): {}",
-                    u.mod_id,
-                    crate::ui::name(&u.label),
-                    u.describe()
+                crate::events::Item::new(
+                    crate::events::Text::new()
+                        .plain(format!("{} (", u.mod_id))
+                        .name(&u.label)
+                        .plain(format!("): {}", u.describe())),
                 )
+                .about(&u.mod_id)
             })
             .collect();
         for item in &items {
-            tracing::info!(item, "not downloaded");
+            tracing::info!(item = %item.text, "not downloaded");
         }
-        crate::ui::section(crate::ui::Tone::Problem, "Not downloaded", &items);
+        crate::events::section(crate::events::Tone::Problem, "Not downloaded", items);
         anyhow::bail!(
             "{} archive(s) could not be downloaded, listed above",
             unfetched.len()
@@ -165,7 +166,7 @@ pub async fn download_report(
     jobs.retain(|job| seen.insert((job.path, job.file_name)));
 
     use futures_util::stream::{self, StreamExt};
-    let bar = crate::ui::progress(jobs.len() as u64, "archives");
+    let bar = crate::events::progress(jobs.len() as u64, "archives");
     let results: Vec<_> = stream::iter(jobs)
         .map(|job| {
             let client = &client;
@@ -181,7 +182,7 @@ pub async fn download_report(
                 )
                 .await;
                 bar.inc(1);
-                bar.set_message(job.mod_id.to_string());
+                bar.set_message(job.mod_id);
                 (job, result)
             }
         })
@@ -189,7 +190,7 @@ pub async fn download_report(
         .collect()
         .await;
 
-    bar.finish_and_clear();
+    bar.finish();
     let mut fetched = 0usize;
     for (job, result) in results {
         match result {
@@ -216,21 +217,21 @@ pub async fn download_report(
     // should not be.
     errors.sort_by(|a, b| (&a.mod_id, &a.label).cmp(&(&b.mod_id, &b.label)));
 
-    crate::ui::status(
+    crate::events::status(
         if errors.is_empty() {
-            crate::ui::Tone::Good
+            crate::events::Tone::Good
         } else {
-            crate::ui::Tone::Warning
+            crate::events::Tone::Warning
         },
-        format!(
-            "{downloaded} archive(s) ready in {} ({fetched} downloaded now){}",
-            crate::ui::dim(settings.cache_dir.display()),
-            if errors.is_empty() {
+        crate::events::Text::new()
+            .plain(format!("{downloaded} archive(s) ready in "))
+            .dim(settings.cache_dir.display().to_string())
+            .plain(format!(" ({fetched} downloaded now)"))
+            .plain(if errors.is_empty() {
                 String::new()
             } else {
                 format!("; {} not downloaded", errors.len())
-            }
-        ),
+            }),
     );
     // Emitted before the bail, as in `check`: the run that fails is the run
     // whose summary is worth having, because it is the one naming dead links.

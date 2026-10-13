@@ -4,7 +4,6 @@ use crate::config::schema::{
     InputValue, PersonalizedMod, PersonalizedPlan,
 };
 use std::collections::{HashMap, HashSet};
-use std::io::{self, Write};
 
 /// Answers given on the command line, as `key=value`, before any prompting.
 pub type Overrides = HashMap<String, String>;
@@ -24,12 +23,17 @@ pub fn parse_overrides(pairs: &[String]) -> anyhow::Result<Overrides> {
     Ok(out)
 }
 
+/// Asks the user one input's question; see [`build_plan`].
+pub type Ask<'a> = &'a mut dyn FnMut(&InputSpec) -> anyhow::Result<InputValue>;
+
+/// The plan for these answers: each input from `overrides` if given there,
+/// else from `ask`, or with no `ask` (headless) its declared default.
 pub fn build_plan(
     compiled: &CompiledModlist,
-    headless: bool,
     overrides: &Overrides,
+    ask: Option<Ask<'_>>,
 ) -> anyhow::Result<PersonalizedPlan> {
-    let responses = resolve_responses(&compiled.inputs, headless, overrides)?;
+    let responses = resolve_responses(&compiled.inputs, overrides, ask)?;
 
     let mod_order = compiled.mods.iter().map(|entry| entry.id.clone()).collect();
     let included = resolve_included(compiled, &responses)?;
@@ -173,12 +177,12 @@ pub fn build_plan(
     })
 }
 
-/// Every input's answer: from `--set` if given, else the declared default
-/// when headless, else by asking.
+/// Every input's answer: from `--set` if given, else by asking, else (headless)
+/// the declared default.
 fn resolve_responses(
     inputs: &HashMap<String, InputSpec>,
-    headless: bool,
     overrides: &Overrides,
+    mut ask: Option<Ask<'_>>,
 ) -> anyhow::Result<HashMap<String, InputValue>> {
     if let Some(unknown) = overrides.keys().find(|key| !inputs.contains_key(*key)) {
         let mut known: Vec<&String> = inputs.keys().collect();
@@ -194,14 +198,14 @@ fn resolve_responses(
         let spec = &inputs[id];
         let value = if let Some(raw) = overrides.get(id) {
             parse_answer(id, spec, raw)?
-        } else if headless {
+        } else if let Some(ask) = ask.as_mut() {
+            ask(spec)?
+        } else {
             spec.default.clone().ok_or_else(|| {
                 anyhow::anyhow!(
                     "input {id} has no default, so a headless run must be given it with --set {id}=..."
                 )
             })?
-        } else {
-            prompt_input(spec)?
         };
         out.insert(id.clone(), value);
     }
@@ -353,134 +357,9 @@ fn resolve_included<'a>(
     Ok(done)
 }
 
-fn prompt_input(spec: &InputSpec) -> anyhow::Result<InputValue> {
-    match spec.input_type {
-        InputType::Bool => {
-            let default = matches!(spec.default, Some(InputValue::Bool(true)));
-            prompt_bool(&spec.query, default).map(InputValue::Bool)
-        }
-        InputType::Choice => {
-            prompt_choice(&spec.query, &spec.choices, text_default(spec)).map(InputValue::Text)
-        }
-        InputType::Text => prompt_text(&spec.query, text_default(spec)).map(InputValue::Text),
-    }
-}
-
-fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
-    let hint = if default { "[Y/n]" } else { "[y/N]" };
-    loop {
-        print!("{} {}: ", crate::ui::question(query), crate::ui::dim(hint));
-        io::stdout().flush()?;
-
-        let mut buf = String::new();
-        io::stdin().read_line(&mut buf)?;
-        let answer = buf.trim().to_lowercase();
-
-        if answer.is_empty() {
-            return Ok(default);
-        }
-        if answer == "n" || answer == "no" {
-            return Ok(false);
-        }
-        if answer == "y" || answer == "yes" {
-            return Ok(true);
-        }
-
-        crate::ui::status(crate::ui::Tone::Warning, "Please answer y or n.");
-    }
-}
-
-/// The declared default of a choice or text input, as text.
-fn text_default(spec: &InputSpec) -> Option<&str> {
-    match &spec.default {
-        Some(InputValue::Text(text)) => Some(text),
-        _ => None,
-    }
-}
-
-fn prompt_choice(query: &str, choices: &[String], default: Option<&str>) -> anyhow::Result<String> {
-    if choices.is_empty() {
-        anyhow::bail!("choice input is missing available choices");
-    }
-
-    println!("{}", crate::ui::question(query));
-    for (idx, choice) in choices.iter().enumerate() {
-        println!(
-            "{}",
-            crate::ui::option(idx + 1, choice, Some(choice.as_str()) == default)
-        );
-    }
-
-    loop {
-        print!(
-            "  {} ",
-            crate::ui::dim(format!("Select [1-{}]:", choices.len()))
-        );
-        io::stdout().flush()?;
-
-        let mut buf = String::new();
-        io::stdin().read_line(&mut buf)?;
-        if let Some(choice) = pick_choice(buf.trim(), choices, default) {
-            return Ok(choice);
-        }
-
-        crate::ui::status(
-            crate::ui::Tone::Warning,
-            format!("Please enter a number from 1 to {}.", choices.len()),
-        );
-    }
-}
-
-/// An answer to a choice prompt: its number, or nothing for the default.
-fn pick_choice(answer: &str, choices: &[String], default: Option<&str>) -> Option<String> {
-    if answer.is_empty() {
-        return default
-            .filter(|d| choices.iter().any(|c| c == d))
-            .map(str::to_string);
-    }
-    let idx = answer.parse::<usize>().ok()?;
-    choices.get(idx.checked_sub(1)?).cloned()
-}
-
-fn prompt_text(query: &str, default: Option<&str>) -> anyhow::Result<String> {
-    match default {
-        Some(default) => print!(
-            "{} {}: ",
-            crate::ui::question(query),
-            crate::ui::dim(format!("[{default}]"))
-        ),
-        None => print!("{}: ", crate::ui::question(query)),
-    }
-    io::stdout().flush()?;
-
-    let mut buf = String::new();
-    io::stdin().read_line(&mut buf)?;
-    let answer = buf.trim();
-    Ok(match default {
-        Some(default) if answer.is_empty() => default.to_string(),
-        _ => answer.to_string(),
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn enter_takes_a_choices_default() {
-        let choices = vec!["none".to_string(), "v0500".to_string()];
-        assert_eq!(
-            pick_choice("", &choices, Some("none")),
-            Some("none".to_string())
-        );
-        assert_eq!(
-            pick_choice("2", &choices, Some("none")),
-            Some("v0500".to_string())
-        );
-        assert_eq!(pick_choice("", &choices, None), None);
-        assert_eq!(pick_choice("0", &choices, None), None);
-        assert_eq!(pick_choice("3", &choices, None), None);
-    }
 
     fn bool_input(default: Option<bool>) -> HashMap<String, InputSpec> {
         HashMap::from([(
@@ -498,17 +377,17 @@ mod tests {
     fn headless_uses_the_declared_default_and_set_overrides_it() {
         let inputs = bool_input(Some(true));
         let none = Overrides::new();
-        let got = resolve_responses(&inputs, true, &none).unwrap();
+        let got = resolve_responses(&inputs, &none, None).unwrap();
         assert!(matches!(got["flag"], InputValue::Bool(true)));
 
         let set = parse_overrides(&["flag=false".to_string()]).unwrap();
-        let got = resolve_responses(&inputs, true, &set).unwrap();
+        let got = resolve_responses(&inputs, &set, None).unwrap();
         assert!(matches!(got["flag"], InputValue::Bool(false)));
     }
 
     #[test]
     fn headless_without_a_default_or_set_is_an_error() {
-        let err = resolve_responses(&bool_input(None), true, &Overrides::new()).unwrap_err();
+        let err = resolve_responses(&bool_input(None), &Overrides::new(), None).unwrap_err();
         assert!(err.to_string().contains("--set flag="), "{err}");
     }
 
@@ -516,8 +395,8 @@ mod tests {
     fn set_must_name_a_declared_input_with_a_valid_value() {
         let inputs = bool_input(Some(true));
         let typo = parse_overrides(&["flg=true".to_string()]).unwrap();
-        assert!(resolve_responses(&inputs, true, &typo).is_err());
+        assert!(resolve_responses(&inputs, &typo, None).is_err());
         let bad = parse_overrides(&["flag=maybe".to_string()]).unwrap();
-        assert!(resolve_responses(&inputs, true, &bad).is_err());
+        assert!(resolve_responses(&inputs, &bad, None).is_err());
     }
 }

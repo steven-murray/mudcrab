@@ -205,7 +205,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         );
     }
 
-    let bar = crate::ui::progress(
+    let bar = crate::events::progress(
         plan.mods
             .iter()
             .filter(|m| settings.filter.matches(&m.section, &m.id))
@@ -247,7 +247,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             continue;
         }
         bar.inc(1);
-        bar.set_message(mod_entry.id.clone());
+        bar.set_message(&mod_entry.id);
 
         let mut mod_target = settings.mods_dir.join(safe_mod_dir_name(&mod_entry.id)?);
         let definition_hash = hash_personalized_mod(mod_entry)?;
@@ -415,7 +415,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         }
     }
 
-    bar.finish_and_clear();
+    bar.finish();
 
     // Merges run after every mod is on disk (they read other mods' plugins)
     // and before LOOT sorts, so LOOT sees the merged plugin rather than the
@@ -483,39 +483,35 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         .merges()
         .filter(|(entry, _)| settings.filter.matches(&entry.section, &entry.id))
         .count();
-    crate::ui::status(
-        crate::ui::Tone::Good,
-        format!(
-            "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}{}",
-            if settings.dry_run { "Dry run: " } else { "" },
-            if merges > 0 {
-                format!(", {merges} merge(s) checked")
-            } else {
-                String::new()
-            },
-            match &settings.mo2_instance_dir {
-                Some(dir) if !settings.dry_run => format!(
-                    "; MO2 profile '{}' in {} written",
-                    settings.profile_name,
-                    crate::ui::dim(dir.display())
-                ),
-                _ => String::new(),
-            }
-        ),
-    );
+    let mut summary = crate::events::Text::new().plain(format!(
+        "{}{changed} mod(s) installed or updated, {unchanged} unchanged{}",
+        if settings.dry_run { "Dry run: " } else { "" },
+        if merges > 0 {
+            format!(", {merges} merge(s) checked")
+        } else {
+            String::new()
+        },
+    ));
+    if let Some(dir) = &settings.mo2_instance_dir
+        && !settings.dry_run
+    {
+        summary = summary
+            .plain(format!("; MO2 profile '{}' in ", settings.profile_name))
+            .dim(dir.display().to_string())
+            .plain(" written");
+    }
+    crate::events::status(crate::events::Tone::Good, summary);
     for step in outstanding_steps(plan, settings) {
-        crate::ui::heading(
-            crate::ui::Tone::Warning,
-            format!("Still to do by hand: {}", step.title),
-        );
-        for line in step
-            .steps
-            .lines()
-            .map(str::trim_end)
-            .filter(|l| !l.trim().is_empty())
-        {
-            crate::ui::say(format!("  {line}"));
-        }
+        crate::events::emit(crate::events::Event::ManualStep {
+            title: step.title.clone(),
+            steps: step
+                .steps
+                .lines()
+                .map(str::trim_end)
+                .filter(|l| !l.trim().is_empty())
+                .map(str::to_string)
+                .collect(),
+        });
     }
     Ok(())
 }
