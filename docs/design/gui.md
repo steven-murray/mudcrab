@@ -1,7 +1,8 @@
 # A GUI, alongside the CLI
 
-**Status: phases 1 and 2 done** (the library API and CLI parity); the GUI
-itself starts at phase 3, the framework spike.
+**Status: phases 1-3 done.** The library API and CLI parity are in, and the
+framework spike ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes))
+chose **Tauri**. Next is phase 4, install mode.
 
 ## Why, and the rule it lives under
 
@@ -67,10 +68,31 @@ would be built:
   live).
 - **A mod's files**: the archive's contents as a tree, with what `install`
   would take from it highlighted (the layout planner `check` already runs).
-  Tick and untick files and folders to write `include`/`exclude`; drag a
-  folder to a new place to write a `file_move`; mark files for the game
-  folder (`game_root_files`). The tree updates from the planner, so what is
-  shown is what will be installed.
+  The tree updates from the planner, so what is shown is what will be
+  installed. What a tick means follows the archive's layout, so an author
+  sees the installer they already know:
+  - **BAIN**: ticks are packages, at the top level only, as in Wrye Bash's
+    installer tab, writing `bain_subpackages`. The files inside are shown
+    read-only, marked installed or not. A `wizard.txt` can be run, as `add`
+    runs it.
+  - **FOMOD**: the installer's steps and options, writing
+    `fomod_selections`, not a file tree to tick.
+  - **Simple, data folder, auto**: ticks on files and folders, writing
+    `exclude` (and dropping it to tick back).
+
+  Separately, for any layout, an expert override: **Exclude from install** on
+  a file or folder's context menu writes an `exclude` for the path the
+  filters see it as (inside the data folder, BAIN package or FOMOD folder;
+  the planner reports it as `filtered_as`). It is visibly an override, not a
+  tick, and says what it covers -- under BAIN one exclude applies to every
+  package, so `Docs/readme.txt` hits each package's copy. (The spike tried
+  letting a file inside an unchosen BAIN package be ticked, choosing the
+  package and excluding the rest of it; it worked, but it is not how BAIN
+  thinks, and the shared excludes made it refuse often. A filter per package
+  in the format would be the cleaner way, if authors ask for it.)
+
+  Also here: drag a folder to a new place to write a `file_move`; mark files
+  for the game folder (`game_root_files`).
 - **Conflicts**: the `conflicts` sweep as a matrix or list -- who wins, who
   loses -- with a mod's overwritten files one click away, and "hide these in
   that mod" writing the `file_hide` with `conflicts_with`.
@@ -80,7 +102,20 @@ would be built:
   answer brings in or leaves out.
 
 Everything is undoable as file edits are: the GUI keeps the file's history for
-the session, and the file is plain text in git anyway.
+the session, and the file is plain text in git anyway. Each edit is written
+at once (as the CLI writes it), so the history is a list of `Edit`s, each
+with its before and after text, its command and its diff:
+
+- **Undo** (and redo) steps back through it, writing the earlier text -- and,
+  like any edit, only if the file has not changed on disk since; an edit made
+  outside the GUI ends the history there.
+- **This session's changes**: one view listing every edit made since the
+  list was opened, each with its command and diff, and the session's diff as
+  a whole -- what a commit message would describe. The commands together are
+  a script that makes the same changes to another copy.
+
+(The spike showed only the last edit's diff, which was enough to try the
+framework but not to work in.)
 
 ## Architecture
 
@@ -188,7 +223,12 @@ Still printing directly, for later phases: `conflicts`' sweep and `assets`
    byte-identical before and after.
 2. **CLI parity.** Done: the commands above, documented and tested.
 3. **Framework spike.** The two views in Tauri and Slint, on the four
-   platforms; decide.
+   platforms; decide. Built: see [spikes/README.md](https://github.com/steven-murray/mudcrab/blob/main/spikes/README.md)
+   for what was measured. Both worked on Linux (Wayland and X11, Intel and
+   NVIDIA) and Windows; Tauri needed a workaround to start on NVIDIA under
+   Wayland and uses about five times the memory, Slint needed its tree,
+   tri-state boxes and fonts built in. **Decided: Tauri**, for how quickly
+   good views are built in it; on the Steam Deck it ships as a Flatpak.
 4. **Install mode.** Read-only list view from the export document, questions,
    locations, the Install timeline, manual-step checklist. Ship it: it is
    useful to players on its own.

@@ -20,6 +20,10 @@ pub struct PlannedFile {
     /// Path relative to the mod's staged folder, with directories folded to
     /// lowercase the way `copy_filtered_tree_folded` writes them.
     pub destination: String,
+    /// The path the archive's `include` and `exclude` were matched against
+    /// to take it: inside the data folder, the BAIN subpackage or the FOMOD
+    /// folder it came from. A glob over this is what leaves it out.
+    pub filtered_as: String,
 }
 
 /// What an archive contributes to a mod, before anything is extracted.
@@ -30,21 +34,31 @@ pub struct LayoutPlan {
 }
 
 impl LayoutPlan {
+    /// From `(source, destination)` pairs, each filtered as its source.
     pub fn from_pairs(pairs: impl IntoIterator<Item = (String, String)>) -> Self {
+        Self::from_planned(pairs.into_iter().map(|(source, destination)| {
+            let filtered_as = source.replace('\\', "/");
+            (source, destination, filtered_as)
+        }))
+    }
+
+    /// From `(source, destination, filtered_as)`.
+    pub fn from_planned(planned: impl IntoIterator<Item = (String, String, String)>) -> Self {
         // A BTreeMap keyed on destination both sorts and settles collisions the
         // way an overlay copy would: the last writer to a destination wins,
         // which is what layering two subpackages onto one folder means.
-        let settled: BTreeMap<String, String> = pairs
+        let settled: BTreeMap<String, (String, String)> = planned
             .into_iter()
-            .map(|(source, destination)| (destination, source))
+            .map(|(source, destination, filtered_as)| (destination, (source, filtered_as)))
             .collect();
 
         Self {
             files: settled
                 .into_iter()
-                .map(|(destination, source)| PlannedFile {
+                .map(|(destination, (source, filtered_as))| PlannedFile {
                     source,
                     destination,
+                    filtered_as,
                 })
                 .collect(),
         }
@@ -76,11 +90,11 @@ impl LayoutPlan {
 /// `layout = "simple"` says so on the author's authority, and a `build` whose
 /// layers already assemble the finished folder has nothing left to rebase.
 pub fn plan_simple(paths: &[String], filters: &ArchiveFilters) -> LayoutPlan {
-    LayoutPlan::from_pairs(paths.iter().filter_map(|path| {
+    LayoutPlan::from_planned(paths.iter().filter_map(|path| {
         let normalized = path.replace('\\', "/");
         filters
             .should_extract(&normalized)
-            .then(|| (path.clone(), folded_destination(&normalized)))
+            .then(|| (path.clone(), folded_destination(&normalized), normalized))
     }))
 }
 
@@ -98,7 +112,7 @@ pub fn plan_data_folder(
         return Ok(plan_simple(paths, filters));
     };
 
-    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut pairs: Vec<(String, String, String)> = Vec::new();
     let mut matched = 0usize;
     for path in paths {
         let Some(rest) = strip_dir_prefix(path, data_folder) else {
@@ -108,14 +122,14 @@ pub fn plan_data_folder(
         if !filters.should_extract(&rest) {
             continue;
         }
-        pairs.push((path.clone(), folded_destination(&rest)));
+        pairs.push((path.clone(), folded_destination(&rest), rest));
     }
 
     if matched == 0 {
         anyhow::bail!("data_folder '{data_folder}' was not found in archive {source_label}");
     }
 
-    Ok(LayoutPlan::from_pairs(pairs))
+    Ok(LayoutPlan::from_planned(pairs))
 }
 
 /// Fold directory components to lowercase, leaving the file name alone.

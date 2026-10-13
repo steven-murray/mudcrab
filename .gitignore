@@ -1,5 +1,7 @@
 # Build output
 /target
+/spikes/target
+/spikes/tauri/gen
 
 # Python venv
 .venv/

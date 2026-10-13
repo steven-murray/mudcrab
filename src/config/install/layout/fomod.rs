@@ -364,7 +364,7 @@ fn walk_fomod(
 /// Resolve the selected install entries against the archive's entry list.
 ///
 /// Entries are laid down lowest priority first, so a higher-priority entry
-/// writing the same destination replaces it -- which `LayoutPlan::from_pairs`
+/// writing the same destination replaces it -- which `LayoutPlan::from_planned`
 /// settles by keeping the last writer.
 pub(crate) fn plan_fomod_entries(
     paths: &[String],
@@ -376,7 +376,7 @@ pub(crate) fn plan_fomod_entries(
     let mut sorted = entries.to_vec();
     sorted.sort_by_key(FomodInstallEntry::priority);
 
-    let mut pairs: Vec<(String, String)> = Vec::new();
+    let mut pairs: Vec<(String, String, String)> = Vec::new();
 
     for entry in &sorted {
         match entry {
@@ -403,6 +403,7 @@ pub(crate) fn plan_fomod_entries(
                 pairs.push((
                     archive_path,
                     folded_destination(&normalize_fomod_path(destination)?),
+                    rel_source,
                 ));
             }
             FomodInstallEntry::Folder {
@@ -428,7 +429,7 @@ pub(crate) fn plan_fomod_entries(
                         continue;
                     }
                     let folded = folded_destination(&rest);
-                    pairs.push((path.clone(), join_under(&dest_prefix, &folded)));
+                    pairs.push((path.clone(), join_under(&dest_prefix, &folded), rest));
                 }
 
                 if matched == 0 {
@@ -441,7 +442,7 @@ pub(crate) fn plan_fomod_entries(
         }
     }
 
-    Ok(LayoutPlan::from_pairs(pairs))
+    Ok(LayoutPlan::from_planned(pairs))
 }
 
 fn join_under(prefix: &str, rest: &str) -> String {
