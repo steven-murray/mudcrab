@@ -12,16 +12,16 @@ and the git history.
 
 `include` another modlist -- a file, or a file in a git repository -- so
 reusable pieces can be published once and pointed at: a shim that fixes a
-badly packaged mod, or a core group of mods several lists share. Plan:
-[design/composability.md](design/composability.md).
+badly packaged mod, or a core group of mods several lists share. The
+design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
 
 ### A GUI, alongside the CLI
 
 An authoring mode (drag mods into order, pick a mod's files, move folders) and
 an install mode (view the list, one button from compile to install). The CLI
 stays complete: nothing will ever need the GUI. The library API and the CLI
-commands it needs are done; next is the framework spike. Plan:
-[design/gui.md](design/gui.md).
+commands it needs are done; next is the framework spike. The
+design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/gui.md).
 
 ## Open
 
@@ -82,4 +82,4 @@ commands it needs are done; next is the framework spike. Plan:
   `install` lists it as a step by hand. Leveled-list merging alone would cover
   much of what lists use it for.
 
-Known limitations with workarounds are in [known-issues.md](known-issues.md).
+Known limitations with workarounds are in [Known issues](known-issues.md).

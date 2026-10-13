@@ -103,7 +103,7 @@ The document's outline:
   before any mod and not part of `entries`.
 - `doc.game_settings`: the list's own `[ini]` settings, as steps.
 - A condition's `question` is set when the condition is simply "yes to this
-  question", so a guide can say "Optional: <question>" instead of the full
+  question", so a guide can say "Optional: &lt;question&gt;" instead of the full
   sentence in `text`.
 
 ## Symbols

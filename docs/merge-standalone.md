@@ -119,7 +119,7 @@ assumption cannot fail quietly.
 **Output is not byte-identical to zMerge's**, and is not trying to be. Same
 record set, same reference graph; different FormIDs for renumbered records, and
 zMerge keeps some masters mudcrab drops. Details in
-[design/merge-engine.md](design/merge-engine.md).
+[The merge engine](design/merge-engine.md).
 
 **Evidence base**: six merges, 171 source plugins, checked against zEdit's own
 output record-for-record and reference-for-reference, two of them verified in

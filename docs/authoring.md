@@ -3,8 +3,8 @@
 This page builds a small modlist from an empty file: four real Oblivion mods,
 one optional, installed and checked. Every command and output below comes from
 an actual run. Installing someone else's list is covered in
-[getting-started.md](getting-started.md); every field a list can use is in
-[modlist-format.md](modlist-format.md).
+[Getting started](getting-started.md); every field a list can use is in
+[The modlist format](modlist-format.md).
 
 The list is a TOML file you write, and mostly *grow* with mudcrab's commands
 rather than by typing: `inspect` reads an archive, `add` writes its entry, and
@@ -33,7 +33,7 @@ says exactly what you decided.
 mudcrab works from the archives themselves, so download each mod first, the
 way you normally would: MO2's "Mod Manager Download" button, or by hand into
 your downloads folder (the one you set as `downloads_dir`; see
-[getting-started.md](getting-started.md#1-tell-mudcrab-where-things-live)).
+[step 1 of Getting started](getting-started.md#1-tell-mudcrab-where-things-live)).
 For anything MO2 downloads, it writes a `.meta` file beside the archive
 recording its Nexus ids, and mudcrab reads it, so nothing has to be copied
 from a web page. For a file you downloaded in the browser, give the ids with
@@ -221,7 +221,7 @@ if = "butterflies"
 When the answer is no, the mod is left out and its plugin leaves the load
 order. Conditions can also ask about other mods (`if = 'mod:"HD Septim"'`) and
 combine with `&&`, `||` and `!`; see
-[modlist-format.md](modlist-format.md#optional-mods-and-inputs).
+[Optional mods and inputs in The modlist format](modlist-format.md#optional-mods-and-inputs).
 
 The rest of what you would otherwise change by hand has a command too, each
 keeping your comments and refusing an edit that would not validate: `set` for
@@ -234,7 +234,7 @@ If your guide has a step no command can take -- building the Bashed Patch in
 Wrye Bash is the usual one -- write it down as a `[[manual-steps]]` table, and
 `install` tells whoever installs the list what is left to do, at the end of
 every run, until it is done. See
-[modlist-format.md](modlist-format.md#steps-by-hand).
+[Steps by hand in The modlist format](modlist-format.md#steps-by-hand).
 
 ## 6. Build it
 
@@ -275,7 +275,7 @@ The four mods above needed nothing more. Real lists usually do:
   (`ini_set`), leave files out (`file_prune`), clean a plugin with xEdit
   (`qac`), pack loose files into a BSA (`pack_bsa`), and more. They are
   `[[mods.actions]]` entries, run in order;
-  see [modlist-format.md](modlist-format.md#actions).
+  see [Actions in The modlist format](modlist-format.md#actions).
 - **Conflicts.** When two mods provide the same file, MO2's order decides.
   After an install, `mudcrab conflicts` with no `--mod` sweeps the list and
   names every mod that shares files, with how many it wins and loses and to
@@ -284,12 +284,12 @@ The four mods above needed nothing more. Real lists usually do:
 - **Merged plugins** keep the plugin count down: a `type = "merge"` entry
   names the source plugins, and `install` builds the merged one
   (`mudcrab new-merge` drafts the sources from a list of plugin names);
-  see [merge-standalone.md](merge-standalone.md) and
-  [modlist-format.md](modlist-format.md#merges).
+  see [The merge engine on its own](merge-standalone.md) and
+  [Merges in The modlist format](modlist-format.md#merges).
 - **Checking against a reference.** If you have built the list by hand
   before (e.g. directly in MO2), `mudcrab diff` compares each installed mod
   against that instance, file by file.
 - **A readable guide.** `docs` tables add prose and pictures to the list,
   section and mods, and `mudcrab export` turns the list into a guide for
   people installing by hand, as a Nexus page, Markdown or a website; see
-  [exporters.md](exporters.md).
+  [Turning a list into a guide](exporters.md).

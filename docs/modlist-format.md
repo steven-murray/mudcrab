@@ -3,8 +3,8 @@
 A modlist is a TOML file: which mods, where each comes from, how to unpack
 it, what to change afterwards, and the order everything loads in. This page
 lists everything a modlist can contain, with a line on when you need each
-field. [authoring.md](authoring.md) walks through writing one, and
-[usage.md](usage.md) covers the commands that read it.
+field. [Writing a modlist](authoring.md) walks through writing one, and
+[Commands](usage.md) covers the commands that read it.
 
 Most of a list is written by `mudcrab add`, which inserts lines without
 disturbing anything else, so comments you write are kept. Use them: a list's
@@ -64,7 +64,7 @@ that table.
 | `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
-| `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [exporters.md](exporters.md). |
+| `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [Turning a list into a guide](exporters.md). |
 | `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
 
 `ini` keys are matched anywhere in `Oblivion.ini`, with no section, so they
@@ -150,7 +150,7 @@ these from the archive itself.
 | a file path | A file on this machine. Ties the list to one computer, so mostly for testing. |
 
 Archives are kept in one downloads folder under their real names; see
-[usage.md](usage.md#the-downloads-folder).
+[The downloads folder in Commands](usage.md#the-downloads-folder).
 
 ### Installers
 
@@ -292,7 +292,7 @@ affected mods' definitions and `install` restages them.
 `[[mods.actions]]` change a mod after its archives are unpacked. They run **in
 the order written**, and each may carry an `if`. Paths are relative to the
 mod's own folder and cannot leave it. An unknown `action` is an error, not a
-silent skip. [usage.md](usage.md#actions) has each action in full, with
+silent skip. [Actions in Commands](usage.md#actions) has each action in full, with
 examples.
 
 | `action` | Fields | When you need it |
@@ -310,7 +310,7 @@ examples.
 | `pack_bsa` | `output`, `include`, `exclude`, `prune_packed` | To pack loose files into a BSA; `prune_packed` deletes what went in. |
 | `create_dummy_plugin` | `output` | For a BSA with no plugin of the same name, which Oblivion would otherwise not load. |
 | `extract_bsa` | `archive`, `keep_archive` | To unpack a BSA the mod ships, to change what is in it. |
-| `dds_decompress` | `paths` | On Linux/Proton: menu textures with DXT1 transparency, which DXVK draws black. See [known-issues.md](known-issues.md#linux--proton). |
+| `dds_decompress` | `paths` | On Linux/Proton: menu textures with DXT1 transparency, which DXVK draws black. See [Linux / Proton in Known issues](known-issues.md#linux--proton). |
 
 `pack_bsa`, `create_dummy_plugin` and `file_prune` exist to be composed, in this order, for mods that ship loose assets
 the guide wants archived:
@@ -474,5 +474,5 @@ places.
 
 A `custom` mod type running arbitrary commands is on the
 [roadmap](roadmap.md), not in the schema, and so is `include`-ing one modlist
-from another (planned in [design/composability.md](design/composability.md)):
+from another (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)):
 every modlist today is one file.
