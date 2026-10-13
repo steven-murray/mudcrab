@@ -227,6 +227,6 @@ Running under Proton has its own fixes; see
 
 ## Still stuck
 
-[CONTRIBUTING.md](../CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly)
+[the contributing guide](https://github.com/steven-murray/mudcrab/blob/main/CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly)
 says what to attach to a report so it can be acted on: the plan, the log, and
 `mudcrab diff` output if you have a reference instance to compare against.

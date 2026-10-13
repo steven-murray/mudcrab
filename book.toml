@@ -1,0 +1,24 @@
+# The documentation site: mdBook over docs/, published to GitHub Pages by
+# .github/workflows/pages.yml. `mdbook serve` previews it.
+[book]
+title = "mudcrab"
+description = "A declarative modlist compiler and installer for TES4: Oblivion"
+authors = ["Steven Murray"]
+language = "en"
+src = "docs"
+
+[build]
+build-dir = "target/book"
+# A page the summary names must exist: never write an empty one.
+create-missing = false
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/steven-murray/mudcrab"
+edit-url-template = "https://github.com/steven-murray/mudcrab/edit/main/{path}"
+site-url = "/mudcrab/"
+no-section-label = true
+
+[output.html.search]
+limit-results = 20

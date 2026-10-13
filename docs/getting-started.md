@@ -238,7 +238,7 @@ Bash Bashed Patch.
   failure (`full log: ...`). [troubleshooting.md](troubleshooting.md) explains
   the messages you are likely to see, and [known-issues.md](known-issues.md)
   covers what is already known; to report something new, see
-  [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly).
+  [the contributing guide](https://github.com/steven-murray/mudcrab/blob/main/CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly).
 
 ## Where to next
 

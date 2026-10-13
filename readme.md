@@ -35,12 +35,12 @@ Yes, on a hard case. mudcrab reproduces
 Oblivion guide with six plugin merges, BSA repacking, xEdit cleaning, FOMOD and
 BAIN installers and a fixed 244-plugin load order — from a single TOML file, on
 Linux, with no GUI tool involved except the final Wrye Bash step. It was
-verified mod-by-mod against a hand-built reference instance and then played.
+verified mod-by-mod against a hand-built reference instance, played, and then
+installed again from scratch on a fresh machine from the documentation alone.
 The list itself is kept privately: it transcribes someone else's guide.
 
-It is **not yet packaged for other people to use**. See
-[docs/roadmap.md](docs/roadmap.md) for what stands between here and that, and
-[docs/known-issues.md](docs/known-issues.md) for what will bite you meanwhile.
+See [docs/roadmap.md](docs/roadmap.md) for what is planned next, and
+[docs/known-issues.md](docs/known-issues.md) for what to look out for.
 
 ## What it covers
 
@@ -54,12 +54,12 @@ all that has been run:
   mods, profile, load order -- and never touches the game folder; files that
   belong there go through the Root Builder MO2 plugin.
 - **Platform:** the full pipeline has been run on **Linux**, with the game, MO2
-  and xEdit under Proton. Windows binaries are built, but a whole install
-  has not been run on Windows yet.
+  and xEdit under Proton. Windows binaries are built and pass the full test
+  suite, but a whole install has not been run on Windows yet.
 - **Nexus:** downloading through the Nexus API needs a premium account (Nexus's
-  rule). Without one, download the archives by hand into a folder mudcrab
-  searches; everything else, including identifying archives, works on any
-  account.
+  rule). Without one, `download` opens each file's page in your browser and
+  picks the file up as you download it; everything else, including
+  identifying archives, works on any account.
 
 Reports from setups other than these are especially welcome: see
 [CONTRIBUTING.md](CONTRIBUTING.md).
@@ -81,6 +81,10 @@ tools and no API key. See
 
 ## Documentation
 
+The documentation is published as a site at
+**https://steven-murray.github.io/mudcrab/**, built from `docs/` with
+[mdBook](https://rust-lang.github.io/mdBook/) (`mdbook serve` previews it).
+
 | | |
 | --- | --- |
 | [docs/getting-started.md](docs/getting-started.md) | **Start here**: installing a modlist, from nothing to a playable game |
@@ -92,7 +96,7 @@ tools and no API key. See
 | [docs/mo2-output-structure.md](docs/mo2-output-structure.md) | What gets written into an MO2 instance |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | The error messages you are likely to see, and what to do |
 | [docs/known-issues.md](docs/known-issues.md) | Limitations, and what to do about them |
-| [docs/roadmap.md](docs/roadmap.md) | What is planned before a release |
+| [docs/roadmap.md](docs/roadmap.md) | What is planned next: composability and a GUI, and what is still open |
 
 ## The pipeline
 

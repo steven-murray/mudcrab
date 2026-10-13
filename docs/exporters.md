@@ -4,7 +4,7 @@
 `exporter.toml` and some [Jinja](https://jinja.palletsprojects.com/templates/)
 templates (mudcrab uses [minijinja](https://docs.rs/minijinja), which follows
 Jinja2 closely). The built-in exporters are folders like this too, compiled into
-the binary; see [`exporters/`](../exporters/).
+the binary; see [`exporters/`](https://github.com/steven-murray/mudcrab/tree/main/exporters).
 
 ```bash
 mudcrab export mofam.toml --to nexus -o guide.bbcode    # a built-in
