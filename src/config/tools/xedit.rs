@@ -138,13 +138,11 @@ pub(crate) fn apply_qac_action(
             // -QAC        : Quick Auto Clean
             // -autoload   : automatically load the specified plugin
             // -D:<path>   : data directory (Windows-style path when via Wine)
-            let tool_path = |path: &Path| {
-                if cfg!(target_os = "windows") {
-                    path.display().to_string()
-                } else {
-                    ToolsConfig::unix_path_to_wine(path)
-                }
-            };
+            // As xEdit sees it: itself on Windows, through Wine's `Z:` elsewhere.
+            #[cfg(target_os = "windows")]
+            let tool_path = |path: &Path| path.display().to_string();
+            #[cfg(not(target_os = "windows"))]
+            let tool_path = |path: &Path| ToolsConfig::unix_path_to_wine(path);
             let data_arg = format!("-D:{}", tool_path(&temp_data));
             // The game's INI, handed over rather than looked for: xEdit
             // otherwise wants one in the prefix's Documents, and a prefix the
