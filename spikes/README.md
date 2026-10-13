@@ -113,6 +113,19 @@ Machines: Linux on Wayland and X11 (done above, except by hand); **Windows**
 artifact; the Tauri one needs WebKitGTK 4.1, which SteamOS may not have
 outside a Flatpak -- whether it starts is itself the finding).
 
+What trying both by hand found (Linux, Wayland):
+
+- **The same behaviour** in both, as it should be with one core. Slint's drag
+  looked a little crisper; Tauri's scrolls the list when dragged past its
+  edge, which the Slint one was not given.
+- **Slint drew some characters in the diff as empty boxes.** It was asked
+  for the generic `monospace` family and did not fall back to a font with
+  those glyphs, where the web view falls back as a browser does. A release
+  would name and bundle its fonts (Slint can embed them), which is work Tauri
+  does not need.
+- Both kept only the last edit's diff; an undo history and a view of the
+  session's changes are now in the plan.
+
 ## The decision so far
 
 Both are viable. The trade is:

@@ -102,7 +102,20 @@ would be built:
   answer brings in or leaves out.
 
 Everything is undoable as file edits are: the GUI keeps the file's history for
-the session, and the file is plain text in git anyway.
+the session, and the file is plain text in git anyway. Each edit is written
+at once (as the CLI writes it), so the history is a list of `Edit`s, each
+with its before and after text, its command and its diff:
+
+- **Undo** (and redo) steps back through it, writing the earlier text -- and,
+  like any edit, only if the file has not changed on disk since; an edit made
+  outside the GUI ends the history there.
+- **This session's changes**: one view listing every edit made since the
+  list was opened, each with its command and diff, and the session's diff as
+  a whole -- what a commit message would describe. The commands together are
+  a script that makes the same changes to another copy.
+
+(The spike showed only the last edit's diff, which was enough to try the
+framework but not to work in.)
 
 ## Architecture
 
