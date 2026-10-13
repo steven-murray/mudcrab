@@ -501,7 +501,21 @@ mod tests {
 
         let found = case_variant_siblings(&dir.path().join("Oblivion.ini"));
 
+        // Where case does not matter (Windows), the second write reopened the
+        // first file: one file, so nothing to report.
+        if std::fs::read_dir(dir.path()).unwrap().count() == 2 {
+            assert!(found.is_empty(), "{found:?}");
+            return;
+        }
         assert_eq!(found, vec![dir.path().join("oblivion.ini")]);
+    }
+
+    /// Windows finds a file however it is spelled; that alone is no duplicate.
+    #[test]
+    fn a_file_named_in_another_case_is_not_its_own_twin() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("oblivion.ini"), b"a").unwrap();
+        assert!(case_variant_siblings(&dir.path().join("Oblivion.ini")).is_empty());
     }
 
     #[test]
