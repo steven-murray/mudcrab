@@ -477,11 +477,11 @@ fn a_modid_with_no_installed_fileid_is_refused_rather_than_guessed() {
 }
 
 #[test]
-fn an_insert_that_would_break_validation_restores_the_original() {
+fn an_insert_that_would_break_validation_writes_nothing() {
     let dir = tempdir().expect("temp dir should be created");
     let path = dir.path().join("modlist.toml");
     // Already invalid before the edit (empty name), so the post-insert
-    // validation is guaranteed to fail and the rollback path is exercised.
+    // validation is guaranteed to fail.
     let text = "name = \"\"\n\n[[mods]]\nid = \"A\"\nsection = [\"S\"]\n";
     std::fs::write(&path, text).expect("fixture should be written");
 
@@ -489,7 +489,7 @@ fn an_insert_that_would_break_validation_restores_the_original() {
         .args(["--nexus", "1/2", "--id", "B", "--section", "S"])
         .assert()
         .failure()
-        .stderr(predicates::str::contains("original file has been restored"));
+        .stderr(predicates::str::contains("nothing was written"));
 
     assert_eq!(
         std::fs::read_to_string(&path).expect("modlist should be readable"),

@@ -50,7 +50,7 @@ pub(crate) fn run_merges(
     let mut hidden = Vec::new();
     let mut built = Vec::new();
 
-    let bar = crate::ui::progress(
+    let bar = crate::events::progress(
         plan.merges()
             .filter(|(entry, _)| settings.filter.matches(&entry.section, &entry.id))
             .count() as u64,
@@ -59,7 +59,7 @@ pub(crate) fn run_merges(
     for (mod_entry, spec) in plan.merges() {
         if settings.filter.matches(&mod_entry.section, &mod_entry.id) {
             bar.inc(1);
-            bar.set_message(mod_entry.id.clone());
+            bar.set_message(&mod_entry.id);
         }
         // A merge is a mod like any other, so the filter decides whether this
         // run builds it. Its *sources* are looked up in `installed`, so a merge
@@ -163,7 +163,7 @@ pub(crate) fn run_merges(
         );
     }
 
-    bar.finish_and_clear();
+    bar.finish();
     Ok(MergeRunOutcome { hidden, built })
 }
 

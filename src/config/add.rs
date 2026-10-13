@@ -107,6 +107,74 @@ pub struct Insertion {
     pub new_text: String,
 }
 
+/// What [`plan_add`] would do.
+#[derive(Debug, Clone)]
+pub struct Added {
+    /// Where the block goes, and the whole new text.
+    pub insertion: Insertion,
+    /// The mod's plugins that the load order did not list yet, now placed.
+    pub placed: Vec<String>,
+}
+
+/// Add `new_mod` to `text` (whose parsed list is `source`): its block where
+/// `placement` says, and any of its plugins the load order does not list yet
+/// at `position`. A plugin in the wrong place fails silently in game, so a
+/// new plugin with no `position` is refused rather than guessed at.
+pub fn plan_add(
+    text: &str,
+    source: &crate::config::schema::SourceModlist,
+    new_mod: &NewMod,
+    placement: &Placement,
+    position: Option<&LoadPosition>,
+) -> anyhow::Result<Added> {
+    if let Some(existing) = source.mods.iter().find(|entry| entry.id == new_mod.id) {
+        anyhow::bail!(
+            "the list already contains a mod with id '{}' (section {}); \
+             pass --id to add this one under a different name",
+            existing.id,
+            if existing.section.is_empty() {
+                "<none>".to_string()
+            } else {
+                existing.section.join(" - ")
+            }
+        );
+    }
+    let mut insertion = plan_insertion_at(text, &source.mods, new_mod, placement)?;
+
+    let unplaced: Vec<String> = new_mod
+        .plugins
+        .iter()
+        .filter(|plugin| {
+            !source
+                .plugins
+                .iter()
+                .any(|listed| listed.eq_ignore_ascii_case(plugin))
+        })
+        .cloned()
+        .collect();
+    match (position, unplaced.is_empty()) {
+        (Some(position), false) => {
+            let placed = place_plugins(&insertion.new_text, &unplaced, position)?;
+            // The load order sits above every mod, so the block moves down by
+            // however many lines went into it.
+            insertion.line += placed.lines().count() - insertion.new_text.lines().count();
+            insertion.new_text = placed;
+        }
+        (None, false) => anyhow::bail!(
+            "{} {} not in the load order yet; say where with --load-after <plugin> or \
+             --load-last (or add {} to `plugins` yourself first)",
+            unplaced.join(", "),
+            if unplaced.len() == 1 { "is" } else { "are" },
+            if unplaced.len() == 1 { "it" } else { "them" },
+        ),
+        (_, true) => {}
+    }
+    Ok(Added {
+        insertion,
+        placed: unplaced,
+    })
+}
+
 /// Render a mod entry as the TOML text that will be spliced into the file.
 ///
 /// No leading or trailing newline: the caller decides the separators, because

@@ -1,8 +1,7 @@
 use crate::cli::AddArgs;
 use crate::config;
 use crate::config::add::{
-    LoadPosition, NewMod, OracleMeta, Placement, find_plugins, parse_meta_ini, place_plugins,
-    plan_insertion_at,
+    Added, LoadPosition, NewMod, OracleMeta, Placement, find_plugins, parse_meta_ini, plan_add,
 };
 use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
@@ -17,66 +16,30 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
     // install would reject there rather than after 600 entries are written.
     safe_mod_dir_name(&new_mod.id)?;
 
-    let original = std::fs::read_to_string(&args.input)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
-    let source = config::loader::load_modlist(&args.input)?;
-
-    if let Some(existing) = source.mods.iter().find(|entry| entry.id == new_mod.id) {
-        anyhow::bail!(
-            "{} already contains a mod with id '{}' (section {}); \
-             pass --id to add this one under a different name",
-            args.input.display(),
-            existing.id,
-            if existing.section.is_empty() {
-                "<none>".to_string()
-            } else {
-                existing.section.join(" - ")
-            }
-        );
-    }
-
     let placement = Placement {
         before_mod: args.before_mod.clone(),
         before_section: (!args.before_sections.is_empty()).then(|| args.before_sections.clone()),
     };
-    let mut plan = plan_insertion_at(&original, &source.mods, &new_mod, &placement)?;
-
-    // Plugins the load order does not list yet go where the author said. A
-    // plugin in the wrong place fails silently in game, so with no place given
-    // this stops here, before anything is written.
-    let unplaced: Vec<String> = new_mod
-        .plugins
-        .iter()
-        .filter(|plugin| {
-            !source
-                .plugins
-                .iter()
-                .any(|listed| listed.eq_ignore_ascii_case(plugin))
-        })
-        .cloned()
-        .collect();
     let position = match (&args.load_after, args.load_last) {
         (Some(after), _) => Some(LoadPosition::After(after.clone())),
         (None, true) => Some(LoadPosition::Last),
         (None, false) => None,
     };
-    match (&position, unplaced.is_empty()) {
-        (Some(position), false) => {
-            let placed = place_plugins(&plan.new_text, &unplaced, position)?;
-            // The load order sits above every mod, so the block moves down by
-            // however many lines went into it.
-            plan.line += placed.lines().count() - plan.new_text.lines().count();
-            plan.new_text = placed;
-        }
-        (None, false) => anyhow::bail!(
-            "{} {} not in the load order yet; say where with --load-after <plugin> or \
-             --load-last (or add {} to `plugins` yourself first)",
-            unplaced.join(", "),
-            if unplaced.len() == 1 { "is" } else { "are" },
-            if unplaced.len() == 1 { "it" } else { "them" },
-        ),
-        (_, true) => {}
-    }
+    let mut added = None;
+    let edit = config::edit::plan(&args.input, |text, source| {
+        let plan = plan_add(text, source, &new_mod, &placement, position.as_ref())?;
+        let new_text = plan.insertion.new_text.clone();
+        added = Some(plan);
+        Ok(new_text)
+    })
+    .map_err(|err| anyhow::anyhow!("adding '{}': {err:#}", new_mod.id))?;
+    let Some(Added {
+        insertion: plan,
+        placed: unplaced,
+    }) = added
+    else {
+        unreachable!("a planned edit runs its change");
+    };
 
     if new_mod.section.is_empty() {
         crate::ui::status_err(
@@ -135,24 +98,7 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    write_atomic(&args.input, &plan.new_text)?;
-
-    // A modlist that no longer parses is worse than one missing a mod, so the
-    // insert is only kept if the whole file still loads and validates.
-    if let Err(err) = reload_and_validate(&args.input) {
-        write_atomic(&args.input, &original).map_err(|restore_err| {
-            anyhow::anyhow!(
-                "adding '{}' produced an invalid modlist ({err}), and restoring the original \
-                 also failed ({restore_err}). The file may be damaged.",
-                new_mod.id
-            )
-        })?;
-        anyhow::bail!(
-            "adding '{}' produced a modlist that no longer validates: {err}. \
-             The original file has been restored unchanged.",
-            new_mod.id
-        );
-    }
+    edit.write()?;
 
     crate::ui::status(
         crate::ui::Tone::Good,
@@ -623,25 +569,4 @@ fn report_plugins(mod_id: &str, mod_dir: &Path) {
          mudcrab will not guess the position, and without those the mod block is written \
          with no `plugins` key so the modlist still validates."
     );
-}
-
-/// Write via a temp file next to the target, then rename, so an interrupted
-/// write cannot leave a half-written modlist behind.
-pub(crate) fn write_atomic(path: &Path, content: &str) -> anyhow::Result<()> {
-    let mut temp = path.as_os_str().to_os_string();
-    temp.push(format!(".mudcrab-add-{}.tmp", std::process::id()));
-    let temp = PathBuf::from(temp);
-
-    std::fs::write(&temp, content)
-        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", temp.display()))?;
-
-    std::fs::rename(&temp, path).map_err(|err| {
-        let _ = std::fs::remove_file(&temp);
-        anyhow::anyhow!("failed to replace {}: {err}", path.display())
-    })
-}
-
-pub(crate) fn reload_and_validate(path: &Path) -> anyhow::Result<()> {
-    let reloaded = config::loader::load_modlist(path)?;
-    config::validator::validate(&reloaded).map(|_| ())
 }

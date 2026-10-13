@@ -20,6 +20,7 @@ pub mod merge;
 pub mod move_mod;
 mod new_merge;
 pub mod nexus_files;
+pub mod prompt;
 pub mod query;
 pub mod setup_tools;
 pub mod unhide_merges;

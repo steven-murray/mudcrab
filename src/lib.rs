@@ -4,6 +4,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod dds;
+pub mod events;
 pub mod export;
 pub mod merge;
 pub mod plugin;

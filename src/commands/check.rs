@@ -2,14 +2,7 @@ use crate::cli::CheckArgs;
 use crate::config;
 
 pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
-    let raw = std::fs::read_to_string(&args.input)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
-    let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to parse personalized plan {}: {err}",
-            args.input.display()
-        )
-    })?;
+    let plan = config::pipeline::read_plan(&args.input)?;
 
     let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let settings = config::check::CheckSettings {
@@ -27,6 +20,9 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         plugins_checked = report.plugins_checked,
         "check completed"
     );
+    if report.problems > 0 {
+        anyhow::bail!("check found {} problem(s), listed above", report.problems);
+    }
 
     Ok(())
 }

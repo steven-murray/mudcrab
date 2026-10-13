@@ -203,12 +203,7 @@ fn record(args: DownloadsRecordArgs) -> anyhow::Result<()> {
         }
         return Ok(());
     }
-    super::add::write_atomic(&args.modlist, &text)?;
-    if let Err(err) = super::add::reload_and_validate(&args.modlist) {
-        super::add::write_atomic(&args.modlist, &original)?;
-        anyhow::bail!("the edited modlist no longer validates ({err}); the original is restored");
-    }
-    Ok(())
+    crate::config::edit::Edit::new(&args.modlist, original, text)?.write()
 }
 
 /// Real names for Nexus archives nothing on disk names, from the API's files

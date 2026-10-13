@@ -631,7 +631,7 @@ fn compare_in_parallel(candidates: &[Candidate]) -> Vec<ModDiff> {
 
     let cursor = AtomicUsize::new(0);
     let collected = Mutex::new(Vec::with_capacity(candidates.len()));
-    let bar = crate::ui::progress(candidates.len() as u64, "comparing");
+    let bar = crate::events::progress(candidates.len() as u64, "comparing");
 
     std::thread::scope(|scope| {
         for _ in 0..workers {
@@ -650,7 +650,7 @@ fn compare_in_parallel(candidates: &[Candidate]) -> Vec<ModDiff> {
                     .expect("diff collector should not be poisoned")
                     .extend(local);
             });
-            bar.finish_and_clear();
+            bar.finish();
         }
     });
 

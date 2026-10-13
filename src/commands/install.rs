@@ -24,14 +24,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
     }
     let game_dir =
         super::resolve_game_dir(args.game_dir.clone(), args.mo2_instance_dir.as_deref())?;
-    let raw = std::fs::read_to_string(&args.input)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
-    let plan = serde_json::from_str::<config::schema::PersonalizedPlan>(&raw).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to parse personalized plan {}: {err}",
-            args.input.display()
-        )
-    })?;
+    let plan = config::pipeline::read_plan(&args.input)?;
 
     let cache_dir =
         super::resolve_downloads_dir(args.downloads.clone(), args.mo2_instance_dir.as_deref())?;

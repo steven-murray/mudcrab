@@ -37,6 +37,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zip = "2.2"
 minijinja = { version = "2", features = ["loader", "json"] }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
+similar = "2"
 
 [profile.release]
 # The audience downloads a binary rather than building one; debug symbols are

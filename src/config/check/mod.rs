@@ -23,7 +23,7 @@ use crate::config::install::layout::{self, EntryReader};
 use crate::config::schema::{
     CompiledArchive, Mo2ModlistEntry, ModType, PersonalizedMod, PersonalizedPlan,
 };
-use crate::ui::Tone;
+use crate::events::{Item, Text, Tone};
 use globset::{GlobBuilder, GlobMatcher};
 use rehearse::{PartnerCache, Rehearsal};
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
@@ -40,7 +40,11 @@ pub struct CheckReport {
     pub mods_checked: usize,
     pub archives_checked: usize,
     pub plugins_checked: usize,
+    /// Findings that would make the install fail or go wrong.
+    pub problems: usize,
     pub warnings: usize,
+    /// Everything found, in report order.
+    pub findings: Vec<Finding>,
 }
 
 /// The plugins shipped by the game itself. A master among these is present
@@ -61,8 +65,9 @@ pub(crate) const GAME_PLUGINS: &[&str] = &[
 
 /// What a finding is about, which decides its heading and whether it fails
 /// the check. Reported grouped, in this order.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-enum Kind {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Kind {
     MissingArchive,
     DamagedArchive,
     WouldFail,
@@ -76,7 +81,7 @@ enum Kind {
 }
 
 impl Kind {
-    fn heading(self) -> &'static str {
+    pub fn heading(self) -> &'static str {
         match self {
             Kind::MissingArchive => "Not in the downloads folder",
             Kind::DamagedArchive => "Archives that are not what the list expects",
@@ -94,7 +99,7 @@ impl Kind {
         }
     }
 
-    fn tone(self) -> Tone {
+    pub fn tone(self) -> Tone {
         match self {
             Kind::Overwritten | Kind::Unordered | Kind::Filters => Tone::Warning,
             Kind::NotChecked => Tone::Note,
@@ -103,31 +108,60 @@ impl Kind {
     }
 }
 
+/// One thing `check` found: its kind, what it says, and the mod it is about.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct Finding {
+    pub kind: Kind,
+    #[serde(flatten)]
+    pub item: Item,
+}
+
 /// Everything `check` found, to be reported grouped by kind.
 #[derive(Default)]
-struct Findings(Vec<(Kind, String)>);
+struct Findings(Vec<Finding>);
 
 impl Findings {
-    fn push(&mut self, kind: Kind, message: String) {
-        self.0.push((kind, message));
+    /// A finding about the plan as a whole, or several mods.
+    fn push(&mut self, kind: Kind, message: impl Into<Text>) {
+        self.0.push(Finding {
+            kind,
+            item: Item::new(message),
+        });
+    }
+
+    /// A finding about one mod; the message starts with its id.
+    fn about(&mut self, kind: Kind, mod_id: &str, message: impl Into<Text>) {
+        self.0.push(Finding {
+            kind,
+            item: Item::new(
+                Text::new()
+                    .plain(format!("{mod_id}: "))
+                    .append(message.into()),
+            )
+            .about(mod_id),
+        });
     }
 
     fn count(&self, tone: Tone) -> usize {
         self.0
             .iter()
-            .filter(|(kind, _)| kind.tone() == tone)
+            .filter(|finding| finding.kind.tone() == tone)
             .count()
     }
 
-    /// Each kind under its heading; the log gets every line too.
+    /// Each kind under its heading, in order; the log gets every line too.
     fn report(&self) {
-        let mut by_kind: BTreeMap<Kind, Vec<String>> = BTreeMap::new();
-        for (kind, message) in &self.0 {
-            tracing::info!(kind = ?kind, message, "check finding");
-            by_kind.entry(*kind).or_default().push(message.clone());
+        let mut by_kind: BTreeMap<Kind, Vec<Item>> = BTreeMap::new();
+        for finding in &self.0 {
+            let message = finding.item.text.to_plain();
+            tracing::info!(kind = ?finding.kind, message, "check finding");
+            by_kind
+                .entry(finding.kind)
+                .or_default()
+                .push(finding.item.clone());
         }
-        for (kind, messages) in &by_kind {
-            crate::ui::section(kind.tone(), kind.heading(), messages);
+        for (kind, items) in by_kind {
+            crate::events::section(kind.tone(), kind.heading(), items);
         }
     }
 }
@@ -205,7 +239,7 @@ fn check_in(
         .collect();
     let mods_checked = in_scope.len();
     let archives_checked: usize = in_scope.iter().map(|m| m.archives.len()).sum();
-    let bar = crate::ui::progress(mods_checked as u64, "checking");
+    let bar = crate::events::progress(mods_checked as u64, "checking");
 
     // Mods are checked side by side, a thread per CPU: most of the time goes
     // on `7z` and `bsdtar` listing and unpacking, and on hashing, one archive
@@ -227,7 +261,7 @@ fn check_in(
                     let Some(mod_entry) = in_scope.get(index) else {
                         break;
                     };
-                    bar.set_message(mod_entry.id.clone());
+                    bar.set_message(&mod_entry.id);
                     let own = scratch.join(format!("mod-{index}"));
                     let mut found = Findings::default();
                     let folder = check_mod(
@@ -249,7 +283,7 @@ fn check_in(
             });
         }
     });
-    bar.finish_and_clear();
+    bar.finish();
     let results = results
         .into_inner()
         .map_err(|_| anyhow::anyhow!("a check thread panicked"))?;
@@ -275,8 +309,11 @@ fn check_in(
         })
         .collect();
     let (master_errors, plugins_checked) = master_problems(plan, &shipped);
-    for error in master_errors {
-        findings.push(Kind::Masters, error);
+    for (mod_id, error) in master_errors {
+        findings.0.push(Finding {
+            kind: Kind::Masters,
+            item: Item::new(error).about(mod_id),
+        });
     }
     let whole_plan = settings.filter.is_empty();
     load_order_problems(plan, &folders, whole_plan, &mut findings);
@@ -308,8 +345,7 @@ fn check_in(
     findings.report();
     let problems = findings.count(Tone::Problem);
     let warnings = findings.count(Tone::Warning);
-    crate::ui::say("");
-    crate::ui::status(
+    crate::events::status(
         if problems > 0 {
             Tone::Problem
         } else if warnings > 0 {
@@ -331,15 +367,13 @@ fn check_in(
         "check summary"
     );
 
-    if problems > 0 {
-        anyhow::bail!("check found {problems} problem(s), listed above");
-    }
-
     Ok(CheckReport {
         mods_checked,
         archives_checked,
         plugins_checked,
+        problems,
         warnings,
+        findings: findings.0,
     })
 }
 
@@ -410,7 +444,11 @@ fn check_mod(
                 } else {
                     (Kind::DamagedArchive, message)
                 };
-                findings.push(kind, format!("{}{which}: {message}", mod_entry.id));
+                findings.0.push(Finding {
+                    kind,
+                    item: Item::new(format!("{}{which}: {message}", mod_entry.id))
+                        .about(&mod_entry.id),
+                });
                 folder.complete = false;
             }
         }
@@ -439,18 +477,18 @@ fn check_mod(
         ) {
             Ok(Rehearsal::Done(files)) => files,
             Ok(Rehearsal::Fails(err)) => {
-                findings.push(Kind::WouldFail, format!("{}: {err:#}", mod_entry.id));
+                findings.about(Kind::WouldFail, &mod_entry.id, format!("{err:#}"));
                 folder.complete = false;
                 return folder;
             }
             Ok(Rehearsal::Unknown(why)) => {
                 tracing::info!(mod_id = %mod_entry.id, why, "check: actions not rehearsed");
-                findings.push(Kind::NotChecked, format!("{}: {why}", mod_entry.id));
+                findings.about(Kind::NotChecked, &mod_entry.id, why);
                 folder.complete = false;
                 return folder;
             }
             Err(err) => {
-                findings.push(Kind::WouldFail, format!("{}: {err:#}", mod_entry.id));
+                findings.about(Kind::WouldFail, &mod_entry.id, format!("{err:#}"));
                 folder.complete = false;
                 return folder;
             }
@@ -585,12 +623,10 @@ fn check_single_archive(
         if plan_with(std::slice::from_ref(pattern), &archive.exclude)
             .is_ok_and(|plan| plan.is_empty())
         {
-            findings.push(
+            findings.about(
                 Kind::Filters,
-                format!(
-                    "{}: include '{pattern}' matches nothing in {file_name}",
-                    mod_entry.id
-                ),
+                &mod_entry.id,
+                format!("include '{pattern}' matches nothing in {file_name}"),
             );
         }
     }
@@ -601,12 +637,10 @@ fn check_single_archive(
             if plan_with(&archive.include, std::slice::from_ref(pattern))
                 .is_ok_and(|plan| plan.len() == unfiltered.len())
             {
-                findings.push(
+                findings.about(
                     Kind::Filters,
-                    format!(
-                        "{}: exclude '{pattern}' leaves nothing out of {file_name}",
-                        mod_entry.id
-                    ),
+                    &mod_entry.id,
+                    format!("exclude '{pattern}' leaves nothing out of {file_name}"),
                 );
             }
         }
@@ -706,23 +740,23 @@ fn load_order_problems(
             if !folder.plugins.contains_key(&declared.to_ascii_lowercase())
                 && !made_by_wrye_bash(declared)
             {
-                findings.push(
+                findings.about(
                     Kind::LoadOrder,
-                    format!(
-                        "{}: declares {}, which it does not install (renamed in a mod update, \
-                         or left out by its layout)",
-                        mod_entry.id,
-                        crate::ui::name(declared)
+                    &mod_entry.id,
+                    Text::new().plain("declares ").name(declared).plain(
+                        ", which it does not install (renamed in a mod update, or left out by \
+                         its layout)",
                     ),
                 );
             }
         }
         for (key, (name, _)) in &folder.plugins {
             if !ordered.contains(key) && !merged_away.contains(key) {
-                findings.push(
-                    Kind::Unordered,
-                    format!("{} ({})", crate::ui::name(name), mod_entry.id),
-                );
+                findings.0.push(Finding {
+                    kind: Kind::Unordered,
+                    item: Item::new(Text::new().name(name).plain(format!(" ({})", mod_entry.id)))
+                        .about(&mod_entry.id),
+                });
             }
         }
     }
@@ -750,10 +784,9 @@ fn load_order_problems(
         {
             findings.push(
                 Kind::LoadOrder,
-                format!(
-                    "{} is in the load order, but no mod installs it",
-                    crate::ui::name(plugin)
-                ),
+                Text::new()
+                    .name(plugin)
+                    .plain(" is in the load order, but no mod installs it"),
             );
         }
     }
@@ -808,13 +841,12 @@ fn bsa_problems(
             {
                 continue;
             }
-            findings.push(
+            findings.about(
                 Kind::Bsa,
-                format!(
-                    "{id}: {} -- no active plugin's name begins it, so its contents never \
-                     reach the game; add a plugin of that name (`create_dummy_plugin`), or \
-                     rename it",
-                    crate::ui::name(bsa)
+                id,
+                Text::new().name(bsa).plain(
+                    " -- no active plugin's name begins it, so its contents never reach the \
+                     game; add a plugin of that name (`create_dummy_plugin`), or rename it",
                 ),
             );
         }
@@ -853,7 +885,9 @@ fn duplicate_plugins(
         let name = &folders[mods[0]].plugins[key].0;
         findings.push(
             Kind::Overwritten,
-            format!("{}: {}", crate::ui::name(name), mods.join(" > ")),
+            Text::new()
+                .name(name)
+                .plain(format!(": {}", mods.join(" > "))),
         );
     }
 }
@@ -861,7 +895,7 @@ fn duplicate_plugins(
 fn master_problems(
     plan: &PersonalizedPlan,
     shipped: &HashMap<String, Shipped>,
-) -> (Vec<String>, usize) {
+) -> (Vec<(String, String)>, usize) {
     let inactive: HashSet<String> = plan
         .inactive_plugins
         .iter()
@@ -916,7 +950,10 @@ fn master_problems(
                 },
             };
             if let Some(problem) = problem {
-                errors.push(format!("{} ({plugin}): {problem}", shipped.mod_id));
+                errors.push((
+                    shipped.mod_id.clone(),
+                    format!("{} ({plugin}): {problem}", shipped.mod_id),
+                ));
             }
         }
     }
@@ -1085,15 +1122,15 @@ mod tests {
         let (errors, checked) = master_problems(&plan, &shipped);
         assert_eq!(checked, 4, "the inactive plugin's masters do not matter");
         assert_eq!(errors.len(), 2, "{errors:#?}");
-        assert!(errors[0].contains("Off.esp") && errors[0].contains("inactive"));
-        assert!(errors[1].contains("Missing.esp") && errors[1].contains("not in the list"));
+        assert!(errors[0].1.contains("Off.esp") && errors[0].1.contains("inactive"));
+        assert!(errors[1].1.contains("Missing.esp") && errors[1].1.contains("not in the list"));
     }
 
     #[test]
     fn a_master_must_load_first() {
         let plan = plan(&["C.esp", "Late.esp"], &[], serde_json::json!([]));
         let (errors, _) = master_problems(&plan, &ships(&[("C.esp", &["Late.esp"])]));
-        assert!(errors[0].contains("loads after it"), "{errors:#?}");
+        assert!(errors[0].1.contains("loads after it"), "{errors:#?}");
     }
 
     #[test]
@@ -1112,6 +1149,9 @@ mod tests {
             }]),
         );
         let (errors, _) = master_problems(&plan, &ships(&[("Patch.esp", &["Src.esp"])]));
-        assert!(errors[0].contains("merged into Merged.esp"), "{errors:#?}");
+        assert!(
+            errors[0].1.contains("merged into Merged.esp"),
+            "{errors:#?}"
+        );
     }
 }
