@@ -239,8 +239,11 @@ pub fn staging_dir_for(target_root: &Path) -> anyhow::Result<PathBuf> {
         .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
         .collect();
 
+    // The clock alone is not unique once threads ask at the same moment.
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let count = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     Ok(staging_parent_for(target_root).join(format!(
-        "mudcrab-stage-{name}-{}-{stamp}",
+        "mudcrab-stage-{name}-{}-{stamp}-{count}",
         std::process::id()
     )))
 }

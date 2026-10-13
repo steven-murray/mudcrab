@@ -36,8 +36,9 @@ pub(super) enum Rehearsal {
     Unknown(String),
 }
 
-/// Partners' files, worked out once per `check`.
-pub(super) type PartnerCache = HashMap<String, Result<(), String>>;
+/// Whether each partner's files can be known from its archives, worked out
+/// once per `check` and shared between its threads.
+pub(super) type PartnerCache = std::sync::Mutex<HashMap<String, Result<(), String>>>;
 
 /// Lay out `planned` (destination, and for a file whose real bytes matter --
 /// a BSA an `extract_bsa` unpacks -- where those bytes are) under `root`, run
@@ -49,7 +50,7 @@ pub(super) fn rehearse(
     settings: &InstallSettings,
     plan_mods: &[PersonalizedMod],
     active_plugins: &HashSet<String>,
-    partners: &mut PartnerCache,
+    partners: &PartnerCache,
 ) -> anyhow::Result<Rehearsal> {
     let _ = std::fs::remove_dir_all(root);
     std::fs::create_dir_all(root)
@@ -82,14 +83,29 @@ pub(super) fn rehearse(
         // A conflict selection compares against what another mod provides;
         // that has to be knowable from its archives alone.
         for partner in conflicts_with(action) {
-            let known = partners.entry(partner.clone()).or_insert_with(|| {
-                let Some(other) = plan_mods.iter().find(|m| &m.id == partner) else {
-                    return Ok(());
-                };
-                staged_paths(other, None, settings, active_plugins)
-                    .map(|_| ())
-                    .map_err(|err| format!("{err:#}"))
-            });
+            let cached = partners
+                .lock()
+                .map_err(|_| anyhow::anyhow!("a check thread panicked"))?
+                .get(partner)
+                .cloned();
+            // Worked out without the lock held, so other threads carry on; two
+            // that ask at once both work it out, which is harmless.
+            let known = match cached {
+                Some(known) => known,
+                None => {
+                    let known = match plan_mods.iter().find(|m| &m.id == partner) {
+                        Some(other) => staged_paths(other, None, settings, active_plugins)
+                            .map(|_| ())
+                            .map_err(|err| format!("{err:#}")),
+                        None => Ok(()),
+                    };
+                    partners
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("a check thread panicked"))?
+                        .insert(partner.clone(), known.clone());
+                    known
+                }
+            };
             if let Err(why) = known {
                 tracing::info!(mod_id = %mod_entry.id, partner = %partner, why, "check: partner's files unknown");
                 return Ok(Rehearsal::Unknown(format!(

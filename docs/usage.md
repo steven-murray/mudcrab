@@ -753,7 +753,7 @@ Plugins made during the install (merge outputs) and mods built from layers,
 inside an `inner_archive`, or installed into MO2 itself are checked as far as
 they can be; the summary says how many plugins it could not read. Every
 problem is reported together, and the summary and warnings are printed even
-when the check fails. On a 700-mod list it takes a couple of minutes.
+when the check fails. Mods are checked in parallel, a thread per CPU; on a 700-mod list it takes under a minute on 16 threads.
 
 ## assets
 

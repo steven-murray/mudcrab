@@ -173,11 +173,9 @@ fn check_in(
     settings: &CheckSettings,
     scratch: &Path,
 ) -> anyhow::Result<CheckReport> {
-    let mut mods_checked = 0usize;
-    let mut archives_checked = 0usize;
     let mut findings = Findings::default();
     let mut folders: BTreeMap<String, ModFolder> = BTreeMap::new();
-    let mut partners = PartnerCache::new();
+    let partners = PartnerCache::default();
     let active_plugins: HashSet<String> = plan
         .plugins
         .iter()
@@ -200,30 +198,67 @@ fn check_in(
         redo_actions: Vec::new(),
     };
 
-    let in_scope = || {
-        plan.mods
-            .iter()
-            .filter(|m| settings.filter.matches(&m.section, &m.id))
-    };
-    let bar = crate::ui::progress(in_scope().count() as u64, "checking");
-    for mod_entry in in_scope() {
-        mods_checked += 1;
-        bar.inc(1);
-        bar.set_message(mod_entry.id.clone());
-        archives_checked += mod_entry.archives.len();
-        let folder = check_mod(
-            mod_entry,
-            plan,
-            settings,
-            &install_settings,
-            &active_plugins,
-            &mut partners,
-            scratch,
-            &mut findings,
-        );
+    let in_scope: Vec<&PersonalizedMod> = plan
+        .mods
+        .iter()
+        .filter(|m| settings.filter.matches(&m.section, &m.id))
+        .collect();
+    let mods_checked = in_scope.len();
+    let archives_checked: usize = in_scope.iter().map(|m| m.archives.len()).sum();
+    let bar = crate::ui::progress(mods_checked as u64, "checking");
+
+    // Mods are checked side by side, a thread per CPU: most of the time goes
+    // on `7z` and `bsdtar` listing and unpacking, and on hashing, one archive
+    // at a time. Each mod has its own scratch folder and its own findings,
+    // gathered back in list order so the report reads the same every run.
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .min(in_scope.len().max(1));
+    let mut results: Vec<Option<(ModFolder, Findings)>> = Vec::new();
+    results.resize_with(in_scope.len(), || None);
+    let results = std::sync::Mutex::new(results);
+    std::thread::scope(|scope| {
+        for _ in 0..threads {
+            scope.spawn(|| {
+                loop {
+                    let index = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let Some(mod_entry) = in_scope.get(index) else {
+                        break;
+                    };
+                    bar.set_message(mod_entry.id.clone());
+                    let own = scratch.join(format!("mod-{index}"));
+                    let mut found = Findings::default();
+                    let folder = check_mod(
+                        mod_entry,
+                        plan,
+                        settings,
+                        &install_settings,
+                        &active_plugins,
+                        &partners,
+                        &own,
+                        &mut found,
+                    );
+                    let _ = std::fs::remove_dir_all(&own);
+                    if let Ok(mut results) = results.lock() {
+                        results[index] = Some((folder, found));
+                    }
+                    bar.inc(1);
+                }
+            });
+        }
+    });
+    bar.finish_and_clear();
+    let results = results
+        .into_inner()
+        .map_err(|_| anyhow::anyhow!("a check thread panicked"))?;
+    for (mod_entry, result) in in_scope.iter().zip(results) {
+        let (folder, found) =
+            result.ok_or_else(|| anyhow::anyhow!("{} was not checked", mod_entry.id))?;
+        findings.0.extend(found.0);
         folders.insert(mod_entry.id.clone(), folder);
     }
-    bar.finish_and_clear();
 
     let shipped: HashMap<String, Shipped> = folders
         .iter()
@@ -317,7 +352,7 @@ fn check_mod(
     settings: &CheckSettings,
     install_settings: &InstallSettings,
     active_plugins: &HashSet<String>,
-    partners: &mut PartnerCache,
+    partners: &PartnerCache,
     scratch: &Path,
     findings: &mut Findings,
 ) -> ModFolder {
