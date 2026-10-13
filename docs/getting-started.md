@@ -173,7 +173,7 @@ and finds everything about the list it can without installing it:
 It reports every problem together, with what the list says about getting any
 archive that is missing. Warnings (a plugin two mods both install, one a mod
 installs that the load order leaves out) do not fail it. It changes nothing,
-and takes a minute or two on a large list. See
+and takes under a minute on a large list. See
 [usage.md](usage.md#check) for the details.
 
 ## 4. Install
