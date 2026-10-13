@@ -13,7 +13,7 @@ full log: /home/you/.local/state/mudcrab/logs/install-20261012-050631.log
 (`%LOCALAPPDATA%\mudcrab\logs` on Windows.) The terminal shows the error and
 what caused it; the log has every step before it. `-v` shows the full log on
 the terminal as the run goes. Limitations that are already known, with
-workarounds, are in [known-issues.md](known-issues.md).
+workarounds, are in [Known issues](known-issues.md).
 
 ## Setting up
 
@@ -22,7 +22,7 @@ workarounds, are in [known-issues.md](known-issues.md).
 mudcrab has not been told where archives live. Set `downloads_dir` in
 `tools.toml` once (`mudcrab setup-tools <list>` writes the file, in the place
 every command looks), or pass `--downloads` each time. See
-[getting-started.md](getting-started.md#1-tell-mudcrab-where-things-live).
+[step 1 of Getting started](getting-started.md#1-tell-mudcrab-where-things-live).
 
 ### `no game folder: pass --game-dir or set GAME_DIR`
 
@@ -61,7 +61,7 @@ Linux, also `[wine]`).
 ## Writing or changing a list
 
 `validate` and `compile` check the list's own consistency before anything is
-downloaded (see [usage.md](usage.md#compile) for what that covers).
+downloaded (see [`compile` in Commands](usage.md#compile) for what that covers).
 
 ### `mod X declares plugin Y that is missing from global plugins load order`
 
@@ -223,7 +223,7 @@ check it under Profiles.
 ### Problems on Linux (black menus, missing water, ENB)
 
 Running under Proton has its own fixes; see
-[known-issues.md](known-issues.md#linux--proton).
+[Linux / Proton in Known issues](known-issues.md#linux--proton).
 
 ## Still stuck
 

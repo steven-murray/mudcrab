@@ -18,12 +18,9 @@
 # Reference
 
 - [Commands](usage.md)
-- [What goes into an MO2 instance](mo2-output-structure.md)
 - [Roadmap](roadmap.md)
 
-# Design
+# Developer reference
 
-- [Composability (plan)](design/composability.md)
-- [A GUI (plan)](design/gui.md)
 - [Conflict resolution](design/conflict-resolution.md)
 - [The merge engine](design/merge-engine.md)

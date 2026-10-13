@@ -2,7 +2,7 @@
 
 This page takes you from nothing to a playable game, using a modlist someone
 else has written. Writing your own list is a different job; see
-[modlist-format.md](modlist-format.md).
+[The modlist format](modlist-format.md).
 
 A mudcrab modlist is a `.toml` file (sometimes with a second, `*.docs.toml`,
 holding its prose). mudcrab reads it, downloads every archive it names,
@@ -85,7 +85,7 @@ MO2 plugin. Step 1 tells you.
    bottom of the window. (`mudcrab game-dir --plain` prints only that, for
    piping to the clipboard.)
 
-See [known-issues.md](known-issues.md#linux--proton) for what else Linux
+See [Linux / Proton in Known issues](known-issues.md#linux--proton) for what else Linux
 needs.
 
 ## 1. Tell mudcrab where things live
@@ -174,7 +174,7 @@ It reports every problem together, with what the list says about getting any
 archive that is missing. Warnings (a plugin two mods both install, one a mod
 installs that the load order leaves out) do not fail it. It changes nothing,
 and takes under a minute on a large list. See
-[usage.md](usage.md#check) for the details.
+[`check` in Commands](usage.md#check) for the details.
 
 ## 4. Install
 
@@ -235,15 +235,15 @@ Bash Bashed Patch.
   changed is installed again.
 - **A new version of the list**: the same three steps after `compile`.
 - **Something went wrong**: every run writes a full log and prints its path on
-  failure (`full log: ...`). [troubleshooting.md](troubleshooting.md) explains
-  the messages you are likely to see, and [known-issues.md](known-issues.md)
+  failure (`full log: ...`). [Troubleshooting](troubleshooting.md) explains
+  the messages you are likely to see, and [Known issues](known-issues.md)
   covers what is already known; to report something new, see
   [the contributing guide](https://github.com/steven-murray/mudcrab/blob/main/CONTRIBUTING.md#reporting-a-modlist-that-installs-wrongly).
 
 ## Where to next
 
-- [usage.md](usage.md): every command and flag, including installing one
+- [Commands](usage.md): every command and flag, including installing one
   section of a large list at a time (`--section`, `--only`).
-- [modlist-format.md](modlist-format.md): writing or changing a list.
-- [exporters.md](exporters.md): turning a list into a guide for people who
-  install by hand.
+- [The modlist format](modlist-format.md): writing or changing a list.
+- [Turning a list into a guide](exporters.md): for people who install by
+  hand.

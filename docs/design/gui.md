@@ -143,7 +143,7 @@ choice is then evidence.
 ## CLI parity
 
 Every edit the GUI makes is one of these commands (documented in
-[usage.md](../usage.md#editing-a-list)):
+[Editing a list in Commands](../usage.md#editing-a-list)):
 
 | Command | Does |
 | --- | --- |

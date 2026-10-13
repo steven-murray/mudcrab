@@ -38,7 +38,7 @@ mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<
 mudcrab add <modlist.toml> --from-mo2 <MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
 ```
 
-[authoring.md](authoring.md) walks through using it on a new list.
+[Writing a modlist](authoring.md) walks through using it on a new list.
 
 `add` only writes the mod's declaration into the list; nothing is installed or
 unpacked until `install`.
@@ -509,7 +509,7 @@ up with.
 
 When the list declares steps to take by hand (`[[manual-steps]]`, such as
 building a Bashed Patch in Wrye Bash), `install` ends by listing those not yet
-done; see [modlist-format.md](modlist-format.md#steps-by-hand). For a list
+done; see [Steps by hand in The modlist format](modlist-format.md#steps-by-hand). For a list
 with a Bashed Patch, it also adds Wrye Bash to the MO2 instance's executables,
 when the game folder has `Mopy/Wrye Bash.exe` and MO2 does not list it yet.
 A list's `[mo2] theme` is set while the instance has no theme chosen; one you
@@ -1046,7 +1046,7 @@ that Mod Organizer 2 unwraps by itself gets no instruction at all. Without it,
 patterns are put into words instead.
 
 The prose comes from the modlist's `docs` tables (see
-[modlist-format.md](modlist-format.md#docs-prose-for-export)); the rest --
+[Docs: prose for export in The modlist format](modlist-format.md#docs-prose-for-export)); the rest --
 sections, Nexus links, installer choices, INI edits, conditions, the load order
 -- comes from the install data, put into words.
 
@@ -1092,7 +1092,7 @@ relative_links:
 
 Exporters take options (`--opt key=value`, or `[export.<exporter>]` in the
 modlist; `--list-options` shows them) and can be customised or replaced by your
-own: see [exporters.md](exporters.md).
+own: see [Turning a list into a guide](exporters.md).
 
 ## game-dir
 
