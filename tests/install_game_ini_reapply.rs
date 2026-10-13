@@ -61,7 +61,7 @@ id = "ui"
 dependencies = []
 
 [[mods.archives]]
-path = "{ui}"
+path = '{ui}'
 download_handler = "local"
 
 [[mods.actions]]

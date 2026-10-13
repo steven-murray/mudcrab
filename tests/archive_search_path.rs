@@ -391,7 +391,7 @@ fn an_archive_without_a_file_name_still_uses_the_ordinary_download_path() {
     );
 
     let source = format!(
-        "name = \"Fallthrough Test\"\n\n[[mods]]\nid = \"plain\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"adopted\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:oblivion/5/6\"\nfile_name = \"Adopted-1-0.zip\"\n",
+        "name = \"Fallthrough Test\"\n\n[[mods]]\nid = \"plain\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"adopted\"\ndependencies = []\n\n[[mods.archives]]\npath = \"nexus:oblivion/5/6\"\nfile_name = \"Adopted-1-0.zip\"\n",
         plain_archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");

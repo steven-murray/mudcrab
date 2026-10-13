@@ -1427,7 +1427,15 @@ mod tests {
         // Staged directories fold to lowercase; the file name does not. The
         // archive spells this folder "Textures".
         assert!(target_root.join("textures/foo.dds").exists());
-        assert!(!target_root.join("Textures").exists());
+        // By its spelling on disk: a case-insensitive filesystem (Windows)
+        // finds "Textures" either way.
+        let names: Vec<String> = std::fs::read_dir(&target_root)
+            .expect("staged folder")
+            .flatten()
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .collect();
+        assert!(names.contains(&"textures".to_string()), "{names:?}");
+        assert!(!names.contains(&"Textures".to_string()), "{names:?}");
         assert!(!target_root.join("plugin3.esp").exists());
     }
 

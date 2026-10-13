@@ -141,28 +141,28 @@ plugins = ["Oblivion.esm", "A1.esp", "B1.esp", "B2.esp", "C1.esp"]
 id = "a1"
 section = ["A"]
 [[mods.archives]]
-path = "{a1}"
+path = '{a1}'
 download_handler = "local"
 
 [[mods]]
 id = "b1"
 section = ["B"]
 [[mods.archives]]
-path = "{b1}"
+path = '{b1}'
 download_handler = "local"
 
 [[mods]]
 id = "b2"
 section = ["B", "Nested"]
 [[mods.archives]]
-path = "{b2}"
+path = '{b2}'
 download_handler = "local"
 
 [[mods]]
 id = "c1"
 section = ["C"]
 [[mods.archives]]
-path = "{c1}"
+path = '{c1}'
 download_handler = "local"
 "#,
             a1 = root.join("a1.zip").display(),
@@ -496,14 +496,14 @@ name = "Filtered Download"
 id = "a1"
 section = ["A"]
 [[mods.archives]]
-path = "{missing}"
+path = '{missing}'
 download_handler = "local"
 
 [[mods]]
 id = "b1"
 section = ["B"]
 [[mods.archives]]
-path = "{b1}"
+path = '{b1}'
 download_handler = "local"
 "#,
             missing = root.join("does-not-exist.zip").display(),

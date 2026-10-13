@@ -75,21 +75,21 @@ name = "Accumulating Failures"
 id = "dead-first"
 dependencies = []
 [[mods.archives]]
-path = "{missing_a}"
+path = '{missing_a}'
 download_handler = "local"
 
 [[mods]]
 id = "alive"
 dependencies = []
 [[mods.archives]]
-path = "{good}"
+path = '{good}'
 download_handler = "local"
 
 [[mods]]
 id = "dead-second"
 dependencies = []
 [[mods.archives]]
-path = "{missing_b}"
+path = '{missing_b}'
 download_handler = "local"
 "#,
             missing_a = root.join("nowhere-a.zip").display(),
@@ -163,7 +163,7 @@ fn download_copies_local_archives_into_cache() {
     std::fs::create_dir_all(&game_dir).expect("game dir should be created");
 
     let source = format!(
-        "name = \"Local Download Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Local Download Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");

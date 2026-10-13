@@ -25,7 +25,7 @@ fn install_unpacks_zip_archives_for_each_selected_mod() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Install Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -155,7 +155,7 @@ fn install_stages_game_root_files_in_the_mods_root_folder_for_root_builder() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Game Root Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ngame_root_files = [\"*.exe\"]\n",
+        "name = \"Game Root Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\ngame_root_files = [\"*.exe\"]\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -292,7 +292,7 @@ fn install_fails_when_ini_set_target_file_is_missing() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install Missing Ini Target Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods.actions]]\naction = \"ini_set\"\nfile = \"Data/missing.ini\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
+        "name = \"Install Missing Ini Target Test\"\n\n[[mods]]\nid = \"core\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods.actions]]\naction = \"ini_set\"\nfile = \"Data/missing.ini\"\nkey = \"bFull Screen\"\nvalue = \"0\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -430,7 +430,7 @@ fn install_auto_detects_supported_archive_layouts_without_arguments() {
     );
 
     let source = format!(
-        "name = \"Auto Layout Test\"\n\n[[mods]]\nid = \"root\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"data\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"modonly\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"moddata\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Auto Layout Test\"\n\n[[mods]]\nid = \"root\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"data\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"modonly\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"moddata\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         root_zip.display(),
         data_zip.display(),
         mod_zip.display(),
@@ -563,7 +563,7 @@ fn install_rejects_noncanonical_plugin_layouts() {
     );
 
     let source = format!(
-        "name = \"Bad Layout Test\"\n\n[[mods]]\nid = \"bad\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Bad Layout Test\"\n\n[[mods]]\nid = \"bad\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -684,7 +684,7 @@ fn install_descends_a_wrapper_folder_holding_a_plugin() {
     );
 
     let source = format!(
-        "name = \"Wrapper Test\"\n\n[[mods]]\nid = \"wrapped\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\n",
+        "name = \"Wrapper Test\"\n\n[[mods]]\nid = \"wrapped\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -790,7 +790,7 @@ fn install_unpacks_an_archive_nested_inside_another() {
     );
 
     let source = format!(
-        "name = \"Nested Test\"\nplugins = [\"bank.esp\"]\n\n[[mods]]\nid = \"bank\"\ndependencies = []\nplugins = [\"bank.esp\"]\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninner_archive = \"installer.zip\"\n",
+        "name = \"Nested Test\"\nplugins = [\"bank.esp\"]\n\n[[mods]]\nid = \"bank\"\ndependencies = []\nplugins = [\"bank.esp\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\ninner_archive = \"installer.zip\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -821,7 +821,7 @@ fn install_rejects_an_inner_archive_the_container_does_not_hold() {
     make_zip_with_files(&archive, &[("readme.txt", b"read me")]);
 
     let source = format!(
-        "name = \"Nested Test\"\n\n[[mods]]\nid = \"bank\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninner_archive = \"missing.zip\"\n",
+        "name = \"Nested Test\"\n\n[[mods]]\nid = \"bank\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\ninner_archive = \"missing.zip\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
@@ -919,7 +919,7 @@ fn install_rejects_an_archive_that_contributes_no_files() {
     );
 
     let source = format!(
-        "name = \"Empty Test\"\n\n[[mods]]\nid = \"empty\"\ndependencies = []\n\n[[mods.archives]]\npath = \"{}\"\ndownload_handler = \"local\"\ninclude = [\"Data/wanted.esp\"]\n",
+        "name = \"Empty Test\"\n\n[[mods]]\nid = \"empty\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\ninclude = [\"Data/wanted.esp\"]\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");

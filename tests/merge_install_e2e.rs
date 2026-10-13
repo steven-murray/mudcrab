@@ -139,21 +139,21 @@ plugins = ["Oblivion.esm", "Merged.esp"]
 id = "Alpha"
 section = ["FORTS"]
 [[mods.archives]]
-path = "{alpha}"
+path = '{alpha}'
 download_handler = "local"
 
 [[mods]]
 id = "Beta"
 section = ["FORTS"]
 [[mods.archives]]
-path = "{beta}"
+path = '{beta}'
 download_handler = "local"
 
 [[mods]]
 id = "Gamma"
 section = ["FORTS"]
 [[mods.archives]]
-path = "{gamma}"
+path = '{gamma}'
 download_handler = "local"
 
 [[mods]]
