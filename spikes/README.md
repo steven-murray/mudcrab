@@ -117,10 +117,17 @@ On each machine, with each spike, on a copy of a real list:
 4. **Keyboard**: Tab through the views. Neither spike adds keyboard
    reordering yet; note how far each gets on its own.
 
-Machines: Linux on Wayland and X11 (done above, except by hand); **Windows**
-(the workflow's artifact); **the Steam Deck** in desktop mode (the Linux
-artifact; the Tauri one needs WebKitGTK 4.1, which SteamOS may not have
-outside a Flatpak -- whether it starts is itself the finding).
+Machines: Linux on Wayland and X11 (done above, by hand too); **Windows**
+(the workflow's artifact, with `sample/`).
+
+**The Steam Deck**, without one to hand: SteamOS reportedly ships no
+WebKitGTK and has a read-only root, so a plain Tauri binary would not start
+there; Tauri apps reach it as a Flatpak, whose GNOME runtime brings
+WebKitGTK, built on an old enough base to avoid glibc mismatches. The Slint
+binary needs only fontconfig and freetype, which any desktop has. So on the
+Deck the difference is packaging (a Flatpak for Tauri, phase 7's work either
+way), not whether it can run. Trying it on a real Deck stays worth doing
+before a release.
 
 What trying both by hand found (Linux, Wayland):
 
@@ -148,6 +155,6 @@ Both are viable. The trade is:
   web-view surprises seen; but the widgets the author mode needs (tree, table,
   tri-state boxes) are ours to build, and layout takes more care.
 
-The Windows and Steam Deck runs decide it: if Tauri starts and drags well on
-both, its speed of building views wins; if it does not start on the Deck, or
-the drag is poor anywhere, Slint does.
+The Windows run decides it: if Tauri starts and drags well there, its speed
+of building views wins, and the Deck costs a Flatpak; if the drag is poor
+there, Slint does.
