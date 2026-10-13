@@ -540,16 +540,7 @@ pub struct DownloadArgs {
     pub browser_downloads: Option<BrowserDownloads>,
 }
 
-/// What `download --browser` does with an archive the browser saved.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
-pub enum BrowserDownloads {
-    /// Leave it; you will put it in the downloads folder yourself.
-    Leave,
-    /// Move it into the downloads folder.
-    Move,
-    /// Hard-link it into the downloads folder, leaving it where it is too.
-    Link,
-}
+pub use crate::config::by_hand::BrowserDownloads;
 
 #[derive(Debug, Args)]
 pub struct CheckArgs {
