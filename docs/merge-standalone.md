@@ -108,9 +108,8 @@ That refusal is deliberate. mudcrab cannot tell whether an unknown field holds a
 FormID, and guessing wrong would silently corrupt the merge instead of failing.
 `cargo run --bin plugin-audit -- <mods dir>` lists every gap your own setup would
 hit; adding them to `src/plugin/schema/tes4.rs` is mechanical, using xEdit's
-`Core/wbDefinitionsTES4.pas` as the source of truth. This is the main thing
-standing between the merge engine and general use — see
-[roadmap A4b](roadmap.md#a4b-close-the-tes4-schema-gap--the-blocker-for-sharing-the-merge-engine).
+`Core/wbDefinitionsTES4.pas` as the source of truth. OBME is what remains;
+see [the roadmap](roadmap.md#plugins-and-merges).
 
 **It refuses plugins with voice directories or FormIDs embedded in script
 bytecode**, for the same reason. Neither occurs in Oblivion in practice — zero

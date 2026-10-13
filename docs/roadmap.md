@@ -1,282 +1,84 @@
-# Roadmap to a publishable mudcrab
+# Roadmap
 
-mudcrab now compiles, downloads, installs, patches, merges and verifies a
-complete 700-mod modlist without driving a single GUI tool, and the result has
-been played. That closes the question of whether the approach works. What
-remains is the distance between *works for its author* and *works for a
-stranger*.
+mudcrab compiles, checks, downloads, installs, patches and merges a complete
+700-mod list, turns it back into a guide, and has installed MOFAM from scratch
+on a fresh machine, driven from the published docs. This page lists what is
+still to do. What is done is in the [releases](https://github.com/steven-murray/mudcrab/releases)
+and the git history.
 
-The phases below are ordered by that distance. A and B are the ones a first
-outside user would actually hit.
+## Next
 
----
+### Composability
 
-## Phase A — Debts a real user would meet
+`include` another modlist -- a file, or a file in a git repository -- so
+reusable pieces can be published once and pointed at: a shim that fixes a
+badly packaged mod, or a core group of mods several lists share. Plan:
+[design/composability.md](design/composability.md).
 
-Each of these is a place the build worked partly because of something true of
-this machine. Details in [known-issues.md](known-issues.md).
+### A GUI, alongside the CLI
 
-### A1. ~~Key the download cache by source, not by mod id~~ — done
+An authoring mode (drag mods into order, pick a mod's files, move folders) and
+an install mode (view the list, one button from compile to install). The CLI
+stays complete: nothing will ever need the GUI. Plan:
+[design/gui.md](design/gui.md).
 
-The cache is gone as a separate idea: the downloads folder holds archives under
-their real names with MO2 `.meta` files, found by Nexus ids or filename, and MO2
-is pointed at it rather than given copies. `downloads tidy` converts a folder
-from the old derived names.
+## Open
 
-### A2. ~~Make manual archives resolvable when the host renames the file~~ — done
+### Plugins and merges
 
-A `manual:` archive can record its `size` and `md5`; when nothing has its name,
-the downloads folder and search paths are searched by content -- only files of
-that exact size are hashed, once each per run -- so a renamed copy is found.
-`add --archive --manual` records both. Without them, `check` and `download`
-still name similarly named files on disk, for the author to confirm.
+- **OBME fields.** 17 Oblivion Magic Extender fields are refused rather than
+  merged. `EFIX`'s parameter is a union whose type is chosen by the `EFME`
+  subrecord of the same record, so it needs a field kind that can see its
+  siblings; that would also handle `EFIT` properly. Until then a merge with an
+  OBME plugin is refused, saying so. (The header of
+  `src/plugin/schema/tes4.rs` explains why marking them opaque would be wrong.)
 
-### A3. ~~One implementation of "where is the content root"~~ — done
+### Installing
 
-`inspect` now asks install's detection what it would do, instead of guessing
-with rules of its own. Install's own rule was tightened where `inspect`'s was
-better: a root with no content, with content in a folder below it, is now
-refused rather than installed one level too deep. Measured over MOFAM's 589
-archives with no declared layout, the change altered no decision. It did turn up
-one entry install would already have refused (Mythic Ghosts and Goblins, saved
-only by having been installed before that check existed), now declared.
+- **Is MO2 running, on Windows.** `install` refuses while MO2 has the instance
+  open on Linux (from `/proc`); Windows has no check yet.
+- **Parallel unpacking.** A first install unpacks archives one at a time;
+  `check` already runs a thread per CPU. Install's ordering (mods recorded as
+  they finish, conflict partners first, xEdit one plugin at a time, merges
+  last) needs care.
+- **`nxm:` links on Linux.** Only one MO2 receives them, and the usual handler
+  starts the game's Steam entry, which does nothing while it runs. `download`
+  opens the browser's own download there instead. A handler that routes a
+  link to the instance being installed would bring "Mod Manager Download" back.
 
-### A4. ~~Tolerate out-of-range mod indices in merge sources~~ — already done
+### Checking
 
-Recorded here as open from a stale note; `merge::rewrite` has clamped them with
-a counted warning since commit `7ed2b6d`, and the merge report prints the total.
+- **Partners whose own actions move files.** A `conflicts_with` naming a mod
+  whose files change during its install (a `file_move`, say) cannot be
+  rehearsed by `check`, which notes it. Rehearsing the partner first would
+  close it.
+- **`assets` is noisy, and blind to textures.** It reports what plugins name
+  and nothing provides, minus what the game already lacks. Known-harmless
+  references (a mod's optional add-ons) need a way to be marked; textures
+  need the meshes read.
+- **Conditions on archives, in MOFAM.** `if` on archives, FOMOD rows and BAIN
+  subpackages is tested but no MOFAM choice uses it yet: the obvious one,
+  texture resolution, needs the alternative archives downloaded.
 
-### A4b. ~~Close the TES4 schema gap~~ — done, except for OBME
+### Output
 
-`plugin-audit` over the 431-plugin instance reported **125 gaps**. Working each
-one against xEdit's `wbDefinitionsTES4.pas` brought that to **17**, all of them
-Oblivion Magic Extender fields.
+- `inspect` and `diff` print reports of their own, not yet in the styled
+  output every other command uses.
 
-Those 17 stay refused on purpose. `EFIX`'s parameter is a union whose type is
-decided by a byte in the *`EFME` subrecord of the same record*, so a per-field
-table cannot answer it — and marking the harmless OBME fields `Opaque` would let
-such a plugin reach the point where `EFIT` is read as inert bytes and its FormID
-silently not renumbered. The header of `src/plugin/schema/tes4.rs` says so, at
-length, because it looks like an easy win.
+### Export
 
-**Remaining work**: a field kind with access to its sibling subrecords, which
-would close OBME and let `EFIT` be handled correctly too. The refusal now says
-plainly that the plugin uses OBME and should be left out of the merge.
+- The MOFAM docs were transcribed from the guide's Markdown, which lost some
+  formatting (stray emphasis around lists); converting the page's HTML afresh
+  would do better.
 
-### A4c. The CTDA table was wrong in seven places — fixed
+## Later
 
-Condition parameters were classified empirically, by checking whether zMerge
-rewrote them. Against xEdit's own `wbCTDAFunctions`, seven disagreed:
-`GetScriptVariable`, `GetIsClass`, `GetIsRace`, `GetFactionRank`,
-`GetDisposition`, `GetDeadCount` and `GetInCellParam` all take a FormID that
-mudcrab treated as a plain integer.
-
-They slipped through because the records those conditions pointed at were
-vanilla, so their ids never changed during a merge. "Observed unchanged" was
-true and meant nothing — a corpus shows which fields *did* change, never which
-ones *can*. All 192 functions now come from xEdit's table.
-
-All six MOFAM merges rebuild **byte-identical** with the correction, so nothing
-already built was affected. The next list would not have been so lucky.
-
-### A4d. ~~Refuse to install while MO2 is running~~ — done (Linux)
-
-`install` refuses while an MO2 running from this instance is visible in
-`/proc`, which covers MO2 under Wine; `--ignore-running-mo2` overrides. No check
-on Windows yet.
-
-### A5. ~~Honour `--parallel`, or remove it~~ — done
-
-`download` now fetches `--parallel` archives at once.
-
----
-
-## Phase B — Optional mods, and inputs that earn their keep
-
-**Done**, apart from a MOFAM input that uses B2. `[inputs]` take a declared
-`default` and `query` takes `--set`. Conditions sit on mods, actions,
-archives, FOMOD rows and BAIN subpackages, can ask about other mods, and
-`validate` rejects one naming an undeclared input or mod. MOFAM has four
-inputs: `decompress_dxt1_alpha`, `dxvk_report_amd_vendor`, `enb` and
-`swearing_rats`.
-
-### B1. ~~Conditions can ask about mods~~ — done
-
-`mod:id` is a condition term, terms combine with `&&`, `||` and `!`, and
-`query` resolves mods in whatever order their conditions need, so the readme's
-*"conditionally include Mod B depending on whether Mod A is included"* is true.
-`validate` refuses unknown mods and conditions that loop; `query` refuses a
-plan that leaves out a mod another included mod lists in `dependencies`.
-
-### B2. ~~Conditions on archives and FOMOD selections~~ — done
-
-`if` sits on archive rows, FOMOD selection rows and BAIN subpackages
-(`{ name = "...", if = "..." }`). `query` resolves them, so the plan --
-and `download`, `check` and `install` -- see only what applies.
-
-### B5. ~~Prove it on MOFAM~~ — done for mods; B2 waits for a real choice
-
-Swearing Rats is now the `swearing_rats` input (default on, as the guide has
-it): its plugin sits at its published position, so the load order now matches
-`loadorder.txt` entry for entry, and `query` takes it out of `plugins.txt` when
-the answer is no. With it off the plan is identical to the one before the
-input existed.
-
-Leaving a mod out needed two things beyond `query` choosing mods: a left-out
-mod's plugins leave the load order (unless an included mod ships the same
-name), and a merge that takes a plugin from a left-out mod is refused with the
-`if` that would fix it.
-
-B2 is exercised by tests but not yet by MOFAM. The guide fixes every
-resolution, and the obvious input -- texture resolution across sections --
-needs the alternative archives, which nobody has downloaded. It belongs with
-the first real choice that has them.
-
----
-
-## Phase C — `export`: turn a modlist back into a guide
-
-The other half of the project's premise: a declarative modlist should produce
-the human guide, so an author maintains one artefact instead of a TOML and a
-wiki page that drift apart.
-
-### Design
-
-- **One document is the contract.** `export` builds a versioned document --
-  sections nesting sections and mods in install order, prose attached, install
-  data also in words (Nexus links, installer choices, INI edits, conditions,
-  the load order). `--to json` writes it as is, for anyone rendering a list
-  their own way. All knowledge of how to *say* an install step lives in
-  `src/export/describe.rs`, once.
-- **Prose lives in `docs` tables** -- guide, section, mod -- inline or in a
-  `docs_file`. Markdown, converted per target. Unknown keys pass through to
-  templates: that is the extension point for content (per-section screenshots,
-  videos, difficulty ratings) that no built-in exporter anticipates.
-- **Exporters are template folders** (minijinja, i.e. Jinja2): an
-  `exporter.toml` (output mode, entry template, options with defaults, assets)
-  plus templates. Built-ins ship the same way inside the binary. Customising
-  one: `{% extends %}` it and override a block, or `--eject` a copy to edit.
-  Options from `--opt key=value` or the modlist's `[export.<name>]`.
-- **Images resolve per target**: a site exporter copies local `path`s in; the
-  Nexus exporter needs a `url` and says which images lack one.
-- **No executable plugin protocol**: the JSON document already gives that power.
-
-### Progress
-
-1. ~~Docs schema, `docs_file`, the document, `--to json`~~ -- done.
-2. ~~Template engine, exporter folders, options, `--eject`; the `nexus` (BBCode)
-   exporter~~ -- done; see [exporters.md](exporters.md).
-3. ~~`markdown` and `github-pages` exporters; image copying~~ -- done, and the
-   site checked in a real Jekyll build: a landing page, the key and the setup
-   on pages of their own, a page per section, the closing text, the load
-   order, and every page in a sidebar (Just the Docs).
-4. ~~MOFAM: import the guide's prose into a docs file~~ -- done: 662 of the
-   guide's 673 rows land on a mod (the rest are tools, empty mods and merges,
-   kept beside the row before), every Part on its section, banners included.
-   The guide's own install paragraphs are dropped where mudcrab's instructions
-   say the same thing.
-5. ~~Read the export against the published guide, Part by Part~~ -- done
-   (2026-10-11), every Part through the epilogue. The passes found wording to
-   fix in `describe.rs` and real bugs in the list (a missing INI edit, fonts
-   installed into the wrong mod), all fixed.
-
-Phase C is **done**.
-
-How an export of MOFAM differs from the guide, on purpose:
-
-- **Order is install order.** Steps that need a later mod (Part 24's armours'
-  conflict rules, installed among Part 9) appear where that mod is in, as a
-  "↩️ Back to ..." entry.
-- **Merges sit with the mods they merge**, not all together in Part 36, so the
-  plugin count stays low as the install goes and the game can be play-tested
-  part by part. The guide's Part 36 how-to is part of the setup, with a note saying
-  so.
-- **The transcription lost some formatting** (stray emphasis around lists): a
-  fresh conversion of the page's HTML would do better.
-
-## Phase D — User-facing documentation
-
-Getting started, writing a list, the format, the commands and
-troubleshooting each have a page now; what is left is keeping them true.
-
-1. ~~**Getting started**~~ — done: [getting-started.md](getting-started.md).
-   Writing it turned up six rough edges, fixed in the commands rather than
-   documented around: `install` takes the game folder from the MO2 instance,
-   finds `Oblivion.ini` in Windows' Documents, and turns on the profile's own
-   INI files (without which MO2 ignores every INI edit); `setup-tools` writes
-   `tools.toml` where the other commands look; a free Nexus account's 403 now
-   says which page to download from by hand; and Enter takes a choice's
-   default in `query`.
-2. ~~**Authoring guide**~~ — done: [authoring.md](authoring.md), built from a
-   real run of four MOFAM mods. The run found the authoring loop's dead ends,
-   fixed in the commands: `add --archive` writes an entry from the archive
-   itself; `add --plugin` places the plugin with `--load-after`/`--load-last`
-   (before, a new plugin always failed validation); `inspect` and `add` read
-   the source from the download's `.meta`; `add --nexus` fills the file name
-   from Nexus; a plain `--mods-dir` install no longer demands a game folder,
-   and a relative one no longer sends extraction to the system temp dir.
-   After it: `add --archive` walks a FOMOD's or BAIN package's choices with
-   the author and records the answers, running a BAIN wizard as Wrye Bash
-   would (subpackages, left-out plugins, renames, `EditINI` as `ini_tweak`);
-   and `conflicts` with no `--mod` sweeps the list for mods that share files.
-3. ~~**Format reference**~~ — done: [modlist-format.md](modlist-format.md)
-   lists every key the schema accepts -- top level, mods, archives, actions --
-   each with a line on when you need it, from a complete example that
-   validates. Keeping it in step with the schema is a standing job: a new
-   field is documented there in the same change.
-4. ~~**Troubleshooting**~~ — done: [troubleshooting.md](troubleshooting.md),
-   quoting the messages from real runs. Writing it improved several: `check`
-   names similarly named archives on disk and says whether `download` can
-   fetch one; `check` and `download` no longer number archives from 0 or
-   repeat the mod's name; `download` no longer retries a missing API key or a
-   free account's refusal; and an OBME plugin in a merge is now refused as
-   OBME, not as a gap in the schema (the A4b refusal).
-5. **Doc comments are the strength here** and should stay that way: the code
-   explains its own reasoning throughout. User docs should link into it rather
-   than restate it.
-
----
-
-## Phase E — Publishing mechanics
-
-Done: dual MIT/Apache licence, Cargo metadata, CI (`cargo fmt --check`,
-`cargo test` and `clippy -D warnings` on push), and tagged releases with Linux
-and Windows binaries. Left:
-
-- ~~**Contributing guide and issue templates**~~ -- done: `CONTRIBUTING.md`,
-  and a template for a modlist that installs wrongly asking for the plan, the
-  log and `diff` output.
-- ~~**A scope statement in the readme**~~ -- done: "What it covers".
-- ~~**Pin CI's toolchain**~~ -- done: `rust-toolchain.toml` pins it for
-  development, CI and releases, and CI checks formatting.
-
-- **An end-to-end run by hand before a release.** Steven installs the full
-  MOFAM list from scratch -- empty instance, empty cache -- driving mudcrab
-  himself from the published docs, to judge whether the whole thing is elegant
-  as well as correct. Everything so far has been run section by section, by the
-  person who wrote the code, with the code's author watching.
-
----
-
-## Phase F — Beyond a first release
-
-Genuinely wanted, none of it blocking.
-
-- **Composition** — `include`-ing another modlist, so small reusable lists can
-  be published and pointed at. The readme has claimed this as a design property
-  for a while; it has never been implemented.
-- **A `custom` mod type** for arbitrary user-supplied build steps.
-- **Download resume, checksum manifests, signature verification.**
+- **A `custom` mod type** for build steps a list supplies itself.
+- **Downloads:** resume, checksum manifests, signature verification.
 - **Other games and other mod managers.** The plugin and BSA code is TES4; the
   pipeline above it is not.
-- **Check referenced asset paths against the install.** A mesh or texture a
-  plugin or another mod names, and that nothing provides, would have caught the
-  OOO v1.7 pin (1009 files gone) outright, where the POST-GUIDE flag was read
-  as harmless version drift.
-- **A GUI for editing a modlist.** Something that reads the TOML and offers
-  more intuitive editing -- sections, mods, archives, actions, inputs -- than a
-  700-entry text file. It must preserve comments and formatting the way
-  `mudcrab add` does (line-based splicing, never re-emitting parsed TOML),
-  since the comments are where the list's reasoning lives.
-- **A modlist test-suite command** — `mudcrab check --strict` against a fresh
-  machine, so an author can find out that a row broke before a user does.
+- **Building a Bashed Patch.** Only Wrye Bash builds one, from its window, so
+  `install` lists it as a step by hand. Leveled-list merging alone would cover
+  much of what lists use it for.
+
+Known limitations with workarounds are in [known-issues.md](known-issues.md).

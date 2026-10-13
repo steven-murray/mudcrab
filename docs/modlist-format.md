@@ -472,6 +472,7 @@ places.
 
 ## Not implemented
 
-A `custom` mod type running arbitrary commands is on the roadmap, not in the
-schema, and so is `include`-ing one modlist from another: every modlist today
-is one file. See [roadmap.md](roadmap.md), Phase F.
+A `custom` mod type running arbitrary commands is on the
+[roadmap](roadmap.md), not in the schema, and so is `include`-ing one modlist
+from another (planned in [design/composability.md](design/composability.md)):
+every modlist today is one file.

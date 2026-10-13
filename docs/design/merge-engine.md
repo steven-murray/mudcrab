@@ -94,7 +94,6 @@ The measurement that *would* indicate a real defect is a reference to an
 own-record object index that was never allocated. That is zero for all six, and
 the oracle test asserts it.
 
-**Open**: `merge::rewrite` still hard-errors on such an index in a *source*
-plugin, which means mudcrab cannot merge a zMerge output. Given that every
-reader accepts them, that should become clamp-with-a-warning. See
-[roadmap A4](../roadmap.md#a4-tolerate-out-of-range-mod-indices-in-merge-sources).
+`merge::rewrite` clamps such an index in a *source* plugin, with a counted
+warning, as every reader does; the merge report prints the total. (It used to
+be a hard error, which made a zMerge output unmergeable.)
