@@ -1,6 +1,6 @@
 [package]
 name = "mudcrab"
-version = "0.2.3"
+version = "0.2.4"
 edition = "2024"
 # 1.88 is where let-chains stabilised, which this crate uses in ten places.
 # Not yet verified by CI against that toolchain.
