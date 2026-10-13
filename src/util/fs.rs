@@ -305,7 +305,8 @@ pub fn link_or_copy(source: &Path, destination: &Path) -> anyhow::Result<()> {
 ///
 /// Every entry in `path`'s directory whose name differs from it only by case.
 ///
-/// On a case-insensitive filesystem there can be at most one, so this is
+/// On a case-insensitive filesystem there can be at most one such entry --
+/// the file itself, perhaps spelled differently from `path` -- so this is
 /// always empty there. On Linux there can be several, and then any
 /// case-insensitive resolution is a coin toss between files with different
 /// contents -- which is exactly the situation this exists to refuse.
@@ -319,15 +320,24 @@ pub fn case_variant_siblings(path: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(parent) else {
         return Vec::new();
     };
-    let mut found: Vec<PathBuf> = entries
+    let same_name: Vec<PathBuf> = entries
         .flatten()
         .map(|entry| entry.path())
         .filter(|candidate| {
             candidate
                 .file_name()
                 .and_then(|n| n.to_str())
-                .is_some_and(|other| other != name && other.eq_ignore_ascii_case(name))
+                .is_some_and(|other| other.eq_ignore_ascii_case(name))
         })
+        .collect();
+    // One entry is the file, however `path` spells it (Windows finds
+    // `Oblivion.ini` when the folder says `oblivion.ini`): no duplicate.
+    if same_name.len() < 2 {
+        return Vec::new();
+    }
+    let mut found: Vec<PathBuf> = same_name
+        .into_iter()
+        .filter(|candidate| candidate.file_name().and_then(|n| n.to_str()) != Some(name))
         .collect();
     found.sort();
     found
