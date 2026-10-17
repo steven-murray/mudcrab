@@ -260,7 +260,7 @@ fn install_applies_top_level_ini_section_to_mo2_profile() {
     zip.finish().expect("zip should finalize");
 
     let source = format!(
-        "name = \"Install MO2 Top Level Ini Test\"\nplugins = [\"Core.esm\"]\n\n[ini]\n\"bFull Screen\" = 0\n\"iSize W\" = 1920\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
+        "name = \"Install MO2 Top Level Ini Test\"\nplugins = [\"Core.esm\"]\n\n[ini]\n\"bFull Screen\" = 0\n\n[ini.Display]\n\"iSize W\" = 1920\n\n[[mods]]\nid = \"core\"\ndependencies = []\nplugins = [\"Core.esm\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");

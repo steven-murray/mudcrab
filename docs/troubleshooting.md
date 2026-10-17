@@ -211,6 +211,24 @@ From a merge: one of the plugins being merged uses OBME, which mudcrab cannot
 merge safely. Leave that plugin out of the merge's `sources` and load it on
 its own.
 
+### `ini_set 'K': ... has no such key, and with no section named there is nowhere right to add it`
+
+The list sets `K` in an ini that does not have it yet, without saying which
+section it belongs in. Appended at the end of the file, it would sit in the
+last section (in `Oblivion.ini`, `[CopyProtectionStrings]`), where the game
+would ignore it. If you wrote the list, put the key under its section:
+`[ini.GamePlay]` for the top-level `[ini]`, or `section = "GamePlay"` on an
+`ini_set` action. See [the modlist format](modlist-format.md#top-level).
+
+### `ini_set 'K' matches 2 lines in ... (sections: A, B). Add section = "<name>"`
+
+The ini has `K` in two sections, and the list does not say which it means.
+Usually one of them is a stray: an earlier mudcrab added a missing key at the
+end of the file, in the wrong section (the error above is how that is caught
+now). Reusing an MO2 instance keeps its profile's ini, stray and all. Name the
+section in the list, as above; the stray line, under the other section, does
+nothing and can be deleted from the profile's ini by hand.
+
 ## Playing
 
 ### Settings the list changes have no effect in game

@@ -14,6 +14,25 @@
   let notes = $state(false);
   const open = $derived(opened || !!words);
 
+  // Where the mod lives: its Nexus page(s), links its docs give, and for a
+  // mod hosted elsewhere, the page its archive comes from. Shown on every
+  // mod, to send people to the authors' own pages.
+  function pagesOf(e: Entry & { kind: "mod" }): { url: string; label: string; title: string }[] {
+    const out = e.pages.map((p) => ({
+      url: p.mod_url,
+      label: "Nexus",
+      title: "The mod's page on Nexus: read about it, and endorse it if you enjoy it",
+    }));
+    for (const link of e.docs.links ?? [])
+      out.push({ url: link.url, label: "Page", title: link.label ?? "The mod's page" });
+    if (!out.length)
+      for (const archive of e.archives) {
+        const url = archive.url ?? archive.raw?.download_page;
+        if (url) out.push({ url, label: "Page", title: "Where the mod is hosted" });
+      }
+    return out.filter((p, i) => out.findIndex((q) => q.url === p.url) === i);
+  }
+
   function count(e: Entry): number {
     if (e.kind === "mod") return 1;
     if (e.kind === "section") return e.entries.reduce((n, c) => n + count(c), 0);
@@ -43,6 +62,9 @@
   <article class="mod">
     <div class="top">
       <span class="title">{entry.title}</span>
+      {#each pagesOf(entry) as page}
+        <a class="page" href={page.url} title={page.title}>{page.label} ↗</a>
+      {/each}
       {#if entry.condition}<span class="cond" title={entry.condition.expr}>{entry.condition.text}</span>{/if}
       {#if entry.mod_type}<span class="kind">{entry.mod_type}</span>{/if}
     </div>
@@ -122,6 +144,17 @@
   }
   .mod .title {
     font-weight: 600;
+  }
+  .page {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--accent);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .page:hover {
+    background: var(--accent-soft);
   }
   .cond,
   .kind {

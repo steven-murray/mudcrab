@@ -48,14 +48,30 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         }
     }
 
+    // `key = value`, or `[ini.<Section>]` holding them.
+    let scalar = |value: &toml::Value| {
+        matches!(
+            value,
+            toml::Value::String(_)
+                | toml::Value::Integer(_)
+                | toml::Value::Float(_)
+                | toml::Value::Boolean(_)
+        )
+    };
     for (key, value) in &modlist.ini {
         match value {
-            toml::Value::String(_)
-            | toml::Value::Integer(_)
-            | toml::Value::Float(_)
-            | toml::Value::Boolean(_) => {}
-            _ => anyhow::bail!(
-                "top-level ini entry {key} must be a string, integer, float, or boolean"
+            toml::Value::Table(keys) => {
+                for (inner, value) in keys {
+                    anyhow::ensure!(
+                        scalar(value),
+                        "ini entry [ini.{key}] {inner} must be a string, integer, float, or boolean"
+                    );
+                }
+            }
+            value => anyhow::ensure!(
+                scalar(value),
+                "top-level ini entry {key} must be a string, integer, float, or boolean, or a \
+                 [ini.{key}] section of them"
             ),
         }
     }

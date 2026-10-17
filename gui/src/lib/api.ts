@@ -7,6 +7,7 @@ export type Markdown = string;
 
 export interface Docs {
   title?: string;
+  links?: { url: string; label?: string }[];
   summary?: Markdown;
   body?: Markdown;
   footer?: Markdown;
@@ -38,6 +39,7 @@ export interface StepDoc {
 
 export interface ArchiveDoc {
   source: string;
+  raw?: { download_page?: string };
   file_name?: string;
   url?: string;
   nexus?: { mod_url: string; file_url: string };
@@ -49,6 +51,7 @@ export interface ModDoc {
   title: string;
   anchor: string;
   mod_type?: string;
+  pages: { mod_url: string }[];
   condition?: ConditionDoc;
   docs: Docs;
   archives: ArchiveDoc[];

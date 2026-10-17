@@ -1318,9 +1318,25 @@ mod tests {
 
         // Nothing to learn from: use the Bethesda form.
         let empty = temp.path().join("empty.ini");
-        std::fs::write(&empty, "[Section]\n").expect("write");
+        std::fs::write(&empty, "").expect("write");
         apply_ini_set(&empty, "d", "4", IniSetFormat::Standard).expect("ini_set");
         assert!(std::fs::read_to_string(&empty).unwrap().contains("d=4"));
+    }
+
+    #[test]
+    fn a_new_key_with_no_section_is_refused_in_a_file_with_sections() {
+        // The end of Oblivion.ini is inside [CopyProtectionStrings]: a key
+        // appended there is read as that section's, and does nothing.
+        let temp = tempdir().expect("tempdir");
+        let ini = temp.path().join("Oblivion.ini");
+        let text = "[General]\nbA=1\n[CopyProtectionStrings]\nSMessage=x\n";
+        std::fs::write(&ini, text).expect("write");
+        let err = apply_ini_set(&ini, "bSaveOnRest", "0", IniSetFormat::Standard).unwrap_err();
+        assert!(err.to_string().contains("[ini.<section>]"), "{err}");
+        assert_eq!(std::fs::read_to_string(&ini).unwrap(), text);
+        // A key it has, it sets wherever it is.
+        apply_ini_set(&ini, "bA", "0", IniSetFormat::Standard).expect("ini_set");
+        assert!(std::fs::read_to_string(&ini).unwrap().contains("bA=0"));
     }
 
     #[test]

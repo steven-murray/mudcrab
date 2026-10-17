@@ -58,7 +58,7 @@ that table.
 | `plugins` | Whenever a mod ships a plugin: the load order, top to bottom. See [Load order](#load-order). |
 | `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
 | `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
-| `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs, applied to the MO2 profile's copy. |
+| `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs under `[ini.<Section>]`, applied to the MO2 profile's copy. |
 | `mo2` | To set up MO2 itself: `[mo2]` with `theme = "vs15 Dark"`, one of the themes MO2 ships (Settings > Theme), applied to an instance that has none chosen yet. |
 | `manual-steps` | When something has to be done by hand after installing (building a Bashed Patch in Wrye Bash): `install` lists it at the end until it is done. See [Steps by hand](#steps-by-hand). |
 | `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
@@ -68,15 +68,23 @@ that table.
 | `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [Turning a list into a guide](exporters.md). |
 | `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
 
-`ini` keys are matched anywhere in `Oblivion.ini`, with no section, so they
-must be keys that occur once (all of the usual ones do); an `ini_set` action
-with `scope = "game"` can name a section.
+Put each `ini` key under the section `Oblivion.ini` keeps it in, as
+`[ini.<Section>]`. A bare key under `[ini]` is matched anywhere in the file,
+which works only for a key the file already has exactly once; a key it lacks
+has nowhere right to go (the end of the file is inside its last section,
+where the game would ignore it), so `install` refuses it and says to name the
+section.
 
 ```toml
-[ini]
+[ini.General]
 SIntroSequence = ""
 bAllowScriptedAutosave = 0
+
+[ini.GamePlay]
+bSaveOnRest = 0
 ```
+
+An `ini_set` action with `scope = "game"` takes a `section` the same way.
 
 ## Mods
 
