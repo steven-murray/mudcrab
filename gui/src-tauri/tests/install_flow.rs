@@ -91,7 +91,11 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     std::fs::write(&list, LIST).unwrap();
     let downloads = root.join("downloads");
     std::fs::create_dir_all(&downloads).unwrap();
-    zip(&downloads.join("Base.zip"), &["textures/base.dds"]);
+    // Base's archive is only in another folder, which the list is told to
+    // look in.
+    let elsewhere = root.join("elsewhere");
+    std::fs::create_dir_all(&elsewhere).unwrap();
+    zip(&elsewhere.join("Base.zip"), &["textures/base.dds"]);
     zip(&downloads.join("Extra.zip"), &["textures/extra.dds"]);
     let instance = root.join("instance");
     let game = root.join("game");
@@ -127,7 +131,26 @@ fn a_list_installs_from_the_commands_the_page_calls() {
         )
         .unwrap();
     }
+    call(
+        &webview,
+        "add_search_folder",
+        json!({ "path": root.join("gone") }),
+    )
+    .unwrap();
+    call(
+        &webview,
+        "remove_search_folder",
+        json!({ "path": root.join("gone") }),
+    )
+    .unwrap();
+    call(&webview, "add_search_folder", json!({ "path": elsewhere })).unwrap();
     let locations = call(&webview, "locations", json!({})).unwrap();
+    assert_eq!(
+        locations["search"].as_array().unwrap().len(),
+        1,
+        "{locations}"
+    );
+    assert_eq!(locations["search"][0]["exists"], true);
     assert_eq!(locations["instance"]["from"], "chosen");
     assert_eq!(locations["downloads"]["exists"], true);
 
@@ -154,6 +177,17 @@ fn a_list_installs_from_the_commands_the_page_calls() {
 
     let downloaded = call(&webview, "step_download", json!({})).unwrap();
     assert_eq!(downloaded["by_hand"], json!([]), "{downloaded}");
+    assert!(
+        downloads.join("Base.zip").is_file(),
+        "linked in from the other folder"
+    );
+    assert!(
+        downloaded["done"]["command"]
+            .as_str()
+            .unwrap()
+            .contains(" --archive-search-path "),
+        "{downloaded}"
+    );
 
     let checked = call(&webview, "step_check", json!({})).unwrap();
     assert_eq!(checked["problems"], 0, "{checked}");

@@ -98,6 +98,7 @@ export interface Locations {
   downloads: Location;
   game: Location;
   profile: string;
+  search: Location[];
 }
 
 export interface Done {
@@ -156,6 +157,8 @@ export const api = {
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
+  addSearchFolder: (path: string) => invoke<Locations>("add_search_folder", { path }),
+  removeSearchFolder: (path: string) => invoke<Locations>("remove_search_folder", { path }),
   plan: (answers: Record<string, string>) => invoke<Done>("step_plan", { answers }),
   download: () => invoke<Downloaded>("step_download"),
   lookForDownloads: () => invoke<ByHand[]>("look_for_downloads"),

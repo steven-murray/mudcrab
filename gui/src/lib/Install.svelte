@@ -46,6 +46,13 @@
   async function resetPlace(kind: string) {
     locations = await api.setLocation(kind, null);
   }
+  async function addSearch() {
+    const path = await open({ directory: true, multiple: false });
+    if (typeof path === "string") locations = await api.addSearchFolder(path);
+  }
+  async function removeSearch(path: string) {
+    locations = await api.removeSearchFolder(path);
+  }
 
   // --- The run ----------------------------------------------------------------
   type State = "idle" | "running" | "waiting" | "done" | "failed";
@@ -254,6 +261,19 @@
           <button onclick={() => choosePlace(place.kind)} disabled={running}>Choose…</button>
         </div>
       {/each}
+      <div class="place">
+        <div class="ptitle">Other folders to look in</div>
+        <div class="pfrom dim">
+          Archives already in these are linked into the downloads folder, not downloaded again.
+        </div>
+        <button onclick={addSearch} disabled={running}>Add…</button>
+      </div>
+      {#each locations.search as folder}
+        <div class="search">
+          <span class="ppath" class:missing={!folder.exists} title={folder.path}>{folder.path}</span>
+          <button class="link small" onclick={() => removeSearch(folder.path!)} disabled={running}>Remove</button>
+        </div>
+      {/each}
       <div class="dim small">Profile: {locations.profile}</div>
     {/if}
   </section>
@@ -421,6 +441,16 @@
     grid-column: 2;
     grid-row: 1 / span 3;
     align-self: center;
+  }
+  .search {
+    display: flex;
+    gap: 10px;
+    align-items: baseline;
+    margin: 2px 0 4px 12px;
+  }
+  .search .ppath {
+    flex: 1;
+    min-width: 0;
   }
   .go {
     width: 100%;

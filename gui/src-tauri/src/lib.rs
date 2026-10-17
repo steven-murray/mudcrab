@@ -194,10 +194,13 @@ struct Locations {
     downloads: Location,
     game: Location,
     profile: String,
+    /// Other folders to look in for archives, before downloading.
+    search: Vec<Location>,
 }
 
 /// Where things go, as shown, and as paths.
 struct Located {
+    search: Vec<PathBuf>,
     shown: Locations,
     instance: Option<PathBuf>,
     downloads: Option<PathBuf>,
@@ -249,6 +252,7 @@ fn locate(state: &State) -> Result<Located, String> {
                 .map(|candidate| (candidate.path, "found"))
         });
     Ok(Located {
+        search: chosen.search.clone(),
         instance: instance.as_ref().map(|(p, _)| p.clone()),
         downloads: downloads.as_ref().map(|(p, _)| p.clone()),
         game: game.as_ref().map(|(p, _)| p.clone()),
@@ -257,6 +261,11 @@ fn locate(state: &State) -> Result<Located, String> {
             downloads: Location::of(downloads),
             game: Location::of(game),
             profile: chosen.profile.unwrap_or_else(|| "Default".to_string()),
+            search: chosen
+                .search
+                .iter()
+                .map(|p| Location::of(Some((p.clone(), "chosen"))))
+                .collect(),
         },
     })
 }
@@ -284,6 +293,35 @@ fn set_location(
             "profile" => chosen.profile = path.map(|p| p.display().to_string()),
             other => return Err(format!("no location called {other}")),
         }
+        settings.save().map_err(shown)?;
+    }
+    locations(state)
+}
+
+/// Look in another folder for archives, before downloading them.
+#[tauri::command]
+fn add_search_folder(state: tauri::State<'_, State>, path: String) -> Result<Locations, String> {
+    let list = state.list()?;
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        let search = &mut settings.list_mut(&list).search;
+        let path = PathBuf::from(path);
+        if !search.contains(&path) {
+            search.push(path);
+        }
+        settings.save().map_err(shown)?;
+    }
+    locations(state)
+}
+
+/// Stop looking in a folder.
+#[tauri::command]
+fn remove_search_folder(state: tauri::State<'_, State>, path: String) -> Result<Locations, String> {
+    let list = state.list()?;
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        let path = PathBuf::from(path);
+        settings.list_mut(&list).search.retain(|p| p != &path);
         settings.save().map_err(shown)?;
     }
     locations(state)
@@ -409,8 +447,21 @@ fn plan_path(state: &State) -> Result<PathBuf, String> {
 #[tauri::command]
 async fn step_download(state: tauri::State<'_, State>) -> Result<Downloaded, String> {
     let plan = plan_of(&state)?;
-    let downloads = locate(&state)?.downloads;
+    let Located {
+        downloads, search, ..
+    } = locate(&state)?;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
+    // An archive found in one of these is linked into the downloads folder,
+    // so `check` and `install` find everything in one place.
+    let search_args: String = search
+        .iter()
+        .map(|dir| {
+            format!(
+                " --archive-search-path {}",
+                quote(dir.display().to_string())
+            )
+        })
+        .collect();
     std::fs::create_dir_all(&downloads).map_err(|err| format!("{}: {err}", downloads.display()))?;
     let settings = config::download::DownloadSettings {
         cache_dir: downloads.clone(),
@@ -418,7 +469,7 @@ async fn step_download(state: tauri::State<'_, State>) -> Result<Downloaded, Str
         nexus_api_key: config::tools::ToolsConfig::nexus_api_key(),
         nexus_api_base: std::env::var("NEXUS_API_BASE").ok(),
         filter: Default::default(),
-        archive_search_paths: Vec::new(),
+        archive_search_paths: search,
         parallel: 4,
     };
     // The download's future cannot be shown to be `Send` (a rustc limit with
@@ -443,7 +494,7 @@ async fn step_download(state: tauri::State<'_, State>) -> Result<Downloaded, Str
             },
             writes: vec![downloads.display().to_string()],
             command: format!(
-                "mudcrab download {} --downloads {}",
+                "mudcrab download {} --downloads {}{search_args}",
                 quote(plan_path(&state)?.display().to_string()),
                 quote(downloads.display().to_string())
             ),
@@ -554,6 +605,7 @@ fn install_settings(state: &State) -> Result<config::install::InstallSettings, S
         instance,
         downloads,
         game,
+        ..
     } = locate(state)?;
     let instance = instance.ok_or("choose the MO2 instance to install into first")?;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
@@ -686,6 +738,8 @@ pub fn app<R: Runtime>(
             open_list,
             locations,
             set_location,
+            add_search_folder,
+            remove_search_folder,
             step_plan,
             step_download,
             look_for_downloads,

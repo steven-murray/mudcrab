@@ -14,7 +14,11 @@ The GUI's install mode reads a list and installs it from one window:
 3. **Say where things go**: the MO2 instance to install into, the downloads
    folder, and the game folder. The game folder is found as `game-dir` finds
    it, and the downloads folder comes from `tools.toml` when it is set there;
-   choose either to use another.
+   choose either to use another. **Other folders to look in** are folders
+   that may already hold some of the list's archives -- another instance's
+   downloads, a backup -- looked in before anything is downloaded; an archive
+   found there is linked into the downloads folder (`download
+   --archive-search-path`).
 4. **Install.** The steps run one after another -- plan, download, check,
    install -- each showing what it is doing, what it writes, and the command
    that does the same from a terminal (with a button to copy it).

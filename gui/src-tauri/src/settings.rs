@@ -27,6 +27,10 @@ pub struct ListSettings {
     pub downloads: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    /// Other folders that may already hold the list's archives, looked in
+    /// before anything is downloaded (`download --archive-search-path`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub search: Vec<PathBuf>,
     /// The answers last given to the list's questions.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub answers: BTreeMap<String, String>,
