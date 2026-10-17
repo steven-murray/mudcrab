@@ -9,12 +9,16 @@ The GUI's install mode reads a list and installs it from one window:
 
 1. **Open a list**: its `.toml` file. Its guide is on the left -- sections,
    each mod with its notes and plugins, and the load order -- read-only.
+   **About this list** shows what its author wrote for whoever installs it
+   (its `about`), or, for a list without one, its guide's introduction.
 2. **Answer its questions**, if it asks any. The list's defaults are chosen;
    your answers are remembered for next time.
-3. **Say where things go**: the MO2 instance to install into, the downloads
-   folder, and the game folder. The game folder is found as `game-dir` finds
-   it, and the downloads folder comes from `tools.toml` when it is set there;
-   choose either to use another. **Other folders to look in** are folders
+3. **Say where things go**: first the MO2 instance to install into -- a
+   portable instance, the folder with `ModOrganizer.exe` in it (any other
+   folder is refused). The downloads folder and the game folder then follow
+   from it: the downloads folder from `tools.toml` if it is set there, else
+   the instance's own; the game folder from the instance's settings, or found
+   as `game-dir` finds it. Change either if they are not right. **Other folders to look in** are folders
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download

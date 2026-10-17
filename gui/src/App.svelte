@@ -4,11 +4,13 @@
   import { api, type ListView } from "./lib/api";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
+  import { inline, markdown } from "./lib/markdown";
 
   let list = $state<ListView | null>(null);
   let recent = $state<string[]>([]);
   let error = $state<string | null>(null);
   let opening = $state(false);
+  let about = $state(false);
 
   async function openPath(path: string) {
     opening = true;
@@ -58,6 +60,7 @@
       <span class="path dim" title={list.path}>{list.path}</span>
     {/if}
     <span class="spacer"></span>
+    {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     <div class="modes" title="Author mode, for editing a list, comes later">
       <span class="mode on">Install</span>
@@ -69,6 +72,31 @@
     <div class="error">
       <pre>{error}</pre>
       <button class="link" onclick={() => (error = null)}>Dismiss</button>
+    </div>
+  {/if}
+
+  {#if list && about}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => (about = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="About this list" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>{list.document.name}</strong>
+          <button class="link" onclick={() => (about = false)}>Close</button>
+        </div>
+        <div class="dbody">
+          {#if list.about}
+            <div class="prose">{@html markdown(list.about)}</div>
+          {:else}
+            <p class="dim small">
+              This list has no introduction for installing it. This is its guide's, written for
+              someone following it by hand, so some of it is done for you here.
+            </p>
+            {#if list.document.docs.summary}<p>{@html inline(list.document.docs.summary)}</p>{/if}
+            <div class="prose">{@html markdown(list.document.docs.body)}</div>
+          {/if}
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -177,6 +205,37 @@
     min-height: 0;
     border-left: 1px solid var(--line);
     background: var(--panel);
+  }
+  .veil {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: rgba(0, 0, 0, 0.45);
+    display: grid;
+    place-items: center;
+  }
+  .dialog {
+    width: min(760px, 92vw);
+    max-height: 82vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  }
+  .dhead {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+  .dbody {
+    padding: 14px 18px 18px;
+    overflow: auto;
+  }
+  .small {
+    font-size: 12px;
   }
   .welcome {
     max-width: 620px;

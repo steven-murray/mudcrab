@@ -78,6 +78,9 @@ pub struct DocLink {
 pub struct DocsFile {
     #[serde(default)]
     pub docs: Option<Docs>,
+    /// The list's `about`, kept here with the rest of its prose.
+    #[serde(default)]
+    pub about: Option<String>,
     #[serde(default)]
     pub sections: IndexMap<String, Docs>,
     /// Keyed by mod id.

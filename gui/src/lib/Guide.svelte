@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Document, Entry } from "./api";
-  import { inline, markdown } from "./markdown";
   import EntryView from "./EntryView.svelte";
 
   let { document }: { document: Document } = $props();
@@ -33,18 +32,13 @@
 
   {#if tab === "guide"}
     <div class="content">
-      {#if !words}
-        {#if document.docs.summary}<p class="lead">{@html inline(document.docs.summary)}</p>{/if}
-        {#if document.docs.body}<div class="prose">{@html markdown(document.docs.body)}</div>{/if}
-        {#if document.inputs.length}
-          <p class="dim small">This list asks {document.inputs.length} question(s); answer them on the right before installing.</p>
-        {/if}
+      {#if !words && document.inputs.length}
+        <p class="dim small">This list asks {document.inputs.length} question(s); answer them on the right before installing.</p>
       {/if}
       {#each shown as entry (entry.kind + ("anchor" in entry ? entry.anchor : ""))}
         <EntryView {entry} {words} {matches} />
       {/each}
       {#if words && !shown.length}<p class="dim">Nothing matches.</p>{/if}
-      {#if !words && document.docs.footer}<div class="prose footer">{@html markdown(document.docs.footer)}</div>{/if}
     </div>
   {:else}
     <div class="content">
@@ -97,17 +91,8 @@
     padding: 16px 20px 40px;
     max-width: 980px;
   }
-  .lead {
-    font-size: 16px;
-    margin: 0 0 8px;
-  }
   .small {
     font-size: 12px;
-  }
-  .footer {
-    margin-top: 24px;
-    padding-top: 12px;
-    border-top: 1px solid var(--line);
   }
   ol.load {
     list-style: none;

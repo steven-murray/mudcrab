@@ -64,6 +64,7 @@ that table.
 | `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
+| `about` | For the GUI: what someone installing the list reads first (Markdown), shown by its **About this list** button. Write it for a player pressing Install -- what the list is, what it needs, what to expect -- not as the guide's instructions, which `docs` holds. It may be in the docs file instead. |
 | `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [Turning a list into a guide](exporters.md). |
 | `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
 

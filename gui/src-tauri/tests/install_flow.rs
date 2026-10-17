@@ -100,6 +100,7 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     let instance = root.join("instance");
     let game = root.join("game");
     std::fs::create_dir_all(&instance).unwrap();
+    std::fs::write(instance.join("ModOrganizer.exe"), b"").unwrap();
     std::fs::create_dir_all(game.join("Data")).unwrap();
     std::fs::write(game.join("Oblivion.ini"), "[General]\n").unwrap();
 
@@ -119,6 +120,19 @@ fn a_list_installs_from_the_commands_the_page_calls() {
 
     // Nothing to install into yet.
     assert!(call(&webview, "step_install", json!({})).is_err());
+    // A folder that is not an MO2 instance is refused.
+    let refused = call(
+        &webview,
+        "set_location",
+        json!({ "kind": "instance", "path": game }),
+    );
+    assert!(
+        refused
+            .unwrap_err()
+            .as_str()
+            .unwrap()
+            .contains("ModOrganizer.exe")
+    );
     for (kind, path) in [
         ("instance", &instance),
         ("downloads", &downloads),

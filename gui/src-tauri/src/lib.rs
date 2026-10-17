@@ -77,6 +77,8 @@ fn quote(text: impl AsRef<str>) -> String {
 #[derive(Serialize)]
 struct ListView {
     path: String,
+    /// The list's `about`, for whoever installs it.
+    about: Option<String>,
     document: mudcrab::export::Document,
     /// The answers last given here, by input.
     answers: BTreeMap<String, String>,
@@ -130,6 +132,7 @@ fn open_list<R: Runtime>(
         ..Session::default()
     };
     Ok(ListView {
+        about: modlist.about.clone(),
         path: path.display().to_string(),
         document,
         answers,
@@ -286,6 +289,11 @@ fn set_location(
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         let chosen = settings.list_mut(&list);
         let path = path.map(PathBuf::from);
+        if kind == "instance"
+            && let Some(problem) = path.as_deref().and_then(config::mo2::not_an_instance)
+        {
+            return Err(problem);
+        }
         match kind.as_str() {
             "instance" => chosen.instance = path,
             "downloads" => chosen.downloads = path,

@@ -44,6 +44,12 @@ pub struct SourceModlist {
     /// The guide's own prose, for `export`. See [`crate::config::docs`].
     #[serde(default)]
     pub docs: Docs,
+    /// What a player installing with the GUI reads about the list, in
+    /// Markdown: what it is, what it needs, what to expect. Apart from
+    /// `docs`, which is written for someone following a guide by hand and
+    /// says to do what the install already does.
+    #[serde(default)]
+    pub about: Option<String>,
     /// Per-section prose, keyed by the section's name as MO2 shows its
     /// separator (`"OBSE PLUGINS - Core"` for a nested one).
     #[serde(default)]

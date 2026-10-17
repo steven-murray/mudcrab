@@ -39,9 +39,16 @@
     { kind: "game", title: "Game folder", hint: "Oblivion's own folder" },
   ];
 
+  let placeError = $state<string | null>(null);
   async function choosePlace(kind: string) {
     const path = await open({ directory: true, multiple: false });
-    if (typeof path === "string") locations = await api.setLocation(kind, path);
+    if (typeof path !== "string") return;
+    try {
+      locations = await api.setLocation(kind, path);
+      placeError = null;
+    } catch (err) {
+      placeError = String(err);
+    }
   }
   async function resetPlace(kind: string) {
     locations = await api.setLocation(kind, null);
@@ -76,6 +83,7 @@
   let current = $state(-1);
   let running = $state(false);
   let byHand = $state<ByHand[]>([]);
+  let byHandTotal = $state(0);
   let browserFolder = $state<string | null>(null);
   let manual = $state<StepByHand[] | null>(null);
   let ticked = $state<Record<string, boolean>>({});
@@ -96,11 +104,26 @@
       await step(1, async () => {
         const result = await api.download();
         byHand = result.by_hand;
+        byHandTotal = byHand.length;
         browserFolder = result.browser_folder;
         if (byHand.length) {
           steps[1].done = result.done;
           steps[1].state = "waiting";
           await waitForDownloads();
+          // The download's own line said what was missing; it is all here now.
+          const log = steps[1].log;
+          let stale = -1;
+          log.forEach((e, i) => {
+            if (e.event === "status" && e.tone === "warning") stale = i;
+          });
+          const settled: LibEvent = {
+            event: "status",
+            tone: "good",
+            text: [{ kind: "plain", text: `Every archive is in the downloads folder (${byHandTotal} downloaded by hand).` }],
+          };
+          if (stale >= 0) log[stale] = settled;
+          else log.push(settled);
+          return { ...result.done, summary: `every archive is in the downloads folder, ${byHandTotal} by hand` };
         }
         return result.done;
       });
@@ -245,36 +268,53 @@
   <section>
     <h3>Where things go</h3>
     {#if locations}
-      {#each places as place}
-        {@const loc = locations[place.kind]}
-        <div class="place">
-          <div class="ptitle">{place.title}</div>
-          {#if loc.path}
-            <div class="ppath" class:missing={!loc.exists} title={loc.path}>{loc.path}</div>
-            <div class="pfrom dim">
-              {loc.exists ? "" : "not there yet · "}from {loc.from}
-              {#if loc.from === "chosen"}· <button class="link" onclick={() => resetPlace(place.kind)} disabled={running}>reset</button>{/if}
-            </div>
-          {:else}
-            <div class="pfrom dim">{place.hint}</div>
-          {/if}
-          <button onclick={() => choosePlace(place.kind)} disabled={running}>Choose…</button>
-        </div>
-      {/each}
+      {@const instance = locations.instance}
+      <!-- The instance first: the other folders follow from it. -->
       <div class="place">
-        <div class="ptitle">Other folders to look in</div>
-        <div class="pfrom dim">
-          Archives already in these are linked into the downloads folder, not downloaded again.
-        </div>
-        <button onclick={addSearch} disabled={running}>Add…</button>
+        <div class="ptitle">MO2 instance</div>
+        {#if instance.path}
+          <div class="ppath" class:missing={!instance.exists}>{instance.path}</div>
+        {:else}
+          <div class="pfrom dim">The portable Mod Organizer 2 instance to install into: the folder with ModOrganizer.exe in it.</div>
+        {/if}
+        <button class={instance.path ? "" : "primary"} onclick={() => choosePlace("instance")} disabled={running}>
+          {instance.path ? "Change…" : "Choose…"}
+        </button>
       </div>
-      {#each locations.search as folder}
-        <div class="search">
-          <span class="ppath" class:missing={!folder.exists} title={folder.path}>{folder.path}</span>
-          <button class="link small" onclick={() => removeSearch(folder.path!)} disabled={running}>Remove</button>
+      {#if placeError}<div class="perror">{placeError}</div>{/if}
+
+      {#if instance.path}
+        {#each places.filter((p) => p.kind !== "instance") as place}
+          {@const loc = locations[place.kind]}
+          <div class="place sub">
+            <div class="ptitle">{place.title}</div>
+            {#if loc.path}
+              <div class="ppath" class:missing={!loc.exists}>{loc.path}</div>
+              <div class="pfrom dim">
+                {loc.exists ? "" : "not there yet · "}from {loc.from}
+                {#if loc.from === "chosen"}· <button class="link" onclick={() => resetPlace(place.kind)} disabled={running}>reset</button>{/if}
+              </div>
+            {:else}
+              <div class="pfrom dim">{place.hint}</div>
+            {/if}
+            <button class="link" onclick={() => choosePlace(place.kind)} disabled={running}>Change…</button>
+          </div>
+        {/each}
+        <div class="place sub">
+          <div class="ptitle">Other folders to look in</div>
+          <div class="pfrom dim">
+            Archives already in these are linked into the downloads folder, not downloaded again.
+          </div>
+          <button class="link" onclick={addSearch} disabled={running}>Add…</button>
         </div>
-      {/each}
-      <div class="dim small">Profile: {locations.profile}</div>
+        {#each locations.search as folder}
+          <div class="search">
+            <span class="ppath" class:missing={!folder.exists}>{folder.path}</span>
+            <button class="link small" onclick={() => removeSearch(folder.path!)} disabled={running}>Remove</button>
+          </div>
+        {/each}
+        <div class="dim small">Profile: {locations.profile}</div>
+      {/if}
     {/if}
   </section>
 
@@ -297,7 +337,9 @@
         <div class="shead">
           <span class="icon">{icon[s.state]}</span>
           <span class="stitle">{s.title}</span>
-          <span class="dim swhat">{s.done?.summary ?? s.what}</span>
+          <span class="dim swhat">
+            {#if s.state === "waiting"}{byHand.length} of {byHandTotal} still to download by hand{:else}{s.done?.summary ?? s.what}{/if}
+          </span>
         </div>
         {#if s.state !== "idle"}
           <div class="sbody">
@@ -319,6 +361,10 @@
             {/each}
             {#if i === 1 && s.state === "waiting"}
               <div class="byhand">
+                <div class="bar">
+                  <div class="blabel"><span>downloaded by hand</span><span class="dim">{byHandTotal - byHand.length}/{byHandTotal}</span></div>
+                  <progress max={byHandTotal} value={byHandTotal - byHand.length}></progress>
+                </div>
                 <p>
                   {byHand.length} archive(s) need a click. Open each page and use its download button;
                   each is picked up as it arrives{browserFolder ? `, including from ${browserFolder}` : ""}.
@@ -426,9 +472,17 @@
     grid-column: 1;
     font-family: var(--mono);
     font-size: 12px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    /* Whole, wrapped wherever it must be: a path cut short is no use. */
+    overflow-wrap: anywhere;
+    user-select: text;
+  }
+  .place.sub {
+    margin-left: 12px;
+  }
+  .perror {
+    color: var(--problem);
+    font-size: 12px;
+    margin: -4px 0 8px;
   }
   .ppath.missing {
     color: var(--warning);

@@ -351,6 +351,24 @@ pub(crate) fn point_at_downloads(
 /// Where an MO2 instance saves downloads: `download_directory` in its
 /// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
 /// a Wine drive other than `Z:`.
+/// Why `dir` is not a Mod Organizer 2 instance, if it is not. A portable
+/// instance has `ModOrganizer.exe` at its top, and `ModOrganizer.ini` once MO2
+/// has been run there; a folder with neither is somewhere else, and
+/// installing into it would build a mods folder no MO2 reads.
+pub fn not_an_instance(dir: &Path) -> Option<String> {
+    if !dir.is_dir() {
+        return Some(format!("{} is not a folder", dir.display()));
+    }
+    let has = |name: &str| dir.join(name).is_file();
+    (!has("ModOrganizer.exe") && !has("ModOrganizer.ini")).then(|| {
+        format!(
+            "{} does not look like a Mod Organizer 2 instance: it has neither ModOrganizer.exe \
+             nor ModOrganizer.ini. Choose the folder MO2 is in (a portable instance).",
+            dir.display()
+        )
+    })
+}
+
 pub fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
     let mut in_settings = false;

@@ -83,6 +83,7 @@ export interface Document {
 
 export interface ListView {
   path: string;
+  about: string | null;
   document: Document;
   answers: Record<string, string>;
 }
