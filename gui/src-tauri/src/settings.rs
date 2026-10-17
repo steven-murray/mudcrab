@@ -14,6 +14,9 @@ pub struct Settings {
     /// Per list, by its path.
     #[serde(default)]
     pub lists: BTreeMap<String, ListSettings>,
+    /// The tools.toml to use, when not the usual one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools_config: Option<PathBuf>,
 }
 
 /// Where one list goes.
@@ -36,9 +39,14 @@ pub struct ListSettings {
     pub answers: BTreeMap<String, String>,
 }
 
-/// `gui.toml`, beside `tools.toml`.
+/// `gui.toml`, beside the usual `tools.toml` (or the one
+/// `MUDCRAB_TOOLS_CONFIG` names) -- not beside a tools.toml chosen in the
+/// GUI, which would move the GUI's own settings with it.
 pub fn path() -> Option<PathBuf> {
-    mudcrab::config::tools::ToolsConfig::default_path()
+    std::env::var_os("MUDCRAB_TOOLS_CONFIG")
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from)
+        .or_else(mudcrab::config::tools::ToolsConfig::standard_path)
         .map(|tools| tools.with_file_name("gui.toml"))
 }
 

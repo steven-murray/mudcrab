@@ -18,7 +18,10 @@ The GUI's install mode reads a list and installs it from one window:
    folder is refused). The downloads folder and the game folder then follow
    from it: the downloads folder from `tools.toml` if it is set there, else
    the instance's own; the game folder from the instance's settings, or found
-   as `game-dir` finds it. Change either if they are not right. **Other folders to look in** are folders
+   as `game-dir` finds it. Change either if they are not right. **Tools**
+   shows which `tools.toml` is used (the usual one, unless you choose
+   another), and, for a list that cleans plugins with xEdit, anything in it
+   that is not set up; Install waits until it is. **Other folders to look in** are folders
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download

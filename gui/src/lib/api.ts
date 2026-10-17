@@ -97,7 +97,15 @@ export interface Location {
   exists: boolean;
 }
 
+export interface Tools {
+  path: string | null;
+  from: string;
+  exists: boolean;
+  problems: string[];
+}
+
 export interface Locations {
+  tools: Tools;
   instance: Location;
   downloads: Location;
   game: Location;
@@ -161,6 +169,7 @@ export const api = {
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
+  setToolsConfig: (path: string | null) => invoke<Locations>("set_tools_config", { path }),
   addSearchFolder: (path: string) => invoke<Locations>("add_search_folder", { path }),
   removeSearchFolder: (path: string) => invoke<Locations>("remove_search_folder", { path }),
   plan: (answers: Record<string, string>) => invoke<Done>("step_plan", { answers }),

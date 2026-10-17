@@ -36,6 +36,8 @@ struct Session {
     list: Option<PathBuf>,
     /// Where `compile` and `query` write, for this list.
     work: Option<PathBuf>,
+    /// Whether the list cleans plugins, and so needs xEdit set up.
+    cleans: bool,
     plan: Option<PersonalizedPlan>,
     /// Archives still to come by hand, and what watches for them.
     pending: Vec<Unfetched>,
@@ -126,9 +128,15 @@ fn open_list<R: Runtime>(
         let _ = settings.save();
         settings.list(&path).answers
     };
+    let cleans = modlist.mods.iter().any(|m| {
+        m.actions
+            .iter()
+            .any(|a| matches!(a.action, config::schema::ModAction::Qac(_)))
+    });
     *state.session.lock().map_err(|_| "a command panicked")? = Session {
         list: Some(path.clone()),
         work: Some(work),
+        cleans,
         ..Session::default()
     };
     Ok(ListView {
@@ -191,8 +199,19 @@ impl Location {
     }
 }
 
+/// The tools.toml in use, and what in it stops this list installing.
+#[derive(Serialize)]
+struct Tools {
+    path: Option<String>,
+    /// "chosen" here, "MUDCRAB_TOOLS_CONFIG", or "usual".
+    from: String,
+    exists: bool,
+    problems: Vec<String>,
+}
+
 #[derive(Serialize)]
 struct Locations {
+    tools: Tools,
     instance: Location,
     downloads: Location,
     game: Location,
@@ -254,12 +273,33 @@ fn locate(state: &State) -> Result<Located, String> {
                 .next()
                 .map(|candidate| (candidate.path, "found"))
         });
+    let cleans = state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .cleans;
+    let tools_path = config::tools::ToolsConfig::default_path();
+    let tools_info = Tools {
+        from: match config::tools::ToolsConfig::chosen_path() {
+            Some((_, "--tools-config")) => "chosen".to_string(),
+            Some((_, from)) => from.to_string(),
+            None => "usual".to_string(),
+        },
+        exists: tools_path.as_ref().is_some_and(|p| p.is_file()),
+        path: tools_path.as_ref().map(|p| p.display().to_string()),
+        problems: if cleans {
+            tools.xedit_problems()
+        } else {
+            Vec::new()
+        },
+    };
     Ok(Located {
         search: chosen.search.clone(),
         instance: instance.as_ref().map(|(p, _)| p.clone()),
         downloads: downloads.as_ref().map(|(p, _)| p.clone()),
         game: game.as_ref().map(|(p, _)| p.clone()),
         shown: Locations {
+            tools: tools_info,
             instance: Location::of(instance),
             downloads: Location::of(downloads),
             game: Location::of(game),
@@ -301,6 +341,25 @@ fn set_location(
             "profile" => chosen.profile = path.map(|p| p.display().to_string()),
             other => return Err(format!("no location called {other}")),
         }
+        settings.save().map_err(shown)?;
+    }
+    locations(state)
+}
+
+/// Use this tools.toml (or with `None`, the usual one), from now on.
+#[tauri::command]
+fn set_tools_config(
+    state: tauri::State<'_, State>,
+    path: Option<String>,
+) -> Result<Locations, String> {
+    let path = path.map(PathBuf::from);
+    if let Some(path) = &path {
+        config::tools::ToolsConfig::load(path).map_err(shown)?;
+    }
+    config::tools::ToolsConfig::set_path_override(path.clone());
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        settings.tools_config = path;
         settings.save().map_err(shown)?;
     }
     locations(state)
@@ -735,6 +794,19 @@ pub fn app<R: Runtime>(
         })
         .manage(Opening(start))
         .setup(|app| {
+            // The tools.toml chosen here last time, unless the command line
+            // or environment names one.
+            let chosen = app
+                .state::<State>()
+                .settings
+                .lock()
+                .ok()
+                .and_then(|s| s.tools_config.clone());
+            if config::tools::ToolsConfig::chosen_path().is_none()
+                && let Some(path) = chosen
+            {
+                config::tools::ToolsConfig::set_path_override(path);
+            }
             mudcrab::events::set_sink(std::sync::Arc::new(sink::GuiSink::new(
                 app.handle().clone(),
             )));
@@ -746,6 +818,7 @@ pub fn app<R: Runtime>(
             open_list,
             locations,
             set_location,
+            set_tools_config,
             add_search_folder,
             remove_search_folder,
             step_plan,

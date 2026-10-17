@@ -52,6 +52,17 @@ xEdit the game's `Oblivion.ini` (the MO2 profile's copy, else the game's), so
 master or a broken xEdit setup in `tools.toml`. Closing xEdit's window by hand
 also stops the install. Once fixed, `install --redo-action qac` cleans again.
 
+### `This list cleans plugins with xEdit, and .../tools.toml is not set up for it`
+
+Checked before anything is installed: the list has `qac` actions, and the
+tools.toml in use lacks something xEdit needs -- a section, or a path that is
+not there. A path like `/path/to/your/wine-prefix` is the example
+`setup-tools` writes for you to fill in. Run `mudcrab setup-tools` (it finds
+xEdit and Proton prefixes and offers them), or edit the file. The first line
+names which tools.toml is being read: if it is not the one you meant, pass
+`--tools-config`, set `MUDCRAB_TOOLS_CONFIG`, or in the GUI choose it under
+**Tools**.
+
 ### `... qac action requires [tes4edit] configuration in tools.toml`
 
 The list cleans plugins with xEdit, and `tools.toml` does not say where xEdit

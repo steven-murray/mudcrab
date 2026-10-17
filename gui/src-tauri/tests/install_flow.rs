@@ -165,6 +165,19 @@ fn a_list_installs_from_the_commands_the_page_calls() {
         "{locations}"
     );
     assert_eq!(locations["search"][0]["exists"], true);
+    assert_eq!(locations["tools"]["from"], "MUDCRAB_TOOLS_CONFIG");
+    assert_eq!(
+        locations["tools"]["problems"],
+        json!([]),
+        "the list cleans nothing"
+    );
+    let other = root.join("other-tools.toml");
+    std::fs::write(&other, "downloads_dir = '/nowhere'\n").unwrap();
+    let chosen = call(&webview, "set_tools_config", json!({ "path": other })).unwrap();
+    assert_eq!(chosen["tools"]["from"], "chosen");
+    assert_eq!(chosen["tools"]["exists"], true);
+    let usual = call(&webview, "set_tools_config", json!({ "path": null })).unwrap();
+    assert_eq!(usual["tools"]["from"], "MUDCRAB_TOOLS_CONFIG");
     assert_eq!(locations["instance"]["from"], "chosen");
     assert_eq!(locations["downloads"]["exists"], true);
 

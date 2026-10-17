@@ -53,6 +53,19 @@
   async function resetPlace(kind: string) {
     locations = await api.setLocation(kind, null);
   }
+  async function chooseTools() {
+    const path = await open({ multiple: false, filters: [{ name: "tools.toml", extensions: ["toml"] }] });
+    if (typeof path !== "string") return;
+    try {
+      locations = await api.setToolsConfig(path);
+      placeError = null;
+    } catch (err) {
+      placeError = String(err);
+    }
+  }
+  async function resetTools() {
+    locations = await api.setToolsConfig(null);
+  }
   async function addSearch() {
     const path = await open({ directory: true, multiple: false });
     if (typeof path === "string") locations = await api.addSearchFolder(path);
@@ -91,7 +104,10 @@
   let manualTimer: ReturnType<typeof setInterval> | null = null;
 
   const ready = $derived(
-    !!locations?.instance.path && !!locations?.downloads.path && unanswered.length === 0,
+    !!locations?.instance.path &&
+      !!locations?.downloads.path &&
+      !locations?.tools.problems.length &&
+      unanswered.length === 0,
   );
 
   async function run() {
@@ -313,6 +329,23 @@
             <button class="link small" onclick={() => removeSearch(folder.path!)} disabled={running}>Remove</button>
           </div>
         {/each}
+        {@const tools = locations.tools}
+        <div class="place sub">
+          <div class="ptitle">Tools (tools.toml)</div>
+          {#if tools.path}<div class="ppath" class:missing={!tools.exists}>{tools.path}</div>{/if}
+          <div class="pfrom dim">
+            {tools.exists ? "" : "not there · "}{tools.from === "chosen" ? "chosen here" : tools.from === "usual" ? "the usual one" : `from ${tools.from}`}
+            {#if tools.from === "chosen"}· <button class="link" onclick={resetTools} disabled={running}>reset</button>{/if}
+          </div>
+          <button class="link" onclick={chooseTools} disabled={running}>Change…</button>
+        </div>
+        {#if tools.problems.length}
+          <div class="toolsbad">
+            <div>This list cleans plugins with xEdit, and this tools.toml is not set up for it:</div>
+            <ul>{#each tools.problems as problem}<li>{problem}</li>{/each}</ul>
+            <div class="dim">Run <code>mudcrab setup-tools</code>, edit the file, or choose another.</div>
+          </div>
+        {/if}
         <div class="dim small">Profile: {locations.profile}</div>
       {/if}
     {/if}
@@ -326,6 +359,7 @@
       <p class="dim small">
         {#if !locations?.instance.path}Choose the MO2 instance. {/if}
         {#if !locations?.downloads.path}Choose the downloads folder. {/if}
+        {#if locations?.tools.problems.length}Set up xEdit in tools.toml. {/if}
         {#if unanswered.length}Answer every question.{/if}
       </p>
     {/if}
@@ -478,6 +512,19 @@
   }
   .place.sub {
     margin-left: 12px;
+  }
+  .toolsbad {
+    border: 1px solid var(--problem);
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin: 4px 0 8px 12px;
+    font-size: 12px;
+  }
+  .toolsbad ul {
+    margin: 4px 0;
+    padding-left: 18px;
+    color: var(--problem);
+    overflow-wrap: anywhere;
   }
   .perror {
     color: var(--problem);

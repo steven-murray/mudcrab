@@ -111,6 +111,10 @@ pub(crate) fn install_order(mods: &[PersonalizedMod]) -> Vec<&PersonalizedMod> {
 }
 
 pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::Result<()> {
+    let problems = tool_problems(plan, settings);
+    if !problems.is_empty() {
+        anyhow::bail!("{}\nNothing was installed.", problems.join("\n"));
+    }
     let active_plugins: HashSet<String> = plan
         .plugins
         .iter()
@@ -516,6 +520,39 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     Ok(())
 }
 
+/// What tools.toml lacks for this install, found before anything is
+/// installed: a list that cleans plugins needs xEdit, and a wrong path there
+/// would otherwise surface hours in, at the first `qac`. Empty when nothing
+/// is missing (or nothing will run: a dry run, or `--skip-actions`).
+pub fn tool_problems(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<String> {
+    if settings.dry_run || !settings.execute_actions {
+        return Vec::new();
+    }
+    let cleans = plan
+        .mods
+        .iter()
+        .filter(|m| settings.filter.matches(&m.section, &m.id))
+        .any(|m| m.actions.iter().any(|a| matches!(a, ModAction::Qac(_))));
+    if !cleans {
+        return Vec::new();
+    }
+    let problems = settings.tools.xedit_problems();
+    if problems.is_empty() {
+        return Vec::new();
+    }
+    let file = crate::config::tools::ToolsConfig::default_path()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "tools.toml".to_string());
+    let mut out = vec![format!(
+        "This list cleans plugins with xEdit, and {file} is not set up for it:"
+    )];
+    out.extend(problems.into_iter().map(|p| format!("  - {p}")));
+    out.push(format!(
+        "Run `mudcrab setup-tools` to find them, or edit {file}."
+    ));
+    out
+}
+
 /// The list's manual steps not yet done, plus a Bashed Patch the load order
 /// expects that nothing has built and no step covers.
 fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<ManualStep> {
@@ -794,6 +831,67 @@ fn run_post_install_actions(
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_list_that_cleans_plugins_needs_xedit_set_up_before_anything_installs() {
+        use super::{InstallSettings, tool_problems};
+        use crate::config::schema::PersonalizedPlan;
+        use crate::config::tools::ToolsConfig;
+        let root = tempfile::tempdir().unwrap();
+        let plan = |actions: serde_json::Value| -> PersonalizedPlan {
+            serde_json::from_value(serde_json::json!({
+                "schema_version": 1, "name": "L", "responses": {}, "mod_order": [],
+                "selected_mods": [], "plugins": [],
+                "mods": [{"id": "M", "archives": [], "actions": actions}]
+            }))
+            .unwrap()
+        };
+        // What `setup-tools` writes for a person to fill in.
+        let template: ToolsConfig = toml::from_str(
+            "[wine]\nprefix = \"/path/to/your/wine-prefix\"\n[tes4edit]\nexe = \"/path/to/your/wine-prefix/drive_c/tools/xEdit/xEdit.exe\"\n",
+        )
+        .unwrap();
+        let settings = |tools: ToolsConfig| InstallSettings {
+            cache_dir: root.path().join("downloads"),
+            mods_dir: root.path().join("mods"),
+            mo2_instance_dir: None,
+            profile_name: "Default".to_string(),
+            game_dir: None,
+            execute_actions: true,
+            dry_run: false,
+            tools,
+            filter: Default::default(),
+            force_merges: false,
+            force: false,
+            redo_actions: Vec::new(),
+        };
+        let cleans = plan(serde_json::json!([{"action": "qac", "plugins": ["A.esp"]}]));
+        let problems = tool_problems(&cleans, &settings(template.clone())).join("\n");
+        assert!(
+            problems.contains("xEdit.exe, which is not there"),
+            "{problems}"
+        );
+        if !cfg!(windows) {
+            assert!(problems.contains("not a Wine prefix"), "{problems}");
+        }
+        // Nothing to clean, nothing needed.
+        assert!(tool_problems(&plan(serde_json::json!([])), &settings(template)).is_empty());
+        // Real files are fine.
+        let prefix = root.path().join("pfx");
+        std::fs::create_dir_all(prefix.join("drive_c")).unwrap();
+        let exe = prefix.join("drive_c/TES4Edit.exe");
+        std::fs::write(&exe, b"").unwrap();
+        let real: ToolsConfig = toml::from_str(&format!(
+            "[wine]\nprefix = '{}'\n[tes4edit]\nexe = '{}'\n",
+            prefix.display(),
+            exe.display()
+        ))
+        .unwrap();
+        assert_eq!(
+            tool_problems(&cleans, &settings(real)),
+            Vec::<String>::new()
+        );
+    }
 
     #[test]
     fn a_mod_yielding_to_a_later_one_is_installed_after_it() {
