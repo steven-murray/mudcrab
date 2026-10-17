@@ -61,7 +61,7 @@ that table.
 | `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs under `[ini.<Section>]`, applied to the MO2 profile's copy. |
 | `mo2` | To set up MO2 itself: `[mo2]` with `theme = "vs15 Dark"`, one of the themes MO2 ships (Settings > Theme), applied to an instance that has none chosen yet. |
 | `manual-steps` | When something has to be done by hand after installing (building a Bashed Patch in Wrye Bash): `install` lists it at the end until it is done. See [Steps by hand](#steps-by-hand). |
-| `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
+| `post-install-actions` | Run after installing: `"4gb-patch"` marks the game's `Oblivion.exe` large-address-aware, as the 4GB Patch tool does, so the game can use 4 GB of memory (needed by most big lists; the original is kept as `Oblivion.exe.mudcrab-backup`, and an exe already patched is left alone). `"loot-sort"` runs LOOT; most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
 | `about` | For the GUI: what someone installing the list reads first (Markdown), shown by its **About this list** button. Write it for a player pressing Install -- what the list is, what it needs, what to expect -- not as the guide's instructions, which `docs` holds. It may be in the docs file instead. |

@@ -24,6 +24,7 @@ pub mod nexus_files;
 pub mod prompt;
 pub mod query;
 pub mod setup_tools;
+mod steps;
 pub mod unhide_merges;
 pub mod validate;
 
@@ -106,6 +107,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::SetupTools(args) => setup_tools::run(args).await,
         Command::GameDir(args) => game_dir::run(args),
         Command::Assets(args) => assets::run(args),
+        Command::Steps(args) => steps::run(args),
         Command::UnhideMerges(args) => unhide_merges::run(args).await,
         Command::Merge(args) => merge::run(args).await,
         Command::NewMerge(args) => new_merge::run(args).await,

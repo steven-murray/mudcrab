@@ -848,6 +848,20 @@ problem is reported together, and the summary and warnings are printed even
 when the check fails. Mods are checked in parallel, a thread per CPU; a
 700-mod list takes under a minute.
 
+## steps
+
+What a list leaves to do by hand after installing -- building a Bashed
+Patch, settings only the game can load -- and what of it is done:
+
+```bash
+mudcrab steps <plan.json> --mo2-instance-dir <instance> [--game-dir <dir>]
+```
+
+A step the list says how to recognise (`done_when_plugin`: the plugin it
+makes has appeared in a mod or in MO2's `overwrite/`) shows ✔ once done;
+the rest show ○ with their instructions, every time. `install` prints the
+ones not done at the end of each run; the GUI shows them as a checklist.
+
 ## assets
 
 After an install: the meshes and sounds the active plugins name that the game

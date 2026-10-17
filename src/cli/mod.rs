@@ -41,6 +41,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
             "check",
             "install",
             "assets",
+            "steps",
         ],
     ),
     (
@@ -156,6 +157,9 @@ pub enum Command {
     /// After an install: the meshes and sounds the active plugins name that
     /// the game would not find.
     Assets(AssetsArgs),
+    /// After an install: what the list leaves to do by hand, and what of it
+    /// is done.
+    Steps(StepsArgs),
     /// Restore plugins that were hidden to make room for a merge.
     UnhideMerges(UnhideMergesArgs),
     /// Build merged plugins from an already-installed mods directory.
@@ -809,6 +813,23 @@ pub struct AssetsArgs {
 /// Setting up an MO2 instance asks for this folder. Under Proton, MO2 sees the
 /// Linux filesystem as drive `Z:`, so the path is also printed in that form,
 /// ready to paste into the file window's "File name" box.
+/// What a list leaves to do by hand after installing -- building a Bashed
+/// Patch, settings to load in game -- with ✔ for each step known to be done
+/// (its plugin exists in a mod or in MO2's overwrite) and ○ for the rest. A
+/// step with nothing to tell it is done by is always ○. `install` prints the
+/// ones not done at the end of every run; this shows them any time.
+#[derive(Debug, Args)]
+pub struct StepsArgs {
+    /// Path to the personalized install plan.
+    pub input: PathBuf,
+    /// The MO2 instance the list is installed in.
+    #[arg(long = "mo2-instance-dir", value_name = "DIR")]
+    pub mo2_instance_dir: PathBuf,
+    /// The game folder, for where Wrye Bash is. Defaults as for `install`.
+    #[arg(long = "game-dir", value_name = "DIR")]
+    pub game_dir: Option<PathBuf>,
+}
+
 #[derive(Debug, Args)]
 pub struct GameDirArgs {
     /// Print only the first folder found, in the form MO2 takes (the `Z:`

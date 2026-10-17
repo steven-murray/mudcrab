@@ -736,6 +736,10 @@ pub enum Mo2ModlistEntry {
 #[serde(rename_all = "kebab-case")]
 pub enum PostInstallAction {
     LootSort,
+    /// Mark the game's `Oblivion.exe` large-address-aware, as the 4GB Patch
+    /// does. See `config::install::large_address`.
+    #[serde(rename = "4gb-patch")]
+    FourGbPatch,
 }
 
 impl<'de> Deserialize<'de> for PostInstallAction {
@@ -746,8 +750,9 @@ impl<'de> Deserialize<'de> for PostInstallAction {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {
             "loot-sort" => Ok(Self::LootSort),
+            "4gb-patch" => Ok(Self::FourGbPatch),
             other => Err(de::Error::custom(format!(
-                "unknown post-install action '{other}'. Supported values: loot-sort"
+                "unknown post-install action '{other}'. Supported values: loot-sort, 4gb-patch"
             ))),
         }
     }

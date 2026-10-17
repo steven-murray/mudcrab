@@ -30,6 +30,7 @@ pub struct InstallSettings {
 }
 
 pub mod index;
+pub mod large_address;
 pub mod layout;
 pub mod manifest;
 pub mod merge;
@@ -823,6 +824,30 @@ fn run_post_install_actions(
     for action in &plan.post_install_actions {
         match action {
             PostInstallAction::LootSort => run_loot_sort(plan, settings)?,
+            PostInstallAction::FourGbPatch => {
+                let game = settings.game_dir.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("the 4gb-patch post-install action needs the game folder")
+                })?;
+                let exe = game.join("Oblivion.exe");
+                match large_address::patch(&exe, settings.dry_run)? {
+                    large_address::Patched::Already => {
+                        tracing::info!(exe = %exe.display(), "4gb-patch: already large-address-aware")
+                    }
+                    large_address::Patched::Now(backup) => crate::events::status(
+                        crate::events::Tone::Good,
+                        crate::events::Text::new()
+                            .plain(if settings.dry_run {
+                                "Would patch "
+                            } else {
+                                "Patched "
+                            })
+                            .name("Oblivion.exe")
+                            .plain(" to use 4 GB of memory (the original is kept as ")
+                            .dim(backup.display().to_string())
+                            .plain(")"),
+                    ),
+                }
+            }
         }
     }
 
