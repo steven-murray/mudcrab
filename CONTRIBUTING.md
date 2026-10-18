@@ -70,3 +70,17 @@ A few conventions the code relies on:
 
 By contributing you agree that your work is licensed as the project is: MIT or
 Apache-2.0, at the user's option.
+
+## Releasing
+
+The CLI and the GUI are released together, from one version:
+
+1. Set it in `Cargo.toml`'s `[workspace.package]`, in `gui/package.json`
+   (then `npm install --package-lock-only` in `gui/`), and as a new
+   `<release>` at the top of
+   `gui/flatpak/io.github.steven_murray.mudcrab.metainfo.xml`.
+2. Merge that, then tag the merge `v<version>` and push the tag. The release
+   workflow checks the tag against `Cargo.toml` and attaches the CLI for
+   Linux and Windows, the GUI's AppImage, Flatpak, Windows installer and
+   Windows zip, with notes generated from the pull requests; a tag with a
+   suffix (`v0.4.0-beta.1`) makes a pre-release.

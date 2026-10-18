@@ -24,7 +24,7 @@ exclude = ["spikes"]
 # One version for the CLI and the GUI, which are released together: a tag
 # `v<version>` builds both (see .github/workflows/release.yml).
 [workspace.package]
-version = "0.2.5"
+version = "0.3.0"
 
 [dependencies]
 anyhow = "1.0"
