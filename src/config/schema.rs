@@ -5,7 +5,14 @@ use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct SourceModlist {
+    /// Required, except in a component (below).
+    #[serde(default)]
     pub name: String,
+    /// A file meant only to be included in other lists: it may leave out
+    /// `name`, its conditions may ask the including list's questions, and it
+    /// is not installed on its own. See [`crate::config::loader`].
+    #[serde(default)]
+    pub component: bool,
     /// When the guide this list follows was published, and how to recognise a
     /// file newer than it. Optional: a list that is not transcribing a guide
     /// has nothing to compare against, and `diff` simply says nothing about
@@ -19,7 +26,10 @@ pub struct SourceModlist {
     pub ini: toml::Table,
     #[serde(default)]
     pub mods: Vec<ModEntry>,
-    #[serde(default)]
+    /// The load order. An included list's plugins are placed in it with
+    /// `{ include = "<its id>" }`, which the loader replaces with them; until
+    /// then they are left out here (the loader reads them separately).
+    #[serde(default, deserialize_with = "plugin_names")]
     pub plugins: Vec<String>,
     /// Plugins that are installed and ordered but **not active**.
     ///
@@ -64,6 +74,10 @@ pub struct SourceModlist {
     /// paths are relative to. Set by the loader.
     #[serde(skip)]
     pub base_dir: Option<std::path::PathBuf>,
+    /// The files the list includes, however indirectly, in the order they
+    /// are first included. Set by the loader.
+    #[serde(skip)]
+    pub included: Vec<std::path::PathBuf>,
 }
 
 /// What `diff` needs to say whether an archive predates the guide being followed.
@@ -601,12 +615,45 @@ impl<'de> Deserialize<'de> for IniValue {
     }
 }
 
+/// The load order's plugin names, leaving out the `{ include = "..." }`
+/// entries that place an included list's plugins: the loader puts those in.
+fn plugin_names<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<String>, D::Error> {
+    Ok(Vec::<PluginSlot>::deserialize(deserializer)?
+        .into_iter()
+        .filter_map(|slot| match slot {
+            PluginSlot::Plugin(name) => Some(name),
+            PluginSlot::Include { .. } => None,
+        })
+        .collect())
+}
+
+/// One entry in a source list's `plugins`: a plugin, or where an included
+/// list's plugins go, in their own order.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(untagged)]
+pub enum PluginSlot {
+    Plugin(String),
+    Include { include: String },
+}
+
 /// One mod in the flat `[[mods]]` list.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModEntry {
     /// Unique id; also the mod's directory name.
     pub id: String,
+    /// Not a mod but another modlist file, relative to this one, whose mods
+    /// the loader puts here in its place. See [`crate::config::loader`].
+    #[serde(default)]
+    pub include: Option<String>,
+    /// The included file the loader took this mod from; `None` for the list's
+    /// own. Set by the loader.
+    #[serde(skip)]
+    pub origin: Option<std::path::PathBuf>,
+    /// How many of `section`'s first levels the includes it came through put
+    /// there, rather than its own file. Set by the loader.
+    #[serde(skip)]
+    pub inherited_sections: usize,
     /// The mod's folder name in a reference instance, used only by `diff` when
     /// our id is deliberately different; it does NOT affect installation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -724,6 +771,10 @@ pub struct MergeSpec {
     /// order, so reordering changes the output. There is deliberately no
     /// `load_order` field -- it is derived from the modlist's `plugins`.
     pub sources: Vec<MergeSource>,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 fn is_true(value: &bool) -> bool {
@@ -921,6 +972,10 @@ pub struct BuildLayer {
 pub struct CompiledModlist {
     pub schema_version: u32,
     pub name: String,
+    /// `SourceModlist::component`: `query` refuses one, as it is not a list
+    /// to install on its own.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub component: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub guide: Option<GuideProvenance>,
     pub input_count: usize,
@@ -943,6 +998,17 @@ pub struct CompiledModlist {
     #[serde(default)]
     pub mo2_modlist_entries: Vec<Mo2ModlistEntry>,
     pub mods: Vec<CompiledMod>,
+}
+
+impl CompiledModlist {
+    /// The list's name, or `fallback` for a component that has none.
+    pub fn name_or<'a>(&'a self, fallback: &'a str) -> &'a str {
+        if self.name.trim().is_empty() {
+            fallback
+        } else {
+            &self.name
+        }
+    }
 }
 
 /// How the list would like Mod Organizer 2 itself set up.
@@ -974,6 +1040,10 @@ pub struct ManualStep {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CompiledMod {
     pub id: String,
+    /// The included file the mod is from, relative to the list, for messages;
+    /// absent for the list's own.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
     /// The mod's folder name in a reference instance, used only by `diff` when
     /// our id is deliberately different; it does NOT affect installation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1095,6 +1165,9 @@ impl PersonalizedPlan {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersonalizedMod {
     pub id: String,
+    /// `CompiledMod::origin`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<String>,
     /// The mod's folder name in a reference instance, used only by `diff` when
     /// our id is deliberately different; it does NOT affect installation.
     #[serde(default, skip_serializing_if = "Option::is_none")]

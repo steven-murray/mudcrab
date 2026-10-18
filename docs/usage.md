@@ -141,6 +141,11 @@ end-of-line comment), the result is validated before anything is written, and
 `--dry-run` prints the change as a diff instead. A GUI built on mudcrab makes
 its edits through these same commands, so anything it can do, they can.
 
+In a list split into several files with `include`, a command changing a mod
+changes the file the mod is written in, and the load order in the file that
+places its plugins; see
+[Lists in several files](modlist-format.md#lists-in-several-files-include).
+
 ### new
 
 ```bash

@@ -176,6 +176,8 @@ export interface LoadOrder {
 export interface ModView {
   id: string;
   left_out: boolean;
+  /** The included file the mod is written in, relative to the list. */
+  origin: string | null;
   archives: { number: number; label: string; layout: string | null; condition: string | null }[];
 }
 

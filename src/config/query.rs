@@ -33,6 +33,11 @@ pub fn build_plan(
     overrides: &Overrides,
     ask: Option<Ask<'_>>,
 ) -> anyhow::Result<PersonalizedPlan> {
+    anyhow::ensure!(
+        !compiled.component,
+        "{} is a component, written to be included in other lists, not installed on its own",
+        compiled.name_or("this list")
+    );
     let responses = resolve_responses(&compiled.inputs, overrides, ask)?;
 
     let mod_order = compiled.mods.iter().map(|entry| entry.id.clone()).collect();
@@ -85,6 +90,7 @@ pub fn build_plan(
         selected_mods.push(entry.id.clone());
         mods.push(PersonalizedMod {
             id: entry.id.clone(),
+            origin: entry.origin.clone(),
             oracle_name: entry.oracle_name.clone(),
             section: entry.section.clone(),
             mod_type: entry.mod_type,

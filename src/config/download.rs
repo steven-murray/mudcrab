@@ -1075,6 +1075,7 @@ mod tests {
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 enabled: true,
+                origin: None,
                 oracle_name: None,
                 section: Vec::new(),
                 mod_type: None,
@@ -1168,6 +1169,7 @@ mod tests {
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
                 enabled: true,
+                origin: None,
                 oracle_name: None,
                 section: Vec::new(),
                 mod_type: None,

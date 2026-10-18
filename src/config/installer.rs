@@ -621,7 +621,7 @@ pub fn plan_choice(
         .chosen
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("this archive's installer has nothing to choose"))?;
-    crate::config::edit::plan(path, |text, _| {
+    crate::config::edit::plan_mod(path, id, |text, _| {
         crate::config::edit::doc::set_installer(text, id, number, chosen)
     })
 }

@@ -214,6 +214,7 @@ pub(super) mod tests {
         PersonalizedMod {
             id: "Partner".to_string(),
             enabled: true,
+            origin: None,
             oracle_name: None,
             section: Vec::new(),
             mod_type: None,

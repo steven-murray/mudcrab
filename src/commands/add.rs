@@ -43,9 +43,13 @@ pub async fn run(mut args: AddArgs) -> anyhow::Result<()> {
         (None, true) => Some(LoadPosition::Last),
         (None, false) => None,
     };
+    // Beside a mod from an included file, the new one goes in that file.
+    let place = config::edit::place_beside(&args.input, placement.before_mod.as_deref())?;
+    let mut local = new_mod.clone();
+    local.section = place.local(&new_mod.section)?;
     let mut added = None;
-    let edit = config::edit::plan(&args.input, |text, source| {
-        let plan = plan_add(text, source, &new_mod, &placement, position.as_ref())?;
+    let edit = config::edit::plan_in(&args.input, &place.file, |text, source| {
+        let plan = plan_add(text, source, &local, &placement, position.as_ref())?;
         let new_text = plan.insertion.new_text.clone();
         added = Some(plan);
         Ok(new_text)

@@ -508,6 +508,9 @@
           </p>
         {:else}
           <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
+          {#if view?.origin}
+            <p class="dim small">Written in <code>{view.origin}</code>, which the list includes: changes here are made there.</p>
+          {/if}
           <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
           <details class="form">
             <summary>The mod's fields</summary>
