@@ -60,7 +60,8 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Editing a modlist",
         &[
-            "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins", "files", "action", "input",
+            "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins", "files",
+            "action", "input",
         ],
     ),
     (

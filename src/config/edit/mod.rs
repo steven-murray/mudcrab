@@ -178,10 +178,7 @@ pub fn plan_remove(list: &Path, id: &str) -> anyhow::Result<Vec<Edit>> {
 
 /// The plugins a mod declares that no other mod does: the ones that leave
 /// the load order with it.
-fn own_plugins(
-    source: &SourceModlist,
-    entry: &crate::config::schema::ModEntry,
-) -> Vec<String> {
+fn own_plugins(source: &SourceModlist, entry: &crate::config::schema::ModEntry) -> Vec<String> {
     entry
         .plugins
         .iter()

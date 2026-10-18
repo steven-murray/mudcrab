@@ -189,7 +189,10 @@ pub fn enabled(args: crate::cli::EnableArgs, enabled: bool) -> anyhow::Result<()
         edit,
         args.dry_run,
         if enabled {
-            format!("{} is ticked in MO2, its plugins in the load order", ui::name(&args.mod_id))
+            format!(
+                "{} is ticked in MO2, its plugins in the load order",
+                ui::name(&args.mod_id)
+            )
         } else {
             format!(
                 "{} is left unticked in MO2, its plugins out of the load order",

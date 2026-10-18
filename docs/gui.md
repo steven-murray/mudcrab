@@ -89,7 +89,10 @@ history there, rather than be undone by it.
   whether it is optional (`if`), left unticked in MO2 (`off`), or not made
   from archives. Choose one to see it on the right. Drag a mod by its handle
   onto another mod to put it before or after that one, or onto a section to
-  put it at the end of it (`move`).
+  put it at the end of it (`move`). Right-click a mod to untick it in MO2 (its
+  plugins leave the load order: `disable`), tick it again (`enable`), or
+  remove it from the list, with its plugins and notes (`remove`). **+** by
+  the search box adds a mod, from an archive or a Nexus link.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
   file (`mudcrab docs`); its actions (each can be removed: `action remove`),

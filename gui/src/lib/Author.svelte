@@ -69,6 +69,23 @@
   let adding = $state<string | null>(null);
   // The archive whose installer is being walked again.
   let choosing = $state<{ id: string; number: number; label: string } | null>(null);
+  // A mod's right-click menu, and whether its removal is being confirmed.
+  let modMenu = $state<{ x: number; y: number; id: string; title: string; enabled: boolean } | null>(null);
+  let confirmRemove = $state(false);
+  // The "+" menu by the search box.
+  let addMenu = $state(false);
+
+  async function removeMod(id: string) {
+    modMenu = null;
+    if (await run(() => api.removeMod(id))) {
+      if (selected === id) {
+        selected = null;
+        view = null;
+        tree = null;
+      }
+      await archivesPane?.refresh();
+    }
+  }
   let archivesPane = $state<Archives | null>(null);
 
   // Every mod in the document by id, the sections above it (by anchor, to
@@ -282,7 +299,43 @@
   }
 </script>
 
-<svelte:window {onkeydown} />
+<svelte:window
+  {onkeydown}
+  onclick={() => {
+    modMenu = null;
+    addMenu = false;
+  }}
+/>
+
+{#if modMenu}
+  <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+  <div class="menu" style="left: {modMenu.x}px; top: {modMenu.y}px" role="menu" tabindex="-1" onclick={(e) => e.stopPropagation()}>
+    <div class="mtitle">{modMenu.title}</div>
+    {#if confirmRemove}
+      <div class="confirm">
+        Remove it from the list, with its plugins and notes?
+        <div>
+          <button class="danger" onclick={() => removeMod(modMenu!.id)}>Remove</button>
+          <button onclick={() => (confirmRemove = false)}>Keep it</button>
+        </div>
+      </div>
+    {:else}
+      <button
+        role="menuitem"
+        onclick={() => {
+          const { id, enabled } = modMenu!;
+          modMenu = null;
+          run(() => api.setEnabled(id, !enabled));
+        }}
+        title={modMenu.enabled
+          ? "Installed, but left unticked in MO2; its plugins leave the load order (mudcrab disable)"
+          : "Ticked in MO2 again; its plugins go back in the load order (mudcrab enable)"}
+        >{modMenu.enabled ? "Untick it in MO2" : "Tick it in MO2"}</button
+      >
+      <button role="menuitem" class="danger" onclick={() => (confirmRemove = true)} title="mudcrab remove">Remove from the list…</button>
+    {/if}
+  </div>
+{/if}
 
 {#if choosing}
   <ChooseDialog
@@ -315,6 +368,36 @@
     </div>
     <div class="bar" class:hidden={pane !== "list"}>
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
+      <div class="addwrap">
+        <button
+          class="plus"
+          onclick={(e) => {
+            e.stopPropagation();
+            addMenu = !addMenu;
+          }}
+          title="Add a mod to the list">+</button
+        >
+        {#if addMenu}
+          <div class="menu right" role="menu">
+            <button
+              role="menuitem"
+              onclick={() => {
+                addMenu = false;
+                pane = "archives";
+              }}>From an archive in the downloads folders…</button
+            >
+            <button
+              role="menuitem"
+              onclick={async () => {
+                addMenu = false;
+                pane = "archives";
+                await Promise.resolve();
+                archivesPane?.focusLink();
+              }}>From a Nexus link…</button
+            >
+          </div>
+        {/if}
+      </div>
     </div>
     <div class="list" class:hidden={pane !== "list"}>
       {#snippet entries(items: Entry[], depth: number)}
@@ -334,7 +417,20 @@
             </button>
             {#if open}{@render entries(e.entries, depth + 1)}{/if}
           {:else if e.kind === "mod"}
-            <div class="mod" class:on={selected === e.id} style="--depth: {depth}" data-drop={"mod:" + e.id}>
+            <div
+              class="mod"
+              class:on={selected === e.id}
+              class:off={e.enabled === false}
+              style="--depth: {depth}"
+              data-drop={"mod:" + e.id}
+              role="listitem"
+              oncontextmenu={(ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                confirmRemove = false;
+                modMenu = { x: ev.clientX, y: ev.clientY, id: e.id, title: e.title, enabled: e.enabled !== false };
+              }}
+            >
               <span
                 class="grip"
                 role="button"
@@ -671,6 +767,65 @@
   }
   .n.bad {
     color: var(--problem);
+  }
+  .addwrap {
+    position: relative;
+  }
+  .plus {
+    font-weight: 700;
+    padding: 2px 10px;
+  }
+  .menu {
+    position: fixed;
+    z-index: 60;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    padding: 4px;
+    min-width: 200px;
+    font-size: 13px;
+  }
+  .menu.right {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    white-space: nowrap;
+  }
+  .menu button {
+    display: block;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+  }
+  .menu button:hover {
+    background: var(--accent-soft);
+  }
+  .menu .danger {
+    color: var(--problem);
+  }
+  .mtitle {
+    font-weight: 600;
+    padding: 2px 12px 4px;
+    overflow-wrap: anywhere;
+  }
+  .confirm {
+    padding: 4px 12px;
+    max-width: 260px;
+  }
+  .confirm div {
+    display: flex;
+    gap: 6px;
+    margin-top: 6px;
+  }
+  .confirm button {
+    width: auto;
+    border: 1px solid var(--line);
+  }
+  .mod.off .title {
+    color: var(--dim);
+    font-style: italic;
   }
   .panes {
     display: flex;

@@ -219,4 +219,57 @@ fn edits_are_the_commands_and_can_be_undone() {
     assert!(read().contains("Edited"));
     let changes = call(&webview, "changes", json!({})).unwrap();
     assert_eq!(changes["edits"], json!([]));
+
+    // A list with a docs file: removing a mod writes both files as one step,
+    // undone as one.
+    let docs_list = root.join("documented.toml");
+    let docs = root.join("documented.docs.toml");
+    let documented = LIST.replace(
+        "name = \"Edits\"",
+        "name = \"Documented\"\ndocs_file = \"documented.docs.toml\"",
+    );
+    let notes = "[mods.\"B\"]\nsummary = \"B.\"\n";
+    std::fs::write(&docs_list, &documented).unwrap();
+    std::fs::write(&docs, notes).unwrap();
+    call(&webview, "open_list", json!({ "path": docs_list })).unwrap();
+    let removed = call(&webview, "remove_mod", json!({ "id": "B" })).unwrap();
+    let command = removed["change"]["command"].as_str().unwrap();
+    assert!(
+        command.starts_with("mudcrab remove ") && command.ends_with(" --mod B"),
+        "{command}"
+    );
+    let now = std::fs::read_to_string(&docs_list).unwrap();
+    assert!(!now.contains("id = \"B\""), "{now}");
+    assert!(!now.contains("\"B.esp\""), "{now}");
+    assert_eq!(std::fs::read_to_string(&docs).unwrap(), "");
+    call(&webview, "undo", json!({})).unwrap();
+    assert_eq!(std::fs::read_to_string(&docs_list).unwrap(), documented);
+    assert_eq!(std::fs::read_to_string(&docs).unwrap(), notes);
+
+    // Unticked and ticked again, its plugin out of the load order and back.
+    call(
+        &webview,
+        "set_enabled",
+        json!({ "id": "B", "enabled": false }),
+    )
+    .unwrap();
+    let now = std::fs::read_to_string(&docs_list).unwrap();
+    assert!(
+        now.contains("enabled = false") && !now.contains("    \"B.esp\","),
+        "{now}"
+    );
+    let enabled = call(
+        &webview,
+        "set_enabled",
+        json!({ "id": "B", "enabled": true }),
+    )
+    .unwrap();
+    assert!(
+        enabled["change"]["command"]
+            .as_str()
+            .unwrap()
+            .starts_with("mudcrab enable "),
+        "{enabled}"
+    );
+    assert_eq!(std::fs::read_to_string(&docs_list).unwrap(), documented);
 }

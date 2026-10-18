@@ -402,6 +402,8 @@ export const api = {
   setDocs: (id: string, fields: [string, string | null][]) => invoke<Edited>("set_docs", { id, fields }),
   fields: (id: string, archive: number | null) =>
     invoke<[string, string | number | boolean | (string | number | boolean)[]][]>("fields", { id, archive }),
+  removeMod: (id: string) => invoke<Edited>("remove_mod", { id }),
+  setEnabled: (id: string, enabled: boolean) => invoke<Edited>("set_enabled", { id, enabled }),
   archives: () => invoke<ArchiveRow[]>("archives"),
   addStart: (path: string) => invoke<Started>("add_start", { path }),
   addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),

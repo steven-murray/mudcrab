@@ -493,7 +493,11 @@ fn a_mod_is_removed_with_its_notes_and_disabled_and_enabled_with_its_plugins() {
     let docs = dir.path().join("list.docs.toml");
     let text = "name = \"R\"\ndocs_file = \"list.docs.toml\"\n\nplugins = [\n    \"Oblivion.esm\",\n    \"A.esp\",\n    \"B.esp\",\n]\n\n[[mods]]\nid = \"A\"\nplugins = [\"A.esp\"]\n\n[[mods]]\nid = \"B\"\nplugins = [\"B.esp\"]\n";
     std::fs::write(&list, text).unwrap();
-    std::fs::write(&docs, "[mods.\"A\"]\nsummary = \"A.\"\n\n[mods.\"B\"]\nsummary = \"B.\"\n").unwrap();
+    std::fs::write(
+        &docs,
+        "[mods.\"A\"]\nsummary = \"A.\"\n\n[mods.\"B\"]\nsummary = \"B.\"\n",
+    )
+    .unwrap();
     let run = |args: &[&str]| {
         mudcrab(dir.path())
             .arg(args[0])
@@ -517,5 +521,9 @@ fn a_mod_is_removed_with_its_notes_and_disabled_and_enabled_with_its_plugins() {
     assert!(!read(&list).contains("id = \"A\""));
     assert!(!read(&list).contains("\"A.esp\""));
     assert_eq!(read(&docs), "[mods.\"B\"]\nsummary = \"B.\"\n");
-    mudcrab(dir.path()).arg("validate").arg(&list).assert().success();
+    mudcrab(dir.path())
+        .arg("validate")
+        .arg(&list)
+        .assert()
+        .success();
 }

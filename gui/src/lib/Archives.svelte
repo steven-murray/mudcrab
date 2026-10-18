@@ -32,6 +32,11 @@
   // A Nexus link: the mod's files to choose from, then the chosen one
   // fetched (or waited for, downloaded by hand) and added.
   let link = $state("");
+  let linkInput = $state<HTMLInputElement | null>(null);
+  /** Put the cursor in the Nexus link box. */
+  export function focusLink() {
+    linkInput?.focus();
+  }
   let nexus = $state<NexusMod | null>(null);
   let showOld = $state(false);
   let looking = $state(false);
@@ -118,7 +123,7 @@
 <svelte:window onclick={() => (menu = null)} onkeydown={(e) => e.key === "Escape" && (menu = null)} />
 
 <form class="link" onsubmit={lookUp}>
-  <input type="text" placeholder="Paste a Nexus link to add a mod from" bind:value={link} />
+  <input type="text" placeholder="Paste a Nexus link to add a mod from" bind:value={link} bind:this={linkInput} />
   <button type="submit" disabled={!link.trim() || looking}>{looking ? "…" : "Look up"}</button>
 </form>
 {#if waiting}
