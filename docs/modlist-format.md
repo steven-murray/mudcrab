@@ -95,7 +95,8 @@ Each `[[mods]]` table is one mod folder in MO2.
 | `id` | Always. Unique; also the mod's folder name in MO2. |
 | `section` | Nearly always: the MO2 separator it sits under, as a list from outermost in (`["Visuals", "Textures"]`). Every level becomes a separator. |
 | `archives` | For any mod made from downloads: one `[[mods.archives]]` per archive, installed in order, later ones overwriting earlier. See [Archives](#archives). |
-| `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged). |
+| `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged), unless the mod is not `enabled`. |
+| `enabled` | `false` for a mod installed but left unticked in MO2, such as a debugging tool the player switches on when they need it. Its plugins stay out of the top-level `plugins`: MO2 cannot see them until the mod is ticked, and then adds them at the end. Defaults to `true`. |
 | `if` | When the mod is optional: a condition. See [Optional mods and inputs](#optional-mods-and-inputs). |
 | `dependencies` | When the mod needs others to work: their ids. `query` refuses a plan that includes this mod but not them. |
 | `actions` | To change the mod after unpacking it: INI edits, files left out, plugins cleaned, BSAs packed. See [Actions](#actions). |

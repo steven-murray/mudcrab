@@ -51,6 +51,8 @@ export interface ModDoc {
   title: string;
   anchor: string;
   mod_type?: string;
+  /** Present, and false, for a mod installed unticked in MO2. */
+  enabled?: boolean;
   pages: { mod_url: string }[];
   condition?: ConditionDoc;
   docs: Docs;

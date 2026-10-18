@@ -214,6 +214,22 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
             if merged_away.contains(&plugin.to_ascii_lowercase()) {
                 continue;
             }
+            // MO2 does not see an unticked mod's plugins, so they have no
+            // place in the load order: it adds them at the end, unticked
+            // itself, when the player switches the mod on.
+            if !spec.enabled {
+                if modlist
+                    .plugins
+                    .iter()
+                    .any(|e| e.eq_ignore_ascii_case(plugin))
+                {
+                    anyhow::bail!(
+                        "mod {mod_id} is not enabled, but its plugin {plugin} is in the global \
+                         plugins load order. MO2 cannot see it there; take it out of `plugins`."
+                    );
+                }
+                continue;
+            }
             if !modlist.plugins.iter().any(|entry| entry == plugin) {
                 anyhow::bail!(
                     "mod {mod_id} declares plugin {plugin} that is missing from global plugins \

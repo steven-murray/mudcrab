@@ -80,6 +80,12 @@ The mod says it ships a plugin, but the top-level `plugins` load order does not
 list it. Add it to `plugins` where it belongs -- or let `mudcrab add` do it,
 with `--load-after <plugin>` or `--load-last`.
 
+### `mod X is not enabled, but its plugin Y is in the global plugins load order`
+
+The mod has `enabled = false`, so it is installed unticked and MO2 cannot see
+its plugins. Take them out of the top-level `plugins`; MO2 adds them at the end
+of the load order when the player ticks the mod.
+
 ### `Y is not in the load order yet; say where with --load-after <plugin> or --load-last`
 
 From `add`: the same thing, caught before anything is written. mudcrab never

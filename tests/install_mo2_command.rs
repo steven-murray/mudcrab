@@ -399,9 +399,10 @@ fn install_exports_modlist_txt_in_reverse_order() {
     }
 
     let source = format!(
-        "name = \"Install MO2 Reverse Order Test\"\n\n[[mods]]\nid = \"alpha\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"beta\"\ndependencies = [\"alpha\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
+        "name = \"Install MO2 Reverse Order Test\"\n\n[[mods]]\nid = \"alpha\"\ndependencies = []\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"beta\"\ndependencies = [\"alpha\"]\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n\n[[mods]]\nid = \"tool\"\nenabled = false\n\n[[mods.archives]]\npath = '{}'\ndownload_handler = \"local\"\n",
         archive_a.display(),
-        archive_b.display()
+        archive_b.display(),
+        archive_a.display()
     );
     std::fs::write(&modlist, source).expect("fixture modlist should be written");
 
@@ -498,7 +499,8 @@ fn install_exports_modlist_txt_in_reverse_order() {
     let profile_dir = instance_dir.join("profiles").join("test-profile");
     let modlist_txt =
         std::fs::read_to_string(profile_dir.join("modlist.txt")).expect("modlist.txt should exist");
-    assert_eq!(modlist_txt, "+beta\n+alpha\n");
+    // `tool` is installed but left unticked, for the player to switch on.
+    assert_eq!(modlist_txt, "-tool\n+beta\n+alpha\n");
 }
 
 #[test]

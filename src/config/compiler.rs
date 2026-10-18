@@ -15,6 +15,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                 oracle_name: spec.oracle_name.clone(),
                 section: spec.section.clone(),
                 mod_type: spec.mod_type,
+                enabled: spec.enabled,
                 merge: spec.merge.clone(),
                 dependencies: spec.dependencies.clone(),
                 plugins: spec.plugins.clone(),

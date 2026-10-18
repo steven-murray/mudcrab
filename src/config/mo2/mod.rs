@@ -631,7 +631,14 @@ fn set_ini_key(text: &str, section: &str, key: &str, value: &str) -> String {
 }
 
 pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> String {
-    let selected: HashSet<&str> = plan.selected_mods.iter().map(String::as_str).collect();
+    // Installed but left unticked: a mod the list says the player switches on.
+    let selected: HashSet<&str> = plan
+        .mods
+        .iter()
+        .filter(|entry| entry.enabled)
+        .map(|entry| entry.id.as_str())
+        .filter(|id| plan.selected_mods.iter().any(|s| s == id))
+        .collect();
     let sections = scoped_section_names(plan, scope);
 
     let mut out = String::new();

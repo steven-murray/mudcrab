@@ -623,6 +623,11 @@ pub struct ModEntry {
     pub archives: Vec<ArchiveSpec>,
     #[serde(rename = "type")]
     pub mod_type: Option<ModType>,
+    /// `false` installs the mod but leaves it unticked in MO2, for a tool the
+    /// player switches on only when they need it. Its plugins are then left
+    /// out of the load order, as MO2 cannot see them.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Merge definition. Required when `type = "merge"`, rejected otherwise.
     pub merge: Option<MergeSpec>,
     #[serde(default)]
@@ -719,6 +724,10 @@ pub struct MergeSpec {
     /// order, so reordering changes the output. There is deliberately no
     /// `load_order` field -- it is derived from the modlist's `plugins`.
     pub sources: Vec<MergeSource>,
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }
 
 fn default_true() -> bool {
@@ -980,6 +989,9 @@ pub struct CompiledMod {
     pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
+    /// Ticked in MO2; see `ModEntry::enabled`.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
@@ -1094,6 +1106,9 @@ pub struct PersonalizedMod {
     pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
+    /// Ticked in MO2; see `ModEntry::enabled`.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     /// The plugins the mod says it ships, for `check` to compare with what its

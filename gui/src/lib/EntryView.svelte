@@ -67,6 +67,9 @@
       {/each}
       {#if entry.condition}<span class="cond" title={entry.condition.expr}>{entry.condition.text}</span>{/if}
       {#if entry.mod_type}<span class="kind">{entry.mod_type}</span>{/if}
+      {#if entry.enabled === false}
+        <span class="kind" title="Installed, but left unticked in MO2: tick it there when you need it">off in MO2</span>
+      {/if}
     </div>
     {#if entry.docs.summary}<p class="summary">{@html inline(entry.docs.summary)}</p>{/if}
     {#if entry.plugins.length}

@@ -213,6 +213,7 @@ pub(super) mod tests {
     pub(in crate::config::actions) fn partner() -> PersonalizedMod {
         PersonalizedMod {
             id: "Partner".to_string(),
+            enabled: true,
             oracle_name: None,
             section: Vec::new(),
             mod_type: None,

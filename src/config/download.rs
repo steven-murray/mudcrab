@@ -1074,6 +1074,7 @@ mod tests {
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
+                enabled: true,
                 oracle_name: None,
                 section: Vec::new(),
                 mod_type: None,
@@ -1166,6 +1167,7 @@ mod tests {
             mo2_modlist_entries: vec![],
             mods: vec![PersonalizedMod {
                 id: "core".to_string(),
+                enabled: true,
                 oracle_name: None,
                 section: Vec::new(),
                 mod_type: None,
