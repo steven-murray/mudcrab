@@ -192,7 +192,7 @@ pub(super) async fn add_walk(
     let path = PathBuf::from(path);
     tokio::task::spawn_blocking(move || {
         let report = report_of(&path)?;
-        installer::walk(&path, &report, &list, &answers, false).map_err(shown)
+        installer::walk(&path, &report, &list, &Default::default(), &answers, false).map_err(shown)
     })
     .await
     .map_err(|err| err.to_string())?
@@ -239,11 +239,19 @@ fn new_mod(request: &AddRequest) -> Result<(NewMod, Vec<String>, InspectReport),
     let report = report_of(&path)?;
     // The walk is run unasked here; it has to be finished already.
     let list = ListPlugins::default();
-    let installed =
-        match installer::walk(&path, &report, &list, &request.answers, false).map_err(shown)? {
-            Walk::Done { installed } => installed,
-            Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
-        };
+    let installed = match installer::walk(
+        &path,
+        &report,
+        &list,
+        &Default::default(),
+        &request.answers,
+        false,
+    )
+    .map_err(shown)?
+    {
+        Walk::Done { installed } => installed,
+        Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
+    };
     let source = request
         .source
         .clone()
@@ -472,6 +480,87 @@ pub(super) fn add_mod(
     let (new_mod, _, _) = new_mod(&request)?;
     let edit = planned(&list, &new_mod, &request).map_err(shown)?;
     apply(&state, command(&list, &request, &new_mod), edit)
+}
+
+// --- An existing archive's installer, walked again ---------------------------------------
+
+/// Mod `id`'s `number`th archive, found for walking its installer again, with
+/// the answers given in Install deciding which archives it has.
+fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existing, String> {
+    let list = state.list()?;
+    let located = locate(state)?;
+    let downloads = located
+        .downloads
+        .ok_or("say where the downloads folder is first (in Install)")?;
+    let answers: config::query::Overrides = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&list)
+        .answers
+        .into_iter()
+        .collect();
+    installer::existing(&list, id, number, &answers, &downloads, &located.search).map_err(shown)
+}
+
+/// The installer of mod `id`'s archive walked with `answers` so far, what the
+/// list chooses now offered as each default (`choose`).
+#[tauri::command]
+pub(super) async fn choose_walk(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    answers: Vec<Answer>,
+) -> Result<Walk, String> {
+    let found = existing(&state, &id, number)?;
+    tokio::task::spawn_blocking(move || {
+        installer::walk(
+            &found.archive,
+            &found.report,
+            &found.list,
+            &found.prior,
+            &answers,
+            false,
+        )
+        .map_err(shown)
+    })
+    .await
+    .map_err(|err| err.to_string())?
+}
+
+/// Write what the walk chose (`choose`), into the history like any edit.
+#[tauri::command]
+pub(super) fn choose_write(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    answers: Vec<Answer>,
+) -> Result<Edited, String> {
+    let list = state.list()?;
+    let found = existing(&state, &id, number)?;
+    let installed = match installer::walk(
+        &found.archive,
+        &found.report,
+        &found.list,
+        &found.prior,
+        &answers,
+        false,
+    )
+    .map_err(shown)?
+    {
+        Walk::Done { installed } => installed,
+        Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
+    };
+    let edit = installer::plan_choice(&list, &id, number, &installed).map_err(shown)?;
+    let mut command = format!(
+        "mudcrab choose {} --mod {}",
+        quote(list.display().to_string()),
+        quote(&id)
+    );
+    if number != 1 {
+        command.push_str(&format!(" --archive {number}"));
+    }
+    apply(&state, command, edit)
 }
 
 // --- From a Nexus link -------------------------------------------------------------------

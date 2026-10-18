@@ -87,6 +87,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Move(args) => move_mod::run(args),
         Command::Set(args) => edit::set(args),
         Command::Docs(args) => edit::docs(args),
+        Command::Choose(args) => edit::choose(args),
         Command::Remove(args) => edit::remove(args),
         Command::Plugins(command) => edit::plugins(command),
         Command::Files(args) => edit::files(args),

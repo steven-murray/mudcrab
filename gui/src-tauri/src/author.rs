@@ -378,8 +378,8 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
         while let Some(slash) = source[..at].rfind('/') {
             let folder = &source[..slash];
             let tail = &source[slash + 1..];
-            if let Some(Some(head)) = (!folder_to.contains_key(folder))
-                .then(|| taken.destination.strip_suffix(tail))
+            if let Some(Some(head)) =
+                (!folder_to.contains_key(folder)).then(|| taken.destination.strip_suffix(tail))
             {
                 folder_to.insert(folder, head.trim_end_matches('/').to_string());
             }

@@ -81,6 +81,19 @@ impl ListPlugins {
     }
 }
 
+/// What an archive's entry already chooses, to offer as each question's
+/// default when its installer is walked again: FOMOD selections by step and
+/// group, and BAIN packages by name. Empty for a new entry, where the
+/// installer's own choice is the default.
+#[derive(Debug, Clone, Default)]
+pub struct Prior {
+    pub fomod: Vec<crate::config::schema::FomodSelection>,
+    pub packages: Vec<String>,
+    /// Walk the installer even on defaults, so each choice is written out
+    /// (`choose`). Adding leaves an installer nobody walked to its defaults.
+    pub always: bool,
+}
+
 /// The walk stopped at a question with no answer yet.
 #[derive(Debug)]
 struct NeedAnswer(Asked);
@@ -148,6 +161,7 @@ pub fn walk(
     archive: &Path,
     report: &InspectReport,
     list: &ListPlugins,
+    prior: &Prior,
     answers: &[Answer],
     defaults: bool,
 ) -> anyhow::Result<Walk> {
@@ -155,7 +169,7 @@ pub fn walk(
         given: answers.iter(),
         defaults,
     };
-    match walk_with(archive, report, list, &mut given) {
+    match walk_with(archive, report, list, prior, &mut given) {
         Ok(installed) => Ok(Walk::Done { installed }),
         Err(err) => match err.downcast::<NeedAnswer>() {
             Ok(NeedAnswer(asked)) => Ok(Walk::Ask { asked }),
@@ -168,12 +182,13 @@ fn walk_with(
     archive: &Path,
     report: &InspectReport,
     list: &ListPlugins,
+    prior: &Prior,
     answers: &mut Answers<'_>,
 ) -> anyhow::Result<Installed> {
     let mut installed = Installed::default();
     match &report.layout {
         LayoutGuess::Fomod { config_path } => {
-            if answers.defaults {
+            if answers.defaults && !prior.always {
                 installed.notes.push(
                     "it has a FOMOD installer; the entry picks each group's default. `mudcrab \
                      inspect` lists the options, to change `fomod_selections`."
@@ -186,6 +201,17 @@ fn walk_with(
             // that from the list's load order, so the walk here does too.
             let active: HashSet<String> = list.active.iter().cloned().collect();
             let selections = choose_fomod(&xml, config_path, &active, &mut |group| {
+                // What the entry chooses already, where it names this group.
+                let default = prior
+                    .fomod
+                    .iter()
+                    .find(|s| s.step == group.step && s.group == group.group)
+                    .map(|s| {
+                        (0..group.options.len())
+                            .filter(|&i| s.options.contains(&group.options[i].name))
+                            .collect()
+                    })
+                    .unwrap_or_else(|| group.default.clone());
                 answers.pick(Question {
                     title: format!("{}: {}", group.step, group.group),
                     rule: Rule::from_fomod(group.group_type),
@@ -205,7 +231,7 @@ fn walk_with(
                             },
                         })
                         .collect(),
-                    default: group.default.clone(),
+                    default,
                 })
             })?;
             installed.chosen = Some(Chosen::Fomod(selections));
@@ -238,7 +264,7 @@ fn walk_with(
                 installed.notes.push(
                     "the wizard did not choose; the packages are chosen directly".to_string(),
                 );
-            } else if answers.defaults {
+            } else if answers.defaults && !prior.always {
                 installed.notes.push(
                     "it is a BAIN package and every subpackage is listed; delete from \
                      `bain_subpackages` the ones that are alternatives to each other."
@@ -257,7 +283,18 @@ fn walk_with(
                         availability: Availability::Free,
                     })
                     .collect(),
-                default: (0..subpackages.len()).collect(),
+                default: if prior.packages.is_empty() {
+                    (0..subpackages.len()).collect()
+                } else {
+                    (0..subpackages.len())
+                        .filter(|&i| {
+                            prior
+                                .packages
+                                .iter()
+                                .any(|p| p.eq_ignore_ascii_case(&subpackages[i]))
+                        })
+                        .collect()
+                },
             })?;
             installed.chosen = Some(Chosen::Bain(
                 picked.into_iter().map(|i| subpackages[i].clone()).collect(),
@@ -507,6 +544,79 @@ pub fn source_of(archive: &Path, report: &InspectReport) -> String {
         .unwrap_or_else(|| format!("manual:{}", report.file_name))
 }
 
+/// An archive of the list, found for walking its installer again.
+pub struct Existing {
+    /// Where the archive is.
+    pub archive: std::path::PathBuf,
+    pub report: InspectReport,
+    /// What its entry chooses now.
+    pub prior: Prior,
+    pub list: ListPlugins,
+}
+
+/// Mod `id`'s `number`th archive (from 1) in the list at `path`, as planned
+/// with `overrides` answering its questions, found in `downloads` or
+/// `search`; with what its entry chooses now.
+pub fn existing(
+    path: &Path,
+    id: &str,
+    number: usize,
+    overrides: &crate::config::query::Overrides,
+    downloads: &Path,
+    search: &[std::path::PathBuf],
+) -> anyhow::Result<Existing> {
+    let text = std::fs::read_to_string(path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    let source = crate::config::loader::parse_modlist(&text, path)?;
+    let spec = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .and_then(|entry| entry.archives.get(number.wrapping_sub(1)))
+        .ok_or_else(|| anyhow::anyhow!("'{id}' has no archive {number}"))?;
+    let planned = crate::config::pipeline::planned_archive(&text, path, id, number, overrides)?;
+    let reference = crate::config::archive_store::ArchiveRef::for_archive(&planned.archive);
+    let archive =
+        crate::config::archive_store::find(downloads, search, &reference).ok_or_else(|| {
+            anyhow::anyhow!(
+                "'{id}'s archive {number} is not in {}; download it first",
+                downloads.display()
+            )
+        })?;
+    let report = inspect_archive(&archive, false)?;
+    Ok(Existing {
+        prior: Prior {
+            fomod: spec.fomod_selections.clone(),
+            packages: spec
+                .bain_subpackages
+                .iter()
+                .map(|p| p.name().to_string())
+                .collect(),
+            always: true,
+        },
+        list: ListPlugins::of(&source),
+        report,
+        archive,
+    })
+}
+
+/// Plan writing what the walk chose into mod `id`'s `number`th archive, in
+/// the list at `path`.
+pub fn plan_choice(
+    path: &Path,
+    id: &str,
+    number: usize,
+    installed: &Installed,
+) -> anyhow::Result<crate::config::edit::Edit> {
+    let chosen = installed
+        .chosen
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("this archive's installer has nothing to choose"))?;
+    crate::config::edit::plan(path, |text, _| {
+        crate::config::edit::doc::set_installer(text, id, number, chosen)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,16 +690,18 @@ mod tests {
         let report = inspect_archive(&archive, false).unwrap();
         let list = ListPlugins::default();
 
-        let first = asked(walk(&archive, &report, &list, &[], false).unwrap());
+        let first = asked(walk(&archive, &report, &list, &Prior::default(), &[], false).unwrap());
         assert_eq!(first.title, "Main: Core");
         assert_eq!(first.default, [0]);
         // "Always" has nothing to decide, so the next question is "Patches".
         let answers = [Answer::Pick(vec![1])];
-        let second = asked(walk(&archive, &report, &list, &answers, false).unwrap());
+        let second =
+            asked(walk(&archive, &report, &list, &Prior::default(), &answers, false).unwrap());
         assert_eq!(second.title, "Extras: Patches");
 
         let answers = [Answer::Pick(vec![1]), Answer::Pick(vec![0])];
-        let Walk::Done { installed } = walk(&archive, &report, &list, &answers, false).unwrap()
+        let Walk::Done { installed } =
+            walk(&archive, &report, &list, &Prior::default(), &answers, false).unwrap()
         else {
             panic!("the walk should be done");
         };
@@ -613,10 +725,32 @@ mod tests {
         assert!(block.contains("md5 = "), "{block}");
 
         // An answer the rule refuses, or of the wrong kind, is an error.
-        assert!(walk(&archive, &report, &list, &[Answer::Pick(vec![0, 1])], false).is_err());
-        assert!(walk(&archive, &report, &list, &[Answer::Yes(true)], false).is_err());
+        assert!(
+            walk(
+                &archive,
+                &report,
+                &list,
+                &Prior::default(),
+                &[Answer::Pick(vec![0, 1])],
+                false
+            )
+            .is_err()
+        );
+        assert!(
+            walk(
+                &archive,
+                &report,
+                &list,
+                &Prior::default(),
+                &[Answer::Yes(true)],
+                false
+            )
+            .is_err()
+        );
         // On defaults nothing is asked, and the entry is left to its defaults.
-        let Walk::Done { installed } = walk(&archive, &report, &list, &[], true).unwrap() else {
+        let Walk::Done { installed } =
+            walk(&archive, &report, &list, &Prior::default(), &[], true).unwrap()
+        else {
             panic!("defaults ask nothing");
         };
         assert!(installed.chosen.is_none());

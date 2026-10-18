@@ -428,3 +428,60 @@ fn docs_writes_a_mods_notes_where_they_already_are() {
         .assert()
         .failure();
 }
+
+#[test]
+fn choose_walks_an_archives_installer_again_and_writes_its_choices() {
+    let dir = tempdir().unwrap();
+    let config = r#"<config><moduleName>M</moduleName><installSteps order="Explicit">
+      <installStep name="Main"><optionalFileGroups order="Explicit">
+        <group name="Size" type="SelectExactlyOne"><plugins order="Explicit">
+          <plugin name="Big"><files><folder source="big" destination="" /></files>
+            <typeDescriptor><type name="Recommended" /></typeDescriptor></plugin>
+          <plugin name="Small"><files><folder source="small" destination="" /></files>
+            <typeDescriptor><type name="Optional" /></typeDescriptor></plugin>
+        </plugins></group>
+      </optionalFileGroups></installStep></installSteps></config>"#;
+    let downloads = dir.path().join("downloads");
+    std::fs::create_dir_all(&downloads).unwrap();
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(downloads.join("M.zip")).unwrap());
+    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+    for (name, bytes) in [
+        ("fomod/ModuleConfig.xml", config.as_bytes()),
+        ("big/a.dds", b"x"),
+        ("small/a.dds", b"x"),
+    ] {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(bytes).unwrap();
+    }
+    zip.finish().unwrap();
+    let list = dir.path().join("list.toml");
+    let entry = "name = \"F\"\n\n[[mods]]\nid = \"M\"\n\n[[mods.archives]]\npath = \"manual:M.zip\"\nlayout = \"fomod\"\n";
+    let choose = || {
+        let mut cmd = mudcrab(dir.path());
+        cmd.args(["choose", list.to_str().unwrap(), "--mod", "M", "--defaults"])
+            .arg("--downloads")
+            .arg(&downloads);
+        cmd
+    };
+
+    // No choices yet: the installer's own.
+    std::fs::write(&list, entry).unwrap();
+    choose().assert().success();
+    assert!(
+        read(&list).contains("step = \"Main\"\ngroup = \"Size\"\noptions = [\"Big\"]"),
+        "{}",
+        read(&list)
+    );
+    // A choice the list has made is the default, and kept.
+    std::fs::write(
+        &list,
+        format!("{entry}\n[[mods.archives.fomod_selections]]\nstep = \"Main\"\ngroup = \"Size\"\noptions = [\"Small\"]\n"),
+    )
+    .unwrap();
+    choose().assert().success();
+    assert!(
+        read(&list).contains("options = [\"Small\"]"),
+        "{}",
+        read(&list)
+    );
+}

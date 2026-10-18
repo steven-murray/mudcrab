@@ -151,6 +151,24 @@ of its archives: `if=butterflies`, `layout=bain`, `data_folder="Data Files"`,
 (`version='"1.0"'`). `id`, `section`, `archives` and `actions` are refused,
 naming the command that changes them.
 
+### choose
+
+```bash
+mudcrab choose <modlist.toml> --mod "<mod id>" [--archive <n>] [--downloads <dir>]
+               [--set key=value]... [--defaults] [--dry-run]
+```
+
+Walks an archive's installer again, as `add` walks it for a new entry -- a
+FOMOD step by step, a BAIN wizard, or a BAIN package list -- with what the
+list chooses now as each question's default, and writes the new choices:
+`fomod_selections` (one table per group asked, each keeping its comments) or
+`bain_subpackages` (with the plugins a wizard leaves out added to
+`exclude`). The archive is found in the downloads folder. Selections or
+packages that depend on the list's questions (an `if`) are refused, to be
+changed in the file. With `--defaults` (or no terminal) nothing is asked: the
+list's choices are kept, and a group it does not name gets the installer's
+own.
+
 ### docs
 
 ```bash

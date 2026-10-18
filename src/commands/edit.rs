@@ -65,6 +65,52 @@ pub fn set(args: SetArgs) -> anyhow::Result<()> {
     )
 }
 
+pub fn choose(args: crate::cli::ChooseArgs) -> anyhow::Result<()> {
+    use std::io::IsTerminal;
+    let overrides = crate::config::query::parse_overrides(&args.set)?;
+    let downloads = super::resolve_downloads_dir(args.downloads.clone(), None)?;
+    let existing = crate::config::installer::existing(
+        &args.input,
+        &args.mod_id,
+        args.archive,
+        &overrides,
+        &downloads,
+        &[],
+    )?;
+    let interactive = !args.defaults && std::io::stdin().is_terminal();
+    let installed = super::add::walk_installer(
+        &existing.archive,
+        &args.mod_id,
+        &existing.report,
+        &existing.list,
+        &existing.prior,
+        interactive,
+    )?;
+    for note in &installed.notes {
+        ui::status_err(Tone::Note, format!("'{}': {note}", args.mod_id));
+    }
+    for action in &installed.actions {
+        ui::status_err(
+            Tone::Note,
+            format!(
+                "the wizard also calls for this action, not written (add it with `mudcrab \
+                 action add`):\n{action}"
+            ),
+        );
+    }
+    let edit =
+        crate::config::installer::plan_choice(&args.input, &args.mod_id, args.archive, &installed)?;
+    finish(
+        edit,
+        args.dry_run,
+        format!(
+            "Wrote {}'s installer choices for archive {}",
+            ui::name(&args.mod_id),
+            args.archive
+        ),
+    )
+}
+
 pub fn docs(args: crate::cli::DocsArgs) -> anyhow::Result<()> {
     let body = match &args.body_file {
         Some(path) if path.as_os_str() == "-" => {

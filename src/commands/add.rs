@@ -248,7 +248,14 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     // answers are what the entry records.
     let interactive = !args.defaults && std::io::stdin().is_terminal();
     let list = ListPlugins::of(&config::loader::load_modlist(&args.input)?);
-    let installed = walk_installer(archive, &id, &report, &list, interactive)?;
+    let installed = walk_installer(
+        archive,
+        &id,
+        &report,
+        &list,
+        &crate::config::installer::Prior::default(),
+        interactive,
+    )?;
     for note in &installed.notes {
         crate::ui::status_err(crate::ui::Tone::Note, format!("'{id}': {note}"));
     }
@@ -294,12 +301,14 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
 
 /// Walk the archive's installer with the author at a terminal (or, not
 /// interactive, on its defaults): the library's walk, each question it
-/// stops at asked here and the walk resumed with the answer.
-fn walk_installer(
+/// stops at asked here and the walk resumed with the answer. `prior` is what
+/// the entry chooses already, offered as each question's default.
+pub(super) fn walk_installer(
     archive: &Path,
     id: &str,
     report: &crate::config::inspect::InspectReport,
     list: &crate::config::installer::ListPlugins,
+    prior: &crate::config::installer::Prior,
     interactive: bool,
 ) -> anyhow::Result<crate::config::installer::Installed> {
     use crate::config::inspect::LayoutGuess;
@@ -311,7 +320,7 @@ fn walk_installer(
     let mut answers = Vec::new();
     let mut introduced = false;
     loop {
-        let asked = match walk(archive, report, list, &answers, !interactive)? {
+        let asked = match walk(archive, report, list, prior, &answers, !interactive)? {
             Walk::Done { installed } => return Ok(installed),
             Walk::Ask { asked } => asked,
         };
@@ -325,7 +334,12 @@ fn walk_installer(
                 "{}",
                 match (&report.layout, wizard) {
                     (LayoutGuess::Fomod { .. }, _) => format!(
-                        "'{id}' has a FOMOD installer. Enter takes the installer's own choice."
+                        "'{id}' has a FOMOD installer. Enter takes {}.",
+                        if prior.fomod.is_empty() {
+                            "the installer's own choice"
+                        } else {
+                            "what the list chooses now"
+                        }
                     ),
                     (_, true) => format!(
                         "'{id}' is a BAIN package with a wizard. Enter takes the wizard's own \

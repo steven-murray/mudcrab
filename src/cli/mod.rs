@@ -60,7 +60,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Editing a modlist",
         &[
-            "move", "set", "docs", "remove", "plugins", "files", "action", "input",
+            "move", "set", "docs", "choose", "remove", "plugins", "files", "action", "input",
         ],
     ),
     (
@@ -111,6 +111,10 @@ pub enum Command {
     Move(MoveArgs),
     /// Set or clear fields of a mod, or of one of its archives.
     Set(SetArgs),
+    /// Walk an archive's installer again -- a FOMOD's steps, a BAIN wizard or
+    /// package list -- with what the list chooses now as each default, and
+    /// write the new choices.
+    Choose(ChooseArgs),
     /// Write a mod's notes: its title, summary, body or footer, in the list
     /// or its docs file, wherever they already are.
     Docs(DocsArgs),
@@ -994,6 +998,33 @@ mod help_tests {
 /// (`true`, `3`, `["a", "b"]`) and as text otherwise; quote it to force text
 /// (`version='"1.0"'`). Comments, and a replaced value's own comment, are
 /// kept. The list is validated before anything is written.
+#[derive(Debug, Args)]
+pub struct ChooseArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod whose installer to walk.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// Which of its archives, counting from 1.
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    pub archive: usize,
+    /// The downloads folder. Defaults to `downloads_dir` in tools.toml.
+    #[arg(long = "downloads", value_name = "DIR")]
+    pub downloads: Option<PathBuf>,
+    /// Answer the list's questions for this (`key=value`), where they decide
+    /// the mod's archives; the rest take their defaults.
+    #[arg(long = "set", value_name = "KEY=VALUE")]
+    pub set: Vec<String>,
+    /// Take every default instead of asking: what the list chooses now, else
+    /// the installer's own choice. Also what happens when input is not a
+    /// terminal.
+    #[arg(long)]
+    pub defaults: bool,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct DocsArgs {
     /// The modlist (its docs file, if it names one, is found from it).

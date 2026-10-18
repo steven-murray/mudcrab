@@ -99,8 +99,11 @@ history there, rather than be undone by it.
   - **BAIN**: the packages at the top are ticked to choose them, as in Wrye
     Bash's installer tab (`files --package`); the files inside show what
     each brings, read-only.
-  - **FOMOD**: its options are chosen in its installer's steps, not here;
-    the tree shows what they install.
+  - **FOMOD**: its options are chosen in its installer's steps, not here:
+    **Choose its FOMOD options…** walks them again, each step starting at
+    what the list chooses now, and writes the new choices (`mudcrab
+    choose`); the tree shows what they install. A BAIN archive has
+    **Choose its BAIN packages…** too, which runs its wizard if it has one.
   - **Anything else**: untick a file or folder to leave it out (an
     `exclude`, `files --exclude`), tick it to bring it back.
 

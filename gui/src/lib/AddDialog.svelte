@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type AddPlan, type AddRequest, type Answer, type Document, type Entry, type Question, type Started, type Walk } from "./api";
+  import { api, type AddPlan, type AddRequest, type Answer, type Document, type Entry, type Started, type Walk } from "./api";
+  import InstallerQuestions from "./InstallerQuestions.svelte";
 
   // Adding a mod from an archive, as `add --archive` does: name it and say
   // where it goes, answer its installer (a FOMOD's steps, a BAIN wizard's
@@ -36,7 +37,6 @@
   // The installer: answers so far, and where the walk stands.
   let answers = $state<Answer[]>([]);
   let walk = $state<Walk | null>(null);
-  let picked = $state<number[]>([]);
 
   // Plugins and the entry.
   let plan = $state<AddPlan | null>(null);
@@ -83,7 +83,6 @@
     busy = true;
     try {
       walk = await api.addWalk(path, answers);
-      if (walk.kind === "ask" && walk.asked.kind === "choose") picked = [...walk.asked.question.default];
       if (walk.kind === "done") await planIt([]);
     } catch (err) {
       error = String(err);
@@ -120,12 +119,6 @@
     } finally {
       busy = false;
     }
-  }
-
-  function toggle(question: Question, index: number) {
-    const one = question.rule === "exactly_one" || question.rule === "at_most_one";
-    if (picked.includes(index)) picked = one && question.rule === "exactly_one" ? picked : picked.filter((i) => i !== index);
-    else picked = one ? [index] : [...picked, index];
   }
 
   function request(plugins: string[]): AddRequest {
@@ -175,18 +168,6 @@
     }
   }
 
-  const question = $derived(walk?.kind === "ask" && walk.asked.kind === "choose" ? walk.asked.question : null);
-  const rule = $derived(
-    question
-      ? {
-          exactly_one: "Choose one.",
-          at_most_one: "Choose one, or none.",
-          at_least_one: "Choose one or more.",
-          any: "Choose any, or none.",
-          all: "All are installed.",
-        }[question.rule]
-      : "",
-  );
 </script>
 
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -233,53 +214,7 @@
         {#if started.has_installer}
           <section>
             <h4>Installer</h4>
-            {#if busy && !walk}
-              <p class="dim">Reading the installer…</p>
-            {:else if question}
-              <div class="question">
-                <div class="qtitle">{question.title} <span class="dim small">{rule}</span></div>
-                {#each question.choices as choice, i}
-                  {@const single = question.rule === "exactly_one" || question.rule === "at_most_one"}
-                  <label class="choice" class:off={choice.availability === "unavailable"} title={choice.description}>
-                    <input
-                      type={single ? "radio" : "checkbox"}
-                      checked={choice.availability === "required" || picked.includes(i)}
-                      disabled={choice.availability === "required" || choice.availability === "unavailable"}
-                      onclick={(e) => {
-                        e.preventDefault();
-                        toggle(question, i);
-                      }}
-                    />
-                    <span>
-                      {choice.name}
-                      {#if choice.availability === "recommended"}<span class="tag good">recommended</span>{/if}
-                      {#if choice.availability === "required"}<span class="tag">always</span>{/if}
-                      {#if question.default.includes(i)}<span class="tag">default</span>{/if}
-                      {#if choice.description}<span class="desc dim">{choice.description.split("\n")[0]}</span>{/if}
-                    </span>
-                  </label>
-                {/each}
-                <div class="buttons">
-                  {#if answers.length}<button onclick={back} disabled={busy}>Back</button>{/if}
-                  <button class="primary" onclick={() => answer({ pick: picked })} disabled={busy}>Next</button>
-                  <button onclick={defaults} disabled={busy} title="Take the installer's own choice for every question left">Defaults for the rest</button>
-                </div>
-              </div>
-            {:else if walk?.kind === "ask" && walk.asked.kind === "yes_no"}
-              <div class="question">
-                <div class="qtitle">The wizard asks whether <code>{walk.asked.path}</code> is already installed, by a mod earlier in the list. Is it?</div>
-                <div class="buttons">
-                  {#if answers.length}<button onclick={back} disabled={busy}>Back</button>{/if}
-                  <button onclick={() => answer({ yes: true })} disabled={busy}>Yes</button>
-                  <button onclick={() => answer({ yes: false })} disabled={busy}>No</button>
-                </div>
-              </div>
-            {:else if walk?.kind === "done"}
-              <p class="small">
-                Answered{#if answers.length} ({answers.length} question(s)){/if}.
-                {#if answers.length}<button class="link" onclick={back}>Back</button>{/if}
-              </p>
-            {/if}
+            <InstallerQuestions {walk} answered={answers.length} {busy} {answer} {back} {defaults} />
           </section>
         {/if}
 
@@ -395,39 +330,6 @@
     align-items: baseline;
     gap: 8px;
     margin: 4px 0;
-  }
-  .choice.off {
-    color: var(--faint);
-  }
-  .question {
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px 12px;
-  }
-  .qtitle {
-    font-weight: 600;
-    margin-bottom: 6px;
-  }
-  .desc {
-    display: block;
-    font-size: 12px;
-  }
-  .tag {
-    font-size: 10px;
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 0 4px;
-    margin-left: 4px;
-    color: var(--dim);
-  }
-  .tag.good {
-    color: var(--good);
-    border-color: var(--good);
-  }
-  .buttons {
-    display: flex;
-    gap: 6px;
-    margin-top: 8px;
   }
   .small {
     font-size: 12px;

@@ -955,6 +955,8 @@ pub fn app<R: Runtime>(
             adding::add_walk,
             adding::add_plan,
             adding::add_mod,
+            adding::choose_walk,
+            adding::choose_write,
             adding::nexus_link,
             adding::nexus_fetch,
             adding::nexus_look,

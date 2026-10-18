@@ -15,6 +15,7 @@
     type Tree,
   } from "./api";
   import AddDialog from "./AddDialog.svelte";
+  import ChooseDialog from "./ChooseDialog.svelte";
   import Archives from "./Archives.svelte";
   import Conflicts from "./Conflicts.svelte";
   import { startDrag, type Place } from "./drag";
@@ -66,6 +67,8 @@
   // being added.
   let pane = $state<"list" | "archives">("list");
   let adding = $state<string | null>(null);
+  // The archive whose installer is being walked again.
+  let choosing = $state<{ id: string; number: number; label: string } | null>(null);
   let archivesPane = $state<Archives | null>(null);
 
   // Every mod in the document by id, the sections above it (by anchor, to
@@ -281,6 +284,16 @@
 
 <svelte:window {onkeydown} />
 
+{#if choosing}
+  <ChooseDialog
+    id={choosing.id}
+    number={choosing.number}
+    label={choosing.label}
+    write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers))}
+    close={() => (choosing = null)}
+  />
+{/if}
+
 {#if adding}
   <AddDialog
     path={adding}
@@ -410,6 +423,16 @@
                   >
                 {/each}
               </nav>
+            {/if}
+            {@const shownArchive = view.archives.find((a) => a.number === archive)}
+            {@const fomod = tree?.layout === "fomod" || !!tree?.rows.some((r) => r.path.toLowerCase().endsWith("fomod/moduleconfig.xml"))}
+            {#if tree && (fomod || tree.layout === "bain")}
+              <button
+                class="chooser"
+                onclick={() => (choosing = { id: chosen.id, number: archive, label: shownArchive?.label ?? "" })}
+                title="Walk its installer again, starting at what the list chooses now (mudcrab choose)"
+                >Choose its {fomod ? "FOMOD options" : "BAIN packages"}…</button
+              >
             {/if}
             <details class="form">
               <summary>Archive {archive}'s fields</summary>
@@ -677,6 +700,10 @@
   .edits button {
     font-size: 12px;
     padding: 3px 8px;
+  }
+  .chooser {
+    font-size: 12px;
+    margin: 6px 0;
   }
   details.form {
     margin: 8px 0;
