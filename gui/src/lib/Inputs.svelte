@@ -38,14 +38,18 @@
 
   // The one being changed, as a draft.
   let editing = $state<string | null>(null);
-  let draft = $state({ query: "", choices: "", fallback: "" });
+  // Answers are edited one per line, so an answer may hold a comma; whether
+  // there is a default is kept apart from its text, which may be empty.
+  let draft = $state({ query: "", choices: "", hasDefault: false, fallback: "" });
+  const lines = (text: string) => text.split("\n").map((c) => c.trim()).filter(Boolean);
 
   function start(input: InputDoc) {
     editing = input.id;
     draft = {
       query: input.query,
-      choices: (input.choices ?? []).join(", "),
-      fallback: input.default === undefined ? "" : String(input.default),
+      choices: (input.choices ?? []).join("\n"),
+      hasDefault: input.default !== undefined,
+      fallback: input.default === undefined ? (input.type === "bool" ? "false" : "") : String(input.default),
     };
   }
 
@@ -54,14 +58,15 @@
     const unsets: string[] = [];
     if (draft.query !== input.query) sets.push(`query=${tomlString(draft.query)}`);
     if (input.type === "choice") {
-      const choices = draft.choices.split(",").map((c) => c.trim()).filter(Boolean);
-      if (choices.join(",") !== (input.choices ?? []).join(","))
+      const choices = lines(draft.choices);
+      if (JSON.stringify(choices) !== JSON.stringify(input.choices ?? []))
         sets.push(`choices=[${choices.map(tomlString).join(", ")}]`);
     }
-    const was = input.default === undefined ? "" : String(input.default);
-    if (draft.fallback !== was) {
-      if (!draft.fallback) unsets.push("default");
-      else if (input.type === "bool") sets.push(`default=${draft.fallback === "true"}`);
+    const had = input.default !== undefined;
+    if (!draft.hasDefault) {
+      if (had) unsets.push("default");
+    } else if (!had || draft.fallback !== String(input.default)) {
+      if (input.type === "bool") sets.push(`default=${draft.fallback === "true"}`);
       else sets.push(`default=${tomlString(draft.fallback)}`);
     }
     if (!sets.length && !unsets.length) {
@@ -73,16 +78,23 @@
 
   // A new question.
   let adding = $state(false);
-  let fresh = $state({ name: "", kind: "bool", query: "", choices: "", fallback: "" });
+  const blank = () => ({ name: "", kind: "bool", query: "", choices: "", hasDefault: false, fallback: "" });
+  let fresh = $state(blank());
   async function add(event: SubmitEvent) {
     event.preventDefault();
-    const choices = fresh.choices.split(",").map((c) => c.trim()).filter(Boolean);
+    const choices = lines(fresh.choices);
     const ok = await run(() =>
-      api.addInput(fresh.name.trim(), fresh.kind, fresh.query, fresh.kind === "choice" ? choices : [], fresh.fallback || null),
+      api.addInput(
+        fresh.name.trim(),
+        fresh.kind,
+        fresh.query,
+        fresh.kind === "choice" ? choices : [],
+        fresh.hasDefault ? (fresh.kind === "bool" ? (fresh.fallback === "true" ? "true" : "false") : fresh.fallback) : null,
+      ),
     );
     if (ok) {
       adding = false;
-      fresh = { name: "", kind: "bool", query: "", choices: "", fallback: "" };
+      fresh = blank();
     }
   }
 </script>
@@ -116,15 +128,18 @@
       >
         <label>Question <input type="text" bind:value={draft.query} /></label>
         {#if input.type === "choice"}
-          <label>Answers <input type="text" bind:value={draft.choices} placeholder="comma-separated" /></label>
+          <label>Answers <textarea rows="3" bind:value={draft.choices} placeholder="one per line"></textarea></label>
         {/if}
         <label
           >Default
-          {#if input.type === "bool"}
-            <select bind:value={draft.fallback}><option value="">none</option><option>true</option><option>false</option></select>
-          {:else}
-            <input type="text" bind:value={draft.fallback} />
-          {/if}
+          <span class="default">
+            <input type="checkbox" bind:checked={draft.hasDefault} title="Whether the question has a default" />
+            {#if input.type === "bool"}
+              <select bind:value={draft.fallback} disabled={!draft.hasDefault}><option>true</option><option>false</option></select>
+            {:else}
+              <input type="text" bind:value={draft.fallback} disabled={!draft.hasDefault} placeholder={draft.hasDefault ? "(empty)" : "none"} />
+            {/if}
+          </span>
         </label>
         <div class="buttons">
           <button type="submit" class="primary">Save</button>
@@ -134,7 +149,9 @@
     {:else}
       <p class="query">{input.query}</p>
       <div class="dim small">
-        {#if input.choices?.length}answers: {input.choices.join(", ")} · {/if}default: {input.default ?? "none"}
+        {#if input.choices?.length}answers: {input.choices.map((c) => `“${c}”`).join(" ")} · {/if}default: {input.default === undefined
+          ? "none"
+          : `“${input.default}”`}
       </div>
     {/if}
     {#if mods.length}
@@ -159,9 +176,19 @@
     </label>
     <label>Question <input type="text" bind:value={fresh.query} /></label>
     {#if fresh.kind === "choice"}
-      <label>Answers <input type="text" bind:value={fresh.choices} placeholder="comma-separated" /></label>
+      <label>Answers <textarea rows="3" bind:value={fresh.choices} placeholder="one per line"></textarea></label>
     {/if}
-    <label>Default <input type="text" bind:value={fresh.fallback} placeholder={fresh.kind === "bool" ? "true or false" : ""} /></label>
+    <label
+      >Default
+      <span class="default">
+        <input type="checkbox" bind:checked={fresh.hasDefault} title="Whether the question has a default" />
+        {#if fresh.kind === "bool"}
+          <select bind:value={fresh.fallback} disabled={!fresh.hasDefault}><option>false</option><option>true</option></select>
+        {:else}
+          <input type="text" bind:value={fresh.fallback} disabled={!fresh.hasDefault} placeholder={fresh.hasDefault ? "(empty)" : "none"} />
+        {/if}
+      </span>
+    </label>
     <div class="buttons">
       <button type="submit" class="primary" disabled={!fresh.name.trim() || !fresh.query.trim()}>Add</button>
       <button type="button" onclick={() => (adding = false)}>Cancel</button>
@@ -225,6 +252,24 @@
     gap: 8px;
     align-items: center;
     font-size: 13px;
+  }
+  .default {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .default input[type="text"],
+  .default select {
+    flex: 1;
+  }
+  textarea {
+    font: inherit;
+    color: inherit;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 4px 8px;
+    resize: vertical;
   }
   .buttons {
     display: flex;

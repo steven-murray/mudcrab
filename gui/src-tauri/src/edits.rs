@@ -154,6 +154,9 @@ pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
             .ok_or("nothing to undo")?
     };
     rewrite(&state, &last.after, &last.before)?;
+    // What the undo did: the edit, backwards. Read before the session is
+    // locked below, which `list` locks too.
+    let diff = edit::diff(&state.list()?, &last.after, &last.before);
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &mut session.history;
     let recorded = history.done.pop().expect("there was one");
@@ -162,7 +165,7 @@ pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
         history,
         Change {
             command: format!("undo: {}", last.command),
-            diff: last.diff,
+            diff,
         },
     ))
 }

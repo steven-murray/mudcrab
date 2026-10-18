@@ -172,7 +172,17 @@ fn edits_are_the_commands_and_can_be_undone() {
     let changes = call(&webview, "changes", json!({})).unwrap();
     assert_eq!(changes["edits"].as_array().unwrap().len(), 5, "{changes}");
     assert!(changes["diff"].as_str().unwrap().contains("Big?"));
-    for _ in 0..5 {
+    // An undo's diff is what it did: the edit backwards.
+    let undone = call(&webview, "undo", json!({})).unwrap();
+    assert!(
+        undone["change"]["diff"]
+            .as_str()
+            .unwrap()
+            .lines()
+            .any(|line| line.starts_with('-') && line.contains("Big?")),
+        "{undone}"
+    );
+    for _ in 0..4 {
         call(&webview, "undo", json!({})).unwrap();
     }
     assert_eq!(read(), LIST);

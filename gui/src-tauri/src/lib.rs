@@ -69,17 +69,33 @@ impl State {
     }
 }
 
-/// Quote a path or value for a shell, if it needs it.
+/// Quote a path or value for a POSIX shell, if it needs it: in single
+/// quotes, where nothing is special (no `$`, backticks or backslashes), a
+/// single quote itself written as `'\''`. The commands shown are copied into
+/// terminals, so they must replay exactly what was done.
 fn quote(text: impl AsRef<str>) -> String {
     let text = text.as_ref();
     if !text.is_empty()
         && text
             .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "-_./=:".contains(c))
+            .all(|c| c.is_ascii_alphanumeric() || "-_./=:,+@%".contains(c))
     {
         text.to_string()
     } else {
-        format!("\"{}\"", text.replace('"', "\\\""))
+        format!("'{}'", text.replace('\'', r"'\''"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn a_quoted_value_is_taken_literally_by_a_shell() {
+        use super::quote;
+        assert_eq!(quote("plain/path.toml"), "plain/path.toml");
+        assert_eq!(quote("New Thing"), "'New Thing'");
+        assert_eq!(quote("$(rm -rf ~) `x` \\n"), "'$(rm -rf ~) `x` \\n'");
+        assert_eq!(quote("it's"), r"'it'\''s'");
+        assert_eq!(quote(""), "''");
     }
 }
 
