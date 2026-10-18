@@ -254,6 +254,8 @@ fn a_list_installs_from_the_commands_the_page_calls() {
         .collect();
     assert_eq!(rows, ["textures", "textures/base.dds"]);
     assert_eq!(tree["rows"][1]["destination"], "textures/base.dds");
+    // A folder too, so it can be moved as one (`file_move`).
+    assert_eq!(tree["rows"][0]["destination"], "textures");
     // Both mods install a texture of their own name, so share nothing.
     let conflicts = call(&webview, "conflicts", json!({})).unwrap();
     assert_eq!(conflicts["sweep"]["installed"], 2, "{conflicts}");

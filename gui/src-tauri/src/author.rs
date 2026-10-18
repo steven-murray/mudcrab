@@ -199,7 +199,8 @@ pub(super) struct FileRow {
     offered: bool,
     /// A BAIN package: a top-level folder of a BAIN archive.
     package: bool,
-    /// Where a taken file goes in the mod's folder.
+    /// Where a taken file (or a folder of them) goes in the mod's folder:
+    /// what a `file_move` names it as.
     destination: Option<String>,
     /// The path the archive's `include` and `exclude` see it as.
     filtered_as: Option<String>,
@@ -368,12 +369,30 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
             at = slash;
         }
     }
+    // Where each folder lands in the mod's folder, read the same way from a
+    // taken file's destination: what a `file_move` names it as.
+    let mut folder_to: BTreeMap<&str, String> = BTreeMap::new();
+    for taken in &contents.taken {
+        let source = taken.source.as_str();
+        let mut at = source.len();
+        while let Some(slash) = source[..at].rfind('/') {
+            let folder = &source[..slash];
+            let tail = &source[slash + 1..];
+            if let Some(Some(head)) = (!folder_to.contains_key(folder))
+                .then(|| taken.destination.strip_suffix(tail))
+            {
+                folder_to.insert(folder, head.trim_end_matches('/').to_string());
+            }
+            at = slash;
+        }
+    }
     let mut files: BTreeMap<&str, Vec<&String>> = BTreeMap::new();
     for entry in contents.entries.iter().filter(|e| !e.ends_with('/')) {
         files.entry(parent(entry)).or_default().push(entry);
     }
     let mut out = Vec::new();
     Walk {
+        folder_to: &folder_to,
         folder_as: &folder_as,
         subfolders: &subfolders,
         files: &files,
@@ -387,6 +406,7 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
 }
 
 struct Walk<'a> {
+    folder_to: &'a BTreeMap<&'a str, String>,
     folder_as: &'a BTreeMap<&'a str, String>,
     subfolders: &'a BTreeMap<&'a str, BTreeSet<&'a str>>,
     files: &'a BTreeMap<&'a str, Vec<&'a String>>,
@@ -414,7 +434,12 @@ impl Walk<'_> {
                 },
                 offered: files > 0 || package,
                 package,
-                destination: None,
+                // The mod's own top folder has no name of its own to move.
+                destination: self
+                    .folder_to
+                    .get(folder)
+                    .filter(|path| !path.is_empty())
+                    .cloned(),
                 filtered_as: self.folder_as.get(folder).cloned(),
                 exclude_glob: self
                     .folder_as

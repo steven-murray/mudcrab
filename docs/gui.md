@@ -104,6 +104,14 @@ history there, rather than be undone by it.
   - **Anything else**: untick a file or folder to leave it out (an
     `exclude`, `files --exclude`), tick it to bring it back.
 
+  An installed file or folder can be moved within the mod: drag it by its
+  handle onto a folder (or the top of the mod), or **move…** to type its new
+  path -- `optional/` for a plugin kept but not loaded, say. Each adds a
+  `file_move` action. Below the notes, **the mod's fields** and each
+  **archive's fields** are a form for what `set` changes: the `if`,
+  whether it is ticked in MO2, what it needs, an archive's source, layout,
+  data folder, game folder files, download page and note.
+
   For any layout, **exclude** beside a file or folder (on hover) is the
   expert override: an `exclude` for that path as the filters see it -- under
   BAIN, for that path in every package. The archive's `include` and

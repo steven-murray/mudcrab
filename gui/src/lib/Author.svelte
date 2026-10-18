@@ -424,6 +424,7 @@
                 {tree}
                 edit={(key, add, drop) => run(() => api.editFilter(chosen.id, archive, key, add, drop))}
                 problem={(message) => (error = message)}
+                move={(from, to) => run(() => api.addAction(chosen.id, "file_move", [`from=${JSON.stringify(from)}`, `to=${JSON.stringify(to)}`], null))}
               />
             {/if}
           {/if}
