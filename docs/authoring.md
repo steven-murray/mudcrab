@@ -289,6 +289,14 @@ The four mods above needed nothing more. Real lists usually do:
 - **Checking against a reference.** If you have built the list by hand
   before (e.g. directly in MO2), `mudcrab diff` compares each installed mod
   against that instance, file by file.
+- **Several files, and mods shared between lists.** A `[[mods]]` entry with
+  `include` puts another file's mods in its place -- one file per section of
+  a long list, or a group of mods several lists share, from a folder or a git
+  repository -- and one with `use` takes a single mod's definition from a
+  shim. The including list can take part of a file, rename its mods, answer
+  its questions and override its fields; `mudcrab includes` lists what a list
+  includes and `mudcrab update` moves git includes on. See
+  [Lists in several files](modlist-format.md#lists-in-several-files-include).
 - **A readable guide.** `docs` tables add prose and pictures to the list,
   section and mods, and `mudcrab export` turns the list into a guide for
   people installing by hand, as a Nexus page, Markdown or a website; see

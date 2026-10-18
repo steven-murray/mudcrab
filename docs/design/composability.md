@@ -1,11 +1,10 @@
 # Composability: lists built from other lists
 
-**Status: phases 1-5 done** (local and git includes, overrides and include
-options, questions, shims; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phase 6 is a plan. Where a finished phase settled something
+**Status: done** (see [the format](../modlist-format.md#lists-in-several-files-include)),
+but for publishing a first shims repository. Where a phase settled something
 differently from the plan below, the notes under [Phases](#phases) say so.
 
-Today a modlist is one file. This plan lets a list pull in other modlist files
+Before this, a modlist was one file. This plan lets a list pull in other modlist files
 -- from its own folder or from a git repository -- and have them resolve as if
 they had been written in place. It has two uses in mind, and one side effect:
 
@@ -287,7 +286,13 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
      through a git source and lock file, plans identically. Publishing the
      repository and pointing MOFAM at it is left to the list's author.
 6. **A shared group.** Move MOFAM's OBSE plugins section into a component
-   and include it, as the proof that groups work in a real list.
+   and include it, as the proof that groups work in a real list. *Done.*
+   MOFAM's Part 2 (35 mods) moved to `components/obse-plugins.toml`, included
+   under its section; the compiled list, the plans for three sets of answers
+   and the exported guide are identical to before. (OBSE plugins ship no
+   plugins, so the load order did not have to move with them.) A test has two
+   lists take different things from one group: one as it is, asking its
+   question; the other renamed, its question answered, a field overridden.
 
 Each phase ends with MOFAM compiling to the same plan it does today, except
 where the phase changes what is installed on purpose.
