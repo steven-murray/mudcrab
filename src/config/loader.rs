@@ -9,10 +9,12 @@
 //! id>" }`. Its `[ini]`, manual steps and post-install actions are added to
 //! the list's; its `name`, `guide`, `mo2`, `export` and `about` describe a
 //! whole list and are not read. Included files can include others; a file
-//! including itself, however indirectly, is refused. See
-//! docs/design/composability.md.
+//! including itself, however indirectly, is refused. `include` can also name
+//! a file in a git repository (`git+<url>?tag=<tag>#<file>`); see
+//! [`crate::config::git`]. See docs/design/composability.md.
 
 use crate::config::docs::{Docs, DocsFile};
+use crate::config::git::{self, Lock};
 use crate::config::schema::{ModEntry, PluginSlot, SourceModlist};
 use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
@@ -33,10 +35,57 @@ pub fn load_modlist_with_docs(path: &Path) -> anyhow::Result<SourceModlist> {
     load_with(path, true, &Texts::new())
 }
 
+/// One include, as the loader resolved it.
+#[derive(Debug, Clone)]
+pub struct Included {
+    /// The `[[mods]]` entry's id.
+    pub id: String,
+    /// Its `include`, as written.
+    pub source: String,
+    /// The file read: on disk, or in the cache for a git include.
+    pub file: PathBuf,
+    /// The commit, for a git include.
+    pub commit: Option<String>,
+    /// The file that includes it.
+    pub by: PathBuf,
+    /// How many includes deep: 1 for the list's own.
+    pub depth: usize,
+}
+
 /// Load the modlist at `path`, reading any file in `texts` from there rather
-/// than from disk.
+/// than from disk. Git includes resolve through the list's lock file, which
+/// is written if any had to be resolved afresh.
 pub fn load_with(path: &Path, with_docs: bool, texts: &Texts) -> anyhow::Result<SourceModlist> {
-    resolve(&normalize(path), with_docs, texts, &mut Vec::new())
+    let mut lock = Lock::read(path)?;
+    let list = load_locked(path, with_docs, texts, &mut lock)?;
+    lock.save()?;
+    Ok(list)
+}
+
+/// [`load_with`], with git includes resolved through `lock`, which is left
+/// for the caller to save (or not).
+pub fn load_locked(
+    path: &Path,
+    with_docs: bool,
+    texts: &Texts,
+    lock: &mut Lock,
+) -> anyhow::Result<SourceModlist> {
+    let mut context = Context {
+        with_docs,
+        texts,
+        lock,
+        stack: Vec::new(),
+    };
+    resolve(&normalize(path), &mut context)
+}
+
+/// What resolving a list's includes carries along.
+struct Context<'a> {
+    with_docs: bool,
+    texts: &'a Texts,
+    lock: &'a mut Lock,
+    /// The files being read, outermost first.
+    stack: Vec<PathBuf>,
 }
 
 /// `text` as the modlist at `path` (without its docs file), with the files it
@@ -88,15 +137,10 @@ fn read(path: &Path, texts: &Texts) -> anyhow::Result<String> {
 }
 
 /// The file at `path` with what it includes put in place, then its docs file
-/// merged in. `stack` is the files being read, outermost first.
-fn resolve(
-    path: &Path,
-    with_docs: bool,
-    texts: &Texts,
-    stack: &mut Vec<PathBuf>,
-) -> anyhow::Result<SourceModlist> {
-    if let Some(at) = stack.iter().position(|file| file == path) {
-        let chain = stack[at..]
+/// merged in.
+fn resolve(path: &Path, context: &mut Context) -> anyhow::Result<SourceModlist> {
+    if let Some(at) = context.stack.iter().position(|file| file == path) {
+        let chain = context.stack[at..]
             .iter()
             .chain([&path.to_path_buf()])
             .map(|file| file.display().to_string())
@@ -104,18 +148,21 @@ fn resolve(
             .join(" includes ");
         anyhow::bail!("{} includes itself: {chain}", path.display());
     }
-    let text = read(path, texts)?;
+    let text = read(path, context.texts)?;
     let mut parsed = parse_file(&text, path)?;
-    stack.push(path.to_path_buf());
-    let spliced = splice(&mut parsed, &text, path, with_docs, texts, stack);
-    stack.pop();
+    context.stack.push(path.to_path_buf());
+    let spliced = splice(&mut parsed, &text, path, context);
+    context.stack.pop();
     spliced?;
 
     // After the includes, so a list's docs file can document the mods its
     // included files bring.
-    if with_docs && let Some(docs_file) = parsed.docs_file.clone() {
+    if context.with_docs
+        && let Some(docs_file) = parsed.docs_file.clone()
+    {
         let docs_path = normalize(&parsed.base_dir.clone().unwrap_or_default().join(&docs_file));
-        let raw = read(&docs_path, texts).map_err(|err| anyhow::anyhow!("docs file: {err}"))?;
+        let raw =
+            read(&docs_path, context.texts).map_err(|err| anyhow::anyhow!("docs file: {err}"))?;
         let docs: DocsFile = toml::from_str(&raw).map_err(|err| {
             anyhow::anyhow!("failed to parse docs file {}: {err}", docs_path.display())
         })?;
@@ -139,9 +186,7 @@ fn splice(
     list: &mut SourceModlist,
     text: &str,
     path: &Path,
-    with_docs: bool,
-    texts: &Texts,
-    stack: &mut Vec<PathBuf>,
+    context: &mut Context,
 ) -> anyhow::Result<()> {
     let slots = plugin_slots(text)?;
     let placing = slots
@@ -166,17 +211,30 @@ fn splice(
             "two includes are called '{}'; each needs its own id",
             entry.id
         );
-        let child_path = normalize(&base.join(&include));
-        let child = resolve(&child_path, with_docs, texts, stack).map_err(|err| {
+        let (child_path, commit) = locate(&base, &include, &entry.id, path, context, list)?;
+        let child = resolve(&child_path, context).map_err(|err| {
             anyhow::anyhow!(
                 "{}, included as '{}' by {}: {err:#}",
-                child_path.display(),
+                shown(&child_path),
                 entry.id,
-                path.display()
+                shown(path)
             )
         })?;
-        list.included.push(child_path.clone());
-        list.included.extend(child.included.iter().cloned());
+        list.includes.push(Included {
+            id: entry.id.clone(),
+            source: include.clone(),
+            file: child_path.clone(),
+            commit,
+            by: path.to_path_buf(),
+            depth: 1,
+        });
+        list.includes
+            .extend(child.includes.iter().cloned().map(|mut nested| {
+                nested.depth += 1;
+                nested
+            }));
+        list.include_warnings
+            .extend(child.include_warnings.iter().cloned());
         let fragment = absorb(list, &mut mods, &entry, &include, &child_path, child)
             .map_err(|err| anyhow::anyhow!("include '{}' ({include}): {err:#}", entry.id))?;
         fragments.insert(entry.id, fragment);
@@ -210,11 +268,63 @@ fn splice(
             fragment.is_empty() || placed.contains(id),
             "include '{id}' has plugins ({}), and `plugins` does not say where they go: add \
              {{ include = \"{id}\" }} to it where they belong in the load order",
-            fragment.join(", ")
+            some(fragment)
         );
     }
     list.plugins = plugins;
     Ok(())
+}
+
+/// A file as messages show it: a git include's by its repository and commit.
+fn shown(path: &Path) -> String {
+    git::describe(path).unwrap_or_else(|| path.display().to_string())
+}
+
+/// The file `include` (in a file in `base`) names, and its commit for a git
+/// include. A relative path inside a git repository stays inside it.
+fn locate(
+    base: &Path,
+    include: &str,
+    id: &str,
+    by: &Path,
+    context: &mut Context,
+    list: &mut SourceModlist,
+) -> anyhow::Result<(PathBuf, Option<String>)> {
+    if let Some(source) = git::parse(include) {
+        let source = source?;
+        if let git::Reference::Branch(branch) = &source.reference {
+            list.include_warnings.push(format!(
+                "include '{id}' follows branch {branch}, which moves: once the component is                  released, name a tag (or a commit) so the list stays the same"
+            ));
+        }
+        let resolved = git::resolve(&source, context.lock)
+            .map_err(|err| anyhow::anyhow!("include '{id}' (in {}): {err:#}", shown(by)))?;
+        return Ok((resolved.file, Some(resolved.commit)));
+    }
+    let path = normalize(&base.join(include));
+    if let Some(checkout) = git::checkout_of(base) {
+        anyhow::ensure!(
+            path.starts_with(&checkout),
+            "include '{id}' in {} names {include}, outside its repository",
+            shown(by)
+        );
+        // The same commit's: no lock entry of its own.
+        let commit = checkout
+            .file_name()
+            .map(|name| name.to_string_lossy().into_owned());
+        return Ok((path, commit));
+    }
+    Ok((path, None))
+}
+
+/// The first few of `names`, and how many more.
+fn some(names: &[String]) -> String {
+    const SHOWN: usize = 3;
+    let mut text = names[..names.len().min(SHOWN)].join(", ");
+    if names.len() > SHOWN {
+        text.push_str(&format!(", and {} more", names.len() - SHOWN));
+    }
+    text
 }
 
 /// An include entry names a file and where its mods go, and nothing else:
@@ -267,12 +377,23 @@ fn absorb(
         "it has the guide's [docs], which are for a whole list; an included file documents its \
          mods and [sections]"
     );
-    // Images are named relative to the file that names them.
-    let folder = include.rsplit_once('/').map(|(folder, _)| folder);
+    // Images are named relative to the file that names them: from a file
+    // elsewhere (a git include's, in the cache), by its whole path.
+    let folder = if git::parse(include).is_some() || git::checkout_of(child_path).is_some() {
+        child_path
+            .parent()
+            .map(|folder| folder.display().to_string())
+    } else {
+        include
+            .rsplit_once('/')
+            .map(|(folder, _)| folder.to_string())
+    };
     let rebase = |docs: &mut Docs| {
-        if let Some(folder) = folder {
+        if let Some(folder) = &folder {
             for image in &mut docs.images {
-                if let Some(path) = &mut image.path {
+                if let Some(path) = &mut image.path
+                    && !Path::new(path.as_str()).is_absolute()
+                {
                     *path = format!("{folder}/{path}");
                 }
             }

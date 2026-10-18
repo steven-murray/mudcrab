@@ -14,6 +14,7 @@ mod edit;
 pub mod export;
 mod game_dir;
 pub mod identify;
+mod includes;
 pub mod inspect;
 pub mod install;
 pub mod merge;
@@ -96,6 +97,8 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Files(args) => edit::files(args),
         Command::Action(command) => edit::action(command),
         Command::Input(command) => edit::input(command),
+        Command::Includes(args) => includes::list(args),
+        Command::Update(args) => includes::update(args),
         Command::Compile(args) => compile::run(args).await,
         Command::Conflicts(args) => conflicts::run(args).await,
         Command::Query(args) => query::run(args).await,
