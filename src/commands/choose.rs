@@ -7,65 +7,7 @@
 
 use std::io::{BufRead, Write};
 
-/// How many options a question takes.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Rule {
-    ExactlyOne,
-    AtMostOne,
-    AtLeastOne,
-    Any,
-    /// Every usable option is installed; nothing to ask.
-    All,
-}
-
-impl Rule {
-    pub(crate) fn from_fomod(group_type: &str) -> Rule {
-        match group_type {
-            "SelectExactlyOne" => Rule::ExactlyOne,
-            "SelectAtMostOne" => Rule::AtMostOne,
-            "SelectAtLeastOne" => Rule::AtLeastOne,
-            "SelectAll" => Rule::All,
-            _ => Rule::Any,
-        }
-    }
-
-    fn instruction(self) -> &'static str {
-        match self {
-            Rule::ExactlyOne => "choose one",
-            Rule::AtMostOne => "choose one, or 0 for none",
-            Rule::AtLeastOne => "choose one or more, separated by spaces",
-            Rule::Any => "choose any, separated by spaces, or 0 for none",
-            Rule::All => "all are installed",
-        }
-    }
-}
-
-/// Whether an option can be chosen.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Availability {
-    Free,
-    /// Free, and the installer recommends it.
-    Recommended,
-    /// Always installed, whatever is chosen.
-    Required,
-    /// The installer rules it out (a missing dependency, say).
-    Unavailable,
-}
-
-pub(crate) struct Choice {
-    pub name: String,
-    pub description: String,
-    pub availability: Availability,
-}
-
-pub(crate) struct Question {
-    /// What is being chosen, e.g. `HD Septim: "Step1" / "Meshes"`.
-    pub title: String,
-    pub rule: Rule,
-    pub choices: Vec<Choice>,
-    /// What install would pick unasked; Enter takes it.
-    pub default: Vec<usize>,
-}
+pub(crate) use crate::config::choose::{Availability, Choice, Question, Rule};
 
 /// Ask `question` on `output`, reading answers from `input` until one is
 /// valid. Returns the chosen indices, required options included.
@@ -130,18 +72,13 @@ pub(crate) fn ask(
     }
 
     // Nothing to decide: say what happens and move on.
-    let settled = match question.rule {
-        Rule::All => Some(usable.clone()),
-        _ if free.is_empty() => Some(required.clone()),
-        Rule::ExactlyOne if free.len() == 1 && required.is_empty() => Some(free.clone()),
-        _ => None,
-    };
+    let settled = question.settled();
     if let Some(chosen) = settled {
         writeln!(
             output,
             "  {} {}",
             crate::ui::arrow(),
-            names(question, &chosen)
+            question.names(&chosen)
         )?;
         return Ok(chosen);
     }
@@ -220,17 +157,6 @@ fn parse(
     chosen.extend(picked);
     chosen.sort_unstable();
     Ok(chosen)
-}
-
-fn names(question: &Question, chosen: &[usize]) -> String {
-    if chosen.is_empty() {
-        return "nothing".to_string();
-    }
-    chosen
-        .iter()
-        .map(|&i| question.choices[i].name.as_str())
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 /// The first line of a description, short enough to sit under its option.

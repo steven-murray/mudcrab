@@ -1,5 +1,4 @@
 pub mod add;
-mod add_wizard;
 mod assets;
 mod bsa;
 pub mod check;
