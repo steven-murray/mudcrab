@@ -1,8 +1,8 @@
 # Composability: lists built from other lists
 
-**Status: phases 1-4 done** (local and git includes, overrides and include
-options, questions; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phases 5-6 are a plan. Where a finished phase settled something
+**Status: phases 1-5 done** (local and git includes, overrides and include
+options, questions, shims; see [the format](../modlist-format.md#lists-in-several-files-include)).
+Phase 6 is a plan. Where a finished phase settled something
 differently from the plan below, the notes under [Phases](#phases) say so.
 
 Today a modlist is one file. This plan lets a list pull in other modlist files
@@ -271,6 +271,21 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
 5. **Shims.** `use`, field merging, `add --use`. Write the first real shims
    from MOFAM's own fixes (Oblivion Trees' layout, the T4UTXL split, WAC's
    prune) into a public `oblivion-shims` repository, and point MOFAM at them.
+   *Done, but for publishing.* As built:
+   - The entry's fields are read as written (from the file's TOML, not the
+     parsed entry, which cannot tell a field left out from one set to its
+     default) and laid over the shim's mod with the override mechanism, so
+     the result is checked as a mod written in full.
+   - The entry's `actions` are added after the shim's, since adding one is
+     what a list using a shim wants; every other field replaces.
+   - The mod is the list's own: its `origin` is the list, edits write the
+     entry, and its definition hash is the result's, so moving a mod into a
+     shim reinstalls nothing.
+   - The first three shims (WAC's include-and-rename, T4UTXL's Priory keep
+     list, Oblivion Trees' hand-download details) are written into a local
+     `oblivion-shims` repository, and a copy of MOFAM using them from it,
+     through a git source and lock file, plans identically. Publishing the
+     repository and pointing MOFAM at it is left to the list's author.
 6. **A shared group.** Move MOFAM's OBSE plugins section into a component
    and include it, as the proof that groups work in a real list.
 

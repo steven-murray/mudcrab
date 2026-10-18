@@ -258,3 +258,32 @@ fn a_tag_the_repository_lacks_is_named() {
     let err = format!("{:#}", load_modlist(&list).unwrap_err());
     assert!(err.contains("has no file nope.toml"), "{err}");
 }
+
+#[test]
+fn a_shim_is_used_from_a_repository_and_locked() {
+    cache();
+    let dir = tempdir().unwrap();
+    let repo = repo(
+        dir.path(),
+        &[(
+            "trees.toml",
+            "component = true\n\n[[mods]]\nid = \"Trees\"\narchives = [{ path = \"manual:t.7z\" }]\n",
+        )],
+    );
+    let path = dir.path().join("list.toml");
+    std::fs::write(
+        &path,
+        format!(
+            "name = \"L\"\n\n[[mods]]\nid = \"Trees\"\nuse = {:?}\n",
+            format!("git+{}?tag=v1#trees.toml", repo.display())
+        ),
+    )
+    .unwrap();
+    let source = load_modlist(&path).unwrap();
+    assert_eq!(
+        source.mods[0].archives[0].path.as_deref(),
+        Some("manual:t.7z")
+    );
+    assert!(source.includes[0].uses && source.includes[0].commit.is_some());
+    assert!(git::lock_path(&path).is_file());
+}

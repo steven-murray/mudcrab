@@ -239,9 +239,19 @@ pub struct AddArgs {
         long = "from-mo2",
         alias = "from-oracle",
         value_name = "MODS_DIR",
-        conflicts_with_all = ["nexus", "archive"]
+        conflicts_with_all = ["nexus", "archive", "use_source"]
     )]
     pub from_mo2: Option<PathBuf>,
+    /// Take the mod's whole definition from a shim: a modlist file holding
+    /// one mod, as a path relative to the list or `git+<url>?tag=<tag>#<file>`.
+    /// The entry written names it with `use`, and the shim's plugins go into
+    /// the load order where --load-after or --load-last says.
+    #[arg(
+        long = "use",
+        value_name = "SHIM",
+        conflicts_with_all = ["nexus", "archive", "plugins"]
+    )]
+    pub use_source: Option<String>,
     /// Write the archive entry from the archive itself: its source (from the
     /// MO2 `.meta` beside it, or --nexus / --manual), file name, layout, FOMOD
     /// defaults and BAIN packages, as `inspect` reports them. Only ever read
@@ -289,12 +299,11 @@ pub struct AddArgs {
     #[arg(
         long = "load-after",
         value_name = "PLUGIN",
-        requires = "plugins",
         conflicts_with = "load_last"
     )]
     pub load_after: Option<String>,
     /// Put the --plugin files at the end of the load order.
-    #[arg(long = "load-last", requires = "plugins")]
+    #[arg(long = "load-last")]
     pub load_last: bool,
     /// When --section names a section the file does not have yet, start it
     /// immediately before this existing section instead of at end of file.

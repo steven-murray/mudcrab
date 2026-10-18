@@ -654,6 +654,15 @@ pub struct ModEntry {
     /// the loader puts here in its place. See [`crate::config::loader`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include: Option<String>,
+    /// A modlist file holding one mod -- a shim -- whose definition this
+    /// entry takes, its own fields written over it. See
+    /// [`crate::config::loader`].
+    #[serde(default, rename = "use", skip_serializing_if = "Option::is_none")]
+    pub use_source: Option<String>,
+    /// The shim file the entry's definition came from (`use`). Set by the
+    /// loader.
+    #[serde(skip)]
+    pub used: Option<std::path::PathBuf>,
     /// With `include`: put this before every included mod's id.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub prefix: Option<String>,

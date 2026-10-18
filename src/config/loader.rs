@@ -50,6 +50,8 @@ pub struct Included {
     pub by: PathBuf,
     /// How many includes deep: 1 for the list's own.
     pub depth: usize,
+    /// A shim taken with `use`, not a file included with `include`.
+    pub uses: bool,
 }
 
 /// Load the modlist at `path`, reading any file in `texts` from there rather
@@ -195,15 +197,71 @@ fn splice(
     let placing = slots
         .iter()
         .any(|slot| matches!(slot, PluginSlot::Include { .. }));
-    if !placing && list.mods.iter().all(|entry| entry.include.is_none()) {
+    if !placing
+        && list
+            .mods
+            .iter()
+            .all(|entry| entry.include.is_none() && entry.use_source.is_none())
+    {
         return Ok(());
     }
+    // The `[[mods]]` tables as written, for what a `use` entry sets itself.
+    let mut written: Option<Vec<toml::Value>> = None;
 
     let base = list.base_dir.clone().unwrap_or_default();
     let mut mods = Vec::with_capacity(list.mods.len());
     // Each include's plugins, by its id, in its own order.
     let mut fragments: IndexMap<String, Vec<String>> = IndexMap::new();
-    for entry in std::mem::take(&mut list.mods) {
+    for (index, entry) in std::mem::take(&mut list.mods).into_iter().enumerate() {
+        if let Some(source) = entry.use_source.clone() {
+            anyhow::ensure!(
+                entry.include.is_none(),
+                "'{}' has both `use` and `include`: `use` takes one mod's definition, \
+                 `include` a file's mods",
+                entry.id
+            );
+            if written.is_none() {
+                let table: toml::Table = toml::from_str(text)?;
+                written = Some(match table.get("mods") {
+                    Some(toml::Value::Array(mods)) => mods.clone(),
+                    _ => Vec::new(),
+                });
+            }
+            let own = match written.as_ref().and_then(|mods| mods.get(index)) {
+                Some(toml::Value::Table(own)) => own.clone(),
+                _ => anyhow::bail!("could not read '{}' as written", entry.id),
+            };
+            let (file, commit) = locate(&base, &source, &entry.id, path, context, list)?;
+            let shim = resolve(&file, context).map_err(|err| {
+                anyhow::anyhow!(
+                    "{}, used by '{}' in {}: {err:#}",
+                    shown(&file),
+                    entry.id,
+                    shown(path)
+                )
+            })?;
+            list.includes.push(Included {
+                id: entry.id.clone(),
+                source: source.clone(),
+                file: file.clone(),
+                commit,
+                by: path.to_path_buf(),
+                depth: 1,
+                uses: true,
+            });
+            list.includes
+                .extend(shim.includes.iter().cloned().map(|mut nested| {
+                    nested.depth += 1;
+                    nested
+                }));
+            list.include_warnings
+                .extend(shim.include_warnings.iter().cloned());
+            mods.push(
+                adopt(&own, &source, &file, shim)
+                    .map_err(|err| anyhow::anyhow!("'{}' (use {source}): {err:#}", entry.id))?,
+            );
+            continue;
+        }
         let Some(include) = entry.include.clone() else {
             mods.push(entry);
             continue;
@@ -230,6 +288,7 @@ fn splice(
             commit,
             by: path.to_path_buf(),
             depth: 1,
+            uses: false,
         });
         list.includes
             .extend(child.includes.iter().cloned().map(|mut nested| {
@@ -281,6 +340,26 @@ fn splice(
 /// A file as messages show it: a git include's by its repository and commit.
 fn shown(path: &Path) -> String {
     git::describe(path).unwrap_or_else(|| path.display().to_string())
+}
+
+/// The one mod of the shim `source` names, for the list at `list` -- a path
+/// relative to it, or a git source, resolved through its lock file -- as a
+/// `use` entry would take it: for writing one.
+pub fn read_shim(list: &Path, source: &str) -> anyhow::Result<ModEntry> {
+    let mut lock = Lock::read(list)?;
+    let base = list.parent().map(Path::to_path_buf).unwrap_or_default();
+    let file = match git::parse(source) {
+        Some(parsed) => git::resolve(&parsed?, &mut lock)?.file,
+        None => normalize(&base.join(source)),
+    };
+    let mut shim = load_locked(&file, false, &Texts::new(), &mut lock)?;
+    lock.save()?;
+    anyhow::ensure!(
+        shim.mods.len() == 1,
+        "{source}: a shim holds one mod, and it has {}",
+        shim.mods.len()
+    );
+    Ok(shim.mods.remove(0))
 }
 
 /// The file `include` (in a file in `base`) names, and its commit for a git
@@ -606,7 +685,83 @@ fn answer(
 /// given as `{ append = [...] }` gains those entries instead.
 fn apply_override(m: ModEntry, fields: &toml::Table) -> anyhow::Result<ModEntry> {
     let id = m.id.clone();
-    let fail = |err: String| anyhow::anyhow!("override of '{id}': {err}");
+    overlay(m, fields, false).map_err(|err| anyhow::anyhow!("override of '{id}': {err:#}"))
+}
+
+/// The mod a `use` entry makes: the shim's one mod, with the fields the
+/// entry `own` writes in place of its own -- its id and section among them.
+/// The entry's actions come after the shim's rather than instead of them,
+/// so a list can add one.
+fn adopt(
+    own: &toml::Table,
+    source: &str,
+    file: &Path,
+    mut shim: SourceModlist,
+) -> anyhow::Result<ModEntry> {
+    anyhow::ensure!(
+        shim.mods.len() == 1,
+        "a shim holds one mod, and it has {}",
+        shim.mods.len()
+    );
+    anyhow::ensure!(
+        shim.inputs.is_empty()
+            && shim.ini.is_empty()
+            && shim.manual_steps.is_empty()
+            && shim.post_install_actions.is_empty(),
+        "a shim holds one mod and nothing else ([inputs], [ini], manual steps or post-install \
+         actions); `include` a file that needs them"
+    );
+    let mut fields = own.clone();
+    fields.remove("use");
+    if let Some(actions) = fields.remove("actions") {
+        fields.insert(
+            "actions".to_string(),
+            toml::Value::Table(toml::Table::from_iter([("append".to_string(), actions)])),
+        );
+    }
+    let mut shim_mod = shim.mods.remove(0);
+    let folder = image_folder(source, file);
+    rebase_images(&mut shim_mod.docs, folder.as_deref());
+    let mut adopted = overlay(shim_mod, &fields, true)?;
+    // It is written in the list, whatever the shim's own file was.
+    adopted.origin = None;
+    adopted.inherited_sections = 0;
+    adopted.written_id = None;
+    adopted.overridden = Vec::new();
+    adopted.used = Some(file.to_path_buf());
+    Ok(adopted)
+}
+
+/// Where pictures named in a file included as `include` (read from `file`)
+/// are, relative to the including file: its folder as written, or, for a
+/// file elsewhere (a git include's, in the cache), its whole path.
+fn image_folder(include: &str, file: &Path) -> Option<String> {
+    if git::parse(include).is_some() || git::checkout_of(file).is_some() {
+        file.parent().map(|folder| folder.display().to_string())
+    } else {
+        include
+            .rsplit_once('/')
+            .map(|(folder, _)| folder.to_string())
+    }
+}
+
+/// `docs`' pictures named from the including file's folder, by `folder`.
+fn rebase_images(docs: &mut Docs, folder: Option<&str>) {
+    if let Some(folder) = folder {
+        for image in &mut docs.images {
+            if let Some(path) = &mut image.path
+                && !Path::new(path.as_str()).is_absolute()
+            {
+                *path = format!("{folder}/{path}");
+            }
+        }
+    }
+}
+
+/// `m` with `fields` written over its own; `id` among them only if
+/// `with_id`.
+fn overlay(m: ModEntry, fields: &toml::Table, with_id: bool) -> anyhow::Result<ModEntry> {
+    let fail = |err: String| anyhow::anyhow!("{err}");
     let mut table = match toml::Value::try_from(&m).map_err(|err| fail(err.to_string()))? {
         toml::Value::Table(table) => table,
         _ => unreachable!("a mod is a table"),
@@ -614,6 +769,7 @@ fn apply_override(m: ModEntry, fields: &toml::Table) -> anyhow::Result<ModEntry>
     for (key, value) in fields {
         match key.as_str() {
             "skip" => continue,
+            "id" if with_id => {}
             "id" | "include" => return Err(fail(format!("`{key}` cannot be overridden"))),
             _ => {}
         }
@@ -672,28 +828,9 @@ fn absorb(
         "it has the guide's [docs], which are for a whole list; an included file documents its \
          mods and [sections]"
     );
-    // Images are named relative to the file that names them: from a file
-    // elsewhere (a git include's, in the cache), by its whole path.
-    let folder = if git::parse(include).is_some() || git::checkout_of(child_path).is_some() {
-        child_path
-            .parent()
-            .map(|folder| folder.display().to_string())
-    } else {
-        include
-            .rsplit_once('/')
-            .map(|(folder, _)| folder.to_string())
-    };
-    let rebase = |docs: &mut Docs| {
-        if let Some(folder) = &folder {
-            for image in &mut docs.images {
-                if let Some(path) = &mut image.path
-                    && !Path::new(path.as_str()).is_absolute()
-                {
-                    *path = format!("{folder}/{path}");
-                }
-            }
-        }
-    };
+    // Images are named relative to the file that names them.
+    let folder = image_folder(include, child_path);
+    let rebase = |docs: &mut Docs| rebase_images(docs, folder.as_deref());
 
     let (child_mods, dropped) = shape(entry, child.mods)?;
     for mut spliced in child_mods {
@@ -797,8 +934,9 @@ fn merge_docs(modlist: &mut SourceModlist, file: DocsFile) -> anyhow::Result<()>
             .ok_or_else(|| {
                 anyhow::anyhow!("documents mod {id:?}, which the modlist does not have")
             })?;
+        // A shim's prose is the shim's: the list's docs file can replace it.
         anyhow::ensure!(
-            entry.docs.is_empty(),
+            entry.docs.is_empty() || entry.used.is_some(),
             "mod {id:?} is documented in both the modlist and the docs file"
         );
         entry.docs = docs;

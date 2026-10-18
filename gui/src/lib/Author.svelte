@@ -508,6 +508,11 @@
           </p>
         {:else}
           <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
+          {#if view?.used}
+            <p class="dim small">
+              Defined by the shim <code>{view.used}</code>: what the entry here sets is written over it.
+            </p>
+          {/if}
           {#if view?.origin}
             <p class="dim small">
               Written in <code>{view.origin}</code>, which the list includes: changes here are made there.

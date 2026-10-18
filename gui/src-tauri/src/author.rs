@@ -153,6 +153,8 @@ pub(super) struct ModView {
     origin: Option<String>,
     /// The fields the include that brings it overrides.
     overridden: Vec<String>,
+    /// The shim it takes its definition from (`use`), relative to the list.
+    used: Option<String>,
     archives: Vec<ArchiveChoice>,
 }
 
@@ -173,6 +175,10 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
             .as_deref()
             .map(|path| config::compiler::origin_name(&base, path)),
         overridden: entry.overridden.clone(),
+        used: entry
+            .used
+            .as_deref()
+            .map(|path| config::compiler::origin_name(&base, path)),
         archives: entry
             .archives
             .iter()
