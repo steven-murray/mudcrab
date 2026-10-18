@@ -228,7 +228,7 @@ fn a_mod_from_a_git_include_is_not_edited_in_the_cache() {
         &format!("git+{}?tag=v1#core.toml", repo.display()),
     );
     let pairs = doc::parse_pairs(&["oracle_name=\"X\"".to_string()]).unwrap();
-    let err = edit::plan_mod(&list, "A", |text, _| {
+    let err = edit::plan_mod(&list, "A", |text, _, _| {
         doc::set_fields(text, "A", None, &pairs, &[])
     })
     .unwrap_err()

@@ -126,6 +126,101 @@ impl Condition {
     }
 }
 
+impl Condition {
+    /// The mods this condition asks about, renamed by `rename` where it
+    /// gives a new name.
+    pub fn rename_mods(&mut self, rename: &dyn Fn(&str) -> Option<String>) {
+        match self {
+            Condition::Any(terms) | Condition::All(terms) => {
+                terms.iter_mut().for_each(|t| t.rename_mods(rename));
+            }
+            Condition::Not(inner) => inner.rename_mods(rename),
+            Condition::Mod(id) => {
+                if let Some(new) = rename(id) {
+                    *id = new;
+                }
+            }
+            Condition::Input { .. } => {}
+        }
+    }
+
+    /// The condition as text `parse` reads back to the same answers. With no
+    /// parentheses, that is terms joined by `&&`, joined by `||`: `!` is
+    /// pushed down onto the terms, and an `&&` of `||`s multiplied out.
+    pub fn to_text(&self) -> String {
+        dnf(self, false)
+            .iter()
+            .map(|all| {
+                all.iter()
+                    .map(|(negated, term)| {
+                        format!("{}{}", if *negated { "!" } else { "" }, term_text(term))
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" && ")
+            })
+            .collect::<Vec<_>>()
+            .join(" || ")
+    }
+}
+
+/// `condition` (negated, if `negated`) as an `||` of `&&`s of terms, each
+/// term perhaps negated.
+fn dnf(condition: &Condition, negated: bool) -> Vec<Vec<(bool, &Condition)>> {
+    match condition {
+        Condition::Any(terms) if !negated => sum(terms, false),
+        Condition::Any(terms) => product(terms, true),
+        Condition::All(terms) if !negated => product(terms, false),
+        Condition::All(terms) => sum(terms, true),
+        Condition::Not(inner) => dnf(inner, !negated),
+        term => vec![vec![(negated, term)]],
+    }
+}
+
+/// Any of `terms`.
+fn sum(terms: &[Condition], negated: bool) -> Vec<Vec<(bool, &Condition)>> {
+    terms.iter().flat_map(|term| dnf(term, negated)).collect()
+}
+
+/// All of `terms`, multiplied out.
+fn product(terms: &[Condition], negated: bool) -> Vec<Vec<(bool, &Condition)>> {
+    terms.iter().fold(vec![Vec::new()], |sum, term| {
+        let next = dnf(term, negated);
+        sum.iter()
+            .flat_map(|left| {
+                next.iter().map(move |right| {
+                    let mut both = left.clone();
+                    both.extend(right.iter().cloned());
+                    both
+                })
+            })
+            .collect()
+    })
+}
+
+fn term_text(term: &Condition) -> String {
+    let value = |value: &str| {
+        if value.is_empty() || value.contains(|c: char| c.is_whitespace() || "&|!=".contains(c)) {
+            format!("\"{value}\"")
+        } else {
+            value.to_string()
+        }
+    };
+    match term {
+        Condition::Mod(id) => mod_term(id),
+        Condition::Input { key, test } => match test {
+            InputTest::Truthy => key.clone(),
+            InputTest::Equals(want) => format!("{key} == {}", value(want)),
+            InputTest::NotEquals(want) => format!("{key} != {}", value(want)),
+        },
+        _ => unreachable!("only terms are left once multiplied out"),
+    }
+}
+
+/// Both `a` and `b`, as one condition's text.
+pub fn and(a: &str, b: &str) -> anyhow::Result<String> {
+    Ok(Condition::All(vec![Condition::parse(a)?, Condition::parse(b)?]).to_text())
+}
+
 /// The term that asks about mod `id`, quoted when it has to be.
 pub fn mod_term(id: &str) -> String {
     if id.contains(|c: char| c.is_whitespace() || "&|!=\"".contains(c)) {
@@ -255,6 +350,49 @@ mod tests {
             ("a".to_string(), InputValue::Bool(true)),
             ("b".to_string(), InputValue::Text("orange".to_string())),
         ])
+    }
+
+    #[test]
+    fn a_condition_written_back_answers_the_same() {
+        let answers = [
+            responses(),
+            HashMap::from([("b".to_string(), InputValue::Text("x y".to_string()))]),
+            HashMap::new(),
+        ];
+        for expr in [
+            "a",
+            "!a && b == orange",
+            "a || b != \"x y\" && !mod:\"Y Z\"",
+            "mod:A || mod:B && !a",
+        ] {
+            let parsed = Condition::parse(expr).unwrap();
+            let again = Condition::parse(&parsed.to_text()).unwrap();
+            for mods in [&[][..], &["A"][..], &["Y Z", "B"][..]] {
+                for responses in &answers {
+                    let ask = |c: &Condition| {
+                        c.eval(responses, &mut |id| Ok(mods.contains(&id))).unwrap()
+                    };
+                    assert_eq!(ask(&parsed), ask(&again), "{expr} as {}", parsed.to_text());
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn two_conditions_are_joined_without_parentheses() {
+        assert_eq!(and("a || b", "c").unwrap(), "a && c || b && c");
+        assert!(and("a", "!(x)").is_err());
+        assert_eq!(
+            and("!mod:A", "b == \"x y\"").unwrap(),
+            "!mod:A && b == \"x y\""
+        );
+    }
+
+    #[test]
+    fn mods_are_renamed() {
+        let mut c = Condition::parse("mod:A && !mod:B || a").unwrap();
+        c.rename_mods(&|id| (id == "A").then(|| "Group A".to_string()));
+        assert_eq!(c.to_text(), "mod:\"Group A\" && !mod:B || a");
     }
 
     fn eval(expr: &str, mods: &[&str]) -> bool {

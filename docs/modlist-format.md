@@ -522,7 +522,7 @@ written in place:
 
 - **Its mods** go where the `include` entry is, in their order, each under the
   entry's `section` and then its own. An `include` entry has only `id`,
-  `section` and `include`.
+  `section`, `include`, and the options below.
 - **Its `plugins`** go where the including list's `plugins` has
   `{ include = "<the entry's id>" }`. Leaving them unplaced is an error, as a
   mod's plugin missing from the load order is. An included file can also leave
@@ -554,6 +554,44 @@ included mod in the file it is written in, and check the whole list before
 writing. A mod moves only within its own file, and a plugin within the file
 that places it. `add --before-mod` adds a mod to the file the mod it goes
 before is in; without it, a new mod goes in the list's own file.
+
+### Choosing and changing what comes in
+
+An `include` entry can take part of a file, or change it, without copying
+it -- which matters most for a file from someone else's repository:
+
+```toml
+[[mods]]
+id = "Common"
+section = ["01 - Core"]
+include = "git+https://github.com/someone/oblivion-common?tag=v3#patches.toml"
+if = "!minimal"              # every included mod takes this condition too
+prefix = "Common - "         # put before every included mod's id
+except = ["Old Patch"]       # leave these out (or `only = [...]`: take just these)
+
+[mods.override."Display Stats"]
+fomod_selections = [{ step = "Main", group = "Size", option = "Large" }]
+actions.append = [{ action = "file_hide", paths = ["textures/menus/stats.dds"] }]
+
+[mods.override."Unofficial Patch"]
+skip = true                  # as `except`
+```
+
+| Option | Effect |
+| --- | --- |
+| `if` | A condition on the whole group: each included mod is left out when it is false, as well as when its own `if` is. |
+| `prefix` | Put before every included mod's id, so two files that use the same ids can both be included. Their mentions of each other -- `dependencies`, `conflicts_with`, merge sources, `mod:` in conditions -- are renamed too. |
+| `only`, `except` | Take only these of the file's mods, or all but these, by their ids in the file. Plugins only the left-out mods have are left out of the load order with them. |
+| `override."<id>"` | Fields of that mod (by its id in the file) to use instead of the file's. A list field given as `{ append = [...] }` -- written `actions.append = [...]` -- keeps the file's entries and adds these. `skip = true` leaves the mod out. A mod's `id` cannot be overridden. |
+
+Mods are named by their ids in the included file, before any `prefix`. An
+option naming a mod the file does not have is an error, so an override cannot
+quietly outlive the mod it was written for. An override's fields are checked
+as a mod's are, and its `docs` replace the file's prose for that mod.
+
+The editing commands still change an included mod in its own file, by the id
+it has there. They refuse to change a field an override sets, since the new
+value would have no effect: change the override instead.
 
 ### From a git repository
 
@@ -588,7 +626,8 @@ being written.
   docs file and its pictures come from the same commit. A path leading out of
   the repository is an error, and so is one the commit does not have.
 - **Read only.** Its mods are not edited where they are: the editing commands
-  refuse, saying to change the repository and run `update`.
+  refuse. Change it with an `override` in your list, or in the repository
+  itself and run `update`.
 - **git** must be installed (in the Flatpak, the host's is used). A private
   repository works if git can already reach it without asking for a password.
 
@@ -598,5 +637,5 @@ Messages name a mod from a git include by repository, commit and file:
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema. Overriding an included mod's fields,
-and questions declared by an included file, are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).
+[roadmap](roadmap.md), not in the schema. Questions declared by an included
+file, and `use` for a single shared mod definition, are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).

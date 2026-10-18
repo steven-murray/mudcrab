@@ -1,7 +1,8 @@
 # Composability: lists built from other lists
 
-**Status: phases 1 and 3 done** (local and git includes; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phases 2 and 4-6 are a plan. Where a finished phase settled something
+**Status: phases 1-3 done** (local and git includes, overrides and include
+options; see [the format](../modlist-format.md#lists-in-several-files-include)).
+Phases 4-6 are a plan. Where a finished phase settled something
 differently from the plan below, the notes under [Phases](#phases) say so.
 
 Today a modlist is one file. This plan lets a list pull in other modlist files
@@ -219,7 +220,21 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
      definition hash, so splitting a list does not reinstall anything.
 2. **Overrides and include options.** `override`, `skip`, `.append`, `section`,
    `if`, `prefix`, `only`/`except`. Tests for each, and for an override that
-   names nothing.
+   names nothing. *Done.* As built:
+   - `.append` works on any list field of a mod, not a chosen few. `exclude`
+     is an archive's field, not a mod's, so changing it means overriding
+     `archives` whole.
+   - An override is applied by turning the mod back into TOML, replacing the
+     fields, and reading it again, so it is checked exactly as a mod written
+     out in full would be.
+   - Conditions have no parentheses, so a group's `if` is joined to a mod's
+     own by multiplying out to an `||` of `&&`s.
+   - `prefix` renames mentions within the included group only: an including
+     list naming one of its mods uses the prefixed id.
+   - Edits still go to the file a mod is written in, by its id there; a field
+     an override sets is refused rather than written where it would do
+     nothing. Writing overrides from the editing commands (for a git
+     include's mods) is left for later.
 3. **Git sources and the lock.** Fetch, cache, `tag`/`rev`/`branch`,
    `mudcrab.lock`, `update`, `includes`, `--offline`. *Done.* As built:
    - The lock file is `<list>.lock`, not `mudcrab.lock`: one folder often
