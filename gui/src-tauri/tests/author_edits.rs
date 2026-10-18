@@ -169,7 +169,7 @@ fn edits_are_the_commands_and_can_be_undone() {
         noted["change"]["command"]
             .as_str()
             .unwrap()
-            .ends_with("--mod C --summary \"Why C.\" --unset body"),
+            .ends_with("--mod C --summary 'Why C.' --unset body"),
         "{noted}"
     );
     assert!(read().contains("docs.summary = \"Why C.\""));

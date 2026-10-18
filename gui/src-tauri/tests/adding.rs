@@ -170,7 +170,7 @@ fn a_mod_is_added_from_an_archive() {
     let command = added["change"]["command"].as_str().unwrap();
     assert!(
         command.contains(
-            "--id \"New Thing\" --section Core --manual --plugin New.esp --load-after Old.esp"
+            "--id 'New Thing' --section Core --manual --plugin New.esp --load-after Old.esp"
         ),
         "{command}"
     );
