@@ -22,6 +22,40 @@ pub(crate) struct InstallManifest {
     /// before this field existed still parses -- it simply rebuilds once.
     #[serde(default)]
     pub(crate) built_merges: Vec<BuiltMerge>,
+    /// The instance as the last install that changed it left it, so a manual
+    /// step's plugin (a Bashed Patch) counts as built only when it was built
+    /// after that. `None` until an install has recorded it.
+    #[serde(default)]
+    pub(crate) by_hand_since: Option<ByHandSince>,
+}
+
+/// The last install that changed what is installed or the load order, and
+/// the copies of the manual steps' plugins already there when it finished.
+/// Those were built for an earlier state -- by an earlier list, or before the
+/// mods changed -- so they are to be built again.
+///
+/// By contents rather than modified time: Oblivion's load order *is* the
+/// plugins' modified times, so Wrye Bash and MO2 both rewrite them, and a
+/// fresh patch can carry a date from 2000.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct ByHandSince {
+    /// Fingerprint of the installed mods and the load order.
+    pub(crate) installed: String,
+    pub(crate) found: Vec<FoundPlugin>,
+}
+
+/// A copy of a plugin a manual step waits for, by its contents.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub(crate) struct FoundPlugin {
+    pub(crate) plugin: String,
+    pub(crate) sha256: String,
+}
+
+/// The contents' fingerprint, which a rebuild changes.
+pub(crate) fn hash_file(path: &Path) -> std::io::Result<String> {
+    let mut hasher = Sha256::new();
+    std::io::copy(&mut std::fs::File::open(path)?, &mut hasher)?;
+    Ok(format!("{:x}", hasher.finalize()))
 }
 
 /// A merge that has been built, and the fingerprint of what it was built from.
@@ -257,6 +291,22 @@ pub(crate) fn relative_path_to_mod(mod_path: &Path, mods_dir: &Path) -> String {
                 .unwrap_or("unknown")
                 .to_string()
         })
+}
+
+/// Fingerprint of an install's result as far as a Bashed Patch is concerned:
+/// which mods are in, as defined, and the load order.
+pub(crate) fn hash_installed(
+    installed: &[InstalledMod],
+    plugins: &[String],
+    inactive: &[String],
+) -> String {
+    let mut mods: Vec<(&str, &str)> = installed
+        .iter()
+        .map(|entry| (entry.id.as_str(), entry.definition_hash.as_str()))
+        .collect();
+    mods.sort_unstable();
+    let payload = serde_json::to_vec(&(mods, plugins, inactive)).unwrap_or_default();
+    format!("{:x}", Sha256::digest(payload))
 }
 
 #[cfg(test)]

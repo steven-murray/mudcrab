@@ -402,8 +402,11 @@ steps = """
 ```
 
 `steps` is printed line by line. With `done_when_plugin`, the step stops being
-listed once a plugin of that name is in a mod folder or in MO2's `overwrite/`;
-without it, it is listed after every install. Put these tables after the
+listed once a plugin of that name is in a mod folder or in MO2's `overwrite/`
+and was built since the last install that changed the mods or the load order
+-- a copy left from before then, by another list or an older build, does not
+count, so changing the list asks for the patch to be rebuilt. Without it, the
+step is listed after every install. Put these tables after the
 top-level keys, like `[[mods]]` -- at the end of the file is simplest.
 
 A list whose `plugins` include a `Bashed Patch, N.esp` and that declares no

@@ -858,7 +858,8 @@ mudcrab steps <plan.json> --mo2-instance-dir <instance> [--game-dir <dir>]
 ```
 
 A step the list says how to recognise (`done_when_plugin`: the plugin it
-makes has appeared in a mod or in MO2's `overwrite/`) shows ✔ once done;
+makes has appeared in a mod or in MO2's `overwrite/`, built since the last
+install that changed the mods or load order) shows ✔ once done;
 the rest show ○ with their instructions, every time. `install` prints the
 ones not done at the end of each run; the GUI shows them as a checklist.
 

@@ -39,8 +39,9 @@ pub mod stage;
 
 use layout::install_mod_archives;
 use manifest::{
-    BuiltMerge, InstallManifest, InstalledMod, get_install_manifest_path, hash_personalized_mod,
-    load_install_manifest, relative_path_to_mod, should_skip_mod_install,
+    BuiltMerge, ByHandSince, FoundPlugin, InstallManifest, InstalledMod, get_install_manifest_path,
+    hash_file, hash_installed, hash_personalized_mod, load_install_manifest, relative_path_to_mod,
+    should_skip_mod_install,
 };
 use merge::HiddenPlugin;
 pub(crate) use stage::is_plugin_file;
@@ -156,12 +157,13 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     } else {
         load_install_manifest(&manifest_path)?
     };
-    let (previous_installed, previous_hidden, previous_built) = previous_manifest
+    let (previous_installed, previous_hidden, previous_built, previous_since) = previous_manifest
         .map(|manifest| {
             (
                 manifest.installed_mods,
                 manifest.hidden_plugins,
                 manifest.built_merges,
+                manifest.by_hand_since,
             )
         })
         .unwrap_or_default();
@@ -360,6 +362,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                     snapshot(&installed_mods, &carried_forward),
                     previous_hidden.clone(),
                     previous_built.clone(),
+                    previous_since.clone(),
                 )?;
             }
             clear_install_target(&mod_target)?;
@@ -416,6 +419,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
                 snapshot(&installed_mods, &carried_forward),
                 previous_hidden.clone(),
                 previous_built.clone(),
+                previous_since.clone(),
             )?;
         }
     }
@@ -467,12 +471,25 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             )
         };
 
+        let installed = snapshot(&installed_mods, &carried_forward);
+        // A run that changed what is installed or the load order makes any
+        // patch already built out of date: note what is there now, so only a
+        // rebuild counts. A run that changed nothing keeps the old note.
+        let fingerprint = hash_installed(&installed, &plan.plugins, &plan.inactive_plugins);
+        let since = match previous_since {
+            Some(since) if since.installed == fingerprint => since,
+            _ => ByHandSince {
+                installed: fingerprint,
+                found: found_plugin_copies(&by_hand(plan, settings), settings),
+            },
+        };
         write_install_manifest(
             &manifest_path,
             plan,
-            snapshot(&installed_mods, &carried_forward),
+            installed,
             hidden_plugins,
             merge_outcome.built,
+            Some(since),
         )?;
 
         if settings.mo2_instance_dir.is_some() {
@@ -567,18 +584,41 @@ fn outstanding_steps(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec
 /// Every step left to do by hand after an install, and whether it is done:
 /// the list's own `[[manual-steps]]`, plus building any Bashed Patch the load
 /// order expects that no step covers. A step is done once its
-/// `done_when_plugin` exists; one without is never known to be.
+/// `done_when_plugin` exists and was built since the last install that
+/// changed the mods or load order (see `ByHandSince`). One without a plugin is
+/// never known to be done.
 pub fn manual_steps(
     plan: &PersonalizedPlan,
     settings: &InstallSettings,
 ) -> Vec<(ManualStep, bool)> {
-    let exists = |plugin: &str| plugin_exists(plugin, settings);
-    let done = |step: &ManualStep| step.done_when_plugin.as_deref().is_some_and(exists);
-    let mut out: Vec<(ManualStep, bool)> = plan
-        .manual_steps
-        .iter()
-        .map(|step| (step.clone(), done(step)))
-        .collect();
+    let found_before = load_install_manifest(&get_install_manifest_path(settings))
+        .ok()
+        .flatten()
+        .and_then(|manifest| manifest.by_hand_since)
+        .map(|since| since.found)
+        .unwrap_or_default();
+    let built = |plugin: &str| {
+        plugin_copies(plugin, settings).iter().any(|copy| {
+            let stale = found_before
+                .iter()
+                .filter(|found| found.plugin.eq_ignore_ascii_case(plugin))
+                .collect::<Vec<_>>();
+            stale.is_empty()
+                || hash_file(copy).is_ok_and(|hash| stale.iter().all(|f| f.sha256 != hash))
+        })
+    };
+    by_hand(plan, settings)
+        .into_iter()
+        .map(|step| {
+            let done = step.done_when_plugin.as_deref().is_some_and(built);
+            (step, done)
+        })
+        .collect()
+}
+
+/// The steps by hand, without whether they are done.
+fn by_hand(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<ManualStep> {
+    let mut out = plan.manual_steps.clone();
     let covered = |plugin: &str| {
         plan.manual_steps.iter().any(|step| {
             step.done_when_plugin
@@ -599,7 +639,7 @@ pub fn manual_steps(
             .filter(|exe| exe.is_file())
             .map(|exe| exe.display().to_string())
             .unwrap_or_else(|| "Wrye Bash.exe, in the game folder's Mopy folder".to_string());
-        let step = ManualStep {
+        out.push(ManualStep {
             title: format!("build {plugin} with Wrye Bash"),
             steps: format!(
                 "The list orders a Bashed Patch, and only Wrye Bash can build one (it has no \
@@ -614,30 +654,49 @@ pub fn manual_steps(
                  mod...\", to keep it in a mod of its own."
             ),
             done_when_plugin: Some(plugin.clone()),
-        };
-        let built = done(&step);
-        out.push((step, built));
+        });
     }
     out
 }
 
-/// Whether a plugin of this name is at the top of any mod folder, or in MO2's
-/// `overwrite/`, where a tool run from MO2 writes.
-fn plugin_exists(plugin: &str, settings: &InstallSettings) -> bool {
-    let has = |dir: &Path| {
-        std::fs::read_dir(dir).is_ok_and(|entries| {
-            entries
-                .flatten()
-                .any(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(plugin))
+/// What is already in the instance of each plugin these steps wait for.
+fn found_plugin_copies(steps: &[ManualStep], settings: &InstallSettings) -> Vec<FoundPlugin> {
+    steps
+        .iter()
+        .filter_map(|step| step.done_when_plugin.as_deref())
+        .flat_map(|plugin| {
+            plugin_copies(plugin, settings)
+                .into_iter()
+                .filter_map(|copy| hash_file(&copy).ok())
+                .map(|sha256| FoundPlugin {
+                    plugin: plugin.to_string(),
+                    sha256,
+                })
         })
+        .collect()
+}
+
+/// Every copy of a plugin at the top of a mod folder, or in MO2's
+/// `overwrite/`, where a tool run from MO2 writes.
+fn plugin_copies(plugin: &str, settings: &InstallSettings) -> Vec<PathBuf> {
+    let named = |dir: &Path| -> Vec<PathBuf> {
+        std::fs::read_dir(dir)
+            .map(|entries| {
+                entries
+                    .flatten()
+                    .filter(|e| e.file_name().to_string_lossy().eq_ignore_ascii_case(plugin))
+                    .map(|e| e.path())
+                    .collect()
+            })
+            .unwrap_or_default()
     };
-    let in_mods = std::fs::read_dir(&settings.mods_dir)
-        .is_ok_and(|entries| entries.flatten().any(|e| has(&e.path())));
-    in_mods
-        || settings
-            .mo2_instance_dir
-            .as_ref()
-            .is_some_and(|dir| has(&dir.join("overwrite")))
+    let mut out: Vec<PathBuf> = std::fs::read_dir(&settings.mods_dir)
+        .map(|entries| entries.flatten().flat_map(|e| named(&e.path())).collect())
+        .unwrap_or_default();
+    if let Some(dir) = &settings.mo2_instance_dir {
+        out.extend(named(&dir.join("overwrite")));
+    }
+    out
 }
 
 /// Everything the manifest should claim right now: what this run has settled,
@@ -655,12 +714,14 @@ fn write_install_manifest(
     installed_mods: Vec<InstalledMod>,
     hidden_plugins: Vec<HiddenPlugin>,
     built_merges: Vec<BuiltMerge>,
+    by_hand_since: Option<ByHandSince>,
 ) -> anyhow::Result<()> {
     let manifest = InstallManifest {
         name: plan.name.clone(),
         installed_mods,
         hidden_plugins,
         built_merges,
+        by_hand_since,
     };
     let payload = serde_json::to_string_pretty(&manifest)
         .map_err(|err| anyhow::anyhow!("failed to serialize install manifest: {err}"))?;
@@ -990,6 +1051,59 @@ mod tests {
         std::fs::create_dir_all(root.path().join("overwrite")).unwrap();
         std::fs::write(root.path().join("overwrite/Bashed Patch, 0.esp"), b"").unwrap();
         assert_eq!(titles(&plan), ["read the readme"]);
+    }
+
+    #[test]
+    fn a_patch_counts_as_built_only_when_built_since_the_list_last_changed() {
+        use super::{InstallSettings, install_all, outstanding_steps};
+        use crate::config::schema::PersonalizedPlan;
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("ModOrganizer.exe"), b"").unwrap();
+        let overwrite = root.path().join("overwrite");
+        std::fs::create_dir_all(&overwrite).unwrap();
+        // From an earlier list, before this one was installed here.
+        std::fs::write(overwrite.join("Bashed Patch, 0.esp"), b"old").unwrap();
+        let plan: PersonalizedPlan = serde_json::from_value(serde_json::json!({
+            "schema_version": 1, "name": "L", "responses": {}, "mod_order": [],
+            "selected_mods": [], "mods": [],
+            "plugins": ["Bashed Patch, 0.esp"]
+        }))
+        .unwrap();
+        let settings = InstallSettings {
+            cache_dir: root.path().join("downloads"),
+            mods_dir: root.path().join("mods"),
+            mo2_instance_dir: Some(root.path().to_path_buf()),
+            profile_name: "Default".to_string(),
+            game_dir: None,
+            execute_actions: true,
+            dry_run: false,
+            tools: Default::default(),
+            filter: Default::default(),
+            force_merges: false,
+            force: false,
+            redo_actions: Vec::new(),
+        };
+        let outstanding = || outstanding_steps(&plan, &settings).len();
+        install_all(&plan, &settings).unwrap();
+        assert_eq!(
+            outstanding(),
+            1,
+            "the old patch was not built for this list"
+        );
+        // Installing again does not take the old patch for a new one.
+        install_all(&plan, &settings).unwrap();
+        assert_eq!(outstanding(), 1);
+        // Wrye Bash rebuilds it, in place.
+        std::fs::write(overwrite.join("Bashed Patch, 0.esp"), b"new").unwrap();
+        assert_eq!(outstanding(), 0);
+        // A later install that changes nothing keeps it built.
+        install_all(&plan, &settings).unwrap();
+        assert_eq!(outstanding(), 0);
+        // One that changes the load order makes it out of date.
+        let mut changed = plan.clone();
+        changed.plugins.insert(0, "Oblivion.esm".to_string());
+        install_all(&changed, &settings).unwrap();
+        assert_eq!(outstanding_steps(&changed, &settings).len(), 1);
     }
 
     #[test]
