@@ -274,8 +274,8 @@ fn a_shim_is_used_from_a_repository_and_locked() {
     std::fs::write(
         &path,
         format!(
-            "name = \"L\"\n\n[[mods]]\nid = \"Trees\"\nuse = \"git+{}?tag=v1#trees.toml\"\n",
-            repo.display()
+            "name = \"L\"\n\n[[mods]]\nid = \"Trees\"\nuse = {:?}\n",
+            format!("git+{}?tag=v1#trees.toml", repo.display())
         ),
     )
     .unwrap();
