@@ -13,17 +13,22 @@ pub fn list(args: IncludesArgs) -> anyhow::Result<()> {
     }
     let base = source.base_dir.clone().unwrap_or_default();
     for included in &source.includes {
-        let mods = source
-            .mods
-            .iter()
-            .filter(|entry| entry.origin.as_ref() == Some(&included.file))
-            .count();
+        let what = if included.uses {
+            "uses its mod".to_string()
+        } else {
+            let mods = source
+                .mods
+                .iter()
+                .filter(|entry| entry.origin.as_ref() == Some(&included.file))
+                .count();
+            format!("{mods} mod(s)")
+        };
         let indent = "  ".repeat(included.depth - 1);
         ui::data(format!(
             "{indent}{}  {}  {}",
             ui::name(&included.id),
             origin_name(&base, &included.file),
-            ui::dim(format!("{mods} mod(s)"))
+            ui::dim(what)
         ));
     }
     for warning in &source.include_warnings {

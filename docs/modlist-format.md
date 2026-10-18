@@ -598,6 +598,31 @@ The editing commands still change an included mod in its own file, by the id
 it has there. They refuse to change a field an override sets, since the new
 value would have no effect: change the override instead.
 
+### Shims: one mod, defined elsewhere (`use`)
+
+A shim is a file holding a single mod, written once the way it installs
+properly -- a fix for a badly packaged archive -- for every list that has the
+mod. An entry takes it with `use`, a path or a [git source](#from-a-git-repository):
+
+```toml
+[[mods]]
+id = "Example Creatures"
+section = ["Creatures"]
+use = "git+https://github.com/someone/oblivion-shims?tag=v1#example-creatures.toml"
+```
+
+The entry is the shim's mod -- archives, layout, filters, actions, plugins,
+download page, prose -- with the fields the entry writes itself in place of
+the shim's: its `id` and `section`, and anything else it sets (an `if`, an
+archive's FOMOD choices). Its `actions` are added after the shim's rather than
+replacing them, so a list can add one. The shim's plugins still need a place in
+the list's `plugins`, and the list's docs file can replace the shim's prose.
+
+A shim holds one mod and nothing else: no `inputs`, `ini`, manual steps or
+post-install actions, which a file `include`d can have. The entry is the
+list's own, so the editing commands change it there: a field set with `set` is
+written into the entry, over the shim's. `add --use <shim>` writes one.
+
 ### From a git repository
 
 `include` can name a file in a git repository -- on GitHub, or anywhere git
@@ -642,5 +667,4 @@ Messages name a mod from a git include by repository, commit and file:
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema. `use`, for a single shared mod
-definition, is planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).
+[roadmap](roadmap.md), not in the schema.

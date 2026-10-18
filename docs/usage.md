@@ -36,12 +36,19 @@ Add one `[[mods]]` block to a source modlist, in place.
 mudcrab add <modlist.toml> --archive <archive> --id "<mod id>" --section "<name>" [--nexus <modid>/<fileid> | --manual] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --from-mo2 <MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
+mudcrab add <modlist.toml> --use <shim> [--id "<mod id>"] [--section "<name>"] [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 ```
 
 [Writing a modlist](authoring.md) walks through using it on a new list.
 
 `add` only writes the mod's declaration into the list; nothing is installed or
 unpacked until `install`.
+
+`--use` writes an entry that takes its definition from a shim -- a file holding
+one mod, a path relative to the list or a `git+` source -- with
+`use = "<shim>"`, the shim's mod id (unless `--id` gives another), and the
+shim's plugins put into the load order where `--load-after` or `--load-last`
+says. See [Shims](modlist-format.md#shims-one-mod-defined-elsewhere-use).
 
 `--archive` writes the archive entry from the archive itself, as `inspect`
 reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
