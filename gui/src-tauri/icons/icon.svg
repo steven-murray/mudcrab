@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- mudcrab's icon: a crab in the app's accent colour on its dark panel. -->
+  <rect x="32" y="32" width="960" height="960" rx="200" fill="#1b1e24"/>
+  <g fill="none" stroke="#c95a22" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Legs, three a side. -->
+    <path d="M330 600 L215 650 L170 740"/>
+    <path d="M335 655 L240 735 L225 830"/>
+    <path d="M370 700 L305 800 L315 880"/>
+    <path d="M694 600 L809 650 L854 740"/>
+    <path d="M689 655 L784 735 L799 830"/>
+    <path d="M654 700 L719 800 L709 880"/>
+    <!-- Arms up to the claws. -->
+    <path d="M380 520 L300 440 L290 360"/>
+    <path d="M644 520 L724 440 L734 360"/>
+  </g>
+  <g fill="#e8743b">
+    <!-- Claws: a pincer each, open at the top. -->
+    <path d="M300 380 C210 380 175 300 205 225 C225 175 270 150 310 160 L285 245 L345 205 C375 250 370 330 300 380 Z"/>
+    <path d="M724 380 C814 380 849 300 819 225 C799 175 754 150 714 160 L739 245 L679 205 C649 250 654 330 724 380 Z"/>
+    <!-- Shell. -->
+    <ellipse cx="512" cy="600" rx="240" ry="165"/>
+  </g>
+  <!-- Eyes on stalks. -->
+  <g stroke="#e8743b" stroke-width="26" stroke-linecap="round">
+    <path d="M455 450 L440 395"/>
+    <path d="M569 450 L584 395"/>
+  </g>
+  <circle cx="438" cy="385" r="30" fill="#f4f5f7"/>
+  <circle cx="586" cy="385" r="30" fill="#f4f5f7"/>
+  <circle cx="442" cy="388" r="13" fill="#15171c"/>
+  <circle cx="582" cy="388" r="13" fill="#15171c"/>
+  <!-- A little shine on the shell. -->
+  <path d="M400 545 C440 500 520 488 590 505" fill="none" stroke="#f0a070" stroke-width="22" stroke-linecap="round" opacity="0.7"/>
+</svg>

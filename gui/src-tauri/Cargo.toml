@@ -1,6 +1,6 @@
 [package]
 name = "mudcrab-gui"
-version = "0.2.5"
+version.workspace = true
 edition = "2024"
 description = "The mudcrab GUI: install a modlist with one button, and (later) author one"
 license = "MIT OR Apache-2.0"

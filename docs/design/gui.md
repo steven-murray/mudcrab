@@ -269,7 +269,12 @@ Still printing directly: `assets` (its logic sits in the command) and
    asking Nexus by checksum where the `.meta` says nothing. Phase 6 is done;
    what is left is polish found in use.
 7. **Packaging.** AppImage (and Flatpak) for Linux, an installer or zip for
-   Windows, the Deck checked; the GUI as a separate release artifact.
+   Windows, the Deck checked; the GUI as a separate release artifact. Built: Tauri's bundler makes an AppImage
+   (on Ubuntu 22.04, for its glibc) and a per-user NSIS installer, with a zip
+   of the Windows program beside it, attached to the release a `v*` tag
+   makes, and built on every GUI CI run so a pull request's can be tried;
+   an icon; one version for the CLI and the GUI (`[workspace.package]`).
+   Still to do: a Flatpak, and the Deck checked.
 
 ## Settled
 

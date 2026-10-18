@@ -1,9 +1,23 @@
 # The GUI
 
-**Preview.** The GUI is new and not yet in a release; build it from source
-(below) to try it. Everything it does is one of the commands in
+**New.** Everything the GUI does is one of the commands in
 [Getting started](getting-started.md), which stay the complete way to use
 mudcrab.
+
+## Getting it
+
+Each [release](https://github.com/steven-murray/mudcrab/releases) has the GUI
+beside the command line:
+
+- **Linux, and the Steam Deck in desktop mode**:
+  `mudcrab-gui-<version>-x86_64.AppImage`. Make it executable (in a file
+  manager's Properties, or `chmod +x`) and run it; nothing is installed. It
+  carries its own WebKitGTK, so it is large, and needs glibc 2.35 or newer.
+- **Windows**: `mudcrab-gui-<version>-windows-x64-setup.exe` installs it for
+  your account (no administrator needed) with a Start menu entry and an
+  uninstaller; `mudcrab-gui-<version>-windows-x64.zip` is the program alone,
+  to unpack and run. Both use Windows' own WebView2, which Windows 10 and 11
+  have; the installer fetches it on the rare system without.
 
 The GUI's install mode reads a list and installs it from one window:
 
@@ -149,8 +163,9 @@ history there, rather than be undone by it.
 
 ## Building it
 
-You need Rust, Node.js, and on Linux WebKitGTK 4.1 (`webkit2gtk-4.1` on Arch,
-`libwebkit2gtk-4.1-dev` on Debian and Ubuntu). From the repository:
+To build it yourself, you need Rust, Node.js, and on Linux WebKitGTK 4.1
+(`webkit2gtk-4.1` on Arch, `libwebkit2gtk-4.1-dev` on Debian and Ubuntu).
+From the repository:
 
 ```bash
 cd gui
@@ -165,3 +180,9 @@ target/release/mudcrab-gui path/to/list.toml
 ```
 
 The list is optional; without it the GUI starts on its own page.
+
+The bundles a release ships are made by Tauri's bundler, from `gui/`:
+`npx tauri build --bundles appimage` on Linux, `--bundles nsis` on Windows,
+into `target/release/bundle/`. On a distribution newer than the AppImage
+tools (Arch and its family), their `strip` cannot read the system's
+libraries; `NO_STRIP=true` before the command skips it.
