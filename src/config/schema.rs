@@ -641,19 +641,44 @@ pub enum PluginSlot {
 }
 
 /// One mod in the flat `[[mods]]` list.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ModEntry {
     /// Unique id; also the mod's directory name.
     pub id: String,
     /// Not a mod but another modlist file, relative to this one, whose mods
     /// the loader puts here in its place. See [`crate::config::loader`].
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub include: Option<String>,
+    /// With `include`: put this before every included mod's id.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    /// With `include`: take only these of its mods, by their ids there.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub only: Vec<String>,
+    /// With `include`: leave these of its mods out.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub except: Vec<String>,
+    /// With `include`: fields to change in its mods, by their ids there.
+    /// See [`crate::config::loader`].
+    #[serde(
+        default,
+        rename = "override",
+        skip_serializing_if = "IndexMap::is_empty"
+    )]
+    pub overrides: IndexMap<String, toml::Table>,
     /// The included file the loader took this mod from; `None` for the list's
     /// own. Set by the loader.
     #[serde(skip)]
     pub origin: Option<std::path::PathBuf>,
+    /// The id as the file it is written in has it, where an include's
+    /// `prefix` changed it. Set by the loader.
+    #[serde(skip)]
+    pub written_id: Option<String>,
+    /// The fields an include's `override` sets, which its file's own values
+    /// no longer decide. Set by the loader.
+    #[serde(skip)]
+    pub overridden: Vec<String>,
     /// How many of `section`'s first levels the includes it came through put
     /// there, rather than its own file. Set by the loader.
     #[serde(skip)]
@@ -837,7 +862,7 @@ pub enum ArchiveLayout {
     CustomDataFolder,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ArchiveSpec {
     /// Only use this archive when the condition holds; see

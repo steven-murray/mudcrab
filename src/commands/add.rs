@@ -47,6 +47,10 @@ pub async fn run(mut args: AddArgs) -> anyhow::Result<()> {
     let place = config::edit::place_beside(&args.input, placement.before_mod.as_deref())?;
     let mut local = new_mod.clone();
     local.section = place.local(&new_mod.section)?;
+    let mut placement = placement;
+    if placement.before_mod.is_some() {
+        placement.before_mod = Some(place.id.clone());
+    }
     let mut added = None;
     let edit = config::edit::plan_in(&args.input, &place.file, |text, source| {
         let plan = plan_add(text, source, &local, &placement, position.as_ref())?;

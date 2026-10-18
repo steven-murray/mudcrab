@@ -178,6 +178,8 @@ export interface ModView {
   left_out: boolean;
   /** The included file the mod is written in, relative to the list. */
   origin: string | null;
+  /** The fields the include that brings it overrides. */
+  overridden: string[];
   archives: { number: number; label: string; layout: string | null; condition: string | null }[];
 }
 

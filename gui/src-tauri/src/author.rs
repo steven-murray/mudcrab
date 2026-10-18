@@ -151,6 +151,8 @@ pub(super) struct ModView {
     /// The included file it is written in, relative to the list; absent for
     /// the list's own.
     origin: Option<String>,
+    /// The fields the include that brings it overrides.
+    overridden: Vec<String>,
     archives: Vec<ArchiveChoice>,
 }
 
@@ -170,6 +172,7 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
             .origin
             .as_deref()
             .map(|path| config::compiler::origin_name(&base, path)),
+        overridden: entry.overridden.clone(),
         archives: entry
             .archives
             .iter()

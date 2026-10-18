@@ -210,7 +210,7 @@ fn an_include_entry_with_a_mods_fields_is_refused() {
         ),
     );
     let err = load_modlist(&list).unwrap_err().to_string();
-    assert!(err.contains("only `id`, `section` and `include`"), "{err}");
+    assert!(err.contains("it also has plugins"), "{err}");
     assert!(err.contains("plugins"), "{err}");
 }
 
@@ -275,7 +275,7 @@ fn an_included_mods_fields_are_set_in_its_own_file() {
     let dir = tempdir().unwrap();
     let list = split(dir.path());
     let pairs = doc::parse_pairs(&["oracle_name=\"Alpha\"".to_string()]).unwrap();
-    let edit = edit::plan_mod(&list, "A", |text, _| {
+    let edit = edit::plan_mod(&list, "A", |text, _, _| {
         doc::set_fields(text, "A", None, &pairs, &[])
     })
     .unwrap();
