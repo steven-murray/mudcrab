@@ -818,6 +818,31 @@ pub enum LoadPosition {
 /// the rest of `add`: nothing outside the lines it inserts changes, except a
 /// comma added to the entry it follows. With no `plugins` array yet, one is
 /// started before the file's first table.
+/// The last plugin, in load order, of the nearest of the first `at` mods
+/// that has any in it: where a mod's plugins go by default when it is put
+/// after them.
+pub fn last_plugin_before(
+    source: &crate::config::schema::SourceModlist,
+    at: usize,
+) -> Option<String> {
+    let order: Vec<String> = source
+        .plugins
+        .iter()
+        .map(|p| p.to_ascii_lowercase())
+        .collect();
+    source.mods[..at.min(source.mods.len())]
+        .iter()
+        .rev()
+        .find_map(|entry| {
+            entry
+                .plugins
+                .iter()
+                .filter_map(|p| order.iter().position(|o| o == &p.to_ascii_lowercase()))
+                .max()
+                .map(|index| source.plugins[index].clone())
+        })
+}
+
 pub fn place_plugins(
     text: &str,
     plugins: &[String],

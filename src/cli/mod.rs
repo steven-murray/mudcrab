@@ -60,7 +60,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Editing a modlist",
         &[
-            "move", "set", "docs", "choose", "remove", "plugins", "files", "action", "input",
+            "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins", "files", "action", "input",
         ],
     ),
     (
@@ -118,8 +118,13 @@ pub enum Command {
     /// Write a mod's notes: its title, summary, body or footer, in the list
     /// or its docs file, wherever they already are.
     Docs(DocsArgs),
-    /// Remove a mod, and its plugins from the load order.
+    /// Remove a mod, its plugins from the load order and its notes.
     Remove(RemoveArgs),
+    /// Leave a mod installed but unticked in MO2, its plugins out of the load
+    /// order.
+    Disable(EnableArgs),
+    /// Tick a mod in MO2 again, its plugins back in the load order.
+    Enable(EnableArgs),
     /// The load order: list it, or move a plugin within it.
     #[command(subcommand)]
     Plugins(PluginsCommand),
@@ -998,6 +1003,25 @@ mod help_tests {
 /// (`true`, `3`, `["a", "b"]`) and as text otherwise; quote it to force text
 /// (`version='"1.0"'`). Comments, and a replaced value's own comment, are
 /// kept. The list is validated before anything is written.
+#[derive(Debug, Args)]
+pub struct EnableArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The mod.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// Enabling: put its plugins straight after this one. By default they go
+    /// after the last plugin of the nearest mod before it that has any.
+    #[arg(long, value_name = "PLUGIN", conflicts_with = "load_last")]
+    pub load_after: Option<String>,
+    /// Enabling: put its plugins at the end of the load order.
+    #[arg(long)]
+    pub load_last: bool,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct ChooseArgs {
     /// The modlist to edit in place.

@@ -89,6 +89,8 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Docs(args) => edit::docs(args),
         Command::Choose(args) => edit::choose(args),
         Command::Remove(args) => edit::remove(args),
+        Command::Disable(args) => edit::enabled(args, false),
+        Command::Enable(args) => edit::enabled(args, true),
         Command::Plugins(command) => edit::plugins(command),
         Command::Files(args) => edit::files(args),
         Command::Action(command) => edit::action(command),

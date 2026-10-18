@@ -193,7 +193,20 @@ Removes the mod's block -- its comments, archives and actions -- and its
 plugins from `plugins` and `inactive-plugins` (unless another mod declares
 them too). Refused while anything still refers to the mod, such as another
 mod's `conflicts_with`; `check` afterwards finds any plugin that needed one of
-its plugins as a master. A docs file that still documents it is pointed out.
+its plugins as a master. Its notes in the list's docs file go too.
+
+### disable, enable
+
+```bash
+mudcrab disable <modlist.toml> --mod "<mod id>" [--dry-run]
+mudcrab enable <modlist.toml> --mod "<mod id>" [--load-after <plugin> | --load-last] [--dry-run]
+```
+
+`disable` leaves a mod installed but unticked in MO2 (`enabled = false`), and
+takes its plugins out of the load order, where MO2 could not see them.
+`enable` ticks it again and puts its plugins back: after `--load-after`, at
+the end with `--load-last`, or by default after the last plugin of the
+nearest mod before it that has any.
 
 ### plugins
 

@@ -823,6 +823,24 @@ pub fn set_installer(
     Ok(doc.to_string())
 }
 
+/// The docs file without mod `id`'s notes.
+pub fn remove_file_docs(text: &str, id: &str) -> anyhow::Result<String> {
+    let mut doc = text
+        .parse::<DocumentMut>()
+        .map_err(|err| anyhow::anyhow!("the docs file is not valid TOML: {err}"))?;
+    if let Some(mods) = doc.get_mut("mods").and_then(Item::as_table_like_mut) {
+        mods.remove(id);
+    }
+    // The blank line before the next table stays with it; at the top of the
+    // file it would only be noise.
+    let out = doc.to_string();
+    Ok(if text.starts_with('\n') {
+        out
+    } else {
+        out.trim_start_matches('\n').to_string()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -152,52 +152,51 @@ pub fn docs(args: crate::cli::DocsArgs) -> anyhow::Result<()> {
 }
 
 pub fn remove(args: RemoveArgs) -> anyhow::Result<()> {
-    let mut dropped = Vec::new();
-    let mut documented = None;
-    let edit = edit::plan(&args.input, |text, source| {
-        let entry = find_mod(source, &args.mod_id)?;
-        // Its plugins leave the load order, unless another mod also has them.
-        dropped = entry
-            .plugins
-            .iter()
-            .filter(|plugin| {
-                !source.mods.iter().any(|other| {
-                    other.id != entry.id
-                        && other.plugins.iter().any(|p| p.eq_ignore_ascii_case(plugin))
-                })
-            })
-            .cloned()
-            .collect();
-        // The docs file is optional; one that is not there documents nothing.
-        if let (Some(docs_file), Some(base)) = (&source.docs_file, &source.base_dir)
-            && let Ok(docs) = crate::config::docs::DocsFile::load(&base.join(docs_file))
-            && docs.mods.contains_key(&entry.id)
-        {
-            documented = Some(docs_file.clone());
+    let edits = edit::plan_remove(&args.input, &args.mod_id)?;
+    if args.dry_run {
+        for edit in &edits {
+            ui::diff(&edit.diff());
         }
-        let text = crate::config::add::plan_removal(text, &source.mods, &entry.id)?;
-        doc::drop_plugins(&text, &dropped)
-    })?;
-    let plugins = if dropped.is_empty() {
-        String::new()
-    } else {
-        format!(", and {} from the load order", dropped.join(", "))
+        ui::say(ui::dim("(--dry-run: nothing written)"));
+        return Ok(());
+    }
+    for edit in &edits {
+        edit.write()?;
+    }
+    let notes = match edits.get(1) {
+        Some(docs) => format!(", and its notes from {}", ui::dim(docs.path.display())),
+        None => String::new(),
     };
+    ui::status(
+        Tone::Good,
+        format!(
+            "Removed {} and its plugins from the load order{notes}",
+            ui::name(&args.mod_id)
+        ),
+    );
+    Ok(())
+}
+
+pub fn enabled(args: crate::cli::EnableArgs, enabled: bool) -> anyhow::Result<()> {
+    use crate::config::add::LoadPosition;
+    let position = match (&args.load_after, args.load_last) {
+        (Some(after), _) => Some(LoadPosition::After(after.clone())),
+        (None, true) => Some(LoadPosition::Last),
+        (None, false) => None,
+    };
+    let edit = edit::plan_enabled(&args.input, &args.mod_id, enabled, position.as_ref())?;
     finish(
         edit,
         args.dry_run,
-        format!("Removed {}{plugins}", ui::name(&args.mod_id)),
-    )?;
-    if let Some(docs_file) = documented {
-        ui::status(
-            Tone::Warning,
+        if enabled {
+            format!("{} is ticked in MO2, its plugins in the load order", ui::name(&args.mod_id))
+        } else {
             format!(
-                "{docs_file} still documents {}; take it out there, or `export` will refuse it",
+                "{} is left unticked in MO2, its plugins out of the load order",
                 ui::name(&args.mod_id)
-            ),
-        );
-    }
-    Ok(())
+            )
+        },
+    )
 }
 
 pub fn plugins(command: PluginsCommand) -> anyhow::Result<()> {
