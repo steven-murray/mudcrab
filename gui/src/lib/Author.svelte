@@ -14,12 +14,15 @@
     type ModView,
     type Tree,
   } from "./api";
+  import AddDialog from "./AddDialog.svelte";
+  import Archives from "./Archives.svelte";
   import Conflicts from "./Conflicts.svelte";
   import { startDrag, type Place } from "./drag";
   import EntryView from "./EntryView.svelte";
   import FileTree from "./FileTree.svelte";
   import Inputs from "./Inputs.svelte";
   import LoadOrder from "./LoadOrder.svelte";
+  import Notes from "./Notes.svelte";
   import Text from "./Text.svelte";
 
   // Author mode: the list as a tree on the left; on the right, the chosen mod
@@ -57,6 +60,12 @@
   let changes = $state<Changes | null>(null);
   let editing = $state(false);
   let scroller = $state<HTMLElement | null>(null);
+
+  // The left pane: the list, or the archives to add from; and the archive
+  // being added.
+  let pane = $state<"list" | "archives">("list");
+  let adding = $state<string | null>(null);
+  let archivesPane = $state<Archives | null>(null);
 
   // Every mod in the document by id, the sections above it (by anchor, to
   // open them) and its section path (for moving it), in list order.
@@ -257,16 +266,43 @@
   }
 
   const chosen = $derived(selected ? mods.get(selected)?.mod : undefined);
+
+  // Add the mod an archive makes, then show it.
+  async function addMod(request: import("./api").AddRequest): Promise<boolean> {
+    const ok = await run(() => api.addMod(request));
+    if (ok) {
+      await archivesPane?.refresh();
+      await select(request.id);
+    }
+    return ok;
+  }
 </script>
 
 <svelte:window {onkeydown} />
 
+{#if adding}
+  <AddDialog
+    path={adding}
+    document={list.document}
+    section={selected ? (mods.get(selected)?.section ?? []) : []}
+    add={addMod}
+    close={() => (adding = null)}
+  />
+{/if}
+
 <div class="author">
   <section class="left" bind:this={scroller}>
-    <div class="bar">
+    <nav class="panes">
+      <button class:on={pane === "list"} onclick={() => (pane = "list")}>The list</button>
+      <button class:on={pane === "archives"} onclick={() => (pane = "archives")} title="The archives in the downloads folders, to add mods from">Archives</button>
+    </nav>
+    <div class:hidden={pane !== "archives"}>
+      <Archives bind:this={archivesPane} add={(path) => (adding = path)} {select} />
+    </div>
+    <div class="bar" class:hidden={pane !== "list"}>
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
     </div>
-    <div class="list">
+    <div class="list" class:hidden={pane !== "list"}>
       {#snippet entries(items: Entry[], depth: number)}
         {#each items.filter((e) => matches(e, words)) as e (e.kind + e.anchor)}
           {#if e.kind === "section"}
@@ -343,7 +379,8 @@
             Every change is written to the list at once, as its command would, and can be undone.
           </p>
         {:else}
-          <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} />
+          <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
+          <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
           {#if actions.length}
             <h4>Actions</h4>
             <ol class="actions">
@@ -601,6 +638,26 @@
   }
   .n.bad {
     color: var(--problem);
+  }
+  .panes {
+    display: flex;
+    gap: 4px;
+    padding: 6px 10px 0;
+    background: var(--bg);
+  }
+  .panes button {
+    background: none;
+    border-color: transparent;
+    color: var(--dim);
+    font-size: 13px;
+  }
+  .panes button.on {
+    color: var(--text);
+    background: var(--card);
+    border-color: var(--line);
+  }
+  .hidden {
+    display: none;
   }
   .edits {
     margin-left: auto;

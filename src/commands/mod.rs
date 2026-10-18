@@ -1,5 +1,4 @@
 pub mod add;
-mod add_wizard;
 mod assets;
 mod bsa;
 pub mod check;
@@ -87,6 +86,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
         Command::Add(args) => add::run(args).await,
         Command::Move(args) => move_mod::run(args),
         Command::Set(args) => edit::set(args),
+        Command::Docs(args) => edit::docs(args),
         Command::Remove(args) => edit::remove(args),
         Command::Plugins(command) => edit::plugins(command),
         Command::Files(args) => edit::files(args),

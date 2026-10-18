@@ -268,6 +268,92 @@ export interface Changes {
   can_redo: boolean;
 }
 
+// Adding a mod from an archive.
+
+export interface ArchiveRow {
+  path: string;
+  file_name: string;
+  size: number;
+  modified: number | null;
+  source: string | null;
+  mod_name: string | null;
+  name: string | null;
+  version: string | null;
+  folder: string;
+  used_by: string[];
+}
+
+export interface Started {
+  path: string;
+  file_name: string;
+  layout: { kind: string; [detail: string]: unknown };
+  layout_label: string;
+  plugins: string[];
+  source: string;
+  suggested_id: string;
+  has_installer: boolean;
+  identified: boolean;
+}
+
+export type Availability = "free" | "recommended" | "required" | "unavailable";
+
+export interface Question {
+  title: string;
+  rule: "exactly_one" | "at_most_one" | "at_least_one" | "any" | "all";
+  choices: { name: string; description: string; availability: Availability }[];
+  default: number[];
+}
+
+export type Answer = { pick: number[] } | { yes: boolean };
+
+export type Walk =
+  | { kind: "ask"; asked: { kind: "choose"; question: Question } | { kind: "yes_no"; path: string } }
+  | { kind: "done"; installed: { notes: string[]; actions: string[] } };
+
+export interface AddRequest {
+  path: string;
+  id: string;
+  section: string[];
+  before_mod: string | null;
+  condition: string | null;
+  source: string | null;
+  answers: Answer[];
+  plugins: string[];
+  load_after: string | null;
+}
+
+export interface AddPlan {
+  block: string;
+  diff: string;
+  command: string;
+  installs_plugins: string[];
+  files: number;
+  suggested_after: string | null;
+  notes: string[];
+}
+
+export interface NexusFileRow {
+  file_id: number;
+  name: string | null;
+  version: string | null;
+  file_name: string | null;
+  category_name: string | null;
+  size_kb: number | null;
+  here: string | null;
+}
+
+export interface NexusMod {
+  mod_id: number;
+  file_id: number | null;
+  files: NexusFileRow[];
+}
+
+export interface Fetched {
+  path: string | null;
+  page: string | null;
+  why: string | null;
+}
+
 // Tauri passes arguments by their camelCase names.
 export const api = {
   opening: () => invoke<string | null>("opening"),
@@ -313,6 +399,16 @@ export const api = {
   setInput: (name: string, sets: string[], unsets: string[]) =>
     invoke<Edited>("set_input", { name, sets, unsets }),
   removeInput: (name: string) => invoke<Edited>("remove_input", { name }),
+  setDocs: (id: string, fields: [string, string | null][]) => invoke<Edited>("set_docs", { id, fields }),
+  archives: () => invoke<ArchiveRow[]>("archives"),
+  addStart: (path: string) => invoke<Started>("add_start", { path }),
+  addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),
+  addPlan: (request: AddRequest) => invoke<AddPlan>("add_plan", { request }),
+  addMod: (request: AddRequest) => invoke<Edited>("add_mod", { request }),
+  nexusLink: (link: string) => invoke<NexusMod>("nexus_link", { link }),
+  nexusFetch: (modId: number, fileId: number, fileName: string | null) =>
+    invoke<Fetched>("nexus_fetch", { modId, fileId, fileName }),
+  nexusLook: () => invoke<string | null>("nexus_look"),
 };
 
 /** A value for a `key=value` edit, as TOML: a string quoted, so any text is safe. */

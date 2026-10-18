@@ -65,6 +65,46 @@ pub fn set(args: SetArgs) -> anyhow::Result<()> {
     )
 }
 
+pub fn docs(args: crate::cli::DocsArgs) -> anyhow::Result<()> {
+    let body = match &args.body_file {
+        Some(path) if path.as_os_str() == "-" => {
+            let mut text = String::new();
+            std::io::Read::read_to_string(&mut std::io::stdin(), &mut text)?;
+            Some(text)
+        }
+        Some(path) => Some(
+            std::fs::read_to_string(path)
+                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?,
+        ),
+        None => args.body.clone(),
+    };
+    let mut fields: Vec<(String, Option<String>)> = [
+        ("title", args.title.clone()),
+        ("summary", args.summary.clone()),
+        ("body", body),
+        ("footer", args.footer.clone()),
+    ]
+    .into_iter()
+    .filter_map(|(key, value)| value.map(|v| (key.to_string(), Some(v))))
+    .collect();
+    fields.extend(args.unset.iter().map(|key| (key.clone(), None)));
+    anyhow::ensure!(
+        !fields.is_empty(),
+        "say what to write: --title, --summary, --body, --body-file, --footer or --unset"
+    );
+    let edit = edit::plan_mod_docs(&args.input, &args.mod_id, &fields)?;
+    let file = edit.path.display().to_string();
+    finish(
+        edit,
+        args.dry_run,
+        format!(
+            "Wrote {}'s notes in {}",
+            ui::name(&args.mod_id),
+            ui::dim(file)
+        ),
+    )
+}
+
 pub fn remove(args: RemoveArgs) -> anyhow::Result<()> {
     let mut dropped = Vec::new();
     let mut documented = None;

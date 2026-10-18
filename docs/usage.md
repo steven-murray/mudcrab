@@ -149,6 +149,20 @@ of its archives: `if=butterflies`, `layout=bain`, `data_folder="Data Files"`,
 (`version='"1.0"'`). `id`, `section`, `archives` and `actions` are refused,
 naming the command that changes them.
 
+### docs
+
+```bash
+mudcrab docs <modlist.toml> --mod "<mod id>" [--title <text>] [--summary <text>]
+             [--body <text> | --body-file <file>] [--footer <text>] [--unset <field>]... [--dry-run]
+```
+
+Writes a mod's notes (see [Docs](modlist-format.md#docs-prose-for-export))
+where they already are: inline in the list as `docs.<field>`, or in the docs
+file the list names as `[mods."<id>"]`. A mod with no notes yet gets them in
+the docs file when the list has one. Text over several lines is written as a
+`'''` block, as a person would write it; `--body-file -` reads the body from
+standard input. A mod whose notes are all removed loses its table.
+
 ### remove
 
 ```bash

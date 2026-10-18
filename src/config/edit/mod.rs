@@ -36,6 +36,27 @@ impl Edit {
         })
     }
 
+    /// The change from `before` to `after` in the docs file at `path`, which
+    /// must still merge into the modlist at `list`.
+    pub fn new_docs(
+        path: &Path,
+        list: &Path,
+        before: String,
+        after: String,
+    ) -> anyhow::Result<Self> {
+        crate::config::loader::check_docs(list, &after).map_err(|err| {
+            anyhow::anyhow!(
+                "the edit would leave {} invalid, so nothing was written: {err:#}",
+                path.display()
+            )
+        })?;
+        Ok(Self {
+            path: path.to_path_buf(),
+            before,
+            after,
+        })
+    }
+
     /// Whether the edit changes anything.
     pub fn changes(&self) -> bool {
         self.before != self.after
@@ -82,6 +103,38 @@ pub fn plan(
     let source = parse_modlist(&before, path)?;
     let after = change(&before, &source)?;
     Edit::new(path, before, after)
+}
+
+/// Plan setting (or, with `None` or empty text, removing) a mod's prose --
+/// `title`, `summary`, `body`, `footer` -- where its docs already are: inline
+/// in the list, or in the docs file the list names. A mod documented nowhere
+/// yet gets its docs in the docs file when the list has one, inline when not.
+pub fn plan_mod_docs(
+    list: &Path,
+    id: &str,
+    fields: &[(String, Option<String>)],
+) -> anyhow::Result<Edit> {
+    let text = std::fs::read_to_string(list)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", list.display()))?;
+    let source = parse_modlist(&text, list)?;
+    let entry = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+    match &source.docs_file {
+        Some(file) if entry.docs.is_empty() => {
+            let path = source.base_dir.clone().unwrap_or_default().join(file);
+            let before = std::fs::read_to_string(&path)
+                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+            let after = doc::set_file_docs(&before, id, fields)?;
+            Edit::new_docs(&path, list, before, after)
+        }
+        _ => {
+            let after = doc::set_inline_docs(&text, id, fields)?;
+            Edit::new(list, text, after)
+        }
+    }
 }
 
 /// `text` loads and validates as the modlist at `path`.

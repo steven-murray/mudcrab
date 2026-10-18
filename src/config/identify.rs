@@ -141,7 +141,7 @@ pub fn mod_id_from_file_name(file_name: &str) -> Option<u64> {
 }
 
 /// One file a Nexus mod publishes, from `files.json`.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, serde::Serialize)]
 pub struct NexusFile {
     pub file_id: u64,
     /// The file's title on the mod page.

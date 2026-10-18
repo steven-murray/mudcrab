@@ -4,20 +4,22 @@
 //! has not changed on disk since it was read. Each comes back with the
 //! command that does the same and the diff it made.
 //!
-//! The session keeps every edit, with the text before and after, so it can be
-//! undone and redone -- writing the earlier or later text, and only while the
-//! file is still what this window last wrote. An edit made outside ends the
-//! history there. See docs/design/gui.md.
+//! The session keeps every edit, with the file it wrote (the list, or its docs
+//! file) and the text before and after, so it can be undone and redone --
+//! writing the earlier or later text, and only while the file is still what
+//! this window last wrote. An edit made outside ends the history there. See
+//! docs/design/gui.md.
 
 use super::{State, quote, shown};
 use mudcrab::config::add::{Placement, plan_move};
 use mudcrab::config::edit::{self, Edit, doc};
 use serde::Serialize;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// One edit, as the session remembers it.
 #[derive(Clone)]
 pub(super) struct Recorded {
+    path: PathBuf,
     command: String,
     diff: String,
     before: String,
@@ -30,8 +32,9 @@ pub(super) struct Recorded {
 pub(super) struct History {
     done: Vec<Recorded>,
     undone: Vec<Recorded>,
-    /// The file as it was before the first edit, for the session's diff.
-    original: Option<String>,
+    /// Each file as it was before its first edit, in the order first
+    /// edited, for the session's diff.
+    original: Vec<(PathBuf, String)>,
 }
 
 /// An edit as the page shows it.
@@ -52,7 +55,7 @@ impl From<&Recorded> for Change {
 
 /// What is done and undone, after an edit, undo or redo.
 #[derive(Serialize)]
-pub(super) struct Edited {
+pub(crate) struct Edited {
     /// What this step did.
     change: Change,
     /// Whether there is an edit to undo, or to redo.
@@ -69,14 +72,16 @@ fn edited(history: &History, change: Change) -> Edited {
 }
 
 /// Write a planned edit, remember it, and mark the plan out of date.
-fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
+pub(super) fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
     if !edit.changes() {
         return Err("That changes nothing in the list.".to_string());
     }
     edit.write().map_err(shown)?;
+    let diff = edit.diff();
     let recorded = Recorded {
+        path: edit.path,
         command,
-        diff: edit.diff(),
+        diff,
         before: edit.before,
         after: edit.after,
     };
@@ -87,14 +92,22 @@ fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
     // past it would undo someone else's change.
     if history
         .done
-        .last()
+        .iter()
+        .rev()
+        .find(|done| done.path == recorded.path)
         .is_some_and(|last| last.after != recorded.before)
     {
         *history = History::default();
     }
-    history
+    if !history
         .original
-        .get_or_insert_with(|| recorded.before.clone());
+        .iter()
+        .any(|(path, _)| path == &recorded.path)
+    {
+        history
+            .original
+            .push((recorded.path.clone(), recorded.before.clone()));
+    }
     history.undone.clear();
     let change = Change::from(&recorded);
     history.done.push(recorded);
@@ -117,10 +130,9 @@ fn list_arg(list: &Path) -> String {
 
 // --- Undo, redo, and the session's changes -----------------------------------------
 
-/// Write `text` over the list, if it is still `expected`.
-fn rewrite(state: &State, expected: &str, text: &str) -> Result<(), String> {
-    let list = state.list()?;
-    let now = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
+/// Write `text` over the file at `path`, if it is still `expected`.
+fn rewrite(state: &State, path: &Path, expected: &str, text: &str) -> Result<(), String> {
+    let now = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
     if now != expected {
         state
             .session
@@ -130,10 +142,10 @@ fn rewrite(state: &State, expected: &str, text: &str) -> Result<(), String> {
         return Err(format!(
             "{} has changed outside this window since the last edit here, so there is nothing \
              to undo or redo safely; the history starts again from here.",
-            list.display()
+            path.display()
         ));
     }
-    edit::write_atomic(&list, text).map_err(shown)?;
+    edit::write_atomic(path, text).map_err(shown)?;
     state
         .session
         .lock()
@@ -153,10 +165,9 @@ pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
             .cloned()
             .ok_or("nothing to undo")?
     };
-    rewrite(&state, &last.after, &last.before)?;
-    // What the undo did: the edit, backwards. Read before the session is
-    // locked below, which `list` locks too.
-    let diff = edit::diff(&state.list()?, &last.after, &last.before);
+    rewrite(&state, &last.path, &last.after, &last.before)?;
+    // What the undo did: the edit, backwards.
+    let diff = edit::diff(&last.path, &last.after, &last.before);
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &mut session.history;
     let recorded = history.done.pop().expect("there was one");
@@ -181,7 +192,7 @@ pub(super) fn redo(state: tauri::State<'_, State>) -> Result<Edited, String> {
             .cloned()
             .ok_or("nothing to redo")?
     };
-    rewrite(&state, &next.before, &next.after)?;
+    rewrite(&state, &next.path, &next.before, &next.after)?;
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &mut session.history;
     let recorded = history.undone.pop().expect("there was one");
@@ -202,13 +213,18 @@ pub(super) struct Changes {
 
 #[tauri::command]
 pub(super) fn changes(state: tauri::State<'_, State>) -> Result<Changes, String> {
-    let list = state.list()?;
     let session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &session.history;
-    let diff = match (&history.original, history.done.last()) {
-        (Some(original), Some(last)) => edit::diff(&list, original, &last.after),
-        _ => String::new(),
-    };
+    // Each file from before its first edit to after its last one still done.
+    let diff = history
+        .original
+        .iter()
+        .filter_map(|(path, original)| {
+            let last = history.done.iter().rev().find(|done| &done.path == path)?;
+            Some(edit::diff(path, original, &last.after))
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
     Ok(Changes {
         edits: history.done.iter().map(Change::from).collect(),
         diff,
@@ -459,5 +475,25 @@ pub(super) fn set_input(
 pub(super) fn remove_input(state: tauri::State<'_, State>, name: String) -> Result<Edited, String> {
     let (list, planned) = plan(&state, |text, _| doc::remove_input(text, &name))?;
     let command = format!("mudcrab input remove {} {}", list_arg(&list), quote(&name));
+    apply(&state, command, planned)
+}
+
+/// Write a mod's notes (`docs`): each field set to its text, or removed when
+/// `None` or empty -- in the list or its docs file, wherever they already are.
+#[tauri::command]
+pub(super) fn set_docs(
+    state: tauri::State<'_, State>,
+    id: String,
+    fields: Vec<(String, Option<String>)>,
+) -> Result<Edited, String> {
+    let list = state.list()?;
+    let planned = edit::plan_mod_docs(&list, &id, &fields).map_err(shown)?;
+    let mut command = format!("mudcrab docs {} --mod {}", list_arg(&list), quote(&id));
+    for (key, value) in &fields {
+        match value.as_deref().filter(|v| !v.trim().is_empty()) {
+            Some(text) => command.push_str(&format!(" --{key} {}", quote(text))),
+            None => command.push_str(&format!(" --unset {key}")),
+        }
+    }
     apply(&state, command, planned)
 }

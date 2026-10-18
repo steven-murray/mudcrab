@@ -181,9 +181,11 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
 
 /// An entry written from the archive itself, as `inspect` reads it. What the
 /// archive cannot decide -- which FOMOD options, which of several BAIN
-/// packages, where its plugins load -- is reported for the author to settle.
+/// packages, where its plugins load -- is asked in a terminal, and otherwise
+/// reported for the author to settle.
 fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
-    use crate::config::inspect::{LayoutGuess, inspect_archive, render_toml_snippet_with};
+    use crate::config::inspect::{Chosen, inspect_archive};
+    use crate::config::installer::{self, ListPlugins};
     use std::io::IsTerminal;
 
     let id = args
@@ -208,70 +210,23 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     // In a terminal, an installer's questions are put to the author, and the
     // answers are what the entry records.
     let interactive = !args.defaults && std::io::stdin().is_terminal();
-    let (chosen, actions) = choose_installer(archive, &id, &args.input, &report, interactive)?;
-
-    // Comments in the snippet talk to someone reading `inspect`'s report; in
-    // the list they would only be noise.
-    let block = render_toml_snippet_with(
-        &report.file_name,
-        Some(&source),
-        &report.layout,
-        report.fomod.as_ref(),
-        chosen.as_ref(),
-    )
-    .lines()
-    .filter(|line| !line.trim_start().starts_with('#'))
-    .collect::<Vec<_>>()
-    .join("\n");
-    // A hand-fetched archive is found by name, and its host may rename it:
-    // its size and MD5 find it under any name.
-    let block = if source.starts_with("manual:") {
-        let size = std::fs::metadata(archive)
-            .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", archive.display()))?
-            .len();
-        let md5 = crate::config::identify::md5_of_file(archive)?;
-        block
-            .lines()
-            .flat_map(|line| {
-                let mut out = vec![line.to_string()];
-                if line.starts_with("file_name = ") {
-                    out.push(format!("size = {size}"));
-                    out.push(format!("md5 = \"{md5}\""));
-                    // Printed by `download` and `check`, so whoever installs
-                    // the list knows where to go without opening it.
-                    out.push("# download_page = \"https://...\"".to_string());
-                    out.push("# download_note = \"Which file on the page, and how.\"".to_string());
-                }
-                out
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
-    } else {
-        block
-    };
-    // Actions the installer's choices call for follow the archive.
-    let block = actions
-        .iter()
-        .fold(block, |block, action| format!("{block}\n\n{action}"));
-
-    match &report.layout {
-        _ if chosen.is_some() => {}
-        LayoutGuess::Fomod { .. } => crate::ui::status_err(
-            crate::ui::Tone::Note,
-            format!(
-                "'{id}' has a FOMOD installer; the entry picks each group's default. \
-             `mudcrab inspect` lists the options, to change `fomod_selections`."
-            ),
-        ),
-        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => crate::ui::status_err(
-            crate::ui::Tone::Note,
-            format!(
-                "'{id}' is a BAIN package and every subpackage is listed; delete from \
-             `bain_subpackages` the ones that are alternatives to each other."
-            ),
-        ),
-        _ => {}
+    let list = ListPlugins::of(&config::loader::load_modlist(&args.input)?);
+    let installed = walk_installer(archive, &id, &report, &list, interactive)?;
+    for note in &installed.notes {
+        crate::ui::status_err(crate::ui::Tone::Note, format!("'{id}': {note}"));
     }
+    if let Some(Chosen::Wizard {
+        subpackages,
+        exclude,
+    }) = &installed.chosen
+    {
+        println!("  subpackages: {}", subpackages.join(", "));
+        if !exclude.is_empty() {
+            println!("  plugins left out: {}", exclude.join(", "));
+        }
+    }
+    let block = installer::archive_block(archive, &report, &source, &installed)?;
+
     let unlisted: Vec<&String> = report
         .plugins
         .iter()
@@ -300,138 +255,86 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     })
 }
 
-/// Walk an archive's installer with the author: each FOMOD group in the order
-/// install meets them, or the BAIN package's wizard, or its package list; and
-/// any actions those choices call for. `None` for a layout with nothing to
-/// choose. Not interactive, only a wizard is run (on its defaults): what it
-/// selects beats listing every subpackage.
-fn choose_installer(
+/// Walk the archive's installer with the author at a terminal (or, not
+/// interactive, on its defaults): the library's walk, each question it
+/// stops at asked here and the walk resumed with the answer.
+fn walk_installer(
     archive: &Path,
     id: &str,
-    modlist: &Path,
     report: &crate::config::inspect::InspectReport,
+    list: &crate::config::installer::ListPlugins,
     interactive: bool,
-) -> anyhow::Result<(Option<crate::config::inspect::Chosen>, Vec<String>)> {
-    use super::choose::{Availability, Choice, Question, Rule, ask};
-    use crate::config::inspect::{Chosen, LayoutGuess, extract_single_entry};
-    use crate::config::install::layout::fomod::{FomodOptionType, choose_fomod};
+) -> anyhow::Result<crate::config::installer::Installed> {
+    use crate::config::inspect::LayoutGuess;
+    use crate::config::installer::{Answer, Asked, Walk, walk};
 
     let stdin = std::io::stdin();
     let mut input = stdin.lock();
     let mut output = std::io::stdout();
-    match &report.layout {
-        LayoutGuess::Fomod { config_path } if interactive => {
-            let xml = extract_single_entry(archive, config_path)?;
-            // A step can depend on which plugins are active; install answers
-            // that from the list's load order, so the walk here does too.
-            let active: std::collections::HashSet<String> =
-                crate::config::loader::load_modlist(modlist)?
-                    .plugins
-                    .iter()
-                    .map(|plugin| plugin.to_ascii_lowercase())
-                    .collect();
-            println!("'{id}' has a FOMOD installer. Enter takes the installer's own choice.");
-            let selections = choose_fomod(&xml, config_path, &active, &mut |group| {
-                let question = Question {
-                    title: format!("{}: {}", group.step, group.group),
-                    rule: Rule::from_fomod(group.group_type),
-                    choices: group
-                        .options
-                        .iter()
-                        .map(|option| Choice {
-                            name: option.name.clone(),
-                            description: option.description.clone(),
-                            availability: match option.kind {
-                                FomodOptionType::Required => Availability::Required,
-                                FomodOptionType::Recommended => Availability::Recommended,
-                                FomodOptionType::NotUsable => Availability::Unavailable,
-                                FomodOptionType::Optional | FomodOptionType::CouldBeUsable => {
-                                    Availability::Free
-                                }
-                            },
-                        })
-                        .collect(),
-                    default: group.default.clone(),
-                };
-                ask(&mut input, &mut output, &question)
-            })?;
-            Ok((Some(Chosen::Fomod(selections)), Vec::new()))
-        }
-        LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => {
-            // A wizard asks its own questions, in words, and decides what
-            // they mean; run it, rather than ask about folder names.
-            let wizard_path = report
+    let mut answers = Vec::new();
+    let mut introduced = false;
+    loop {
+        let asked = match walk(archive, report, list, &answers, !interactive)? {
+            Walk::Done { installed } => return Ok(installed),
+            Walk::Ask { asked } => asked,
+        };
+        if !introduced {
+            introduced = true;
+            let wizard = report
                 .top_level_files
                 .iter()
-                .find(|name| name.eq_ignore_ascii_case("wizard.txt"));
-            if let Some(path) = wizard_path {
-                let script = extract_single_entry(archive, path)?;
-                let listing = crate::config::inspect::inspect_archive(archive, true)?;
-                let package = crate::config::bain_wizard::run::Package {
-                    subpackages: subpackages.clone(),
-                    files: listing.files.unwrap_or_default(),
-                };
-                if interactive {
-                    println!(
+                .any(|name| name.eq_ignore_ascii_case("wizard.txt"));
+            println!(
+                "{}",
+                match (&report.layout, wizard) {
+                    (LayoutGuess::Fomod { .. }, _) => format!(
+                        "'{id}' has a FOMOD installer. Enter takes the installer's own choice."
+                    ),
+                    (_, true) => format!(
                         "'{id}' is a BAIN package with a wizard. Enter takes the wizard's own \
                          choice."
-                    );
+                    ),
+                    _ => format!(
+                        "'{id}' is a BAIN package. Pick the subpackages to install; numbered \
+                         alike (01 ..., 01 ...) usually means alternatives."
+                    ),
                 }
-                let result = super::add_wizard::run_wizard(
-                    &script,
-                    &package,
-                    modlist,
-                    interactive,
-                    &mut input,
-                    &mut output,
-                )?;
-                if let Some(result) = result {
-                    println!("  subpackages: {}", result.subpackages.join(", "));
-                    if !result.exclude.is_empty() {
-                        println!("  plugins left out: {}", result.exclude.join(", "));
-                    }
-                    return Ok((
-                        Some(Chosen::Wizard {
-                            subpackages: result.subpackages,
-                            exclude: result.exclude,
-                        }),
-                        result.actions,
-                    ));
-                }
-                if !interactive {
-                    return Ok((None, Vec::new()));
-                }
-                println!("Pick the subpackages directly instead.");
-            } else if !interactive {
-                return Ok((None, Vec::new()));
-            } else {
-                println!(
-                    "'{id}' is a BAIN package. Pick the subpackages to install; numbered alike \
-                     (01 ..., 01 ...) usually means alternatives."
-                );
-            }
-            let question = Question {
-                title: "Subpackages".to_string(),
-                rule: Rule::AtLeastOne,
-                choices: subpackages
-                    .iter()
-                    .map(|name| Choice {
-                        name: name.clone(),
-                        description: String::new(),
-                        availability: Availability::Free,
-                    })
-                    .collect(),
-                default: (0..subpackages.len()).collect(),
-            };
-            let picked = ask(&mut input, &mut output, &question)?;
-            Ok((
-                Some(Chosen::Bain(
-                    picked.into_iter().map(|i| subpackages[i].clone()).collect(),
-                )),
-                Vec::new(),
-            ))
+            );
         }
-        _ => Ok((None, Vec::new())),
+        answers.push(match asked {
+            Asked::Choose { question } => {
+                Answer::Pick(super::choose::ask(&mut input, &mut output, &question)?)
+            }
+            Asked::YesNo { path } => Answer::Yes(yes_no(
+                &mut input,
+                &mut output,
+                &format!(
+                    "The wizard asks whether `{path}` is already installed (by a mod earlier in \
+                     your list). Is it?"
+                ),
+            )?),
+        });
+    }
+}
+
+/// A yes-or-no question; Enter is no.
+fn yes_no(
+    input: &mut dyn std::io::BufRead,
+    output: &mut dyn std::io::Write,
+    question: &str,
+) -> anyhow::Result<bool> {
+    loop {
+        write!(output, "\n{question} [y/N]: ")?;
+        output.flush()?;
+        let mut line = String::new();
+        if input.read_line(&mut line)? == 0 {
+            anyhow::bail!("input ended before the wizard's question was answered");
+        }
+        match line.trim().to_ascii_lowercase().as_str() {
+            "" | "n" | "no" => return Ok(false),
+            "y" | "yes" => return Ok(true),
+            _ => writeln!(output, "  Please answer y or n.")?,
+        }
     }
 }
 

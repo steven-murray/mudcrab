@@ -257,10 +257,15 @@ Still printing directly: `assets` (its logic sits in the command) and
    these" from a conflict, the questions, undo and redo, the last change's
    command and diff, and the session's changes as commands and one diff.
    `files` gained `--package` and `--drop-package` so a BAIN tick is one
-   command. Still to come: FOMOD options chosen through the installer's
-   steps, adding a mod from an archive (with `add`'s question model), a
-   folder dragged to write a `file_move`, `game_root_files`, and fields of a
-   mod set from a form.
+   command. Then: a mod's notes (`docs`, a new command); adding a mod from an
+   archive -- an Archives pane listing the downloads folders, a Nexus link
+   to fetch from, unknown archives identified by checksum, and the
+   installer's questions asked through the library's resumable walk
+   (`config::installer`, which `add` on a terminal now drives too), with the
+   plugins it installs read from the planner to declare. Still to come:
+   changing an existing mod's FOMOD options through the installer's steps,
+   a folder dragged to write a `file_move`, `game_root_files`, and fields of
+   a mod set from a form.
 7. **Packaging.** AppImage (and Flatpak) for Linux, an installer or zip for
    Windows, the Deck checked; the GUI as a separate release artifact.
 

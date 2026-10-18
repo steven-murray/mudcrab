@@ -584,6 +584,113 @@ fn attach_comment(array: &mut Array, at: usize, comment: &str) {
     }
 }
 
+/// The prose fields a mod's docs take a string for.
+pub const DOC_FIELDS: &[&str] = &["title", "summary", "body", "footer"];
+
+/// Prose as a TOML value: several lines as a `'''` literal block, as a person
+/// writes them, so the file stays readable; one line as a plain string.
+fn prose(text: &str) -> Value {
+    if text.contains('\n') && !text.contains("'''") {
+        let parsed = format!("v = '''\n{text}'''")
+            .parse::<DocumentMut>()
+            .ok()
+            .and_then(|doc| doc.get("v").and_then(Item::as_value).cloned());
+        if let Some(value) = parsed {
+            return value;
+        }
+    }
+    Value::from(text)
+}
+
+/// Set (or with `None`, remove) prose fields of `table`.
+fn set_prose(table: &mut Table, fields: &[(String, Option<String>)]) -> anyhow::Result<()> {
+    for (key, value) in fields {
+        anyhow::ensure!(
+            DOC_FIELDS.contains(&key.as_str()),
+            "{key} is not a docs field; these are {}",
+            DOC_FIELDS.join(", ")
+        );
+        match value.as_deref().filter(|v| !v.trim().is_empty()) {
+            Some(text) => {
+                table.insert(key, Item::Value(prose(text)));
+            }
+            None => {
+                table.remove(key);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A mod's docs written inline in the list, as `docs.<field>` keys in its
+/// `[[mods]]` table.
+pub fn set_inline_docs(
+    text: &str,
+    id: &str,
+    fields: &[(String, Option<String>)],
+) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    let docs = table.entry("docs").or_insert_with(|| {
+        let mut dotted = Table::new();
+        dotted.set_dotted(true);
+        Item::Table(dotted)
+    });
+    let docs = docs
+        .as_table_like_mut()
+        .ok_or_else(|| anyhow::anyhow!("'{id}' has a docs that is not a table"))?;
+    let mut owned = Table::new();
+    for (key, item) in docs.iter() {
+        owned.insert(key, item.clone());
+    }
+    set_prose(&mut owned, fields)?;
+    // Written back key by key, so the table keeps its own form (dotted keys,
+    // or a [mods.docs] table).
+    let keys: Vec<String> = docs.iter().map(|(key, _)| key.to_string()).collect();
+    for key in keys {
+        if !owned.contains_key(&key) {
+            docs.remove(&key);
+        }
+    }
+    for (key, item) in owned.iter() {
+        docs.insert(key, item.clone());
+    }
+    if docs.is_empty() {
+        table.remove("docs");
+    }
+    Ok(doc.to_string())
+}
+
+/// A mod's docs in the list's docs file: its `[mods."<id>"]` table, started
+/// if need be.
+pub fn set_file_docs(
+    text: &str,
+    id: &str,
+    fields: &[(String, Option<String>)],
+) -> anyhow::Result<String> {
+    let mut doc = text
+        .parse::<DocumentMut>()
+        .map_err(|err| anyhow::anyhow!("the docs file is not valid TOML: {err}"))?;
+    let mods = doc.entry("mods").or_insert_with(|| {
+        let mut implicit = Table::new();
+        implicit.set_implicit(true);
+        Item::Table(implicit)
+    });
+    let mods = mods
+        .as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("the docs file's `mods` is not a table"))?;
+    let table = mods
+        .entry(id)
+        .or_insert_with(|| Item::Table(Table::new()))
+        .as_table_mut()
+        .ok_or_else(|| anyhow::anyhow!("the docs file's [mods.\"{id}\"] is not a table"))?;
+    set_prose(table, fields)?;
+    if table.is_empty() {
+        mods.remove(id);
+    }
+    Ok(doc.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

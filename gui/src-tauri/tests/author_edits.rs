@@ -158,6 +158,22 @@ fn edits_are_the_commands_and_can_be_undone() {
     .unwrap();
     assert!(read().contains("big"));
 
+    // A mod's notes, inline in a list with no docs file.
+    let noted = call(
+        &webview,
+        "set_docs",
+        json!({ "id": "C", "fields": [["summary", "Why C."], ["body", null]] }),
+    )
+    .unwrap();
+    assert!(
+        noted["change"]["command"]
+            .as_str()
+            .unwrap()
+            .ends_with("--mod C --summary 'Why C.' --unset body"),
+        "{noted}"
+    );
+    assert!(read().contains("docs.summary = \"Why C.\""));
+
     // A change the list's rules refuse is not written.
     let before = read();
     let refused = call(
@@ -170,7 +186,7 @@ fn edits_are_the_commands_and_can_be_undone() {
 
     // The session's changes, then undone back to the start, and redone.
     let changes = call(&webview, "changes", json!({})).unwrap();
-    assert_eq!(changes["edits"].as_array().unwrap().len(), 5, "{changes}");
+    assert_eq!(changes["edits"].as_array().unwrap().len(), 6, "{changes}");
     assert!(changes["diff"].as_str().unwrap().contains("Big?"));
     // An undo's diff is what it did: the edit backwards.
     let undone = call(&webview, "undo", json!({})).unwrap();
@@ -179,10 +195,10 @@ fn edits_are_the_commands_and_can_be_undone() {
             .as_str()
             .unwrap()
             .lines()
-            .any(|line| line.starts_with('-') && line.contains("Big?")),
+            .any(|line| line.starts_with('-') && line.contains("Why C.")),
         "{undone}"
     );
-    for _ in 0..4 {
+    for _ in 0..5 {
         call(&webview, "undo", json!({})).unwrap();
     }
     assert_eq!(read(), LIST);

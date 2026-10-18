@@ -498,7 +498,9 @@ fn toml_string(value: &str) -> String {
 }
 
 /// Choices made for an installer, in place of its defaults.
-pub(crate) enum Chosen {
+#[derive(Debug, Clone, Serialize)]
+#[serde(tag = "kind", content = "chosen", rename_all = "snake_case")]
+pub enum Chosen {
     Fomod(Vec<crate::config::schema::FomodSelection>),
     Bain(Vec<String>),
     /// What a BAIN wizard selected: subpackages, and plugins in them it left
