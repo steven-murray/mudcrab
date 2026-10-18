@@ -178,6 +178,21 @@ pub(crate) fn apply_qac_action(
                 .unwrap_or(0);
 
             let mut command = settings.tools.windows_tool_command(&qac_exe)?;
+            command.args([
+                "-TES4",
+                "-QAC",
+                "-autoload",
+                "-autoexit",
+                "-save",
+                &data_arg,
+                &ini_arg,
+                &log_arg,
+                &plugin_name,
+            ]);
+            // In a Flatpak, Wine and Proton are the host's; the group id it
+            // runs in there is written here, to close it by.
+            let group_file = console.with_extension("pgid");
+            let mut command = crate::util::host::on_host_in_group(command, &group_file);
             // Its own process group, so closing it closes the whole Proton
             // tree. Killing the launcher alone leaves the real xEdit window
             // running -- which is what happened the first time a plugin hung.
@@ -190,17 +205,6 @@ pub(crate) fn apply_qac_action(
                 anyhow::anyhow!("qac: failed to create {}: {err}", console.display())
             })?;
             let mut child = command
-                .args([
-                    "-TES4",
-                    "-QAC",
-                    "-autoload",
-                    "-autoexit",
-                    "-save",
-                    &data_arg,
-                    &ini_arg,
-                    &log_arg,
-                    &plugin_name,
-                ])
                 .stdin(std::process::Stdio::null())
                 .stdout(console_file.try_clone()?)
                 .stderr(console_file)
@@ -220,7 +224,7 @@ pub(crate) fn apply_qac_action(
                 if let Some(fatal) = fatal_line(&own_log, 0)
                     .or_else(|| log_path.as_deref().and_then(|p| fatal_line(p, log_offset)))
                 {
-                    close_process_tree(&mut child);
+                    close_process_tree(&mut child, &group_file);
                     anyhow::bail!("qac: xEdit stopped cleaning {plugin_name}: {fatal}");
                 }
                 if child
@@ -249,13 +253,13 @@ pub(crate) fn apply_qac_action(
                         plugin = plugin_name,
                         "qac: xEdit reported Quick Clean finished; closing it"
                     );
-                    close_process_tree(&mut child);
+                    close_process_tree(&mut child, &group_file);
                     finished = true;
                     break;
                 }
 
                 if start.elapsed() > QAC_TIMEOUT {
-                    close_process_tree(&mut child);
+                    close_process_tree(&mut child, &group_file);
                     break;
                 }
 
@@ -515,7 +519,13 @@ fn newest_save_file(data_dir: &Path, plugin_name: &str) -> anyhow::Result<Option
 /// `Child::kill` reaches only the process mudcrab spawned, which under Proton
 /// is a launcher; the window belongs to a grandchild and survives. The child
 /// leads its own process group, so signalling the negative pid takes the tree.
-fn close_process_tree(child: &mut std::process::Child) {
+/// In a Flatpak the tree is on the host, in the group `group_file` names.
+fn close_process_tree(child: &mut std::process::Child, group_file: &Path) {
+    if crate::util::host::in_flatpak() {
+        crate::util::host::close_host_group(group_file, "TERM");
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        crate::util::host::close_host_group(group_file, "KILL");
+    }
     #[cfg(unix)]
     {
         let _ = std::process::Command::new("kill")

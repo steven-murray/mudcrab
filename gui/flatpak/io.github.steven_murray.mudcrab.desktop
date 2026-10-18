@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=mudcrab
+GenericName=Modlist installer
+Comment=Install and write modlists for Oblivion
+Exec=mudcrab-gui %f
+Icon=io.github.steven_murray.mudcrab
+Terminal=false
+Categories=Game;Utility;
+Keywords=oblivion;mod;modlist;mo2;
+MimeType=application/toml;

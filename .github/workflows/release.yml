@@ -109,6 +109,14 @@ jobs:
         run: |
           mkdir out
           cp target/release/bundle/appimage/*.AppImage "out/mudcrab-gui-${{ github.ref_name }}-x86_64.AppImage"
+      # The same binary goes into the Flatpak, made in the job below.
+      - name: Keep the binary for the Flatpak
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release/mudcrab-gui
+          if-no-files-found: error
       - name: Name (windows)
         if: runner.os == 'Windows'
         run: |
@@ -122,4 +130,31 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           files: out/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # The Flatpak, for the Steam Deck and other systems that install programs
+  # that way: the Linux binary above, on the GNOME runtime (see
+  # gui/flatpak/). A single-file bundle, installed with
+  # `flatpak install --user <file>`.
+  flatpak:
+    needs: gui
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release
+      - run: chmod +x target/release/mudcrab-gui
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: mudcrab-gui-${{ github.ref_name }}-x86_64.flatpak
+          manifest-path: gui/flatpak/io.github.steven_murray.mudcrab.yml
+          cache: false
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: mudcrab-gui-${{ github.ref_name }}-x86_64.flatpak
           prerelease: ${{ contains(github.ref_name, '-') }}

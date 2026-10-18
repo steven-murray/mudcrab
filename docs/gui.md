@@ -9,10 +9,23 @@ mudcrab.
 Each [release](https://github.com/steven-murray/mudcrab/releases) has the GUI
 beside the command line:
 
-- **Linux, and the Steam Deck in desktop mode**:
-  `mudcrab-gui-<version>-x86_64.AppImage`. Make it executable (in a file
-  manager's Properties, or `chmod +x`) and run it; nothing is installed. It
-  carries its own WebKitGTK, so it is large, and needs glibc 2.35 or newer.
+- **Linux, and the Steam Deck in desktop mode**, either:
+  - `mudcrab-gui-<version>-x86_64.flatpak`, installed like any Flatpak and
+    then found among your applications (and updated by installing the next
+    one the same way):
+
+    ```bash
+    flatpak install --user mudcrab-gui-<version>-x86_64.flatpak
+    ```
+
+    It uses the GNOME runtime, which Flatpak fetches from Flathub the first
+    time. It sees your home folder, SD cards and other drives, and runs
+    Wine or Proton (for xEdit) and LOOT on the system itself, outside its
+    sandbox, so they need to be installed there as usual.
+  - or `mudcrab-gui-<version>-x86_64.AppImage`: make it executable (in a
+    file manager's Properties, or `chmod +x`) and run it; nothing is
+    installed. It carries its own WebKitGTK, so it is large, and needs glibc
+    2.35 or newer.
 - **Windows**: `mudcrab-gui-<version>-windows-x64-setup.exe` installs it for
   your account (no administrator needed) with a Start menu entry and an
   uninstaller; `mudcrab-gui-<version>-windows-x64.zip` is the program alone,
@@ -185,4 +198,6 @@ The bundles a release ships are made by Tauri's bundler, from `gui/`:
 `npx tauri build --bundles appimage` on Linux, `--bundles nsis` on Windows,
 into `target/release/bundle/`. On a distribution newer than the AppImage
 tools (Arch and its family), their `strip` cannot read the system's
-libraries; `NO_STRIP=true` before the command skips it.
+libraries; `NO_STRIP=true` before the command skips it. The Flatpak is made from the
+binary that builds, with `flatpak-builder` and the manifest in
+`gui/flatpak/`, which says how.

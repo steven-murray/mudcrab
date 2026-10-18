@@ -274,7 +274,11 @@ Still printing directly: `assets` (its logic sits in the command) and
    of the Windows program beside it, attached to the release a `v*` tag
    makes, and built on every GUI CI run so a pull request's can be tried;
    an icon; one version for the CLI and the GUI (`[workspace.package]`).
-   Still to do: a Flatpak, and the Deck checked.
+   Then a Flatpak, from the same binary on the GNOME runtime, with 7-Zip
+   in it; host programs (Wine or Proton, LOOT, the check that MO2 is open)
+   run through `flatpak-spawn --host`, xEdit in a host process group of its
+   own so it can still be closed (`util::host`). Still to do: the Deck
+   checked.
 
 ## Settled
 

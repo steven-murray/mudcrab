@@ -48,6 +48,11 @@ toml = "0.8"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 zip = "2.2"
+# zip's bzip2 and xz, built in rather than linked from the system: the
+# binaries then need neither library installed, and the GNOME runtime the
+# Flatpak runs on has neither under the names the system ones carry.
+bzip2-sys = { version = "0.1", features = ["static"] }
+lzma-sys = { version = "0.1", features = ["static"] }
 minijinja = { version = "2", features = ["loader", "json"] }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
 similar = "2"
