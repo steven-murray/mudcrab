@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import type { FileRow, Tree } from "./api";
+  import ModFolder from "./ModFolder.svelte";
 
   // A mod's archive as a tree, marked with what install takes from it, with
   // ticks that follow the installer an author already knows:
@@ -12,16 +13,23 @@
   //   (`files --exclude`) and ticking back dropping it.
   //
   // For any layout, "exclude" on a row is the expert override: an `exclude`
-  // for what the filters see it as.
+  // for what the filters see it as. "Mod folder" shows the same files where
+  // they end up in the mod, after its `file_move`s, and is where they are
+  // moved (see ModFolder).
   let {
     tree,
     edit,
     problem,
+    move,
   }: {
     tree: Tree;
     edit: (key: string, add: string[], drop: string[]) => void;
     problem: (message: string) => void;
+    /** Move `from` to `to`, both in the mod's folder (`file_move`). */
+    move: (from: string, to: string) => void;
   } = $props();
+
+  let view = $state<"archive" | "mod">("archive");
 
   const bain = $derived(tree.layout === "bain");
   const fomod = $derived(tree.layout === "fomod");
@@ -119,6 +127,15 @@
     {#if tree.include.length}<span class="dim">include: <code>{tree.include.join(", ")}</code></span>{/if}
     {#if tree.exclude.length}<span class="dim">exclude: <code>{tree.exclude.join(", ")}</code></span>{/if}
   </div>
+  <nav class="views">
+    <button class:on={view === "archive"} onclick={() => (view = "archive")} title="The archive's own files, and what is taken from it">Archive</button>
+    <button class:on={view === "mod"} onclick={() => (view = "mod")} title="Where its files end up in the mod's folder; move them here"
+      >Mod folder</button
+    >
+  </nav>
+  {#if view === "mod"}
+    <ModFolder files={tree.installed} {move} {problem} />
+  {:else}
   <div class="filters">
     {#each [{ key: "include", list: tree.include }, { key: "exclude", list: tree.exclude }] as filter}
       {#each filter.list as glob}
@@ -195,6 +212,7 @@
       </li>
     {/each}
   </ul>
+  {/if}
   <p class="cmd dim">Same from a terminal: <code>{tree.command}</code></p>
 </div>
 
@@ -313,6 +331,23 @@
   .dest {
     font-size: 11px;
     overflow-wrap: anywhere;
+  }
+  .views {
+    display: flex;
+    gap: 4px;
+    margin: 6px 0;
+  }
+  .views button {
+    font-size: 12px;
+    padding: 2px 10px;
+    background: none;
+    border-color: transparent;
+    color: var(--dim);
+  }
+  .views button.on {
+    color: var(--text);
+    background: var(--card);
+    border-color: var(--line);
   }
   .cmd {
     font-size: 12px;

@@ -137,6 +137,108 @@ pub fn plan_mod_docs(
     }
 }
 
+/// Plan removing mod `id` from the list at `list`: its block (comments,
+/// archives, actions) and its plugins from the load order, unless another
+/// mod also has them -- and its notes from the docs file, where it has some
+/// there, which would otherwise name a mod the list no longer has. The edits
+/// to write, the list's first. Refused, naming what is in the way, while
+/// anything else refers to it.
+pub fn plan_remove(list: &Path, id: &str) -> anyhow::Result<Vec<Edit>> {
+    let text = std::fs::read_to_string(list)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", list.display()))?;
+    let source = parse_modlist(&text, list)?;
+    let entry = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+    let dropped = own_plugins(&source, entry);
+    let after = crate::config::add::plan_removal(&text, &source.mods, id)?;
+    let after = doc::drop_plugins(&after, &dropped)?;
+    let mut edits = vec![Edit::new(list, text, after)?];
+    if let (Some(file), Some(base)) = (&source.docs_file, &source.base_dir) {
+        let path = base.join(file);
+        if let Ok(before) = std::fs::read_to_string(&path) {
+            let after = doc::remove_file_docs(&before, id)?;
+            if after != before {
+                // Checked as a docs file only: the list it merges into is the
+                // one written just before it.
+                toml::from_str::<crate::config::docs::DocsFile>(&after)
+                    .map_err(|err| anyhow::anyhow!("not a valid docs file: {err}"))?;
+                edits.push(Edit {
+                    path,
+                    before,
+                    after,
+                });
+            }
+        }
+    }
+    Ok(edits)
+}
+
+/// The plugins a mod declares that no other mod does: the ones that leave
+/// the load order with it.
+fn own_plugins(source: &SourceModlist, entry: &crate::config::schema::ModEntry) -> Vec<String> {
+    entry
+        .plugins
+        .iter()
+        .filter(|plugin| {
+            !source.mods.iter().any(|other| {
+                other.id != entry.id && other.plugins.iter().any(|p| p.eq_ignore_ascii_case(plugin))
+            })
+        })
+        .cloned()
+        .collect()
+}
+
+/// Plan ticking mod `id` in MO2, or leaving it unticked (`enabled = false`).
+/// An unticked mod's plugins cannot be in the load order -- MO2 does not see
+/// them -- so disabling takes them out, and enabling puts back the ones
+/// missing: at `position`, or by default after the last plugin of the
+/// nearest mod before it that has any.
+pub fn plan_enabled(
+    list: &Path,
+    id: &str,
+    enabled: bool,
+    position: Option<&crate::config::add::LoadPosition>,
+) -> anyhow::Result<Edit> {
+    use crate::config::add::{LoadPosition, last_plugin_before, place_plugins};
+    plan(list, |text, source| {
+        let at = source
+            .mods
+            .iter()
+            .position(|entry| entry.id == id)
+            .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+        let entry = &source.mods[at];
+        let plugins = own_plugins(source, entry);
+        if !enabled {
+            let text = doc::set_fields(
+                text,
+                id,
+                None,
+                &[("enabled".to_string(), toml_edit::Value::from(false))],
+                &[],
+            )?;
+            return doc::drop_plugins(&text, &plugins);
+        }
+        let text = doc::set_fields(text, id, None, &[], &["enabled".to_string()])?;
+        let missing: Vec<String> = plugins
+            .into_iter()
+            .filter(|p| !source.plugins.iter().any(|q| q.eq_ignore_ascii_case(p)))
+            .collect();
+        if missing.is_empty() {
+            return Ok(text);
+        }
+        let position = match position {
+            Some(position) => position.clone(),
+            None => last_plugin_before(source, at)
+                .map(LoadPosition::After)
+                .unwrap_or(LoadPosition::Last),
+        };
+        place_plugins(&text, &missing, &position)
+    })
+}
+
 /// `text` loads and validates as the modlist at `path`.
 pub fn check(path: &Path, text: &str) -> anyhow::Result<()> {
     parse_modlist(text, path)

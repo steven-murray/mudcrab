@@ -199,7 +199,8 @@ pub(super) struct FileRow {
     offered: bool,
     /// A BAIN package: a top-level folder of a BAIN archive.
     package: bool,
-    /// Where a taken file goes in the mod's folder.
+    /// Where a taken file (or a folder of them) goes in the mod's folder:
+    /// what a `file_move` names it as.
     destination: Option<String>,
     /// The path the archive's `include` and `exclude` see it as.
     filtered_as: Option<String>,
@@ -232,6 +233,9 @@ pub(super) struct Tree {
     bain_subpackages: Vec<String>,
     bain_conditional: Vec<String>,
     rows: Vec<FileRow>,
+    /// The files this archive puts in the mod's folder, where they end up
+    /// once the mod's `file_move`s have run.
+    installed: Vec<InstalledFile>,
     entries: usize,
     taken: usize,
     /// The command that shows the same from a terminal.
@@ -262,7 +266,7 @@ pub(super) async fn mod_files(
     let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
     let path = list.clone();
     let mod_id = id.clone();
-    let (contents, archive) = tokio::task::spawn_blocking(move || {
+    let (contents, archive, actions) = tokio::task::spawn_blocking(move || {
         let planned = config::pipeline::planned_archive(&text, &path, &mod_id, number, &answers)?;
         let contents = config::check::archive_contents(
             &planned.entry,
@@ -270,7 +274,7 @@ pub(super) async fn mod_files(
             &downloads,
             &planned.active_plugins,
         )?;
-        anyhow::Ok((contents, planned.archive))
+        anyhow::Ok((contents, planned.archive, planned.entry.actions))
     })
     .await
     .map_err(|err| err.to_string())?
@@ -301,6 +305,7 @@ pub(super) async fn mod_files(
             .map(|p| p.name().to_string())
             .collect(),
         rows: rows(&contents, archive.layout == Some(ArchiveLayout::Bain)),
+        installed: installed(&contents, &actions),
         entries: contents.entries.len(),
         taken: contents.taken.len(),
         command: format!(
@@ -314,6 +319,71 @@ pub(super) async fn mod_files(
             }
         ),
     })
+}
+
+/// A file in the mod's folder.
+#[derive(Serialize)]
+pub(super) struct InstalledFile {
+    /// Where it ends up.
+    path: String,
+    /// Where the archive's layout puts it, before any `file_move`.
+    laid_out: String,
+    /// Named by a `file_hide`'s `paths`: kept, but hidden from the game.
+    hidden: bool,
+}
+
+/// The files `contents` puts in the mod's folder, with the mod's `file_move`
+/// actions applied in order, as install runs them; a moved folder takes
+/// everything in it.
+fn installed(
+    contents: &config::check::ArchiveContents,
+    actions: &[config::schema::ModAction],
+) -> Vec<InstalledFile> {
+    use config::schema::ModAction;
+    // Inside `folder`; `get` keeps a name with accents from being cut
+    // mid-character.
+    let under = |path: &str, folder: &str| {
+        path.get(..folder.len())
+            .is_some_and(|head| head.eq_ignore_ascii_case(folder))
+            && path.as_bytes().get(folder.len()) == Some(&b'/')
+    };
+    let mut out: Vec<InstalledFile> = contents
+        .taken
+        .iter()
+        .map(|t| InstalledFile {
+            path: t.destination.clone(),
+            laid_out: t.destination.clone(),
+            hidden: false,
+        })
+        .collect();
+    for action in actions {
+        match action {
+            ModAction::FileMove(m) => {
+                let from = m.from.replace('\\', "/");
+                let to = m.to.replace('\\', "/");
+                for file in &mut out {
+                    if file.path.eq_ignore_ascii_case(&from) {
+                        file.path = to.clone();
+                    } else if under(&file.path, &from) {
+                        file.path = format!("{to}{}", &file.path[from.len()..]);
+                    }
+                }
+            }
+            ModAction::FileHide(h) => {
+                for named in &h.paths {
+                    let named = named.replace('\\', "/");
+                    for file in &mut out {
+                        if file.path.eq_ignore_ascii_case(&named) || under(&file.path, &named) {
+                            file.hidden = true;
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out.sort_by_key(|file| file.path.to_lowercase());
+    out
 }
 
 /// The folder a path is in; `""` at the top.
@@ -368,12 +438,30 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
             at = slash;
         }
     }
+    // Where each folder lands in the mod's folder, read the same way from a
+    // taken file's destination: what a `file_move` names it as.
+    let mut folder_to: BTreeMap<&str, String> = BTreeMap::new();
+    for taken in &contents.taken {
+        let source = taken.source.as_str();
+        let mut at = source.len();
+        while let Some(slash) = source[..at].rfind('/') {
+            let folder = &source[..slash];
+            let tail = &source[slash + 1..];
+            if let Some(Some(head)) =
+                (!folder_to.contains_key(folder)).then(|| taken.destination.strip_suffix(tail))
+            {
+                folder_to.insert(folder, head.trim_end_matches('/').to_string());
+            }
+            at = slash;
+        }
+    }
     let mut files: BTreeMap<&str, Vec<&String>> = BTreeMap::new();
     for entry in contents.entries.iter().filter(|e| !e.ends_with('/')) {
         files.entry(parent(entry)).or_default().push(entry);
     }
     let mut out = Vec::new();
     Walk {
+        folder_to: &folder_to,
         folder_as: &folder_as,
         subfolders: &subfolders,
         files: &files,
@@ -387,6 +475,7 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
 }
 
 struct Walk<'a> {
+    folder_to: &'a BTreeMap<&'a str, String>,
     folder_as: &'a BTreeMap<&'a str, String>,
     subfolders: &'a BTreeMap<&'a str, BTreeSet<&'a str>>,
     files: &'a BTreeMap<&'a str, Vec<&'a String>>,
@@ -414,7 +503,12 @@ impl Walk<'_> {
                 },
                 offered: files > 0 || package,
                 package,
-                destination: None,
+                // The mod's own top folder has no name of its own to move.
+                destination: self
+                    .folder_to
+                    .get(folder)
+                    .filter(|path| !path.is_empty())
+                    .cloned(),
                 filtered_as: self.folder_as.get(folder).cloned(),
                 exclude_glob: self
                     .folder_as

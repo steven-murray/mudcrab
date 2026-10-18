@@ -220,4 +220,36 @@ fn a_mod_is_added_from_an_archive() {
         Value::Null,
         "nothing before Old has plugins"
     );
+
+    // Added, then its options chosen again: the list's choice is the default.
+    call(
+        &webview,
+        "add_mod",
+        json!({ "request": {
+            "path": choice, "id": "Choice", "section": ["Core"], "before_mod": null,
+            "condition": null, "source": "manual:Choice.zip", "answers": answers,
+            "plugins": ["Small.esp"], "load_after": null,
+        }}),
+    )
+    .unwrap();
+    let again = call(
+        &webview,
+        "choose_walk",
+        json!({ "id": "Choice", "number": 1, "answers": [] }),
+    )
+    .unwrap();
+    assert_eq!(again["asked"]["question"]["default"], json!([1]), "{again}");
+    let chosen = call(
+        &webview,
+        "choose_write",
+        json!({ "id": "Choice", "number": 1, "answers": [{ "pick": [0] }] }),
+    )
+    .unwrap();
+    let command = chosen["change"]["command"].as_str().unwrap();
+    assert!(
+        command.starts_with("mudcrab choose ") && command.ends_with(" --mod Choice"),
+        "{command}"
+    );
+    let text = std::fs::read_to_string(&list).unwrap();
+    assert!(text.contains("options = [\"Big\"]"), "{text}");
 }

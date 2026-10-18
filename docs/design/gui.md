@@ -1,6 +1,6 @@
 # A GUI, alongside the CLI
 
-**Status: phases 1-5 done; phase 6, author mode editing, has its first cut.** The
+**Status: phases 1-6 done; phase 7, packaging, is next.** The
 library API and CLI parity are in, the framework spike
 ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes)) chose
 **Tauri**, and `gui/` has install mode: open a list, read it, answer its
@@ -262,10 +262,12 @@ Still printing directly: `assets` (its logic sits in the command) and
    to fetch from, unknown archives identified by checksum, and the
    installer's questions asked through the library's resumable walk
    (`config::installer`, which `add` on a terminal now drives too), with the
-   plugins it installs read from the planner to declare. Still to come:
-   changing an existing mod's FOMOD options through the installer's steps,
-   a folder dragged to write a `file_move`, `game_root_files`, and fields of
-   a mod set from a form.
+   plugins it installs read from the planner to declare. Then: an existing
+   archive's installer walked again (`choose`, a new command), files and
+   folders moved within a mod (`file_move`, by dragging or typing a path), a
+   form for a mod's and an archive's fields (`set`), and `add --archive`
+   asking Nexus by checksum where the `.meta` says nothing. Phase 6 is done;
+   what is left is polish found in use.
 7. **Packaging.** AppImage (and Flatpak) for Linux, an installer or zip for
    Windows, the Deck checked; the GUI as a separate release artifact.
 

@@ -193,6 +193,12 @@ export interface FileRow {
   taken: number;
 }
 
+export interface InstalledFile {
+  path: string;
+  laid_out: string;
+  hidden: boolean;
+}
+
 export interface Tree {
   label: string;
   layout: string | null;
@@ -201,6 +207,7 @@ export interface Tree {
   bain_subpackages: string[];
   bain_conditional: string[];
   rows: FileRow[];
+  installed: InstalledFile[];
   entries: number;
   taken: number;
   command: string;
@@ -400,11 +407,19 @@ export const api = {
     invoke<Edited>("set_input", { name, sets, unsets }),
   removeInput: (name: string) => invoke<Edited>("remove_input", { name }),
   setDocs: (id: string, fields: [string, string | null][]) => invoke<Edited>("set_docs", { id, fields }),
+  fields: (id: string, archive: number | null) =>
+    invoke<[string, string | number | boolean | (string | number | boolean)[]][]>("fields", { id, archive }),
+  removeMod: (id: string) => invoke<Edited>("remove_mod", { id }),
+  setEnabled: (id: string, enabled: boolean) => invoke<Edited>("set_enabled", { id, enabled }),
   archives: () => invoke<ArchiveRow[]>("archives"),
   addStart: (path: string) => invoke<Started>("add_start", { path }),
   addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),
   addPlan: (request: AddRequest) => invoke<AddPlan>("add_plan", { request }),
   addMod: (request: AddRequest) => invoke<Edited>("add_mod", { request }),
+  chooseWalk: (id: string, number: number, answers: Answer[]) =>
+    invoke<Walk>("choose_walk", { id, number, answers }),
+  chooseWrite: (id: string, number: number, answers: Answer[]) =>
+    invoke<Edited>("choose_write", { id, number, answers }),
   nexusLink: (link: string) => invoke<NexusMod>("nexus_link", { link }),
   nexusFetch: (modId: number, fileId: number, fileName: string | null) =>
     invoke<Fetched>("nexus_fetch", { modId, fileId, fileName }),

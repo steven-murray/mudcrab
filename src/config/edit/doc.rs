@@ -691,6 +691,156 @@ pub fn set_file_docs(
     Ok(doc.to_string())
 }
 
+/// The plain fields of a mod, or with `archive` one of its archives: each
+/// key whose value is a string, number, boolean or list of those, as JSON,
+/// in the file's order. Tables and lists of tables (`archives`, `actions`,
+/// `merge`, `fomod_selections`...) have commands of their own and are left
+/// out. What `set` changes, for a form to show.
+pub fn field_values(
+    text: &str,
+    id: &str,
+    archive: Option<usize>,
+) -> anyhow::Result<Vec<(String, serde_json::Value)>> {
+    fn json(value: &Value) -> Option<serde_json::Value> {
+        Some(match value {
+            Value::String(s) => serde_json::Value::from(s.value().as_str()),
+            Value::Integer(n) => serde_json::Value::from(*n.value()),
+            Value::Float(f) => serde_json::Value::from(*f.value()),
+            Value::Boolean(b) => serde_json::Value::from(*b.value()),
+            Value::Array(items) => serde_json::Value::Array(
+                items
+                    .iter()
+                    .map(|item| match item {
+                        Value::InlineTable(_) | Value::Array(_) => None,
+                        other => json(other),
+                    })
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            _ => return None,
+        })
+    }
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, archive)?;
+    Ok(table
+        .iter()
+        .filter_map(|(key, item)| Some((key.to_string(), json(item.as_value()?)?)))
+        .collect())
+}
+
+/// Write an installer's choices into a mod's archive (from 1): a FOMOD's as
+/// its `fomod_selections`, one table per group asked, in order (a group's
+/// table keeps its comments); BAIN packages as `bain_subpackages`; a
+/// wizard's packages likewise, with the plugins it left out added to
+/// `exclude`. Choices that depend on the list's questions (an `if` on a
+/// selection or package) are the author's to change in the file, so an
+/// archive with any is refused rather than have them dropped.
+pub fn set_installer(
+    text: &str,
+    id: &str,
+    archive: usize,
+    chosen: &crate::config::inspect::Chosen,
+) -> anyhow::Result<String> {
+    use crate::config::inspect::Chosen;
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    let conditional = |item: Option<&Item>| -> bool {
+        match item {
+            Some(Item::ArrayOfTables(tables)) => tables.iter().any(|t| t.contains_key("if")),
+            Some(Item::Value(Value::Array(items))) => items
+                .iter()
+                .any(|v| v.as_inline_table().is_some_and(|t| t.contains_key("if"))),
+            _ => false,
+        }
+    };
+    let packages =
+        |names: &[String]| Item::Value(Value::Array(names.iter().map(String::as_str).collect()));
+    match chosen {
+        Chosen::Fomod(selections) => {
+            anyhow::ensure!(
+                !conditional(table.get("fomod_selections")),
+                "some of '{id}'s FOMOD selections depend on the list's questions (an `if`); \
+                 change them in the list's file"
+            );
+            let old: Vec<Table> = table
+                .get("fomod_selections")
+                .and_then(Item::as_array_of_tables)
+                .map(|tables| tables.iter().cloned().collect())
+                .unwrap_or_default();
+            let mut tables = ArrayOfTables::new();
+            for selection in selections {
+                let mut new = Table::new();
+                // The group's old table, for its comments.
+                if let Some(was) = old.iter().find(|t| {
+                    t.get("step").and_then(Item::as_str) == Some(selection.step.as_str())
+                        && t.get("group").and_then(Item::as_str) == Some(selection.group.as_str())
+                }) {
+                    *new.decor_mut() = was.decor().clone();
+                }
+                new.insert("step", toml_edit::value(selection.step.as_str()));
+                new.insert("group", toml_edit::value(selection.group.as_str()));
+                new.insert(
+                    "options",
+                    Item::Value(Value::Array(
+                        selection.options.iter().map(String::as_str).collect(),
+                    )),
+                );
+                tables.push(new);
+            }
+            if tables.is_empty() {
+                table.remove("fomod_selections");
+            } else {
+                table.insert("fomod_selections", Item::ArrayOfTables(tables));
+            }
+        }
+        Chosen::Bain(names)
+        | Chosen::Wizard {
+            subpackages: names, ..
+        } => {
+            anyhow::ensure!(
+                !conditional(table.get("bain_subpackages")),
+                "some of '{id}'s BAIN packages depend on the list's questions (an `if`); change \
+                 them in the list's file"
+            );
+            table.insert("bain_subpackages", packages(names));
+            if let Chosen::Wizard { exclude, .. } = chosen {
+                let item = table
+                    .entry("exclude")
+                    .or_insert(Item::Value(Value::Array(Array::new())));
+                let array = item
+                    .as_array_mut()
+                    .ok_or_else(|| anyhow::anyhow!("exclude is not a list"))?;
+                for plugin in exclude {
+                    if position(array, plugin).is_none() {
+                        insert_item(array, array.len(), Value::from(plugin.as_str()), false);
+                    }
+                }
+                if array.is_empty() {
+                    table.remove("exclude");
+                }
+            }
+        }
+    }
+    Ok(doc.to_string())
+}
+
+/// The docs file without mod `id`'s notes.
+pub fn remove_file_docs(text: &str, id: &str) -> anyhow::Result<String> {
+    let mut doc = text
+        .parse::<DocumentMut>()
+        .map_err(|err| anyhow::anyhow!("the docs file is not valid TOML: {err}"))?;
+    if let Some(mods) = doc.get_mut("mods").and_then(Item::as_table_like_mut) {
+        mods.remove(id);
+    }
+    // The blank line before the next table stays with it; at the top of the
+    // file it would only be noise.
+    let out = doc.to_string();
+    Ok(if text.starts_with('\n') {
+        out
+    } else {
+        out.trim_start_matches('\n').to_string()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -891,5 +1041,73 @@ id = "B"
             out.starts_with("name = \"T\"\ninputs.x.type = \"bool\""),
             "{out}"
         );
+    }
+
+    #[test]
+    fn a_mods_plain_fields_are_read_for_a_form() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\nif = \"big\"\nenabled = false\ndependencies = [\"B\"]\n\n[[mods.archives]]\npath = \"manual:A.zip\"\nlayout = \"bain\"\nbain_subpackages = [{ name = \"00 Core\", if = \"x\" }]\n\n[[mods.actions]]\naction = \"file_hide\"\n";
+        let fields = super::field_values(text, "A", None).unwrap();
+        let keys: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["id", "if", "enabled", "dependencies"]);
+        assert_eq!(fields[2].1, serde_json::json!(false));
+        let archive = super::field_values(text, "A", Some(1)).unwrap();
+        assert_eq!(
+            archive,
+            [
+                ("path".to_string(), serde_json::json!("manual:A.zip")),
+                ("layout".to_string(), serde_json::json!("bain"))
+            ]
+        );
+    }
+
+    #[test]
+    fn an_installers_choices_replace_the_old_ones_keeping_comments() {
+        use crate::config::inspect::Chosen;
+        use crate::config::schema::FomodSelection;
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\n\n# Lite, for low-end machines.\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Lite\"]\n\n[[mods.actions]]\naction = \"file_hide\"\n";
+        let chosen = Chosen::Fomod(vec![
+            FomodSelection {
+                condition: None,
+                step: "S".to_string(),
+                group: "G".to_string(),
+                options: vec!["Full".to_string()],
+            },
+            FomodSelection {
+                condition: None,
+                step: "S".to_string(),
+                group: "H".to_string(),
+                options: vec![],
+            },
+        ]);
+        let out = super::set_installer(text, "A", 1, &chosen).unwrap();
+        assert!(
+            out.contains("# Lite, for low-end machines.\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Full\"]"),
+            "{out}"
+        );
+        assert!(out.contains("group = \"H\"\noptions = []"), "{out}");
+        assert!(out.find("group = \"H\"").unwrap() < out.find("[[mods.actions]]").unwrap());
+
+        let bain = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\nbain_subpackages = [\"00 Core\"]\nexclude = [\"docs/**\"]\n";
+        let out = super::set_installer(
+            bain,
+            "A",
+            1,
+            &Chosen::Wizard {
+                subpackages: vec!["00 Core".to_string(), "10 Extra".to_string()],
+                exclude: vec!["Extra.esp".to_string()],
+            },
+        )
+        .unwrap();
+        assert!(
+            out.contains("bain_subpackages = [\"00 Core\", \"10 Extra\"]"),
+            "{out}"
+        );
+        assert!(
+            out.contains("exclude = [\"docs/**\", \"Extra.esp\"]"),
+            "{out}"
+        );
+
+        let conditional = bain.replace("[\"00 Core\"]", "[{ name = \"00 Core\", if = \"x\" }]");
+        assert!(super::set_installer(&conditional, "A", 1, &Chosen::Bain(vec![])).is_err());
     }
 }

@@ -16,14 +16,21 @@ use mudcrab::config::edit::{self, Edit, doc};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
-/// One edit, as the session remembers it.
+/// One file's text before and after an edit.
 #[derive(Clone)]
-pub(super) struct Recorded {
+pub(super) struct FileChange {
     path: PathBuf,
-    command: String,
-    diff: String,
     before: String,
     after: String,
+}
+
+/// One edit, as the session remembers it: the files it wrote, in the order
+/// written (a removal writes the list, then its docs file).
+#[derive(Clone)]
+pub(super) struct Recorded {
+    files: Vec<FileChange>,
+    command: String,
+    diff: String,
 }
 
 /// What this window has changed in the open list, in order, and what has been
@@ -35,6 +42,18 @@ pub(super) struct History {
     /// Each file as it was before its first edit, in the order first
     /// edited, for the session's diff.
     original: Vec<(PathBuf, String)>,
+}
+
+impl History {
+    /// What this window last wrote to `path`, if it has.
+    fn last_written(&self, path: &Path) -> Option<&str> {
+        self.done
+            .iter()
+            .rev()
+            .flat_map(|done| done.files.iter().rev())
+            .find(|file| file.path == path)
+            .map(|file| file.after.as_str())
+    }
 }
 
 /// An edit as the page shows it.
@@ -73,40 +92,59 @@ fn edited(history: &History, change: Change) -> Edited {
 
 /// Write a planned edit, remember it, and mark the plan out of date.
 pub(super) fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
-    if !edit.changes() {
+    apply_all(state, command, vec![edit])
+}
+
+/// Write planned edits of several files as one step, in order: if one cannot
+/// be written, those before it are put back.
+pub(super) fn apply_all(
+    state: &State,
+    command: String,
+    edits: Vec<Edit>,
+) -> Result<Edited, String> {
+    let edits: Vec<Edit> = edits.into_iter().filter(Edit::changes).collect();
+    if edits.is_empty() {
         return Err("That changes nothing in the list.".to_string());
     }
-    edit.write().map_err(shown)?;
-    let diff = edit.diff();
+    for (index, edit) in edits.iter().enumerate() {
+        if let Err(err) = edit.write() {
+            for written in edits[..index].iter().rev() {
+                let _ = edit::write_atomic(&written.path, &written.before);
+            }
+            return Err(shown(err));
+        }
+    }
+    let diff = edits.iter().map(Edit::diff).collect::<Vec<_>>().join("\n");
     let recorded = Recorded {
-        path: edit.path,
+        files: edits
+            .into_iter()
+            .map(|edit| FileChange {
+                path: edit.path,
+                before: edit.before,
+                after: edit.after,
+            })
+            .collect(),
         command,
         diff,
-        before: edit.before,
-        after: edit.after,
     };
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     session.planned_at = None;
     let history = &mut session.history;
     // An edit made outside since the last one here ends the history: undoing
     // past it would undo someone else's change.
-    if history
-        .done
-        .iter()
-        .rev()
-        .find(|done| done.path == recorded.path)
-        .is_some_and(|last| last.after != recorded.before)
-    {
+    if recorded.files.iter().any(|file| {
+        history
+            .last_written(&file.path)
+            .is_some_and(|last| last != file.before)
+    }) {
         *history = History::default();
     }
-    if !history
-        .original
-        .iter()
-        .any(|(path, _)| path == &recorded.path)
-    {
-        history
-            .original
-            .push((recorded.path.clone(), recorded.before.clone()));
+    for file in &recorded.files {
+        if !history.original.iter().any(|(path, _)| path == &file.path) {
+            history
+                .original
+                .push((file.path.clone(), file.before.clone()));
+        }
     }
     history.undone.clear();
     let change = Change::from(&recorded);
@@ -130,22 +168,40 @@ fn list_arg(list: &Path) -> String {
 
 // --- Undo, redo, and the session's changes -----------------------------------------
 
-/// Write `text` over the file at `path`, if it is still `expected`.
-fn rewrite(state: &State, path: &Path, expected: &str, text: &str) -> Result<(), String> {
-    let now = std::fs::read_to_string(path).map_err(|err| err.to_string())?;
-    if now != expected {
-        state
-            .session
-            .lock()
-            .map_err(|_| "a command panicked")?
-            .history = History::default();
-        return Err(format!(
-            "{} has changed outside this window since the last edit here, so there is nothing \
-             to undo or redo safely; the history starts again from here.",
-            path.display()
-        ));
+/// Write each file's `from` text back to its `to` (undo: after to before;
+/// redo: before to after), but only if every one is still what this window
+/// last wrote. Otherwise the history ends there.
+fn rewrite(state: &State, recorded: &Recorded, undo: bool) -> Result<(), String> {
+    fn side(file: &FileChange, undo: bool) -> (&str, &str) {
+        if undo {
+            (&file.after, &file.before)
+        } else {
+            (&file.before, &file.after)
+        }
     }
-    edit::write_atomic(path, text).map_err(shown)?;
+    for file in &recorded.files {
+        let now = std::fs::read_to_string(&file.path).map_err(|err| err.to_string())?;
+        if now != side(file, undo).0 {
+            state
+                .session
+                .lock()
+                .map_err(|_| "a command panicked")?
+                .history = History::default();
+            return Err(format!(
+                "{} has changed outside this window since the last edit here, so there is \
+                 nothing to undo or redo safely; the history starts again from here.",
+                file.path.display()
+            ));
+        }
+    }
+    let files: Vec<&FileChange> = if undo {
+        recorded.files.iter().rev().collect()
+    } else {
+        recorded.files.iter().collect()
+    };
+    for file in files {
+        edit::write_atomic(&file.path, side(file, undo).1).map_err(shown)?;
+    }
     state
         .session
         .lock()
@@ -165,9 +221,14 @@ pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
             .cloned()
             .ok_or("nothing to undo")?
     };
-    rewrite(&state, &last.path, &last.after, &last.before)?;
+    rewrite(&state, &last, true)?;
     // What the undo did: the edit, backwards.
-    let diff = edit::diff(&last.path, &last.after, &last.before);
+    let diff = last
+        .files
+        .iter()
+        .map(|file| edit::diff(&file.path, &file.after, &file.before))
+        .collect::<Vec<_>>()
+        .join("\n");
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &mut session.history;
     let recorded = history.done.pop().expect("there was one");
@@ -192,7 +253,7 @@ pub(super) fn redo(state: tauri::State<'_, State>) -> Result<Edited, String> {
             .cloned()
             .ok_or("nothing to redo")?
     };
-    rewrite(&state, &next.path, &next.before, &next.after)?;
+    rewrite(&state, &next, false)?;
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &mut session.history;
     let recorded = history.undone.pop().expect("there was one");
@@ -220,8 +281,7 @@ pub(super) fn changes(state: tauri::State<'_, State>) -> Result<Changes, String>
         .original
         .iter()
         .filter_map(|(path, original)| {
-            let last = history.done.iter().rev().find(|done| &done.path == path)?;
-            Some(edit::diff(path, original, &last.after))
+            Some(edit::diff(path, original, history.last_written(path)?))
         })
         .collect::<Vec<_>>()
         .join("\n");
@@ -496,4 +556,44 @@ pub(super) fn set_docs(
         }
     }
     apply(&state, command, planned)
+}
+
+/// A mod's plain fields, or one of its archives', as `set` changes them.
+#[tauri::command]
+pub(super) fn fields(
+    state: tauri::State<'_, State>,
+    id: String,
+    archive: Option<usize>,
+) -> Result<Vec<(String, serde_json::Value)>, String> {
+    let text = std::fs::read_to_string(state.list()?).map_err(|err| err.to_string())?;
+    doc::field_values(&text, &id, archive).map_err(shown)
+}
+
+/// Remove a mod (`remove`): its block, its plugins from the load order, and
+/// its notes from the docs file -- one step, undone as one.
+#[tauri::command]
+pub(super) fn remove_mod(state: tauri::State<'_, State>, id: String) -> Result<Edited, String> {
+    let list = state.list()?;
+    let edits = edit::plan_remove(&list, &id).map_err(shown)?;
+    let command = format!("mudcrab remove {} --mod {}", list_arg(&list), quote(&id));
+    apply_all(&state, command, edits)
+}
+
+/// Tick a mod in MO2 or leave it unticked (`enable`, `disable`), its plugins
+/// put back in the load order or taken out.
+#[tauri::command]
+pub(super) fn set_enabled(
+    state: tauri::State<'_, State>,
+    id: String,
+    enabled: bool,
+) -> Result<Edited, String> {
+    let list = state.list()?;
+    let edit = edit::plan_enabled(&list, &id, enabled, None).map_err(shown)?;
+    let command = format!(
+        "mudcrab {} {} --mod {}",
+        if enabled { "enable" } else { "disable" },
+        list_arg(&list),
+        quote(&id)
+    );
+    apply(&state, command, edit)
 }

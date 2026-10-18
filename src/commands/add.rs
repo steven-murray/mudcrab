@@ -6,7 +6,25 @@ use crate::config::add::{
 use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
 
-pub async fn run(args: AddArgs) -> anyhow::Result<()> {
+pub async fn run(mut args: AddArgs) -> anyhow::Result<()> {
+    // An archive whose `.meta` does not say where it came from: ask Nexus
+    // which file it is, by its MD5, as `identify` does.
+    if let Some(archive) = args.archive.clone()
+        && args.nexus.is_none()
+        && !args.manual
+        && config::archive_store::meta_source(&archive).is_none()
+        && let Some((mod_id, file_id)) = identify_on_nexus(&archive).await
+    {
+        crate::ui::status_err(
+            crate::ui::Tone::Note,
+            format!(
+                "{} has no `.meta` saying where it came from; Nexus knows it by its checksum \
+                 as mod {mod_id}, file {file_id}",
+                archive.display()
+            ),
+        );
+        args.nexus = Some(format!("{mod_id}/{file_id}"));
+    }
     let (mut new_mod, mod_dir) = resolve(&args)?;
     if new_mod.file_name.is_none() {
         new_mod.file_name = nexus_file_name(new_mod.path.as_deref()).await;
@@ -114,6 +132,24 @@ pub async fn run(args: AddArgs) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Which Nexus mod and file an archive is, by its MD5. Best effort: `None`
+/// with no API key, or no answer.
+async fn identify_on_nexus(archive: &Path) -> Option<(u64, u64)> {
+    let key = crate::config::tools::ToolsConfig::nexus_api_key()?;
+    let client = reqwest::Client::builder()
+        .user_agent("mudcrab")
+        .build()
+        .ok()?;
+    let base = std::env::var("NEXUS_API_BASE").ok();
+    let file_name = archive.file_name()?.to_string_lossy();
+    let hint = config::identify::mod_id_from_file_name(&file_name);
+    let found =
+        config::identify::identify(&client, archive, "oblivion", &key, base.as_deref(), hint)
+            .await
+            .ok()?;
+    Some((found.mod_id, found.file_id))
+}
+
 /// The archive's filename, from Nexus's list of the mod's files, for a
 /// `nexus:` source given without --file-name. It lets `download` save the file
 /// under its real name and later stages find one already on disk. Best effort:
@@ -201,7 +237,8 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
         (None, true) => format!("manual:{}", report.file_name),
         (None, false) => crate::config::archive_store::meta_source(archive).ok_or_else(|| {
             anyhow::anyhow!(
-                "{} has no MO2 `.meta` saying where it came from; give the source with \
+                "{} has no MO2 `.meta` saying where it came from, and Nexus could not say by \
+                 its checksum (or there is no Nexus API key to ask with); give the source with \
                  --nexus <modid>/<fileid>, or --manual for an archive fetched by hand",
                 archive.display()
             )
@@ -211,7 +248,14 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
     // answers are what the entry records.
     let interactive = !args.defaults && std::io::stdin().is_terminal();
     let list = ListPlugins::of(&config::loader::load_modlist(&args.input)?);
-    let installed = walk_installer(archive, &id, &report, &list, interactive)?;
+    let installed = walk_installer(
+        archive,
+        &id,
+        &report,
+        &list,
+        &crate::config::installer::Prior::default(),
+        interactive,
+    )?;
     for note in &installed.notes {
         crate::ui::status_err(crate::ui::Tone::Note, format!("'{id}': {note}"));
     }
@@ -257,12 +301,14 @@ fn from_archive(archive: &Path, args: &AddArgs) -> anyhow::Result<NewMod> {
 
 /// Walk the archive's installer with the author at a terminal (or, not
 /// interactive, on its defaults): the library's walk, each question it
-/// stops at asked here and the walk resumed with the answer.
-fn walk_installer(
+/// stops at asked here and the walk resumed with the answer. `prior` is what
+/// the entry chooses already, offered as each question's default.
+pub(super) fn walk_installer(
     archive: &Path,
     id: &str,
     report: &crate::config::inspect::InspectReport,
     list: &crate::config::installer::ListPlugins,
+    prior: &crate::config::installer::Prior,
     interactive: bool,
 ) -> anyhow::Result<crate::config::installer::Installed> {
     use crate::config::inspect::LayoutGuess;
@@ -274,7 +320,7 @@ fn walk_installer(
     let mut answers = Vec::new();
     let mut introduced = false;
     loop {
-        let asked = match walk(archive, report, list, &answers, !interactive)? {
+        let asked = match walk(archive, report, list, prior, &answers, !interactive)? {
             Walk::Done { installed } => return Ok(installed),
             Walk::Ask { asked } => asked,
         };
@@ -288,7 +334,12 @@ fn walk_installer(
                 "{}",
                 match (&report.layout, wizard) {
                     (LayoutGuess::Fomod { .. }, _) => format!(
-                        "'{id}' has a FOMOD installer. Enter takes the installer's own choice."
+                        "'{id}' has a FOMOD installer. Enter takes {}.",
+                        if prior.fomod.is_empty() {
+                            "the installer's own choice"
+                        } else {
+                            "what the list chooses now"
+                        }
                     ),
                     (_, true) => format!(
                         "'{id}' is a BAIN package with a wizard. Enter takes the wizard's own \

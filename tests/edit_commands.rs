@@ -428,3 +428,102 @@ fn docs_writes_a_mods_notes_where_they_already_are() {
         .assert()
         .failure();
 }
+
+#[test]
+fn choose_walks_an_archives_installer_again_and_writes_its_choices() {
+    let dir = tempdir().unwrap();
+    let config = r#"<config><moduleName>M</moduleName><installSteps order="Explicit">
+      <installStep name="Main"><optionalFileGroups order="Explicit">
+        <group name="Size" type="SelectExactlyOne"><plugins order="Explicit">
+          <plugin name="Big"><files><folder source="big" destination="" /></files>
+            <typeDescriptor><type name="Recommended" /></typeDescriptor></plugin>
+          <plugin name="Small"><files><folder source="small" destination="" /></files>
+            <typeDescriptor><type name="Optional" /></typeDescriptor></plugin>
+        </plugins></group>
+      </optionalFileGroups></installStep></installSteps></config>"#;
+    let downloads = dir.path().join("downloads");
+    std::fs::create_dir_all(&downloads).unwrap();
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(downloads.join("M.zip")).unwrap());
+    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+    for (name, bytes) in [
+        ("fomod/ModuleConfig.xml", config.as_bytes()),
+        ("big/a.dds", b"x"),
+        ("small/a.dds", b"x"),
+    ] {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(bytes).unwrap();
+    }
+    zip.finish().unwrap();
+    let list = dir.path().join("list.toml");
+    let entry = "name = \"F\"\n\n[[mods]]\nid = \"M\"\n\n[[mods.archives]]\npath = \"manual:M.zip\"\nlayout = \"fomod\"\n";
+    let choose = || {
+        let mut cmd = mudcrab(dir.path());
+        cmd.args(["choose", list.to_str().unwrap(), "--mod", "M", "--defaults"])
+            .arg("--downloads")
+            .arg(&downloads);
+        cmd
+    };
+
+    // No choices yet: the installer's own.
+    std::fs::write(&list, entry).unwrap();
+    choose().assert().success();
+    assert!(
+        read(&list).contains("step = \"Main\"\ngroup = \"Size\"\noptions = [\"Big\"]"),
+        "{}",
+        read(&list)
+    );
+    // A choice the list has made is the default, and kept.
+    std::fs::write(
+        &list,
+        format!("{entry}\n[[mods.archives.fomod_selections]]\nstep = \"Main\"\ngroup = \"Size\"\noptions = [\"Small\"]\n"),
+    )
+    .unwrap();
+    choose().assert().success();
+    assert!(
+        read(&list).contains("options = [\"Small\"]"),
+        "{}",
+        read(&list)
+    );
+}
+
+#[test]
+fn a_mod_is_removed_with_its_notes_and_disabled_and_enabled_with_its_plugins() {
+    let dir = tempdir().unwrap();
+    let list = dir.path().join("list.toml");
+    let docs = dir.path().join("list.docs.toml");
+    let text = "name = \"R\"\ndocs_file = \"list.docs.toml\"\n\nplugins = [\n    \"Oblivion.esm\",\n    \"A.esp\",\n    \"B.esp\",\n]\n\n[[mods]]\nid = \"A\"\nplugins = [\"A.esp\"]\n\n[[mods]]\nid = \"B\"\nplugins = [\"B.esp\"]\n";
+    std::fs::write(&list, text).unwrap();
+    std::fs::write(
+        &docs,
+        "[mods.\"A\"]\nsummary = \"A.\"\n\n[mods.\"B\"]\nsummary = \"B.\"\n",
+    )
+    .unwrap();
+    let run = |args: &[&str]| {
+        mudcrab(dir.path())
+            .arg(args[0])
+            .arg(&list)
+            .args(&args[1..])
+            .assert()
+            .success();
+    };
+
+    // Unticked: B's plugin leaves the load order.
+    run(&["disable", "--mod", "B"]);
+    let now = read(&list);
+    assert!(now.contains("enabled = false"), "{now}");
+    assert!(!now.contains("    \"B.esp\","), "{now}");
+    // Ticked again: back after the last plugin of the mod before it.
+    run(&["enable", "--mod", "B"]);
+    assert_eq!(read(&list), text);
+
+    // Removed, notes and all; the list still loads with its docs.
+    run(&["remove", "--mod", "A"]);
+    assert!(!read(&list).contains("id = \"A\""));
+    assert!(!read(&list).contains("\"A.esp\""));
+    assert_eq!(read(&docs), "[mods.\"B\"]\nsummary = \"B.\"\n");
+    mudcrab(dir.path())
+        .arg("validate")
+        .arg(&list)
+        .assert()
+        .success();
+}
