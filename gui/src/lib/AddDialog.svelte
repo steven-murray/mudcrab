@@ -30,6 +30,9 @@
   // Name and place.
   let id = $state("");
   let sectionKey = $state("");
+  // A section the list does not have yet, when "New section…" is chosen.
+  const NEW = "\u0001new";
+  let newSection = $state("");
   let beforeMod = $state("");
   let condition = $state("");
   let source = $state("");
@@ -66,7 +69,7 @@
   const inputs = $derived(document.inputs.map((i) => i.id));
 
   onMount(async () => {
-    sectionKey = startSection.join("\u0000") || (sections.at(-1)?.key ?? "");
+    sectionKey = startSection.join("\u0000") || (sections.at(-1)?.key ?? NEW);
     try {
       started = await api.addStart(path);
       id = started.suggested_id;
@@ -125,7 +128,7 @@
     return {
       path,
       id: id.trim(),
-      section: chosenSection?.path ?? [],
+      section: sectionKey === NEW ? (newSection.trim() ? [newSection.trim()] : []) : (chosenSection?.path ?? []),
       before_mod: beforeMod || null,
       condition: condition.trim() || null,
       source: source.trim() || null,
@@ -195,8 +198,14 @@
             >Section
             <select bind:value={sectionKey} onchange={() => ((beforeMod = ""), replan())}>
               {#each sections as s}<option value={s.key}>{s.title}</option>{/each}
+              <option value={NEW}>New section…</option>
             </select>
           </label>
+          {#if sectionKey === NEW}
+            <label
+              >New section <input type="text" bind:value={newSection} onchange={replan} placeholder="its name, as MO2's separator shows it" />
+            </label>
+          {/if}
           <label
             >Position
             <select bind:value={beforeMod} onchange={replan}>

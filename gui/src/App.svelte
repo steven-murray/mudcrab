@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
+  import { open, save } from "@tauri-apps/plugin-dialog";
   import { api, type ListView } from "./lib/api";
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
@@ -24,6 +24,32 @@
     } finally {
       opening = false;
       recent = await api.recent();
+    }
+  }
+
+  // A new list: a name, then where to keep it; opened in author mode, where
+  // its mods are added.
+  let creating = $state(false);
+  let newName = $state("");
+  async function create(event: SubmitEvent) {
+    event.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    const file = name.replace(/[^A-Za-z0-9 _-]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "modlist";
+    const path = await save({
+      defaultPath: `${file}.toml`,
+      filters: [{ name: "Modlist", extensions: ["toml"] }],
+    });
+    if (!path) return;
+    error = null;
+    try {
+      const made = await api.newList(path.endsWith(".toml") ? path : `${path}.toml`, name);
+      creating = false;
+      newName = "";
+      await openPath(made);
+      mode = "author";
+    } catch (err) {
+      error = String(err);
     }
   }
 
@@ -124,9 +150,24 @@
       <h1>Install a modlist</h1>
       <p class="dim">
         Open a list's <code>.toml</code> file to read it, answer its questions and install it into a
-        Mod Organizer 2 instance. Every step is one of mudcrab's commands, shown as it runs.
+        Mod Organizer 2 instance -- or start a list of your own. Every step is one of mudcrab's
+        commands, shown as it runs.
       </p>
-      <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
+      <div class="starts">
+        <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
+        <button onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
+      </div>
+      {#if creating}
+        <form class="create" onsubmit={create}>
+          <label for="new-name">Its name, as players will see it</label>
+          <div>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input id="new-name" type="text" bind:value={newName} placeholder="My Oblivion list" autofocus />
+            <button type="submit" class="primary" disabled={!newName.trim()}>Choose where to save it…</button>
+          </div>
+          <p class="dim small">It starts empty, and opens in author mode, where mods are added from your downloads or a Nexus link.</p>
+        </form>
+      {/if}
       {#if recent.length}
         <h2>Recent</h2>
         <ul>
@@ -273,6 +314,34 @@
     list-style: none;
     padding: 0;
     margin: 0;
+  }
+  .starts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .create {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .create label {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .create div {
+    display: flex;
+    gap: 6px;
+  }
+  .create input {
+    flex: 1;
+    min-width: 0;
+  }
+  .create p {
+    margin: 8px 0 0;
   }
   .welcome li {
     padding: 3px 0;

@@ -85,6 +85,7 @@ pub async fn execute(cli: Cli) -> anyhow::Result<()> {
     match cli.command {
         Command::Add(args) => add::run(args).await,
         Command::Move(args) => move_mod::run(args),
+        Command::New(args) => edit::new_list(args),
         Command::Set(args) => edit::set(args),
         Command::Docs(args) => edit::docs(args),
         Command::Choose(args) => edit::choose(args),

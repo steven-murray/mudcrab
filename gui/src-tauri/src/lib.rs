@@ -130,6 +130,14 @@ fn recent(state: tauri::State<'_, State>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Start a new, empty list at `path` (`new`); the page then opens it.
+#[tauri::command]
+fn new_list(path: String, name: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    config::edit::create_list(&path, &name).map_err(shown)?;
+    Ok(path.display().to_string())
+}
+
 #[tauri::command]
 fn open_list<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -917,6 +925,7 @@ pub fn app<R: Runtime>(
             opening,
             recent,
             open_list,
+            new_list,
             locations,
             set_location,
             set_tools_config,

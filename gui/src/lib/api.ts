@@ -366,6 +366,7 @@ export const api = {
   opening: () => invoke<string | null>("opening"),
   recent: () => invoke<string[]>("recent"),
   openList: (path: string) => invoke<ListView>("open_list", { path }),
+  newList: (path: string, name: string) => invoke<string>("new_list", { path, name }),
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),

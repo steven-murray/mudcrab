@@ -138,6 +138,15 @@ end-of-line comment), the result is validated before anything is written, and
 `--dry-run` prints the change as a diff instead. A GUI built on mudcrab makes
 its edits through these same commands, so anything it can do, they can.
 
+### new
+
+```bash
+mudcrab new <modlist.toml> --name "<name>"
+```
+
+Starts a list: its name, and a load order holding only the game's master,
+ready for `add`. Never written over a file that is already there.
+
 ### set
 
 ```bash

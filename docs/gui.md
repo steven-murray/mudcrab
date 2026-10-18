@@ -77,6 +77,10 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 
 ## Author mode
 
+To start a list of your own, **Create a new list…** on the opening page asks
+its name and where to keep it (`mudcrab new`), and opens it here, empty,
+ready for its first mod.
+
 **Author** in the top right switches to working on the list as its author.
 It reads the list as planned with the answers given in Install, and plans it
 again after each change.
@@ -100,7 +104,7 @@ history there, rather than be undone by it.
   downloaded it. A Nexus API key is needed to list a mod's files.
 - **Adding a mod**: double-click an archive (or right-click, **Add to the
   list**). Name it (the mod's name on Nexus, or the file's), choose its
-  section and where in it, and an `if` if it is optional. An archive whose
+  section (or start a new one) and where in it, and an `if` if it is optional. An archive whose
   `.meta` does not say where it came from is looked up on Nexus by its
   checksum, as `mudcrab identify` does; the source can be changed by hand.
   Most archives install as they are; one with an installer asks its

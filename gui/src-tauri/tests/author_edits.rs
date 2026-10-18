@@ -272,4 +272,24 @@ fn edits_are_the_commands_and_can_be_undone() {
         "{enabled}"
     );
     assert_eq!(std::fs::read_to_string(&docs_list).unwrap(), documented);
+
+    // A new list, started here and opened like any other; never over a file.
+    let fresh = root.join("fresh.toml");
+    let made = call(
+        &webview,
+        "new_list",
+        json!({ "path": fresh, "name": "Fresh" }),
+    )
+    .unwrap();
+    assert_eq!(made, json!(fresh.display().to_string()));
+    let opened = call(&webview, "open_list", json!({ "path": fresh })).unwrap();
+    assert_eq!(opened["document"]["name"], "Fresh");
+    assert!(
+        call(
+            &webview,
+            "new_list",
+            json!({ "path": fresh, "name": "Again" })
+        )
+        .is_err()
+    );
 }

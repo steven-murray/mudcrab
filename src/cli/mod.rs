@@ -60,8 +60,8 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Editing a modlist",
         &[
-            "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins", "files",
-            "action", "input",
+            "new", "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins",
+            "files", "action", "input",
         ],
     ),
     (
@@ -108,6 +108,8 @@ pub fn command() -> clap::Command {
 pub enum Command {
     /// Add a mod to a source modlist, preserving its comments and formatting.
     Add(AddArgs),
+    /// Start a new, empty modlist.
+    New(NewArgs),
     /// Move a mod to another section or position, comments and all.
     Move(MoveArgs),
     /// Set or clear fields of a mod, or of one of its archives.
@@ -1004,6 +1006,15 @@ mod help_tests {
 /// (`true`, `3`, `["a", "b"]`) and as text otherwise; quote it to force text
 /// (`version='"1.0"'`). Comments, and a replaced value's own comment, are
 /// kept. The list is validated before anything is written.
+#[derive(Debug, Args)]
+pub struct NewArgs {
+    /// Where to write it; refused if something is there already.
+    pub output: PathBuf,
+    /// The list's name, as players see it.
+    #[arg(long)]
+    pub name: String,
+}
+
 #[derive(Debug, Args)]
 pub struct EnableArgs {
     /// The modlist to edit in place.
