@@ -133,13 +133,16 @@ pub(super) fn load_order(state: tauri::State<'_, State>) -> Result<LoadOrder, St
 /// One of a mod's archives, to choose between.
 #[derive(Serialize)]
 pub(super) struct ArchiveChoice {
-    /// Counting from 1, as `--archive` does.
+    /// Counting from 1 in the list's file, as `--archive` does.
     number: usize,
     label: String,
     layout: Option<ArchiveLayout>,
+    /// The archive's `if`, when it has one.
+    condition: Option<String>,
 }
 
-/// A mod as planned: what it is, and its archives.
+/// A mod: whether the answers given plan it, and its archives as the list
+/// declares them.
 #[derive(Serialize)]
 pub(super) struct ModView {
     id: String,
@@ -151,27 +154,28 @@ pub(super) struct ModView {
 #[tauri::command]
 pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<ModView, String> {
     let plan = current_plan(&state)?;
-    let Some(entry) = plan.mods.iter().find(|m| m.id == id) else {
-        return Ok(ModView {
-            id,
-            left_out: true,
-            archives: Vec::new(),
-        });
-    };
+    let source = config::loader::load_modlist(&state.list()?).map_err(shown)?;
+    let entry = source
+        .mods
+        .iter()
+        .find(|m| m.id == id)
+        .ok_or_else(|| format!("the list has no mod with id '{id}'"))?;
     Ok(ModView {
-        left_out: false,
+        left_out: !plan.mods.iter().any(|m| m.id == id),
         archives: entry
             .archives
             .iter()
             .enumerate()
             .map(|(index, archive)| ArchiveChoice {
                 number: index + 1,
-                label: archive
-                    .file_name
-                    .clone()
-                    .or(archive.path.clone())
-                    .unwrap_or_default(),
+                // Its file name, or the last part of where it comes from
+                // (`manual:Name.zip`, a URL).
+                label: archive.file_name.clone().unwrap_or_else(|| {
+                    let path = archive.path.as_deref().unwrap_or_default();
+                    path.rsplit(['/', ':']).next().unwrap_or(path).to_string()
+                }),
                 layout: archive.layout,
+                condition: archive.condition.clone(),
             })
             .collect(),
         id,
@@ -199,6 +203,10 @@ pub(super) struct FileRow {
     destination: Option<String>,
     /// The path the archive's `include` and `exclude` see it as.
     filtered_as: Option<String>,
+    /// The `exclude` that leaves exactly this out (for a folder, everything
+    /// in it), where the layout offers it: what unticking it writes. `None`
+    /// for what the layout does not offer, and for the data folder itself.
+    exclude_glob: Option<String>,
     /// Inside a folder: the files the layout offers, and how many are taken.
     files: usize,
     taken: usize,
@@ -219,7 +227,10 @@ pub(super) struct Tree {
     layout: Option<ArchiveLayout>,
     include: Vec<String>,
     exclude: Vec<String>,
+    /// Packages chosen always; those chosen only under a condition are in
+    /// `bain_conditional`, and changed in the file itself.
     bain_subpackages: Vec<String>,
+    bain_conditional: Vec<String>,
     rows: Vec<FileRow>,
     entries: usize,
     taken: usize,
@@ -227,43 +238,43 @@ pub(super) struct Tree {
     command: String,
 }
 
-/// Mod `id`'s `number`th archive (from 1) as a tree, with what `install`
-/// takes from it: the planner `check` and `files` use.
+/// Mod `id`'s `number`th archive (from 1, as the list declares them) as a
+/// tree, with what `install` takes from it: the planner `check` and `files`
+/// use, with the answers given in Install.
 #[tauri::command]
 pub(super) async fn mod_files(
     state: tauri::State<'_, State>,
     id: String,
     number: usize,
 ) -> Result<Tree, String> {
-    let plan = current_plan(&state)?;
     let downloads = locate(&state)?
         .downloads
         .ok_or("say where the downloads folder is first (in Install)")?;
     let list = state.list()?;
-    let entry = plan
-        .mods
-        .iter()
-        .find(|m| m.id == id)
-        .ok_or_else(|| format!("the answers given leave '{id}' out"))?
-        .clone();
-    let archive = entry
-        .archives
-        .get(number.wrapping_sub(1))
-        .ok_or_else(|| format!("'{id}' has no archive {number}"))?
-        .clone();
-    let active = plan
-        .plugins
-        .iter()
-        .map(|p| p.to_ascii_lowercase())
+    let answers: config::query::Overrides = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&list)
+        .answers
+        .into_iter()
         .collect();
-    let contents = tokio::task::spawn_blocking(move || {
-        config::check::archive_contents(&entry, &archive, &downloads, &active)
-            .map(|contents| (contents, archive))
+    let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
+    let path = list.clone();
+    let mod_id = id.clone();
+    let (contents, archive) = tokio::task::spawn_blocking(move || {
+        let planned = config::pipeline::planned_archive(&text, &path, &mod_id, number, &answers)?;
+        let contents = config::check::archive_contents(
+            &planned.entry,
+            &planned.archive,
+            &downloads,
+            &planned.active_plugins,
+        )?;
+        anyhow::Ok((contents, planned.archive))
     })
     .await
     .map_err(|err| err.to_string())?
     .map_err(shown)?;
-    let (contents, archive) = contents;
     let contents = contents.ok_or(
         "what this archive installs is only known at install (an archive inside an archive, an \
          MO2 plugin, or a build from files)",
@@ -280,6 +291,13 @@ pub(super) async fn mod_files(
         bain_subpackages: archive
             .bain_subpackages
             .iter()
+            .filter(|p| p.condition().is_none())
+            .map(|p| p.name().to_string())
+            .collect(),
+        bain_conditional: archive
+            .bain_subpackages
+            .iter()
+            .filter(|p| p.condition().is_some())
             .map(|p| p.name().to_string())
             .collect(),
         rows: rows(&contents, archive.layout == Some(ArchiveLayout::Bain)),
@@ -333,12 +351,30 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
     for folder in folders.keys() {
         subfolders.entry(parent(folder)).or_default().insert(folder);
     }
+    // What each folder is to the filters: the part of an offered file's
+    // filtered path above the part inside the folder.
+    let mut folder_as: BTreeMap<&str, String> = BTreeMap::new();
+    for offered in &contents.available {
+        let source = offered.source.as_str();
+        let mut at = source.len();
+        while let Some(slash) = source[..at].rfind('/') {
+            let folder = &source[..slash];
+            let tail = &source[slash + 1..];
+            if let Some(Some(head)) =
+                (!folder_as.contains_key(folder)).then(|| offered.filtered_as.strip_suffix(tail))
+            {
+                folder_as.insert(folder, head.trim_end_matches('/').to_string());
+            }
+            at = slash;
+        }
+    }
     let mut files: BTreeMap<&str, Vec<&String>> = BTreeMap::new();
     for entry in contents.entries.iter().filter(|e| !e.ends_with('/')) {
         files.entry(parent(entry)).or_default().push(entry);
     }
     let mut out = Vec::new();
     Walk {
+        folder_as: &folder_as,
         subfolders: &subfolders,
         files: &files,
         folders: &folders,
@@ -351,6 +387,7 @@ fn rows(contents: &config::check::ArchiveContents, bain: bool) -> Vec<FileRow> {
 }
 
 struct Walk<'a> {
+    folder_as: &'a BTreeMap<&'a str, String>,
     subfolders: &'a BTreeMap<&'a str, BTreeSet<&'a str>>,
     files: &'a BTreeMap<&'a str, Vec<&'a String>>,
     folders: &'a BTreeMap<String, (usize, usize)>,
@@ -378,7 +415,12 @@ impl Walk<'_> {
                 offered: files > 0 || package,
                 package,
                 destination: None,
-                filtered_as: None,
+                filtered_as: self.folder_as.get(folder).cloned(),
+                exclude_glob: self
+                    .folder_as
+                    .get(folder)
+                    .filter(|path| !path.is_empty())
+                    .map(|path| format!("{}/**", globset::escape(path))),
                 files,
                 taken: inside,
             });
@@ -403,6 +445,10 @@ impl Walk<'_> {
                     .offered
                     .get(entry.as_str())
                     .map(|t| t.filtered_as.clone()),
+                exclude_glob: self
+                    .offered
+                    .get(entry.as_str())
+                    .map(|t| globset::escape(&t.filtered_as)),
                 files: 1,
                 taken: usize::from(taken.is_some()),
             });

@@ -50,30 +50,62 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 
 ## Author mode
 
-**Author** in the top right switches to looking into the list as its author
-would. It reads the list as planned with the answers given in Install, and
-plans it again when the file changes on disk (or on **Reload**). Editing
-comes later; for now it reads.
+**Author** in the top right switches to working on the list as its author.
+It reads the list as planned with the answers given in Install, and plans it
+again after each change.
+
+Every change is one of the [editing commands](usage.md#editing-a-list),
+made the way the command makes it: planned, checked to leave a valid list,
+and written at once -- only if the file has not changed on disk since it was
+read. The bar at the bottom shows the last change's command, and a click
+shows the diff it made. **Undo** and **Redo** (Ctrl+Z, Ctrl+Shift+Z) step
+back and forward through this session's changes, as long as the file is
+still what this window last wrote; a change made in an editor ends the
+history there, rather than be undone by it.
 
 - **The list** on the left: sections as a tree, each mod with a note of
   whether it is optional (`if`), left unticked in MO2 (`off`), or not made
-  from archives. Choose one to see it on the right.
-- **Mod**: its notes, and each of its archives as a tree of files, marked
-  with what `install` takes: ✔ installed (with where it goes, when that is
-  somewhere else), ◐ a folder partly installed, ○ left out by the archive's
-  `include` or `exclude`, and greyed out, what the layout itself does not
-  choose (a BAIN package or FOMOD option not picked). This needs the
-  downloads folder, as `mudcrab files` does.
+  from archives. Choose one to see it on the right. Drag a mod by its handle
+  onto another mod to put it before or after that one, or onto a section to
+  put it at the end of it (`move`).
+- **Mod**: its notes, its actions (each can be removed: `action remove`),
+  and each of its archives as a tree of files, marked with what `install`
+  takes. What a tick does follows the archive's layout, so it works as the
+  installer you know:
+  - **BAIN**: the packages at the top are ticked to choose them, as in Wrye
+    Bash's installer tab (`files --package`); the files inside show what
+    each brings, read-only.
+  - **FOMOD**: its options are chosen in its installer's steps, not here;
+    the tree shows what they install.
+  - **Anything else**: untick a file or folder to leave it out (an
+    `exclude`, `files --exclude`), tick it to bring it back.
+
+  For any layout, **exclude** beside a file or folder (on hover) is the
+  expert override: an `exclude` for that path as the filters see it -- under
+  BAIN, for that path in every package. The archive's `include` and
+  `exclude` are listed above the tree, each with a ✕ to take it out, and a
+  box to add one. Greyed out is what the layout does not choose; ○ is what a
+  filter leaves out. This needs the downloads folder, as `mudcrab files`
+  does.
 - **Load order**: every plugin, the mods that ship it, and once a check has
   read them, its masters. A plugin placed above one of its masters, or
   needing one that is not in the list, is inactive, or is merged away, is
-  flagged, with why.
+  flagged, with why -- and the flags follow as you drag a plugin by its
+  handle to a new place (`plugins move`).
 - **Conflicts**: which installed mods provide the same files, who wins (a
   later mod in MO2's order), and, a click on a pair, the files both provide
-  -- `mudcrab conflicts`. This reads the instance chosen in Install, so the
-  list needs installing there first.
+  -- `mudcrab conflicts`. **Hide these in** a mod adds a `file_hide` with
+  `conflicts_with` to it, so the other mod's copies are used whatever the
+  order. This reads the instance chosen in Install, so the list needs
+  installing there first.
 - **Check**: `mudcrab check`, on demand, its findings under the same
   headings; a finding about a mod opens that mod.
+- **Questions**: the list's inputs, each with the mods whose `if` asks it.
+  Change one's wording, answers or default (`input set`), add one (`input
+  add`), or remove one no mod asks any more (`input remove`).
+- **Changes**: every change made in this session, as the commands that make
+  them -- run in order on another copy of the list, they make the same
+  changes -- and as one diff.
 
 ## Building it
 

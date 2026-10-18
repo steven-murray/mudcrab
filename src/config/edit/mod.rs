@@ -43,12 +43,7 @@ impl Edit {
 
     /// The change as a unified diff, with three lines of context.
     pub fn diff(&self) -> String {
-        let name = self.path.display().to_string();
-        similar::TextDiff::from_lines(&self.before, &self.after)
-            .unified_diff()
-            .context_radius(3)
-            .header(&name, &name)
-            .to_string()
+        diff(&self.path, &self.before, &self.after)
     }
 
     /// Write the new text, unless the file changed on disk since it was read.
@@ -62,6 +57,17 @@ impl Edit {
         );
         write_atomic(&self.path, &self.after)
     }
+}
+
+/// The change from `before` to `after` in the file at `path`, as a unified
+/// diff with three lines of context.
+pub fn diff(path: &Path, before: &str, after: &str) -> String {
+    let name = path.display().to_string();
+    similar::TextDiff::from_lines(before, after)
+        .unified_diff()
+        .context_radius(3)
+        .header(&name, &name)
+        .to_string()
 }
 
 /// Plan an edit of the modlist at `path`: `change` gets its text and the list

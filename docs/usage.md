@@ -182,14 +182,18 @@ plugin's own end-of-line comment goes with it.
 ```bash
 mudcrab files <modlist.toml> --mod "<mod id>" [--archive <n>] [--downloads <dir>] [--set key=value]...
 mudcrab files <modlist.toml> --mod "<mod id>" [--include <glob>]... [--exclude <glob>]...
-                             [--drop-include <glob>]... [--drop-exclude <glob>]... [--dry-run]
+                             [--drop-include <glob>]... [--drop-exclude <glob>]...
+                             [--package <name>]... [--drop-package <name>]... [--dry-run]
 ```
 
 Without filters to change, prints the files `install` would take from the
 archive (the first, unless `--archive`), before the mod's actions run: the
 same plan `check` makes, from the archive in the downloads folder. With
 filters, edits the archive's `include` and `exclude`, and shows which files
-that adds and drops. `--set` answers the list's questions where they decide
+that adds and drops. `--package` and `--drop-package` choose a BAIN package
+or stop choosing it (`bain_subpackages`), as ticking one in Wrye Bash's
+installer tab does; a package chosen only under a condition is changed in the
+file itself. `--set` answers the list's questions where they decide
 which archives a mod has; the rest take their defaults.
 
 ### action

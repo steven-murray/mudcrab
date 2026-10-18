@@ -64,6 +64,7 @@ export interface ModDoc {
 
 export interface SectionDoc {
   name: string;
+  path: string[];
   title: string;
   depth: number;
   anchor: string;
@@ -173,7 +174,7 @@ export interface LoadOrder {
 export interface ModView {
   id: string;
   left_out: boolean;
-  archives: { number: number; label: string; layout: string | null }[];
+  archives: { number: number; label: string; layout: string | null; condition: string | null }[];
 }
 
 export interface FileRow {
@@ -186,6 +187,8 @@ export interface FileRow {
   package: boolean;
   destination: string | null;
   filtered_as: string | null;
+  /** The exclude that leaves exactly this out; null where the layout does not offer it. */
+  exclude_glob: string | null;
   files: number;
   taken: number;
 }
@@ -196,6 +199,7 @@ export interface Tree {
   include: string[];
   exclude: string[];
   bain_subpackages: string[];
+  bain_conditional: string[];
   rows: FileRow[];
   entries: number;
   taken: number;
@@ -244,6 +248,27 @@ export interface Bar {
   done: boolean;
 }
 
+// Author mode, editing: what an edit did, and the session's history.
+
+export interface Change {
+  command: string;
+  diff: string;
+}
+
+export interface Edited {
+  change: Change;
+  can_undo: boolean;
+  can_redo: boolean;
+}
+
+export interface Changes {
+  edits: Change[];
+  diff: string;
+  can_undo: boolean;
+  can_redo: boolean;
+}
+
+// Tauri passes arguments by their camelCase names.
 export const api = {
   opening: () => invoke<string | null>("opening"),
   recent: () => invoke<string[]>("recent"),
@@ -267,4 +292,30 @@ export const api = {
   conflicts: () => invoke<Conflicts>("conflicts"),
   conflictsBetween: (id: string, other: string) =>
     invoke<Between>("conflicts_between", { id, other }),
+  reloadList: () => invoke<ListView>("reload_list"),
+  undo: () => invoke<Edited>("undo"),
+  redo: () => invoke<Edited>("redo"),
+  changes: () => invoke<Changes>("changes"),
+  movePlugin: (plugin: string, before: string | null) =>
+    invoke<Edited>("move_plugin", { plugin, before }),
+  moveMod: (id: string, section: string[], beforeMod: string | null) =>
+    invoke<Edited>("move_mod", { id, section, beforeMod }),
+  editFilter: (id: string, number: number, key: string, add: string[], drop: string[]) =>
+    invoke<Edited>("edit_filter", { id, number, key, add, drop }),
+  setFields: (id: string, archive: number | null, sets: string[], unsets: string[]) =>
+    invoke<Edited>("set_fields", { id, archive, sets, unsets }),
+  addAction: (id: string, action: string, fields: string[], condition: string | null) =>
+    invoke<Edited>("add_action", { id, action, fields, condition }),
+  removeAction: (id: string, number: number) => invoke<Edited>("remove_action", { id, number }),
+  actions: (id: string) => invoke<string[]>("actions", { id }),
+  addInput: (name: string, kind: string, query: string, choices: string[], fallback: string | null) =>
+    invoke<Edited>("add_input", { name, kind, query, choices, default: fallback }),
+  setInput: (name: string, sets: string[], unsets: string[]) =>
+    invoke<Edited>("set_input", { name, sets, unsets }),
+  removeInput: (name: string) => invoke<Edited>("remove_input", { name }),
 };
+
+/** A value for a `key=value` edit, as TOML: a string quoted, so any text is safe. */
+export function tomlString(text: string): string {
+  return JSON.stringify(text);
+}

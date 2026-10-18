@@ -7,7 +7,14 @@
     found,
     select,
     focus,
-  }: { found: Conflicts; select: (mod: string) => void; focus: string | null } = $props();
+    hide,
+  }: {
+    found: Conflicts;
+    select: (mod: string) => void;
+    focus: string | null;
+    /** Hide in `id` the files `other` also provides (`file_hide` with `conflicts_with`). */
+    hide: (id: string, other: string) => void;
+  } = $props();
 
   let filter = $state("");
   // The pair whose files are open, and them.
@@ -88,6 +95,14 @@
             {between.shared.overlap.length} file(s) both {m.id} and {pair.other} provide{#if between.shared.already_hidden}; {between.shared.already_hidden} more already hidden in {m.id}{/if}
           </div>
           <ul>{#each between.shared.overlap as path}<li><code>{path}</code></li>{/each}</ul>
+          {#if between.shared.overlap.length}
+            <button
+              class="hide"
+              onclick={() => hide(m.id, pair!.other)}
+              title="Adds a file_hide action with conflicts_with to {m.id}: at install, its copies of these files are hidden, so {pair.other}'s are used whatever the order"
+              >Hide these in {m.id}</button
+            >
+          {/if}
           <div class="dim small cmd">Same from a terminal: <code>{between.command}</code></div>
         {/if}
       </div>
@@ -161,6 +176,10 @@
   .files code,
   .cmd code {
     overflow-wrap: anywhere;
+  }
+  .hide {
+    font-size: 12px;
+    margin: 2px 0 6px;
   }
   .error {
     color: var(--problem);

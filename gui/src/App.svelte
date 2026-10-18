@@ -117,7 +117,7 @@
         <section class="left"><Guide document={list.document} /></section>
         <aside class="right"><Install {list} /></aside>
       </main>
-      <div class="authoring" class:hidden={mode !== "author"}><Author {list} /></div>
+      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} /></div>
     {/key}
   {:else}
     <div class="welcome">

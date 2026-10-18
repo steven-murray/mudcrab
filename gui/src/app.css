@@ -133,3 +133,40 @@ a {
   max-width: 100%;
   border-radius: 6px;
 }
+
+/* Dragging rows (lib/drag.ts): where the row would land, and the row itself. */
+.grip {
+  cursor: grab;
+  color: var(--faint);
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+
+.grip:hover {
+  color: var(--dim);
+}
+
+.drop-before {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.drop-after {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.drop-into {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.dragged {
+  opacity: 0.4;
+}
+
+.dragging {
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}

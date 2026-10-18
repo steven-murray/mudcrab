@@ -320,3 +320,47 @@ fn files_shows_what_an_archive_installs_and_what_a_filter_changes() {
         .stdout(predicates::str::contains("2 file(s) taken, was 3"));
     assert!(read(&list).contains("exclude = [\"*.txt\"]"));
 }
+
+#[test]
+fn files_chooses_a_bain_package_as_wrye_bash_ticks_one() {
+    let dir = tempdir().unwrap();
+    let list = dir.path().join("list.toml");
+    std::fs::write(
+        &list,
+        "name = \"B\"\n\n[[mods]]\nid = \"Pack\"\n\n[[mods.archives]]\npath = \"manual:Pack.zip\"\nlayout = \"bain\"\nbain_subpackages = [\"00 Core\"]\n",
+    )
+    .unwrap();
+    let downloads = dir.path().join("downloads");
+    std::fs::create_dir_all(&downloads).unwrap();
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(downloads.join("Pack.zip")).unwrap());
+    let options: zip::write::FileOptions<'_, ()> = zip::write::FileOptions::default();
+    for name in ["00 Core/textures/a.dds", "10 Extra/textures/b.dds"] {
+        zip.start_file(name, options).unwrap();
+        zip.write_all(b"x").unwrap();
+    }
+    zip.finish().unwrap();
+
+    let files = |extra: &[&str]| {
+        let mut cmd = mudcrab(dir.path());
+        cmd.args([
+            "files",
+            list.to_str().unwrap(),
+            "--mod",
+            "Pack",
+            "--downloads",
+        ])
+        .arg(&downloads)
+        .args(extra);
+        cmd
+    };
+    files(&["--package", "10 Extra"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("+ textures/b.dds"));
+    assert!(read(&list).contains("bain_subpackages = [\"00 Core\", \"10 Extra\"]"));
+    files(&["--drop-package", "00 Core"])
+        .assert()
+        .success()
+        .stdout(predicates::str::contains("- textures/a.dds"));
+    assert!(read(&list).contains("bain_subpackages = [\"10 Extra\"]"));
+}
