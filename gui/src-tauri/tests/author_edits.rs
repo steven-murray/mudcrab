@@ -174,6 +174,12 @@ fn edits_are_the_commands_and_can_be_undone() {
     );
     assert!(read().contains("docs.summary = \"Why C.\""));
 
+    // A mod's plain fields, and an archive's, for the form.
+    let fields = call(&webview, "fields", json!({ "id": "A", "archive": null })).unwrap();
+    assert_eq!(fields[0], json!(["id", "A"]), "{fields}");
+    let archive = call(&webview, "fields", json!({ "id": "A", "archive": 1 })).unwrap();
+    assert_eq!(archive[0], json!(["path", "manual:A.zip"]), "{archive}");
+
     // A change the list's rules refuse is not written.
     let before = read();
     let refused = call(

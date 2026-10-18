@@ -400,6 +400,8 @@ export const api = {
     invoke<Edited>("set_input", { name, sets, unsets }),
   removeInput: (name: string) => invoke<Edited>("remove_input", { name }),
   setDocs: (id: string, fields: [string, string | null][]) => invoke<Edited>("set_docs", { id, fields }),
+  fields: (id: string, archive: number | null) =>
+    invoke<[string, string | number | boolean | (string | number | boolean)[]][]>("fields", { id, archive }),
   archives: () => invoke<ArchiveRow[]>("archives"),
   addStart: (path: string) => invoke<Started>("add_start", { path }),
   addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),

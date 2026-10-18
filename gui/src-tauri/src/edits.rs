@@ -497,3 +497,14 @@ pub(super) fn set_docs(
     }
     apply(&state, command, planned)
 }
+
+/// A mod's plain fields, or one of its archives', as `set` changes them.
+#[tauri::command]
+pub(super) fn fields(
+    state: tauri::State<'_, State>,
+    id: String,
+    archive: Option<usize>,
+) -> Result<Vec<(String, serde_json::Value)>, String> {
+    let text = std::fs::read_to_string(state.list()?).map_err(|err| err.to_string())?;
+    doc::field_values(&text, &id, archive).map_err(shown)
+}

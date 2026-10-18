@@ -691,6 +691,42 @@ pub fn set_file_docs(
     Ok(doc.to_string())
 }
 
+/// The plain fields of a mod, or with `archive` one of its archives: each
+/// key whose value is a string, number, boolean or list of those, as JSON,
+/// in the file's order. Tables and lists of tables (`archives`, `actions`,
+/// `merge`, `fomod_selections`...) have commands of their own and are left
+/// out. What `set` changes, for a form to show.
+pub fn field_values(
+    text: &str,
+    id: &str,
+    archive: Option<usize>,
+) -> anyhow::Result<Vec<(String, serde_json::Value)>> {
+    fn json(value: &Value) -> Option<serde_json::Value> {
+        Some(match value {
+            Value::String(s) => serde_json::Value::from(s.value().as_str()),
+            Value::Integer(n) => serde_json::Value::from(*n.value()),
+            Value::Float(f) => serde_json::Value::from(*f.value()),
+            Value::Boolean(b) => serde_json::Value::from(*b.value()),
+            Value::Array(items) => serde_json::Value::Array(
+                items
+                    .iter()
+                    .map(|item| match item {
+                        Value::InlineTable(_) | Value::Array(_) => None,
+                        other => json(other),
+                    })
+                    .collect::<Option<Vec<_>>>()?,
+            ),
+            _ => return None,
+        })
+    }
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, archive)?;
+    Ok(table
+        .iter()
+        .filter_map(|(key, item)| Some((key.to_string(), json(item.as_value()?)?)))
+        .collect())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -890,6 +926,23 @@ id = "B"
         assert!(
             out.starts_with("name = \"T\"\ninputs.x.type = \"bool\""),
             "{out}"
+        );
+    }
+
+    #[test]
+    fn a_mods_plain_fields_are_read_for_a_form() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\nif = \"big\"\nenabled = false\ndependencies = [\"B\"]\n\n[[mods.archives]]\npath = \"manual:A.zip\"\nlayout = \"bain\"\nbain_subpackages = [{ name = \"00 Core\", if = \"x\" }]\n\n[[mods.actions]]\naction = \"file_hide\"\n";
+        let fields = super::field_values(text, "A", None).unwrap();
+        let keys: Vec<&str> = fields.iter().map(|(k, _)| k.as_str()).collect();
+        assert_eq!(keys, ["id", "if", "enabled", "dependencies"]);
+        assert_eq!(fields[2].1, serde_json::json!(false));
+        let archive = super::field_values(text, "A", Some(1)).unwrap();
+        assert_eq!(
+            archive,
+            [
+                ("path".to_string(), serde_json::json!("manual:A.zip")),
+                ("layout".to_string(), serde_json::json!("bain"))
+            ]
         );
     }
 }

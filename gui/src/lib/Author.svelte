@@ -19,6 +19,7 @@
   import Conflicts from "./Conflicts.svelte";
   import { startDrag, type Place } from "./drag";
   import EntryView from "./EntryView.svelte";
+  import Fields from "./Fields.svelte";
   import FileTree from "./FileTree.svelte";
   import Inputs from "./Inputs.svelte";
   import LoadOrder from "./LoadOrder.svelte";
@@ -381,6 +382,10 @@
         {:else}
           <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
           <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
+          <details class="form">
+            <summary>The mod's fields</summary>
+            <Fields id={chosen.id} archive={null} save={(sets, unsets) => run(() => api.setFields(chosen.id, null, sets, unsets))} />
+          </details>
           {#if actions.length}
             <h4>Actions</h4>
             <ol class="actions">
@@ -406,6 +411,10 @@
                 {/each}
               </nav>
             {/if}
+            <details class="form">
+              <summary>Archive {archive}'s fields</summary>
+              <Fields id={chosen.id} {archive} save={(sets, unsets) => run(() => api.setFields(chosen.id, archive, sets, unsets))} />
+            </details>
             {#if loadingTree}
               <p class="dim">Reading the archive…</p>
             {:else if treeError}
@@ -667,6 +676,15 @@
   .edits button {
     font-size: 12px;
     padding: 3px 8px;
+  }
+  details.form {
+    margin: 8px 0;
+  }
+  details.form summary {
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 4px;
   }
   h4 {
     font-size: 13px;

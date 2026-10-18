@@ -949,6 +949,7 @@ pub fn app<R: Runtime>(
             edits::set_input,
             edits::remove_input,
             edits::set_docs,
+            edits::fields,
             adding::archives,
             adding::add_start,
             adding::add_walk,
