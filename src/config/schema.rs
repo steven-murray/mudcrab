@@ -173,6 +173,10 @@ pub struct InputSpec {
     /// must be given the answer with `--set`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<InputValue>,
+    /// The answer, given by a list including the file that asks: `set` on
+    /// the include. Nobody is asked, and `--set` cannot change it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fixed: Option<InputValue>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -667,6 +671,10 @@ pub struct ModEntry {
         skip_serializing_if = "IndexMap::is_empty"
     )]
     pub overrides: IndexMap<String, toml::Table>,
+    /// With `include`: answers to the included file's questions, by their
+    /// names there, so nobody installing the list is asked them.
+    #[serde(default, skip_serializing_if = "toml::Table::is_empty")]
+    pub set: toml::Table,
     /// The included file the loader took this mod from; `None` for the list's
     /// own. Set by the loader.
     #[serde(skip)]

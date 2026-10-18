@@ -203,6 +203,15 @@ fn resolve_responses(
     let mut out = HashMap::new();
     for id in sorted_ids {
         let spec = &inputs[id];
+        // Answered by the list that includes the file asking it.
+        if let Some(fixed) = &spec.fixed {
+            anyhow::ensure!(
+                !overrides.contains_key(id),
+                "--set {id}: the list answers {id} itself, so it cannot be set"
+            );
+            out.insert(id.clone(), fixed.clone());
+            continue;
+        }
         let value = if let Some(raw) = overrides.get(id) {
             parse_answer(id, spec, raw)?
         } else if let Some(ask) = ask.as_mut() {
@@ -376,6 +385,7 @@ mod tests {
                 query: "?".to_string(),
                 choices: Vec::new(),
                 default: default.map(InputValue::Bool),
+                fixed: None,
             },
         )])
     }

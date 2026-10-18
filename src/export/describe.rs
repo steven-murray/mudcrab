@@ -608,6 +608,7 @@ mod tests {
                 query: "Install Swearing Rats?".to_string(),
                 choices: Vec::new(),
                 default: Some(InputValue::Bool(true)),
+                fixed: None,
             },
         )]);
         let say = |expr: &str| condition(&Condition::parse(expr).unwrap(), &inputs);
