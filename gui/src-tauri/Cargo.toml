@@ -1,0 +1,31 @@
+[package]
+name = "mudcrab-gui"
+version = "0.2.5"
+edition = "2024"
+description = "The mudcrab GUI: install a modlist with one button, and (later) author one"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/steven-murray/mudcrab"
+publish = false
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+mudcrab = { path = "../.." }
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "time"] }
+
+[dev-dependencies]
+tauri = { version = "2", features = ["test"] }
+tempfile = "3"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
+[features]
+# What `tauri build` turns on for a release: serve the built front end from
+# the binary rather than from Vite's dev server.
+custom-protocol = ["tauri/custom-protocol"]

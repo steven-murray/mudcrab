@@ -675,3 +675,19 @@ fn rejects_undeclared_inputs_in_archive_level_conditions() {
         assert!(err.contains("'hdd'") && err.contains(site), "{site}: {err}");
     }
 }
+
+#[test]
+fn a_mod_left_unticked_keeps_its_plugins_out_of_the_load_order() {
+    let dir = tempdir().expect("temp dir should be created");
+    let path = dir.path().join("modlist.toml");
+    let list = |plugins: &str| {
+        format!(
+            "name = \"Off\"\nplugins = [{plugins}]\n\n[[mods]]\nid = \"tool\"\nenabled = false\nplugins = [\"Tool.esp\"]\n"
+        )
+    };
+    std::fs::write(&path, list("")).unwrap();
+    validate(&load_modlist(&path).unwrap()).expect("not in the load order, as MO2 sees it");
+    std::fs::write(&path, list("\"Tool.esp\"")).unwrap();
+    let err = validate(&load_modlist(&path).unwrap()).unwrap_err();
+    assert!(err.to_string().contains("is not enabled"), "{err}");
+}

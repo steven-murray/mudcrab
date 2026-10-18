@@ -52,6 +52,17 @@ xEdit the game's `Oblivion.ini` (the MO2 profile's copy, else the game's), so
 master or a broken xEdit setup in `tools.toml`. Closing xEdit's window by hand
 also stops the install. Once fixed, `install --redo-action qac` cleans again.
 
+### `This list cleans plugins with xEdit, and .../tools.toml is not set up for it`
+
+Checked before anything is installed: the list has `qac` actions, and the
+tools.toml in use lacks something xEdit needs -- a section, or a path that is
+not there. A path like `/path/to/your/wine-prefix` is the example
+`setup-tools` writes for you to fill in. Run `mudcrab setup-tools` (it finds
+xEdit and Proton prefixes and offers them), or edit the file. The first line
+names which tools.toml is being read: if it is not the one you meant, pass
+`--tools-config`, set `MUDCRAB_TOOLS_CONFIG`, or in the GUI choose it under
+**Tools**.
+
 ### `... qac action requires [tes4edit] configuration in tools.toml`
 
 The list cleans plugins with xEdit, and `tools.toml` does not say where xEdit
@@ -68,6 +79,12 @@ downloaded (see [`compile` in Commands](usage.md#compile) for what that covers).
 The mod says it ships a plugin, but the top-level `plugins` load order does not
 list it. Add it to `plugins` where it belongs -- or let `mudcrab add` do it,
 with `--load-after <plugin>` or `--load-last`.
+
+### `mod X is not enabled, but its plugin Y is in the global plugins load order`
+
+The mod has `enabled = false`, so it is installed unticked and MO2 cannot see
+its plugins. Take them out of the top-level `plugins`; MO2 adds them at the end
+of the load order when the player ticks the mod.
 
 ### `Y is not in the load order yet; say where with --load-after <plugin> or --load-last`
 
@@ -210,6 +227,24 @@ fixing xEdit's setup, say).
 From a merge: one of the plugins being merged uses OBME, which mudcrab cannot
 merge safely. Leave that plugin out of the merge's `sources` and load it on
 its own.
+
+### `ini_set 'K': ... has no such key, and with no section named there is nowhere right to add it`
+
+The list sets `K` in an ini that does not have it yet, without saying which
+section it belongs in. Appended at the end of the file, it would sit in the
+last section (in `Oblivion.ini`, `[CopyProtectionStrings]`), where the game
+would ignore it. If you wrote the list, put the key under its section:
+`[ini.GamePlay]` for the top-level `[ini]`, or `section = "GamePlay"` on an
+`ini_set` action. See [the modlist format](modlist-format.md#top-level).
+
+### `ini_set 'K' matches 2 lines in ... (sections: A, B). Add section = "<name>"`
+
+The ini has `K` in two sections, and the list does not say which it means.
+Usually one of them is a stray: an earlier mudcrab added a missing key at the
+end of the file, in the wrong section (the error above is how that is caught
+now). Reusing an MO2 instance keeps its profile's ini, stray and all. Name the
+section in the list, as above; the stray line, under the other section, does
+nothing and can be deleted from the profile's ini by hand.
 
 ## Playing
 

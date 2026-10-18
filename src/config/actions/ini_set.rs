@@ -272,6 +272,23 @@ pub(crate) fn apply_ini_set_in_section(
         );
     }
 
+    // A key the file lacks, with no section named, has nowhere right to go in
+    // a file that has sections: the end of the file is inside its last
+    // section, where the game reads it as that section's key -- a setting
+    // that silently does nothing. (Oblivion.ini ends in
+    // `[CopyProtectionStrings]`; autosave keys landed there.)
+    if matches.is_empty()
+        && section.is_none()
+        && lines.iter().any(|line| line.trim_start().starts_with('['))
+    {
+        anyhow::bail!(
+            "ini_set '{key}': {} has no such key, and with no section named there is nowhere \
+             right to add it. Say which section it belongs in (`section = \"<name>\"`, or for \
+             the top-level [ini], `[ini.<section>]`).",
+            path.display(),
+        );
+    }
+
     let outcome = if matches.is_empty() {
         lines.insert(append_at, rendered);
         IniSetOutcome::AppendedToSection

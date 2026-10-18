@@ -39,6 +39,13 @@ pub fn parse_modlist(text: &str, path: &Path) -> anyhow::Result<SourceModlist> {
 /// Fold a docs file into the modlist. Anything documented in both is refused:
 /// silently preferring one copy would leave the other to be edited in vain.
 fn merge_docs(modlist: &mut SourceModlist, file: DocsFile) -> anyhow::Result<()> {
+    if let Some(about) = file.about {
+        anyhow::ensure!(
+            modlist.about.is_none(),
+            "`about` is in both the modlist and the docs file"
+        );
+        modlist.about = Some(about);
+    }
     if let Some(docs) = file.docs {
         anyhow::ensure!(
             modlist.docs.is_empty(),

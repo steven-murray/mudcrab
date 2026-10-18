@@ -88,6 +88,7 @@ pub fn build_plan(
             oracle_name: entry.oracle_name.clone(),
             section: entry.section.clone(),
             mod_type: entry.mod_type,
+            enabled: entry.enabled,
             merge: entry.merge.clone(),
             plugins: entry.plugins.clone(),
             archives,

@@ -58,24 +58,33 @@ that table.
 | `plugins` | Whenever a mod ships a plugin: the load order, top to bottom. See [Load order](#load-order). |
 | `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
 | `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
-| `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs, applied to the MO2 profile's copy. |
+| `ini` | To change the game's own `Oblivion.ini`: `key = value` pairs under `[ini.<Section>]`, applied to the MO2 profile's copy. |
 | `mo2` | To set up MO2 itself: `[mo2]` with `theme = "vs15 Dark"`, one of the themes MO2 ships (Settings > Theme), applied to an instance that has none chosen yet. |
 | `manual-steps` | When something has to be done by hand after installing (building a Bashed Patch in Wrye Bash): `install` lists it at the end until it is done. See [Steps by hand](#steps-by-hand). |
-| `post-install-actions` | To run LOOT after installing: `["loot-sort"]`. Most lists keep a fixed `plugins` order instead. |
+| `post-install-actions` | Run after installing: `"4gb-patch"` marks the game's `Oblivion.exe` large-address-aware, as the 4GB Patch tool does, so the game can use 4 GB of memory (needed by most big lists; the original is kept as `Oblivion.exe.mudcrab-backup`, and an exe already patched is left alone). `"loot-sort"` runs LOOT; most lists keep a fixed `plugins` order instead. |
 | `guide` | When the list transcribes a published guide: `published = "YYYY-MM-DD"` (and optionally `file_id`), so `diff` can flag archives newer than the guide. |
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
+| `about` | For the GUI: what someone installing the list reads first (Markdown), shown by its **About this list** button. Write it for a player pressing Install -- what the list is, what it needs, what to expect -- not as the guide's instructions, which `docs` holds. It may be in the docs file instead. |
 | `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [Turning a list into a guide](exporters.md). |
 | `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
 
-`ini` keys are matched anywhere in `Oblivion.ini`, with no section, so they
-must be keys that occur once (all of the usual ones do); an `ini_set` action
-with `scope = "game"` can name a section.
+Put each `ini` key under the section `Oblivion.ini` keeps it in, as
+`[ini.<Section>]`. A bare key under `[ini]` is matched anywhere in the file,
+which works only for a key the file already has exactly once; a key it lacks
+has nowhere right to go (the end of the file is inside its last section,
+where the game would ignore it), so `install` refuses it and says to name the
+section.
 
 ```toml
-[ini]
+[ini.General]
 SIntroSequence = ""
 bAllowScriptedAutosave = 0
+
+[ini.GamePlay]
+bSaveOnRest = 0
 ```
+
+An `ini_set` action with `scope = "game"` takes a `section` the same way.
 
 ## Mods
 
@@ -86,7 +95,8 @@ Each `[[mods]]` table is one mod folder in MO2.
 | `id` | Always. Unique; also the mod's folder name in MO2. |
 | `section` | Nearly always: the MO2 separator it sits under, as a list from outermost in (`["Visuals", "Textures"]`). Every level becomes a separator. |
 | `archives` | For any mod made from downloads: one `[[mods.archives]]` per archive, installed in order, later ones overwriting earlier. See [Archives](#archives). |
-| `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged). |
+| `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged), unless the mod is not `enabled`. |
+| `enabled` | `false` for a mod installed but left unticked in MO2, such as a debugging tool the player switches on when they need it. Its plugins stay out of the top-level `plugins`: MO2 cannot see them until the mod is ticked, and then adds them at the end. Defaults to `true`. |
 | `if` | When the mod is optional: a condition. See [Optional mods and inputs](#optional-mods-and-inputs). |
 | `dependencies` | When the mod needs others to work: their ids. `query` refuses a plan that includes this mod but not them. |
 | `actions` | To change the mod after unpacking it: INI edits, files left out, plugins cleaned, BSAs packed. See [Actions](#actions). |
@@ -393,8 +403,11 @@ steps = """
 ```
 
 `steps` is printed line by line. With `done_when_plugin`, the step stops being
-listed once a plugin of that name is in a mod folder or in MO2's `overwrite/`;
-without it, it is listed after every install. Put these tables after the
+listed once a plugin of that name is in a mod folder or in MO2's `overwrite/`
+and was built since the last install that changed the mods or the load order
+-- a copy left from before then, by another list or an older build, does not
+count, so changing the list asks for the patch to be rebuilt. Without it, the
+step is listed after every install. Put these tables after the
 top-level keys, like `[[mods]]` -- at the end of the file is simplest.
 
 A list whose `plugins` include a `Bashed Patch, N.esp` and that declares no

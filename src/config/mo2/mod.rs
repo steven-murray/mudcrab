@@ -351,7 +351,25 @@ pub(crate) fn point_at_downloads(
 /// Where an MO2 instance saves downloads: `download_directory` in its
 /// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
 /// a Wine drive other than `Z:`.
-pub(crate) fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
+/// Why `dir` is not a Mod Organizer 2 instance, if it is not. A portable
+/// instance has `ModOrganizer.exe` at its top, and `ModOrganizer.ini` once MO2
+/// has been run there; a folder with neither is somewhere else, and
+/// installing into it would build a mods folder no MO2 reads.
+pub fn not_an_instance(dir: &Path) -> Option<String> {
+    if !dir.is_dir() {
+        return Some(format!("{} is not a folder", dir.display()));
+    }
+    let has = |name: &str| dir.join(name).is_file();
+    (!has("ModOrganizer.exe") && !has("ModOrganizer.ini")).then(|| {
+        format!(
+            "{} does not look like a Mod Organizer 2 instance: it has neither ModOrganizer.exe \
+             nor ModOrganizer.ini. Choose the folder MO2 is in (a portable instance).",
+            dir.display()
+        )
+    })
+}
+
+pub fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
     let mut in_settings = false;
     for line in text.lines() {
@@ -613,7 +631,14 @@ fn set_ini_key(text: &str, section: &str, key: &str, value: &str) -> String {
 }
 
 pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> String {
-    let selected: HashSet<&str> = plan.selected_mods.iter().map(String::as_str).collect();
+    // Installed but left unticked: a mod the list says the player switches on.
+    let selected: HashSet<&str> = plan
+        .mods
+        .iter()
+        .filter(|entry| entry.enabled)
+        .map(|entry| entry.id.as_str())
+        .filter(|id| plan.selected_mods.iter().any(|s| s == id))
+        .collect();
     let sections = scoped_section_names(plan, scope);
 
     let mut out = String::new();
@@ -861,7 +886,7 @@ pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
 /// The game folder an MO2 instance was set up with: `gamePath` in its
 /// `ModOrganizer.ini`. `None` when the instance has none, or names it by a
 /// Wine drive this side cannot see.
-pub(crate) fn instance_game_path(instance: &Path) -> Option<PathBuf> {
+pub fn instance_game_path(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).ok()?;
     parse_game_path(&text, cfg!(windows))
 }

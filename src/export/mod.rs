@@ -125,6 +125,9 @@ pub struct ModDoc {
     pub anchor: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
+    /// `false` for a mod installed unticked in MO2; left out when ticked.
+    #[serde(skip_serializing_if = "is_true")]
+    pub enabled: bool,
     /// The Nexus pages its archives come from, each once, in archive order.
     /// Usually one; a mod built from several pages' files has several.
     pub pages: Vec<NexusDoc>,
@@ -583,6 +586,7 @@ fn mod_doc(
         title: entry.docs.title.clone().unwrap_or_else(|| entry.id.clone()),
         id: entry.id.clone(),
         mod_type: entry.mod_type,
+        enabled: entry.enabled,
         pages: {
             let mut pages: Vec<NexusDoc> = Vec::new();
             for n in archive_docs.iter().filter_map(|a| a.nexus.as_ref()) {
@@ -837,4 +841,8 @@ impl Anchors {
             format!("{slug}-{count}")
         }
     }
+}
+
+fn is_true(value: &bool) -> bool {
+    *value
 }

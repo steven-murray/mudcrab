@@ -12,92 +12,17 @@
 //! terms as much as by design.
 
 use super::choose::{Availability, Choice, Question, Rule, ask};
-use crate::cli::BrowserDownloads;
-use crate::config::archive_store::{self, ArchiveRef};
+use crate::config::by_hand::{
+    BrowserDownloads, Found, MOD_MANAGER_LINKS, Watcher, open_url, page_of,
+};
 use crate::config::download::Unfetched;
 use crate::ui::Tone;
-use std::collections::HashMap;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// How often the folders are looked at.
 const POLL: Duration = Duration::from_secs(2);
-
-/// The page to open for an archive: a Nexus file's download page, or a URL
-/// itself. A `manual:` archive or a local path has none.
-fn page_for(source: &str) -> Option<String> {
-    if let Some((game, mod_id, file_id)) = ArchiveRef::new(source, None).nexus_ids() {
-        return Some(nexus_page(game, mod_id, file_id, MOD_MANAGER_LINKS));
-    }
-    (source.starts_with("http://") || source.starts_with("https://")).then(|| source.to_string())
-}
-
-/// Whether to offer Nexus's "Mod Manager Download". On Linux it is not: the
-/// `nxm:` link goes to whichever MO2 owns such links, which with more than
-/// one instance is often not this list's, and the usual Linux handler (it
-/// starts the game's Steam entry) does nothing once that is running. The
-/// browser's own download always works.
-const MOD_MANAGER_LINKS: bool = !cfg!(target_os = "linux");
-
-/// A Nexus file's download page: with `mod_manager`, the one whose button
-/// hands the file to MO2 (`nmm=1`); without, the one whose "Slow download"
-/// has the browser save it.
-fn nexus_page(game: &str, mod_id: &str, file_id: &str, mod_manager: bool) -> String {
-    let nmm = if mod_manager { "&nmm=1" } else { "" };
-    format!("https://www.nexusmods.com/{game}/mods/{mod_id}?tab=files&file_id={file_id}{nmm}")
-}
-
-/// The page to open for one unfetched archive: its source's, or the page the
-/// list gives for a hand download.
-fn page_of(item: &Unfetched) -> Option<String> {
-    page_for(&item.source).or_else(|| item.page.clone())
-}
-
-/// The folder browsers save to: XDG's download directory on Linux, else
-/// `~/Downloads`.
-fn default_watch_dir() -> Option<PathBuf> {
-    let home = std::env::var_os("HOME")
-        .or_else(|| std::env::var_os("USERPROFILE"))
-        .map(PathBuf::from)?;
-    let config = std::env::var_os("XDG_CONFIG_HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| home.join(".config"));
-    if let Ok(text) = std::fs::read_to_string(config.join("user-dirs.dirs")) {
-        for line in text.lines() {
-            if let Some(value) = line.trim().strip_prefix("XDG_DOWNLOAD_DIR=") {
-                let value = value.trim().trim_matches('"');
-                let path = value.replace("$HOME", &home.to_string_lossy());
-                return Some(PathBuf::from(path));
-            }
-        }
-    }
-    Some(home.join("Downloads"))
-}
-
-/// Open `url` in the default browser, without waiting for it.
-fn open_url(url: &str) -> bool {
-    use std::process::{Command, Stdio};
-    let mut command = if cfg!(windows) {
-        let mut c = Command::new("cmd");
-        c.args(["/C", "start", "", url]);
-        c
-    } else if cfg!(target_os = "macos") {
-        let mut c = Command::new("open");
-        c.arg(url);
-        c
-    } else {
-        let mut c = Command::new("xdg-open");
-        c.arg(url);
-        c
-    };
-    command
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .is_ok()
-}
 
 /// Whether pages can be opened for someone to click: a terminal to talk to,
 /// and (on Linux) a desktop session with `xdg-open`.
@@ -138,57 +63,6 @@ fn profile_warning() -> Option<String> {
          separate tools.toml, MUDCRAB_TOOLS_CONFIG names one without moving anything else).",
         config.display()
     ))
-}
-
-/// A file a browser or MO2 has finished writing: not empty, not shadowed by a
-/// partial-download file, and the same size as when last looked at.
-fn settled(path: &Path, sizes: &mut HashMap<PathBuf, u64>) -> bool {
-    let Ok(len) = path.metadata().map(|m| m.len()) else {
-        return false;
-    };
-    let partial = [".part", ".crdownload", ".unfinished", ".download"]
-        .iter()
-        .any(|suffix| {
-            let mut name = path.as_os_str().to_os_string();
-            name.push(suffix);
-            Path::new(&name).exists()
-        });
-    let steady = sizes.insert(path.to_path_buf(), len) == Some(len);
-    len > 0 && !partial && steady
-}
-
-/// Move (or link) a browser download into the downloads folder, with the
-/// `.meta` MO2 would have written.
-fn adopt(
-    file: &Path,
-    downloads: &Path,
-    archive: &ArchiveRef<'_>,
-    how: BrowserDownloads,
-) -> anyhow::Result<PathBuf> {
-    let name = file
-        .file_name()
-        .ok_or_else(|| anyhow::anyhow!("{} has no file name", file.display()))?;
-    let destination = downloads.join(name);
-    match how {
-        BrowserDownloads::Leave => return Ok(file.to_path_buf()),
-        BrowserDownloads::Link => crate::util::fs::link_or_copy(file, &destination)?,
-        BrowserDownloads::Move => {
-            if std::fs::rename(file, &destination).is_err() {
-                // Another filesystem: copy, then remove the original.
-                std::fs::copy(file, &destination).map_err(|err| {
-                    anyhow::anyhow!(
-                        "failed to move {} into {}: {err}",
-                        file.display(),
-                        downloads.display()
-                    )
-                })?;
-                std::fs::remove_file(file)
-                    .map_err(|err| anyhow::anyhow!("failed to remove {}: {err}", file.display()))?;
-            }
-        }
-    }
-    archive_store::write_meta(&destination, archive)?;
-    Ok(destination)
 }
 
 /// Ask what to do with browser downloads, the first time one arrives.
@@ -278,10 +152,8 @@ pub(crate) async fn run(
     if unfetched.is_empty() {
         return Ok(());
     }
-    let watch = watch
-        .or_else(default_watch_dir)
-        .filter(|dir| dir.is_dir())
-        .filter(|dir| std::fs::canonicalize(dir).ok() != std::fs::canonicalize(downloads).ok());
+    let mut watcher = Watcher::new(downloads, watch);
+    let watch = watcher.browser_folder().map(Path::to_path_buf);
     let interactive = std::io::stdin().is_terminal();
     let total = unfetched.len();
 
@@ -338,7 +210,6 @@ pub(crate) async fn run(
         .filter_map(|u| Some((u.source.clone(), page_of(u)?)))
         .collect();
     to_open.reverse();
-    let mut sizes: HashMap<PathBuf, u64> = HashMap::new();
     let mut told_left: Vec<PathBuf> = Vec::new();
     let mut done = 0usize;
 
@@ -368,24 +239,15 @@ pub(crate) async fn run(
 
         let mut arrived = Vec::new();
         for (index, item) in pending.iter().enumerate() {
-            let mut reference = ArchiveRef::new(&item.source, item.file_name.as_deref());
-            reference.content = item
-                .content
-                .as_ref()
-                .map(|(size, md5)| (*size, md5.as_str()));
-            if let Some(path) = archive_store::find(downloads, &[], &reference)
-                && settled(&path, &mut sizes)
-            {
-                arrived.push((index, path));
-                continue;
-            }
-            let Some(watch) = &watch else { continue };
-            let Some(file) = archive_store::find(watch, &[], &reference) else {
-                continue;
+            let file = match watcher.look(item) {
+                None => continue,
+                Some(Found::Here(path)) => {
+                    arrived.push((index, path));
+                    continue;
+                }
+                Some(Found::InBrowserFolder(file)) => file,
             };
-            if !settled(&file, &mut sizes) {
-                continue;
-            }
+            let Some(watch) = &watch else { continue };
             let how = match policy {
                 Some(how) => how,
                 None if interactive => {
@@ -421,7 +283,7 @@ pub(crate) async fn run(
                 }
                 continue;
             }
-            arrived.push((index, adopt(&file, downloads, &reference, how)?));
+            arrived.push((index, watcher.take_in(&file, item, how)?));
         }
 
         // Highest index first, so removing one does not shift the next.
@@ -449,70 +311,5 @@ pub(crate) async fn run(
             return Ok(());
         }
         tokio::time::sleep(POLL).await;
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pages_for_nexus_files_and_urls_only() {
-        assert_eq!(
-            page_for("nexus:oblivion/47085/1000022995"),
-            Some(nexus_page(
-                "oblivion",
-                "47085",
-                "1000022995",
-                MOD_MANAGER_LINKS
-            ))
-        );
-        assert_eq!(
-            nexus_page("oblivion", "47085", "1000022995", true),
-            "https://www.nexusmods.com/oblivion/mods/47085?tab=files&file_id=1000022995&nmm=1"
-        );
-        assert_eq!(
-            nexus_page("oblivion", "47085", "1000022995", false),
-            "https://www.nexusmods.com/oblivion/mods/47085?tab=files&file_id=1000022995"
-        );
-        assert_eq!(
-            page_for("https://x.example/a.7z").as_deref(),
-            Some("https://x.example/a.7z")
-        );
-        assert_eq!(page_for("manual:a.7z"), None);
-    }
-
-    #[test]
-    fn a_file_still_being_written_is_not_taken() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("a.7z");
-        let mut sizes = HashMap::new();
-        std::fs::write(&file, b"").unwrap();
-        assert!(!settled(&file, &mut sizes), "empty: Firefox's placeholder");
-        std::fs::write(&file, b"abc").unwrap();
-        std::fs::write(dir.path().join("a.7z.part"), b"").unwrap();
-        assert!(!settled(&file, &mut sizes), "a .part beside it");
-        std::fs::remove_file(dir.path().join("a.7z.part")).unwrap();
-        assert!(settled(&file, &mut sizes), "same size as last time");
-        std::fs::write(&file, b"abcd").unwrap();
-        assert!(!settled(&file, &mut sizes), "grew since");
-        assert!(settled(&file, &mut sizes));
-    }
-
-    #[test]
-    fn a_browser_download_is_moved_in_with_its_meta() {
-        let watch = tempfile::tempdir().unwrap();
-        let downloads = tempfile::tempdir().unwrap();
-        let file = watch.path().join("Mod-1-2.7z");
-        std::fs::write(&file, b"x").unwrap();
-        let reference = ArchiveRef::new("nexus:oblivion/1/2", Some("Mod-1-2.7z"));
-        let moved = adopt(&file, downloads.path(), &reference, BrowserDownloads::Move).unwrap();
-        assert!(!file.exists());
-        assert!(moved.exists());
-        let meta = std::fs::read_to_string(archive_store::meta_path(&moved)).unwrap();
-        assert!(
-            meta.contains("modID=1") && meta.contains("fileID=2"),
-            "{meta}"
-        );
     }
 }

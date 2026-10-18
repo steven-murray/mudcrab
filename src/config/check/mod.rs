@@ -868,7 +868,9 @@ fn load_order_problems(
             }
         }
         for (key, (name, _)) in &folder.plugins {
-            if !ordered.contains(key) && !merged_away.contains(key) {
+            // An unticked mod's plugins are unordered on purpose: MO2 cannot
+            // see them until the player switches the mod on.
+            if mod_entry.enabled && !ordered.contains(key) && !merged_away.contains(key) {
                 findings.0.push(Finding {
                     kind: Kind::Unordered,
                     item: Item::new(Text::new().name(name).plain(format!(" ({})", mod_entry.id)))

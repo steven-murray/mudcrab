@@ -20,7 +20,7 @@ design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/
 An authoring mode (drag mods into order, pick a mod's files, move folders) and
 an install mode (view the list, one button from compile to install). The CLI
 stays complete: nothing will ever need the GUI. The library API and the CLI
-commands it needs are done, and a spike chose Tauri; next is install mode. The
+commands it needs are done, a spike chose Tauri, and install mode has a first cut ([docs/gui.md](gui.md)). The
 design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/gui.md).
 
 ## Open

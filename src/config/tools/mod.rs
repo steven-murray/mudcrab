@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-static PATH_OVERRIDE: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
+/// `--tools-config`, or the file a GUI was told to use. Replaceable, so a
+/// long-running front end can switch files.
+static PATH_OVERRIDE: std::sync::RwLock<Option<PathBuf>> = std::sync::RwLock::new(None);
 
 /// Machine-local tool configuration.  Loaded from a `tools.toml` file whose
 /// path is passed on the command line or defaults to
@@ -140,18 +142,71 @@ impl ToolsConfig {
     /// The tools.toml named by `--tools-config` or `MUDCRAB_TOOLS_CONFIG`, and
     /// which one named it; `None` for the standard place.
     pub fn chosen_path() -> Option<(PathBuf, &'static str)> {
-        match PATH_OVERRIDE.get() {
-            Some(path) => Some((path.clone(), "--tools-config")),
+        let chosen = PATH_OVERRIDE.read().ok().and_then(|path| path.clone());
+        match chosen {
+            Some(path) => Some((path, "--tools-config")),
             None => std::env::var_os("MUDCRAB_TOOLS_CONFIG")
                 .filter(|value| !value.is_empty())
                 .map(|value| (PathBuf::from(value), "MUDCRAB_TOOLS_CONFIG")),
         }
     }
 
-    /// Point every command at this tools.toml (the global `--tools-config`).
-    /// Only the first call counts.
-    pub fn set_path_override(path: PathBuf) {
-        let _ = PATH_OVERRIDE.set(path);
+    /// Point every command at this tools.toml (the global `--tools-config`),
+    /// or with `None` back at the usual one.
+    pub fn set_path_override(path: impl Into<Option<PathBuf>>) {
+        if let Ok(mut current) = PATH_OVERRIDE.write() {
+            *current = path.into();
+        }
+    }
+
+    /// What stops this configuration from running xEdit (the `qac` action),
+    /// each said plainly: a section missing, a path that is not there --
+    /// including the placeholders `setup-tools` writes for a person to fill
+    /// in. Empty when xEdit can be run.
+    pub fn xedit_problems(&self) -> Vec<String> {
+        let mut out = Vec::new();
+        match &self.tes4edit {
+            None => out.push("no [tes4edit] section: where xEdit (TES4Edit.exe) is".to_string()),
+            Some(xedit) => {
+                if !xedit.exe.is_file() {
+                    out.push(format!(
+                        "[tes4edit] exe is {}, which is not there",
+                        xedit.exe.display()
+                    ));
+                }
+                let qac = xedit.qac_executable();
+                if qac != xedit.exe && !qac.is_file() {
+                    out.push(format!(
+                        "[tes4edit] qac_exe is {}, which is not there",
+                        qac.display()
+                    ));
+                }
+            }
+        }
+        // xEdit is a Windows program: elsewhere it runs in a Wine prefix.
+        if !cfg!(windows) {
+            match &self.wine {
+                None => out
+                    .push("no [wine] section: the Wine or Proton prefix xEdit runs in".to_string()),
+                Some(wine) => {
+                    if !wine.prefix.join("drive_c").is_dir() {
+                        out.push(format!(
+                            "[wine] prefix is {}, which is not a Wine prefix (it has no drive_c)",
+                            wine.prefix.display()
+                        ));
+                    }
+                    if let Some(proton) = &wine.proton
+                        && !proton.is_file()
+                    {
+                        out.push(format!(
+                            "[wine] proton is {}, which is not there",
+                            proton.display()
+                        ));
+                    }
+                }
+            }
+        }
+        out
     }
 
     /// Where tools.toml lives when nothing says otherwise:

@@ -48,14 +48,30 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         }
     }
 
+    // `key = value`, or `[ini.<Section>]` holding them.
+    let scalar = |value: &toml::Value| {
+        matches!(
+            value,
+            toml::Value::String(_)
+                | toml::Value::Integer(_)
+                | toml::Value::Float(_)
+                | toml::Value::Boolean(_)
+        )
+    };
     for (key, value) in &modlist.ini {
         match value {
-            toml::Value::String(_)
-            | toml::Value::Integer(_)
-            | toml::Value::Float(_)
-            | toml::Value::Boolean(_) => {}
-            _ => anyhow::bail!(
-                "top-level ini entry {key} must be a string, integer, float, or boolean"
+            toml::Value::Table(keys) => {
+                for (inner, value) in keys {
+                    anyhow::ensure!(
+                        scalar(value),
+                        "ini entry [ini.{key}] {inner} must be a string, integer, float, or boolean"
+                    );
+                }
+            }
+            value => anyhow::ensure!(
+                scalar(value),
+                "top-level ini entry {key} must be a string, integer, float, or boolean, or a \
+                 [ini.{key}] section of them"
             ),
         }
     }
@@ -196,6 +212,22 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
             // still declares it, because the mod really does ship it, and that
             // is worth recording whether or not it survives to the load order.
             if merged_away.contains(&plugin.to_ascii_lowercase()) {
+                continue;
+            }
+            // MO2 does not see an unticked mod's plugins, so they have no
+            // place in the load order: it adds them at the end, unticked
+            // itself, when the player switches the mod on.
+            if !spec.enabled {
+                if modlist
+                    .plugins
+                    .iter()
+                    .any(|e| e.eq_ignore_ascii_case(plugin))
+                {
+                    anyhow::bail!(
+                        "mod {mod_id} is not enabled, but its plugin {plugin} is in the global \
+                         plugins load order. MO2 cannot see it there; take it out of `plugins`."
+                    );
+                }
                 continue;
             }
             if !modlist.plugins.iter().any(|entry| entry == plugin) {

@@ -15,6 +15,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                 oracle_name: spec.oracle_name.clone(),
                 section: spec.section.clone(),
                 mod_type: spec.mod_type,
+                enabled: spec.enabled,
                 merge: spec.merge.clone(),
                 dependencies: spec.dependencies.clone(),
                 plugins: spec.plugins.clone(),
@@ -136,20 +137,27 @@ fn manual_file_name(path: Option<&str>) -> Option<String> {
 /// These target Oblivion.ini specifically; game-scoped writes are redirected to
 /// the MO2 profile-local copy, never the original in the game directory.
 pub fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
+    let set = |section: Option<&str>, key: &str, value: &toml::Value| {
+        ModAction::IniSet(IniSetAction {
+            scope: IniScope::Game,
+            file: "Oblivion.ini".to_string(),
+            section: section.map(str::to_string),
+            key: key.to_string(),
+            value: IniValue(ini_value_to_string(value)),
+            format: IniSetFormat::Standard,
+        })
+    };
+    // `[ini.General]` names the section its keys belong in. A bare key is
+    // matched anywhere in the file, which is right only for a key the file
+    // already has exactly once; `ini_set` refuses rather than guesses
+    // otherwise.
     ini.iter()
-        .map(|(key, value)| {
-            ModAction::IniSet(IniSetAction {
-                scope: IniScope::Game,
-                file: "Oblivion.ini".to_string(),
-                // The top-level `[ini]` table is a flat key/value map with no
-                // way to name a section. That is fine while every key it sets
-                // is unique in the file, and `apply_ini_set_in_section` now
-                // errors rather than guessing if one ever is not.
-                section: None,
-                key: key.clone(),
-                value: IniValue(ini_value_to_string(value)),
-                format: IniSetFormat::Standard,
-            })
+        .flat_map(|(key, value)| match value {
+            toml::Value::Table(keys) => keys
+                .iter()
+                .map(|(inner, value)| set(Some(key), inner, value))
+                .collect::<Vec<_>>(),
+            value => vec![set(None, key, value)],
         })
         .collect()
 }
@@ -173,6 +181,34 @@ fn ini_value_to_string(value: &toml::Value) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ini_keys_may_be_grouped_by_section() {
+        let ini: toml::Table = toml::from_str(
+            "SIntroSequence = \"\"\n[General]\nbAllowScriptedAutosave = 0\n[GamePlay]\nbSaveOnRest = false\n",
+        )
+        .unwrap();
+        let mut sets: Vec<(Option<String>, String, String)> = compile_top_level_actions(&ini)
+            .into_iter()
+            .map(|action| match action {
+                ModAction::IniSet(set) => (set.section, set.key, set.value.0),
+                other => panic!("{other:?}"),
+            })
+            .collect();
+        sets.sort();
+        assert_eq!(
+            sets,
+            [
+                (None, "SIntroSequence".into(), "".into()),
+                (Some("GamePlay".into()), "bSaveOnRest".into(), "0".into()),
+                (
+                    Some("General".into()),
+                    "bAllowScriptedAutosave".into(),
+                    "0".into()
+                ),
+            ]
+        );
+    }
 
     #[test]
     fn a_manual_descriptor_supplies_its_own_file_name() {

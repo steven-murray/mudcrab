@@ -44,6 +44,12 @@ pub struct SourceModlist {
     /// The guide's own prose, for `export`. See [`crate::config::docs`].
     #[serde(default)]
     pub docs: Docs,
+    /// What a player installing with the GUI reads about the list, in
+    /// Markdown: what it is, what it needs, what to expect. Apart from
+    /// `docs`, which is written for someone following a guide by hand and
+    /// says to do what the install already does.
+    #[serde(default)]
+    pub about: Option<String>,
     /// Per-section prose, keyed by the section's name as MO2 shows its
     /// separator (`"OBSE PLUGINS - Core"` for a nested one).
     #[serde(default)]
@@ -617,6 +623,11 @@ pub struct ModEntry {
     pub archives: Vec<ArchiveSpec>,
     #[serde(rename = "type")]
     pub mod_type: Option<ModType>,
+    /// `false` installs the mod but leaves it unticked in MO2, for a tool the
+    /// player switches on only when they need it. Its plugins are then left
+    /// out of the load order, as MO2 cannot see them.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Merge definition. Required when `type = "merge"`, rejected otherwise.
     pub merge: Option<MergeSpec>,
     #[serde(default)]
@@ -715,6 +726,10 @@ pub struct MergeSpec {
     pub sources: Vec<MergeSource>,
 }
 
+fn is_true(value: &bool) -> bool {
+    *value
+}
+
 fn default_true() -> bool {
     true
 }
@@ -730,6 +745,10 @@ pub enum Mo2ModlistEntry {
 #[serde(rename_all = "kebab-case")]
 pub enum PostInstallAction {
     LootSort,
+    /// Mark the game's `Oblivion.exe` large-address-aware, as the 4GB Patch
+    /// does. See `config::install::large_address`.
+    #[serde(rename = "4gb-patch")]
+    FourGbPatch,
 }
 
 impl<'de> Deserialize<'de> for PostInstallAction {
@@ -740,8 +759,9 @@ impl<'de> Deserialize<'de> for PostInstallAction {
         let value = String::deserialize(deserializer)?;
         match value.as_str() {
             "loot-sort" => Ok(Self::LootSort),
+            "4gb-patch" => Ok(Self::FourGbPatch),
             other => Err(de::Error::custom(format!(
-                "unknown post-install action '{other}'. Supported values: loot-sort"
+                "unknown post-install action '{other}'. Supported values: loot-sort, 4gb-patch"
             ))),
         }
     }
@@ -969,6 +989,9 @@ pub struct CompiledMod {
     pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
+    /// Ticked in MO2; see `ModEntry::enabled`.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
@@ -1083,6 +1106,9 @@ pub struct PersonalizedMod {
     pub section: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub mod_type: Option<ModType>,
+    /// Ticked in MO2; see `ModEntry::enabled`.
+    #[serde(default = "default_true", skip_serializing_if = "is_true")]
+    pub enabled: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     /// The plugins the mod says it ships, for `check` to compare with what its
