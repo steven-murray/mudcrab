@@ -11,7 +11,7 @@
 //! docs/design/gui.md.
 
 use super::{State, quote, shown};
-use mudcrab::config::add::{Placement, plan_move};
+use mudcrab::config::add::Placement;
 use mudcrab::config::edit::{self, Edit, doc};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
@@ -162,6 +162,18 @@ fn plan(
     Ok((list, planned))
 }
 
+/// Plan with `change` on the file mod `id` is written in: the open list, or
+/// a file it includes.
+fn plan_mod(
+    state: &State,
+    id: &str,
+    change: impl FnOnce(&str, &mudcrab::config::schema::SourceModlist) -> anyhow::Result<String>,
+) -> Result<(std::path::PathBuf, Edit), String> {
+    let list = state.list()?;
+    let planned = edit::plan_mod(&list, id, change).map_err(shown)?;
+    Ok((list, planned))
+}
+
 fn list_arg(list: &Path) -> String {
     quote(list.display().to_string())
 }
@@ -306,7 +318,8 @@ pub(super) fn move_plugin(
         Some(name) => doc::PluginPosition::Before(name.clone()),
         None => doc::PluginPosition::Last,
     };
-    let (list, planned) = plan(&state, |text, _| doc::move_plugin(text, &plugin, &to))?;
+    let list = state.list()?;
+    let planned = edit::plan_plugin_move(&list, &plugin, &to).map_err(shown)?;
     let place = match &before {
         Some(name) => format!("--before {}", quote(name)),
         None => "--last".to_string(),
@@ -332,9 +345,9 @@ pub(super) fn move_mod(
         before_mod: before_mod.clone(),
         before_section: None,
     };
-    let (list, planned) = plan(&state, |text, source| {
-        Ok(plan_move(text, &source.mods, &id, &section, &placement)?.new_text)
-    })?;
+    let list = state.list()?;
+    let (planned, _) =
+        edit::plan_mod_move(&list, &id, Some(&section), &placement).map_err(shown)?;
     let mut command = format!("mudcrab move {} --mod {}", list_arg(&list), quote(&id));
     for level in &section {
         command.push_str(&format!(" --section {}", quote(level)));
@@ -362,7 +375,7 @@ pub(super) fn edit_filter(
         "bain_subpackages" => ("--package", "--drop-package"),
         other => return Err(format!("{other} is not a filter")),
     };
-    let (list, planned) = plan(&state, |text, _| {
+    let (list, planned) = plan_mod(&state, &id, |text, _| {
         doc::edit_strings(text, &id, Some(number), &key, &add, &drop)
     })?;
     let mut command = format!("mudcrab files {} --mod {}", list_arg(&list), quote(&id));
@@ -389,7 +402,7 @@ pub(super) fn set_fields(
     unsets: Vec<String>,
 ) -> Result<Edited, String> {
     let pairs = doc::parse_pairs(&sets).map_err(shown)?;
-    let (list, planned) = plan(&state, |text, _| {
+    let (list, planned) = plan_mod(&state, &id, |text, _| {
         doc::set_fields(text, &id, archive, &pairs, &unsets)
     })?;
     let mut command = format!("mudcrab set {} --mod {}", list_arg(&list), quote(&id));
@@ -415,7 +428,7 @@ pub(super) fn add_action(
     condition: Option<String>,
 ) -> Result<Edited, String> {
     let pairs = doc::parse_pairs(&fields).map_err(shown)?;
-    let (list, planned) = plan(&state, |text, source| {
+    let (list, planned) = plan_mod(&state, &id, |text, source| {
         anyhow::ensure!(
             source.mods.iter().any(|m| m.id == id),
             "the list has no mod with id '{id}'"
@@ -443,7 +456,7 @@ pub(super) fn remove_action(
     id: String,
     number: usize,
 ) -> Result<Edited, String> {
-    let (list, planned) = plan(&state, |text, _| doc::remove_action(text, &id, number))?;
+    let (list, planned) = plan_mod(&state, &id, |text, _| doc::remove_action(text, &id, number))?;
     let command = format!(
         "mudcrab action remove {} --mod {} {number}",
         list_arg(&list),
@@ -455,8 +468,8 @@ pub(super) fn remove_action(
 /// A mod's actions, numbered as `action remove` takes them.
 #[tauri::command]
 pub(super) fn actions(state: tauri::State<'_, State>, id: String) -> Result<Vec<String>, String> {
-    let list = state.list()?;
-    let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
+    let file = edit::file_of_mod(&state.list()?, &id).map_err(shown)?;
+    let text = std::fs::read_to_string(&file).map_err(|err| err.to_string())?;
     doc::action_lines(&text, &id).map_err(shown)
 }
 
@@ -565,7 +578,8 @@ pub(super) fn fields(
     id: String,
     archive: Option<usize>,
 ) -> Result<Vec<(String, serde_json::Value)>, String> {
-    let text = std::fs::read_to_string(state.list()?).map_err(|err| err.to_string())?;
+    let file = edit::file_of_mod(&state.list()?, &id).map_err(shown)?;
+    let text = std::fs::read_to_string(&file).map_err(|err| err.to_string())?;
     doc::field_values(&text, &id, archive).map_err(shown)
 }
 
@@ -588,12 +602,12 @@ pub(super) fn set_enabled(
     enabled: bool,
 ) -> Result<Edited, String> {
     let list = state.list()?;
-    let edit = edit::plan_enabled(&list, &id, enabled, None).map_err(shown)?;
+    let edits = edit::plan_enabled(&list, &id, enabled, None).map_err(shown)?;
     let command = format!(
         "mudcrab {} {} --mod {}",
         if enabled { "enable" } else { "disable" },
         list_arg(&list),
         quote(&id)
     );
-    apply(&state, command, edit)
+    apply_all(&state, command, edits)
 }

@@ -54,7 +54,8 @@ that table.
 
 | Key | When you need it |
 | --- | --- |
-| `name` | Always: the list's name. |
+| `name` | Always, except in a `component`: the list's name. |
+| `component` | `true` in a file written only to be included in other lists: see [Lists in several files](#lists-in-several-files-include). |
 | `plugins` | Whenever a mod ships a plugin: the load order, top to bottom. See [Load order](#load-order). |
 | `inactive-plugins` | When a tool absorbs some plugins (Wrye Bash's Bashed Patch): installed and ordered, but not ticked. |
 | `inputs` | When the list offers choices: the questions `query` asks. See [Optional mods and inputs](#optional-mods-and-inputs). |
@@ -66,7 +67,7 @@ that table.
 | `docs`, `sections`, `docs_file` | For `export`: prose for the guide and each section. See [Docs](#docs-prose-for-export). |
 | `about` | For the GUI: what someone installing the list reads first (Markdown), shown by its **About this list** button. Write it for a player pressing Install -- what the list is, what it needs, what to expect -- not as the guide's instructions, which `docs` holds. It may be in the docs file instead. |
 | `export` | To set an exporter's options for this list: `[export.<exporter>]`. See [Turning a list into a guide](exporters.md). |
-| `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict). |
+| `mods` | Always: one `[[mods]]` table per mod, in MO2's order (later wins a file conflict), or an `include` of another file's mods. |
 
 Put each `ini` key under the section `Oblivion.ini` keeps it in, as
 `[ini.<Section>]`. A bare key under `[ini]` is matched anywhere in the file,
@@ -105,6 +106,7 @@ Each `[[mods]]` table is one mod folder in MO2.
 | `files` | With `type = "build-from-files"`: the files to assemble it from. |
 | `docs` | For `export`: prose and pictures for this mod. |
 | `oracle_name` | Only for `diff`: the mod's folder name in a reference instance, when it differs from `id`. Has no effect on installing. |
+| `include` | In place of a mod: another modlist file whose mods go here. See [Lists in several files](#lists-in-several-files-include). |
 
 ### Kinds of mod (`type`)
 
@@ -483,9 +485,79 @@ The file is merged in when the modlist is loaded. A mod id it names that the
 modlist does not have is an error, and so is documenting the same thing in both
 places.
 
+## Lists in several files (`include`)
+
+A long list can be split into files -- one per section, say -- and a group
+of mods written once can be used by several lists. A `[[mods]]` entry with
+`include` in place of archives puts another file's mods where it is:
+
+```toml
+plugins = [
+    "Oblivion.esm",
+    { include = "Core" },     # the included file's plugins, in its order
+    "Last.esp",
+]
+
+[[mods]]
+id = "Core"                   # names the include, in `plugins` and in messages
+section = ["01 - Core"]       # put before each included mod's own section
+include = "parts/core.toml"   # relative to this file
+```
+
+```toml
+# parts/core.toml
+component = true
+
+plugins = ["A.esp", "B.esp"]
+
+[[mods]]
+id = "A"
+section = ["Patches"]         # under "01 - Core", as "01 - Core - Patches"
+plugins = ["A.esp"]
+archives = [{ path = "nexus:oblivion/1234/5678" }]
+```
+
+The included file is an ordinary modlist file, read as if its mods had been
+written in place:
+
+- **Its mods** go where the `include` entry is, in their order, each under the
+  entry's `section` and then its own. An `include` entry has only `id`,
+  `section` and `include`.
+- **Its `plugins`** go where the including list's `plugins` has
+  `{ include = "<the entry's id>" }`. Leaving them unplaced is an error, as a
+  mod's plugin missing from the load order is. An included file can also leave
+  its mods' plugins out of its own `plugins` for the including list to place,
+  which keeps the whole load order in one file.
+- **Its `ini`, `inactive-plugins`, `manual-steps` and `post-install-actions`**
+  are added to the list's. An `ini` key the two set differently is an error.
+- **Its `sections` and its mods' `docs`** come with it (a section's name gains
+  the entry's `section` in front), and so does its own `docs_file`. The
+  including list's docs file can document its mods too.
+- **Its `name`, `guide`, `mo2`, `export` and `about`** describe a whole list
+  and are not read.
+- **Questions:** an included file cannot declare `inputs` yet. Its conditions
+  can ask the including list's questions.
+
+`component = true` marks a file written only to be included: it may leave out
+`name`, its conditions may ask questions it does not declare, and `query`
+refuses to plan it on its own. Included files can include others; a file that
+ends up including itself is an error.
+
+Everything after loading sees one list: the compiled list and the plan are the
+same as for the list written in one file, except that each included mod
+records the `origin` file it came from, which error messages name. Moving a
+mod's definition to another file does not make `install` reinstall it.
+
+The editing commands (`set`, `files`, `action`, `docs`, `choose`, `disable`,
+`remove`, `move`, `plugins move`, and the GUI's author mode) change an
+included mod in the file it is written in, and check the whole list before
+writing. A mod moves only within its own file, and a plugin within the file
+that places it. `add --before-mod` adds a mod to the file the mod it goes
+before is in; without it, a new mod goes in the list's own file.
+
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema, and so is `include`-ing one modlist
-from another (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)):
-every modlist today is one file.
+[roadmap](roadmap.md), not in the schema. Including a file from a git
+repository, overriding an included mod's fields, and questions declared by an
+included file are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).

@@ -148,6 +148,9 @@ pub(super) struct ModView {
     id: String,
     /// Left out by the answers given, so not planned.
     left_out: bool,
+    /// The included file it is written in, relative to the list; absent for
+    /// the list's own.
+    origin: Option<String>,
     archives: Vec<ArchiveChoice>,
 }
 
@@ -160,8 +163,13 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
         .iter()
         .find(|m| m.id == id)
         .ok_or_else(|| format!("the list has no mod with id '{id}'"))?;
+    let base = source.base_dir.clone().unwrap_or_default();
     Ok(ModView {
         left_out: !plan.mods.iter().any(|m| m.id == id),
+        origin: entry
+            .origin
+            .as_deref()
+            .map(|path| config::compiler::origin_name(&base, path)),
         archives: entry
             .archives
             .iter()

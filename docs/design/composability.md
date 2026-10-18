@@ -1,6 +1,8 @@
 # Composability: lists built from other lists
 
-**Status: plan.** Nothing here is implemented yet.
+**Status: phase 1 done** (local includes; see [the format](../modlist-format.md#lists-in-several-files-include)).
+Phases 2-6 are a plan. Where phase 1 settled something differently from the
+plan below, the notes under [Phases](#phases) say so.
 
 Today a modlist is one file. This plan lets a list pull in other modlist files
 -- from its own folder or from a git repository -- and have them resolve as if
@@ -198,7 +200,23 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
 1. **Local includes.** `include = "<path>"` in `[[mods]]`, splicing, section
    prefixing, the `plugins` fragment, ini/manual-step merging, origins in
    messages, cycle detection. Proved by splitting a copy of MOFAM into a file
-   per Part and compiling it to a plan **identical** to today's.
+   per Part and compiling it to a plan **identical** to today's. *Done.* As
+   built:
+   - Includes are resolved by the loader, not `compile`, so `validate`,
+     `export` and the editing commands see the same list `compile` does.
+   - An included file's mods may leave their plugins to the including list's
+     `plugins`. A fragment is placed in one piece, and MOFAM's load order
+     interleaves its Parts, so splitting MOFAM by Part keeps the whole order in
+     the top file; the plan was identical for three sets of answers.
+   - Until phase 4, an included file cannot declare `inputs`, and its
+     conditions ask the including list's questions; `component = true` lets
+     it validate on its own regardless.
+   - Editing commands change an included mod in its own file and check the
+     whole list with the change. A mod moves only within its file; a plugin
+     only within the file that places it. A remove or disable that touches a
+     mod in one file and its plugins in another is one edit, checked as one.
+   - `origin` is in the compiled list and the plan but not in a mod's
+     definition hash, so splitting a list does not reinstall anything.
 2. **Overrides and include options.** `override`, `skip`, `.append`, `section`,
    `if`, `prefix`, `only`/`except`. Tests for each, and for an override that
    names nothing.

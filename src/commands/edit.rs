@@ -29,6 +29,26 @@ fn finish(edit: Edit, dry_run: bool, done: String) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// [`finish`], for an edit of several files, written in order.
+fn finish_all(edits: Vec<Edit>, dry_run: bool, done: String) -> anyhow::Result<()> {
+    if edits.is_empty() {
+        ui::status(Tone::Note, "Nothing to change");
+        return Ok(());
+    }
+    if dry_run {
+        for edit in &edits {
+            ui::diff(&edit.diff());
+        }
+        ui::say(ui::dim("(--dry-run: nothing written)"));
+        return Ok(());
+    }
+    for edit in &edits {
+        edit.write()?;
+    }
+    ui::status(Tone::Good, done);
+    Ok(())
+}
+
 fn find_mod<'a>(
     source: &'a SourceModlist,
     id: &str,
@@ -46,7 +66,7 @@ pub fn set(args: SetArgs) -> anyhow::Result<()> {
         "nothing to set: give key=value, or --unset <key>"
     );
     let sets = doc::parse_pairs(&args.sets)?;
-    let edit = edit::plan(&args.input, |text, _| {
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
         doc::set_fields(text, &args.mod_id, args.archive, &sets, &args.unsets)
     })?;
     let what = match args.archive {
@@ -176,15 +196,16 @@ pub fn remove(args: RemoveArgs) -> anyhow::Result<()> {
     for edit in &edits {
         edit.write()?;
     }
-    let notes = match edits.get(1) {
-        Some(docs) => format!(", and its notes from {}", ui::dim(docs.path.display())),
-        None => String::new(),
-    };
+    let files: Vec<String> = edits
+        .iter()
+        .map(|edit| edit.path.display().to_string())
+        .collect();
     ui::status(
         Tone::Good,
         format!(
-            "Removed {} and its plugins from the load order{notes}",
-            ui::name(&args.mod_id)
+            "Removed {}, its plugins from the load order and its notes ({})",
+            ui::name(&args.mod_id),
+            ui::dim(files.join(", "))
         ),
     );
     Ok(())
@@ -197,9 +218,9 @@ pub fn enabled(args: crate::cli::EnableArgs, enabled: bool) -> anyhow::Result<()
         (None, true) => Some(LoadPosition::Last),
         (None, false) => None,
     };
-    let edit = edit::plan_enabled(&args.input, &args.mod_id, enabled, position.as_ref())?;
-    finish(
-        edit,
+    let edits = edit::plan_enabled(&args.input, &args.mod_id, enabled, position.as_ref())?;
+    finish_all(
+        edits,
         args.dry_run,
         if enabled {
             format!(
@@ -265,9 +286,7 @@ fn plugins_move(args: PluginsMoveArgs) -> anyhow::Result<()> {
         (_, _, true) => doc::PluginPosition::First,
         _ => doc::PluginPosition::Last,
     };
-    let edit = edit::plan(&args.input, |text, _| {
-        doc::move_plugin(text, &args.plugin, &to)
-    })?;
+    let edit = edit::plan_plugin_move(&args.input, &args.plugin, &to)?;
     let place = match &to {
         doc::PluginPosition::After(name) => format!("after {}", ui::name(name)),
         doc::PluginPosition::Before(name) => format!("before {}", ui::name(name)),
@@ -325,7 +344,7 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let edit = edit::plan(&args.input, |text, _| {
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
         let archive = Some(args.archive);
         let text = doc::edit_strings(
             text,
@@ -446,7 +465,7 @@ fn action_list(args: ActionListArgs) -> anyhow::Result<()> {
 
 fn action_add(args: ActionAddArgs) -> anyhow::Result<()> {
     let fields = doc::parse_pairs(&args.fields)?;
-    let edit = edit::plan(&args.input, |text, source| {
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, source| {
         find_mod(source, &args.mod_id)?;
         doc::add_action(
             text,
@@ -464,7 +483,7 @@ fn action_add(args: ActionAddArgs) -> anyhow::Result<()> {
 }
 
 fn action_remove(args: ActionRemoveArgs) -> anyhow::Result<()> {
-    let edit = edit::plan(&args.input, |text, _| {
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
         doc::remove_action(text, &args.mod_id, args.number)
     })?;
     finish(

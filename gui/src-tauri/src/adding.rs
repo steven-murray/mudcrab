@@ -321,9 +321,13 @@ fn planned(
             _ => LoadPosition::Last,
         })
     };
-    config::edit::plan(list, |text, source| {
+    // Before a mod from an included file, the new one goes in that file.
+    let place = config::edit::place_beside(list, placement.before_mod.as_deref())?;
+    let mut local = new_mod.clone();
+    local.section = place.local(&new_mod.section)?;
+    config::edit::plan_in(list, &place.file, |text, source| {
         Ok(
-            plan_add(text, source, new_mod, &placement, position.as_ref())?
+            plan_add(text, source, &local, &placement, position.as_ref())?
                 .insertion
                 .new_text,
         )

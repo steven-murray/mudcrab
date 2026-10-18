@@ -1,36 +1,15 @@
 use crate::cli::MoveArgs;
-use crate::config::add::{Placement, plan_move};
+use crate::config::add::Placement;
 
 pub fn run(args: MoveArgs) -> anyhow::Result<()> {
     let placement = Placement {
         before_mod: args.before_mod.clone(),
         before_section: (!args.before_sections.is_empty()).then(|| args.before_sections.clone()),
     };
-    let mut planned = None;
-    let edit = crate::config::edit::plan(&args.input, |text, source| {
-        let current = source
-            .mods
-            .iter()
-            .find(|entry| entry.id == args.mod_id)
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "{} has no mod with id '{}'",
-                    args.input.display(),
-                    args.mod_id
-                )
-            })?;
-        let section = if args.sections.is_empty() {
-            current.section.clone()
-        } else {
-            args.sections.clone()
-        };
-        let plan = plan_move(text, &source.mods, &args.mod_id, &section, &placement)?;
-        let new_text = plan.new_text.clone();
-        planned = Some(plan);
-        Ok(new_text)
-    })
-    .map_err(|err| anyhow::anyhow!("moving '{}': {err:#}", args.mod_id))?;
-    let plan = planned.expect("a planned edit ran its change");
+    let sections = (!args.sections.is_empty()).then_some(args.sections.as_slice());
+    let (edit, plan) =
+        crate::config::edit::plan_mod_move(&args.input, &args.mod_id, sections, &placement)
+            .map_err(|err| anyhow::anyhow!("moving '{}': {err:#}", args.mod_id))?;
 
     if args.dry_run {
         crate::ui::status(

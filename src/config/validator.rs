@@ -11,7 +11,37 @@ use std::collections::{HashMap, HashSet};
 /// that can be built but will not behave as its author expects is a warning.
 /// `--strict` is what turns the second into the first.
 pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
-    if modlist.name.trim().is_empty() {
+    validate_list(modlist).map_err(|err| locate(err, modlist))
+}
+
+/// `err`, saying which included file the mod it is about is written in, so
+/// the fix is made in the right file.
+fn locate(err: anyhow::Error, modlist: &SourceModlist) -> anyhow::Error {
+    let message = err.to_string();
+    let base = modlist
+        .base_dir
+        .as_deref()
+        .unwrap_or(std::path::Path::new(""));
+    let found = modlist.mods.iter().find_map(|entry| {
+        let origin = entry.origin.as_ref()?;
+        let id = &entry.id;
+        [
+            format!("mod {id} "),
+            format!("mod {id}:"),
+            format!("mod '{id}'"),
+        ]
+        .iter()
+        .any(|named| message.contains(named.as_str()))
+        .then(|| (id, crate::config::compiler::origin_name(base, origin)))
+    });
+    match found {
+        Some((id, origin)) => anyhow::anyhow!("{message} (mod {id} is in {origin})"),
+        None => err,
+    }
+}
+
+fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
+    if modlist.name.trim().is_empty() && !modlist.component {
         anyhow::bail!("modlist name must not be empty");
     }
     for step in &modlist.manual_steps {
@@ -133,10 +163,13 @@ pub fn validate(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         for (expr, site, gates_mod) in conditions {
             let condition = Condition::parse(expr)
                 .map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err:#}"))?;
+            // A component's conditions may ask the including list's
+            // questions, which it cannot see.
             if let Some(input) = condition
                 .inputs()
                 .into_iter()
                 .find(|i| !modlist.inputs.contains_key(*i))
+                && !modlist.component
             {
                 anyhow::bail!(
                     "mod {mod_id}: {site} asks about input '{input}', which [inputs] does not declare"

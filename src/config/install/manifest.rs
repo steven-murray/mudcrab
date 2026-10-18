@@ -164,6 +164,9 @@ pub(crate) fn hash_personalized_mod(mod_entry: &PersonalizedMod) -> anyhow::Resu
     let mut hashable = mod_entry.clone();
     hashable.section.clear();
     hashable.plugins.clear();
+    // Which file the mod is written in changes nothing installed: splitting
+    // a list into included files must not restage it.
+    hashable.origin = None;
     for archive in &mut hashable.archives {
         archive.size = None;
         archive.md5 = None;

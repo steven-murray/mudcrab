@@ -11,7 +11,7 @@
 
 pub mod doc;
 
-use crate::config::loader::parse_modlist;
+use crate::config::loader::{Texts, load_modlist, load_with, normalize, parse_file};
 use crate::config::schema::SourceModlist;
 use std::path::{Path, PathBuf};
 
@@ -25,10 +25,17 @@ pub struct Edit {
 }
 
 impl Edit {
-    /// The change from `before` (the file's text, as read) to `after`, which
-    /// must load and validate.
+    /// The change from `before` (the file's text, as read) to `after` in the
+    /// modlist at `path`, which must load and validate.
     pub fn new(path: &Path, before: String, after: String) -> anyhow::Result<Self> {
-        check(path, &after)?;
+        Self::new_in(path, path, before, after)
+    }
+
+    /// The change from `before` to `after` in `path`: the modlist at `list`,
+    /// or a file it includes. The list, with the change, must load and
+    /// validate.
+    pub fn new_in(list: &Path, path: &Path, before: String, after: String) -> anyhow::Result<Self> {
+        check_in(list, path, &after)?;
         Ok(Self {
             path: path.to_path_buf(),
             before,
@@ -44,7 +51,8 @@ impl Edit {
         before: String,
         after: String,
     ) -> anyhow::Result<Self> {
-        crate::config::loader::check_docs(list, &after).map_err(|err| {
+        let texts = Texts::from([(normalize(path), after.clone())]);
+        load_with(list, true, &texts).map_err(|err| {
             anyhow::anyhow!(
                 "the edit would leave {} invalid, so nothing was written: {err:#}",
                 path.display()
@@ -93,47 +101,333 @@ pub fn diff(path: &Path, before: &str, after: &str) -> String {
 
 /// Plan an edit of the modlist at `path`: `change` gets its text and the list
 /// parsed from it, and returns the new text, which must still load and
-/// validate.
+/// validate. The list read is the file alone: what its includes bring is not
+/// in its text, so it is not in what `change` sees either.
 pub fn plan(
     path: &Path,
     change: impl FnOnce(&str, &SourceModlist) -> anyhow::Result<String>,
 ) -> anyhow::Result<Edit> {
-    let before = std::fs::read_to_string(path)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
-    let source = parse_modlist(&before, path)?;
-    let after = change(&before, &source)?;
-    Edit::new(path, before, after)
+    plan_in(path, path, change)
 }
 
-/// Plan setting (or, with `None` or empty text, removing) a mod's prose --
-/// `title`, `summary`, `body`, `footer` -- where its docs already are: inline
-/// in the list, or in the docs file the list names. A mod documented nowhere
-/// yet gets its docs in the docs file when the list has one, inline when not.
-pub fn plan_mod_docs(
+/// [`plan`], for `file`: the list at `list`, or a file it includes.
+pub fn plan_in(
+    list: &Path,
+    file: &Path,
+    change: impl FnOnce(&str, &SourceModlist) -> anyhow::Result<String>,
+) -> anyhow::Result<Edit> {
+    let before = read(file)?;
+    let source = parse_file(&before, file)?;
+    let after = change(&before, &source)?;
+    Edit::new_in(list, file, before, after)
+}
+
+/// [`plan`], in the file mod `id` is written in: the list, or the file it
+/// includes the mod from.
+pub fn plan_mod(
     list: &Path,
     id: &str,
-    fields: &[(String, Option<String>)],
+    change: impl FnOnce(&str, &SourceModlist) -> anyhow::Result<String>,
 ) -> anyhow::Result<Edit> {
-    let text = std::fs::read_to_string(list)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", list.display()))?;
-    let source = parse_modlist(&text, list)?;
+    plan_in(list, &file_of_mod(list, id)?, change)
+}
+
+/// The file mod `id` is written in: the list at `list`, or a file it
+/// includes.
+pub fn file_of_mod(list: &Path, id: &str) -> anyhow::Result<PathBuf> {
+    let source = load_modlist(list)?;
     let entry = source
         .mods
         .iter()
         .find(|entry| entry.id == id)
         .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
-    match &source.docs_file {
-        Some(file) if entry.docs.is_empty() => {
-            let path = source.base_dir.clone().unwrap_or_default().join(file);
-            let before = std::fs::read_to_string(&path)
-                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    Ok(entry.origin.clone().unwrap_or_else(|| list.to_path_buf()))
+}
+
+/// Where a mod is written: the file, and the sections every mod in that file
+/// is under because of how it is included, which its own `section` leaves
+/// out.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Place {
+    pub file: PathBuf,
+    pub sections: Vec<String>,
+}
+
+impl Place {
+    /// The list's own file.
+    pub fn list(list: &Path) -> Self {
+        Self {
+            file: list.to_path_buf(),
+            sections: Vec::new(),
+        }
+    }
+
+    /// `section`, as the list shows it, as this file writes it.
+    pub fn local(&self, section: &[String]) -> anyhow::Result<Vec<String>> {
+        section
+            .strip_prefix(self.sections.as_slice())
+            .map(<[String]>::to_vec)
+            .ok_or_else(|| {
+                anyhow::anyhow!(
+                    "every mod in {} is under section {}, as that is where it is included",
+                    self.file.display(),
+                    self.sections.join(" - ")
+                )
+            })
+    }
+}
+
+/// Where mod `id` is written.
+pub fn place_of_mod(list: &Path, id: &str) -> anyhow::Result<Place> {
+    let source = load_modlist(list)?;
+    let entry = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+    Ok(match &entry.origin {
+        Some(file) => Place {
+            file: file.clone(),
+            sections: entry.section[..entry.inherited_sections].to_vec(),
+        },
+        None => Place::list(list),
+    })
+}
+
+/// Where an edit placing a mod just before mod `anchor` is made: in
+/// `anchor`'s file, or, with none, in the list's.
+pub fn place_beside(list: &Path, anchor: Option<&str>) -> anyhow::Result<Place> {
+    match anchor {
+        Some(anchor) => place_of_mod(list, anchor),
+        None => Ok(Place::list(list)),
+    }
+}
+
+/// Plan moving mod `id` to `section` (as the list shows it; `None` keeps
+/// its own), before mod `placement.before_mod` or at the section's end, in
+/// the file it is written in, which a mod cannot leave by moving.
+pub fn plan_mod_move(
+    list: &Path,
+    id: &str,
+    section: Option<&[String]>,
+    placement: &crate::config::add::Placement,
+) -> anyhow::Result<(Edit, crate::config::add::Insertion)> {
+    let place = place_of_mod(list, id)?;
+    if let Some(anchor) = &placement.before_mod {
+        let theirs = place_of_mod(list, anchor)?;
+        anyhow::ensure!(
+            theirs.file == place.file,
+            "'{id}' is in {} and '{anchor}' in {}; a mod moves only within the file it is              written in",
+            place.file.display(),
+            theirs.file.display()
+        );
+    }
+    let section = section.map(|section| place.local(section)).transpose()?;
+    let before_section = placement
+        .before_section
+        .as_ref()
+        .map(|section| place.local(section))
+        .transpose()?;
+    let placement = crate::config::add::Placement {
+        before_mod: placement.before_mod.clone(),
+        before_section,
+    };
+    let mut planned = None;
+    let edit = plan_in(list, &place.file, |text, source| {
+        let current = source
+            .mods
+            .iter()
+            .find(|entry| entry.id == id)
+            .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+        let section = section.unwrap_or_else(|| current.section.clone());
+        let plan = crate::config::add::plan_move(text, &source.mods, id, &section, &placement)?;
+        let text = plan.new_text.clone();
+        planned = Some(plan);
+        Ok(text)
+    })?;
+    Ok((edit, planned.expect("a planned edit runs its change")))
+}
+
+/// The list's file, then each file it includes.
+pub fn list_files(list: &Path) -> anyhow::Result<Vec<PathBuf>> {
+    let source = load_modlist(list)?;
+    let mut files = vec![list.to_path_buf()];
+    for file in source.included {
+        if !files.contains(&file) {
+            files.push(file);
+        }
+    }
+    Ok(files)
+}
+
+/// The file whose `plugins` place `plugin` in the load order: the list's
+/// own, or an included file's.
+pub fn file_of_plugin(list: &Path, plugin: &str) -> anyhow::Result<PathBuf> {
+    let files = list_files(list)?;
+    for file in files {
+        let own = parse_file(&read(&file)?, &file)?;
+        if own.plugins.iter().any(|p| p.eq_ignore_ascii_case(plugin)) {
+            return Ok(file);
+        }
+    }
+    anyhow::bail!("{plugin} is not in the load order")
+}
+
+/// Plan moving `plugin` in the load order, in the file that places it: the
+/// list's `plugins`, or an included file's. Next to another plugin, both
+/// must be in the same file's.
+pub fn plan_plugin_move(
+    list: &Path,
+    plugin: &str,
+    to: &doc::PluginPosition,
+) -> anyhow::Result<Edit> {
+    let file = file_of_plugin(list, plugin)?;
+    if let doc::PluginPosition::Before(anchor) | doc::PluginPosition::After(anchor) = to {
+        let theirs = file_of_plugin(list, anchor)?;
+        anyhow::ensure!(
+            theirs == file,
+            "{plugin} is placed by {} and {anchor} by {}; a plugin moves only within the file              that places it",
+            file.display(),
+            theirs.display()
+        );
+    }
+    plan_in(list, &file, |text, _| doc::move_plugin(text, plugin, to))
+}
+
+fn read(path: &Path) -> anyhow::Result<String> {
+    std::fs::read_to_string(path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))
+}
+
+/// The docs file of the modlist file at `file`, if it names one.
+fn docs_file_of(file: &Path, source: &SourceModlist) -> Option<PathBuf> {
+    let name = source.docs_file.as_ref()?;
+    Some(normalize(
+        &file.parent().unwrap_or(Path::new("")).join(name),
+    ))
+}
+
+/// Whether the docs file at `path` documents mod `id`.
+fn documents(path: &Path, id: &str) -> bool {
+    std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| toml::from_str::<crate::config::docs::DocsFile>(&text).ok())
+        .is_some_and(|docs| docs.mods.contains_key(id))
+}
+
+/// Plan setting (or, with `None` or empty text, removing) a mod's prose --
+/// `title`, `summary`, `body`, `footer` -- where its docs already are: inline
+/// in the file it is written in, in that file's docs file, or in the list's.
+/// A mod documented nowhere yet gets its docs in its own file's docs file
+/// when that has one, inline when not.
+pub fn plan_mod_docs(
+    list: &Path,
+    id: &str,
+    fields: &[(String, Option<String>)],
+) -> anyhow::Result<Edit> {
+    let file = file_of_mod(list, id)?;
+    let text = read(&file)?;
+    let source = parse_file(&text, &file)?;
+    let entry = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+    let own = docs_file_of(&file, &source);
+    let docs_path = if !entry.docs.is_empty() {
+        None
+    } else if let Some(path) = own.as_ref().filter(|path| documents(path, id)) {
+        Some(path.clone())
+    } else if let Some(path) = (file != list)
+        .then(|| docs_file_of(list, &parse_file(&read(list).ok()?, list).ok()?))
+        .flatten()
+        .filter(|path| documents(path, id))
+    {
+        Some(path)
+    } else {
+        own
+    };
+    match docs_path {
+        Some(path) => {
+            let before = read(&path)?;
             let after = doc::set_file_docs(&before, id, fields)?;
             Edit::new_docs(&path, list, before, after)
         }
-        _ => {
+        None => {
             let after = doc::set_inline_docs(&text, id, fields)?;
-            Edit::new(list, text, after)
+            Edit::new_in(list, &file, text, after)
         }
+    }
+}
+
+/// Several files changed as one edit: each read once and changed in turn,
+/// and the list checked with every change made, as one change can be invalid
+/// without another (a mod's block in one file, its plugin in another's load
+/// order).
+struct Work<'a> {
+    list: &'a Path,
+    /// Each file, its text as read, and as changed so far.
+    files: Vec<(PathBuf, String, String)>,
+}
+
+impl<'a> Work<'a> {
+    fn new(list: &'a Path) -> Self {
+        Self {
+            list,
+            files: Vec::new(),
+        }
+    }
+
+    /// The text of `path` as changed so far.
+    fn text(&mut self, path: &Path) -> anyhow::Result<&mut String> {
+        let at = match self.files.iter().position(|(file, _, _)| file == path) {
+            Some(at) => at,
+            None => {
+                let text = read(path)?;
+                self.files.push((path.to_path_buf(), text.clone(), text));
+                self.files.len() - 1
+            }
+        };
+        Ok(&mut self.files[at].2)
+    }
+
+    /// Change `path`'s text with `change`, which gets it parsed as well.
+    fn change(
+        &mut self,
+        path: &Path,
+        change: impl FnOnce(&str, &SourceModlist) -> anyhow::Result<String>,
+    ) -> anyhow::Result<()> {
+        let text = self.text(path)?;
+        let parsed = parse_file(text, path)?;
+        *text = change(text, &parsed)?;
+        Ok(())
+    }
+
+    /// The edits, once the list loads and validates with all of them.
+    fn finish(self) -> anyhow::Result<Vec<Edit>> {
+        let texts: Texts = self
+            .files
+            .iter()
+            .map(|(path, _, after)| (normalize(path), after.clone()))
+            .collect();
+        load_with(self.list, false, &texts)
+            .and_then(|list| crate::config::validator::validate(&list).map(|_| ()))
+            .map_err(|err| {
+                anyhow::anyhow!(
+                    "the edit would leave {} invalid, so nothing was written: {err:#}",
+                    self.list.display()
+                )
+            })?;
+        Ok(self
+            .files
+            .into_iter()
+            .filter(|(_, before, after)| before != after)
+            .map(|(path, before, after)| Edit {
+                path,
+                before,
+                after,
+            })
+            .collect())
     }
 }
 
@@ -141,23 +435,33 @@ pub fn plan_mod_docs(
 /// archives, actions) and its plugins from the load order, unless another
 /// mod also has them -- and its notes from the docs file, where it has some
 /// there, which would otherwise name a mod the list no longer has. The edits
-/// to write, the list's first. Refused, naming what is in the way, while
-/// anything else refers to it.
+/// to write, the file the mod is written in first. Refused, naming what is in
+/// the way, while anything else refers to it.
 pub fn plan_remove(list: &Path, id: &str) -> anyhow::Result<Vec<Edit>> {
-    let text = std::fs::read_to_string(list)
-        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", list.display()))?;
-    let source = parse_modlist(&text, list)?;
+    let source = load_modlist(list)?;
     let entry = source
         .mods
         .iter()
         .find(|entry| entry.id == id)
         .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
-    let dropped = own_plugins(&source, entry);
-    let after = crate::config::add::plan_removal(&text, &source.mods, id)?;
-    let after = doc::drop_plugins(&after, &dropped)?;
-    let mut edits = vec![Edit::new(list, text, after)?];
-    if let (Some(file), Some(base)) = (&source.docs_file, &source.base_dir) {
-        let path = base.join(file);
+    let file = entry.origin.clone().unwrap_or_else(|| list.to_path_buf());
+    let mut work = Work::new(list);
+    work.change(&file, |text, own| {
+        crate::config::add::plan_removal(text, &own.mods, id)
+    })?;
+    drop_from_load_order(&mut work, &own_plugins(&source, entry))?;
+    let mut edits = work.finish()?;
+
+    let own = parse_file(&read(&file)?, &file)?;
+    let mut docs_files: Vec<PathBuf> = docs_file_of(&file, &own).into_iter().collect();
+    if file != list
+        && let Some(path) = parse_file(&read(list)?, list)
+            .ok()
+            .and_then(|root| docs_file_of(list, &root))
+    {
+        docs_files.push(path);
+    }
+    for path in docs_files {
         if let Ok(before) = std::fs::read_to_string(&path) {
             let after = doc::remove_file_docs(&before, id)?;
             if after != before {
@@ -174,6 +478,17 @@ pub fn plan_remove(list: &Path, id: &str) -> anyhow::Result<Vec<Edit>> {
         }
     }
     Ok(edits)
+}
+
+/// Take `plugins` out of the load order, from whichever file places each.
+fn drop_from_load_order(work: &mut Work, plugins: &[String]) -> anyhow::Result<()> {
+    for plugin in plugins {
+        if let Ok(file) = file_of_plugin(work.list, plugin) {
+            let text = work.text(&file)?;
+            *text = doc::drop_plugins(text, std::slice::from_ref(plugin))?;
+        }
+    }
+    Ok(())
 }
 
 /// The plugins a mod declares that no other mod does: the ones that leave
@@ -195,48 +510,70 @@ fn own_plugins(source: &SourceModlist, entry: &crate::config::schema::ModEntry) 
 /// An unticked mod's plugins cannot be in the load order -- MO2 does not see
 /// them -- so disabling takes them out, and enabling puts back the ones
 /// missing: at `position`, or by default after the last plugin of the
-/// nearest mod before it that has any.
+/// nearest mod before it that has any. The edits to write: the file the mod
+/// is written in, and the files whose load order changes.
 pub fn plan_enabled(
     list: &Path,
     id: &str,
     enabled: bool,
     position: Option<&crate::config::add::LoadPosition>,
-) -> anyhow::Result<Edit> {
+) -> anyhow::Result<Vec<Edit>> {
     use crate::config::add::{LoadPosition, last_plugin_before, place_plugins};
-    plan(list, |text, source| {
-        let at = source
-            .mods
-            .iter()
-            .position(|entry| entry.id == id)
-            .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
-        let entry = &source.mods[at];
-        let plugins = own_plugins(source, entry);
-        if !enabled {
-            let text = doc::set_fields(
+    let source = load_modlist(list)?;
+    let at = source
+        .mods
+        .iter()
+        .position(|entry| entry.id == id)
+        .ok_or_else(|| anyhow::anyhow!("the list has no mod with id '{id}'"))?;
+    let entry = &source.mods[at];
+    let file = entry.origin.clone().unwrap_or_else(|| list.to_path_buf());
+    let plugins = own_plugins(&source, entry);
+    let mut work = Work::new(list);
+    if !enabled {
+        work.change(&file, |text, _| {
+            doc::set_fields(
                 text,
                 id,
                 None,
                 &[("enabled".to_string(), toml_edit::Value::from(false))],
                 &[],
-            )?;
-            return doc::drop_plugins(&text, &plugins);
-        }
-        let text = doc::set_fields(text, id, None, &[], &["enabled".to_string()])?;
-        let missing: Vec<String> = plugins
-            .into_iter()
-            .filter(|p| !source.plugins.iter().any(|q| q.eq_ignore_ascii_case(p)))
-            .collect();
-        if missing.is_empty() {
-            return Ok(text);
-        }
+            )
+        })?;
+        drop_from_load_order(&mut work, &plugins)?;
+        return work.finish();
+    }
+    work.change(&file, |text, _| {
+        doc::set_fields(text, id, None, &[], &["enabled".to_string()])
+    })?;
+    let missing: Vec<String> = plugins
+        .into_iter()
+        .filter(|p| !source.plugins.iter().any(|q| q.eq_ignore_ascii_case(p)))
+        .collect();
+    if !missing.is_empty() {
+        // Next to a plugin, in the file that places it; at the end, in the
+        // mod's own file if that places plugins, or else the list's.
+        let at_end = || -> anyhow::Result<PathBuf> {
+            let own = parse_file(&read(&file)?, &file)?;
+            Ok(if own.plugins.is_empty() {
+                list.to_path_buf()
+            } else {
+                file.clone()
+            })
+        };
         let position = match position {
             Some(position) => position.clone(),
-            None => last_plugin_before(source, at)
+            None => last_plugin_before(&source, at)
                 .map(LoadPosition::After)
                 .unwrap_or(LoadPosition::Last),
         };
-        place_plugins(&text, &missing, &position)
-    })
+        let target = match &position {
+            LoadPosition::After(anchor) => file_of_plugin(list, anchor)?,
+            LoadPosition::Last => at_end()?,
+        };
+        let text = work.text(&target)?;
+        *text = place_plugins(text, &missing, &position)?;
+    }
+    work.finish()
 }
 
 /// The text of a new, empty modlist called `name`: valid as it is, with the
@@ -279,7 +616,14 @@ pub fn create_list(path: &Path, name: &str) -> anyhow::Result<()> {
 
 /// `text` loads and validates as the modlist at `path`.
 pub fn check(path: &Path, text: &str) -> anyhow::Result<()> {
-    parse_modlist(text, path)
+    check_in(path, path, text)
+}
+
+/// The modlist at `list` loads and validates with `text` as the file at
+/// `path`: the list itself, or a file it includes.
+pub fn check_in(list: &Path, path: &Path, text: &str) -> anyhow::Result<()> {
+    let texts = Texts::from([(normalize(path), text.to_string())]);
+    load_with(list, false, &texts)
         .and_then(|list| crate::config::validator::validate(&list).map(|_| ()))
         .map_err(|err| {
             anyhow::anyhow!(

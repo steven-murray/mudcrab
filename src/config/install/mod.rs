@@ -1144,6 +1144,7 @@ mod tests {
         PersonalizedMod {
             id: id.to_string(),
             enabled: true,
+            origin: None,
             oracle_name: None,
             section: Vec::new(),
             mod_type: None,

@@ -7,11 +7,16 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
     let actions = compile_top_level_actions(&source.ini);
     let flattened_mods = source.flatten_mods()?;
     let mo2_modlist_entries = source.mo2_modlist_entries()?;
+    let base = source
+        .base_dir
+        .as_deref()
+        .unwrap_or(std::path::Path::new(""));
     let mods: Vec<CompiledMod> = flattened_mods
         .iter()
         .map(|(id, spec)| -> anyhow::Result<CompiledMod> {
             Ok(CompiledMod {
                 id: id.clone(),
+                origin: spec.origin.as_deref().map(|path| origin_name(base, path)),
                 oracle_name: spec.oracle_name.clone(),
                 section: spec.section.clone(),
                 mod_type: spec.mod_type,
@@ -35,6 +40,7 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         guide: source.guide.clone(),
         schema_version: 1,
         name: source.name,
+        component: source.component,
         input_count: source.inputs.len(),
         mod_count: mods.len(),
         plugin_count: source.plugins.len(),
@@ -48,6 +54,17 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
         mo2_modlist_entries,
         mods,
     })
+}
+
+/// An included file's path as messages show it: relative to the list's
+/// folder, with `/` between folders whatever the platform.
+pub fn origin_name(base: &std::path::Path, path: &std::path::Path) -> String {
+    let relative = path.strip_prefix(base).unwrap_or(path);
+    relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect::<Vec<_>>()
+        .join("/")
 }
 
 /// One archive entry as the compiled modlist carries it.
