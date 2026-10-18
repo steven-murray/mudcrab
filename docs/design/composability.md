@@ -1,8 +1,8 @@
 # Composability: lists built from other lists
 
-**Status: phase 1 done** (local includes; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phases 2-6 are a plan. Where phase 1 settled something differently from the
-plan below, the notes under [Phases](#phases) say so.
+**Status: phases 1 and 3 done** (local and git includes; see [the format](../modlist-format.md#lists-in-several-files-include)).
+Phases 2 and 4-6 are a plan. Where a finished phase settled something
+differently from the plan below, the notes under [Phases](#phases) say so.
 
 Today a modlist is one file. This plan lets a list pull in other modlist files
 -- from its own folder or from a git repository -- and have them resolve as if
@@ -221,7 +221,25 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
    `if`, `prefix`, `only`/`except`. Tests for each, and for an override that
    names nothing.
 3. **Git sources and the lock.** Fetch, cache, `tag`/`rev`/`branch`,
-   `mudcrab.lock`, `update`, `includes`, `--offline`.
+   `mudcrab.lock`, `update`, `includes`, `--offline`. *Done.* As built:
+   - The lock file is `<list>.lock`, not `mudcrab.lock`: one folder often
+     holds several lists (MOFAM's full and minimal), which should not move
+     together. It records the commit for each URL and reference; a commit
+     pins the file's content, so no file hash is kept.
+   - Each commit used is unpacked (`git archive`) into the cache, read only,
+     so a git include is then a file on disk: its own relative includes, docs
+     file and pictures resolve inside the same commit with no more code, and
+     a path leading out of the repository is refused.
+   - Nested git includes are recorded in the top list's lock like the rest;
+     a component repository's own lock file is not read.
+   - A fetch happens only when the lock lacks a reference (or the cache a
+     commit), so loading a list that resolved once never touches the network.
+     `update` drops the chosen lock entries and loads again; a `rev=` include
+     resolves to the same commit and so never moves.
+   - Following a branch is a `validate` warning.
+   - The editing commands refuse a file from a git include, pointing to its
+     repository and `update`, until overrides (phase 2) give the includer a
+     place to make such a change.
 4. **Inputs across includes.** Namespacing, `set`, conditions resolving
    against namespaced inputs, `query` asking only what is left.
 5. **Shims.** `use`, field merging, `add --use`. Write the first real shims

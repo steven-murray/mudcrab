@@ -74,10 +74,14 @@ pub struct SourceModlist {
     /// paths are relative to. Set by the loader.
     #[serde(skip)]
     pub base_dir: Option<std::path::PathBuf>,
-    /// The files the list includes, however indirectly, in the order they
-    /// are first included. Set by the loader.
+    /// What the list includes, however indirectly, in the order it is
+    /// included. Set by the loader.
     #[serde(skip)]
-    pub included: Vec<std::path::PathBuf>,
+    pub includes: Vec<crate::config::loader::Included>,
+    /// What the loader found worth saying about the includes (a git include
+    /// following a branch), for the validator's warnings.
+    #[serde(skip)]
+    pub include_warnings: Vec<String>,
 }
 
 /// What `diff` needs to say whether an archive predates the guide being followed.

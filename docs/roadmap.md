@@ -13,10 +13,10 @@ and the git history.
 `include` another modlist -- a file, or a file in a git repository -- so
 reusable pieces can be published once and pointed at: a shim that fixes a
 badly packaged mod, or a core group of mods several lists share.
-Including a local file works ([Lists in several files](modlist-format.md#lists-in-several-files-include)).
-Still to do: overrides and include options, git sources with a lock file,
-questions declared by an included file, shims (`use`), and a shared group in
-MOFAM. The design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
+Including a local file, or a file from a git repository pinned by a lock
+file, works ([Lists in several files](modlist-format.md#lists-in-several-files-include)).
+Still to do: overrides and include options, questions declared by an
+included file, shims (`use`), and a shared group in MOFAM. The design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
 
 ### The GUI, in use
 

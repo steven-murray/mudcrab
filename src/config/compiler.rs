@@ -57,8 +57,12 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
 }
 
 /// An included file's path as messages show it: relative to the list's
-/// folder, with `/` between folders whatever the platform.
+/// folder, with `/` between folders whatever the platform; a git include's
+/// as `<repository>@<commit>:<file>`.
 pub fn origin_name(base: &std::path::Path, path: &std::path::Path) -> String {
+    if let Some(described) = crate::config::git::describe(path) {
+        return described;
+    }
     let relative = path.strip_prefix(base).unwrap_or(path);
     relative
         .components()

@@ -555,9 +555,48 @@ writing. A mod moves only within its own file, and a plugin within the file
 that places it. `add --before-mod` adds a mod to the file the mod it goes
 before is in; without it, a new mod goes in the list's own file.
 
+### From a git repository
+
+`include` can name a file in a git repository -- on GitHub, or anywhere git
+can clone from -- so a group of mods published once can be used by many
+lists:
+
+```toml
+[[mods]]
+id = "Common"
+section = ["01 - Core"]
+include = "git+https://github.com/someone/oblivion-common?tag=v3#patches.toml"
+```
+
+After `git+` comes the repository's URL, then which commit -- `?tag=<tag>`,
+`?rev=<commit>`, or `?branch=<branch>` -- and after `#` the file, from the
+repository's top. A tag or a commit is the norm. A branch moves whenever its
+author pushes, so `validate` warns about one; it is for a component still
+being written.
+
+- **The lock file.** The first time a tag or branch is resolved, the commit
+  it means is written to `<list>.lock` beside the list (`mylist.lock` for
+  `mylist.toml`), and from then on the list uses that commit, wherever it is
+  installed. Keep the lock file with the list. `mudcrab update` moves includes
+  on (see [usage](usage.md#includes-update)).
+- **The cache.** Each repository is cloned once into mudcrab's cache
+  (`~/.cache/mudcrab/git`, `%LOCALAPPDATA%\mudcrab\git` on Windows), and each
+  commit used is unpacked there. With the lock file and the cache in place,
+  nothing is fetched. `compile --offline` makes sure of it, and says which
+  include it cannot resolve.
+- **Inside the repository**, the included file's own includes (by path), its
+  docs file and its pictures come from the same commit. A path leading out of
+  the repository is an error, and so is one the commit does not have.
+- **Read only.** Its mods are not edited where they are: the editing commands
+  refuse, saying to change the repository and run `update`.
+- **git** must be installed (in the Flatpak, the host's is used). A private
+  repository works if git can already reach it without asking for a password.
+
+Messages name a mod from a git include by repository, commit and file:
+`oblivion-common@3f2a1c0:patches.toml`.
+
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema. Including a file from a git
-repository, overriding an included mod's fields, and questions declared by an
-included file are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).
+[roadmap](roadmap.md), not in the schema. Overriding an included mod's fields,
+and questions declared by an included file, are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).

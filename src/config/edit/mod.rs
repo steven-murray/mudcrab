@@ -51,6 +51,7 @@ impl Edit {
         before: String,
         after: String,
     ) -> anyhow::Result<Self> {
+        crate::config::git::ensure_editable(path)?;
         let texts = Texts::from([(normalize(path), after.clone())]);
         load_with(list, true, &texts).map_err(|err| {
             anyhow::anyhow!(
@@ -116,6 +117,7 @@ pub fn plan_in(
     file: &Path,
     change: impl FnOnce(&str, &SourceModlist) -> anyhow::Result<String>,
 ) -> anyhow::Result<Edit> {
+    crate::config::git::ensure_editable(file)?;
     let before = read(file)?;
     let source = parse_file(&before, file)?;
     let after = change(&before, &source)?;
@@ -248,13 +250,14 @@ pub fn plan_mod_move(
     Ok((edit, planned.expect("a planned edit runs its change")))
 }
 
-/// The list's file, then each file it includes.
+/// The list's file, then each file it includes that can be edited: not
+/// those from git repositories.
 pub fn list_files(list: &Path) -> anyhow::Result<Vec<PathBuf>> {
     let source = load_modlist(list)?;
     let mut files = vec![list.to_path_buf()];
-    for file in source.included {
-        if !files.contains(&file) {
-            files.push(file);
+    for included in source.includes {
+        if included.commit.is_none() && !files.contains(&included.file) {
+            files.push(included.file);
         }
     }
     Ok(files)
@@ -380,6 +383,7 @@ impl<'a> Work<'a> {
 
     /// The text of `path` as changed so far.
     fn text(&mut self, path: &Path) -> anyhow::Result<&mut String> {
+        crate::config::git::ensure_editable(path)?;
         let at = match self.files.iter().position(|(file, _, _)| file == path) {
             Some(at) => at,
             None => {

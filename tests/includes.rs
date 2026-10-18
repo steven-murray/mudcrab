@@ -150,7 +150,8 @@ fn an_included_files_section_docs_take_its_section_and_folder() {
     let docs = &source.sections["Core - Patches"];
     assert_eq!(docs.summary.as_deref(), Some("The patches."));
     assert_eq!(docs.images[0].path.as_deref(), Some("parts/img/p.png"));
-    assert_eq!(source.included, [dir.path().join("parts/core.toml")]);
+    let included: Vec<_> = source.includes.iter().map(|i| &i.file).collect();
+    assert_eq!(included, [&dir.path().join("parts/core.toml")]);
 }
 
 #[test]

@@ -61,7 +61,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
         "Editing a modlist",
         &[
             "new", "move", "set", "docs", "choose", "remove", "disable", "enable", "plugins",
-            "files", "action", "input",
+            "files", "action", "input", "includes", "update",
         ],
     ),
     (
@@ -139,6 +139,11 @@ pub enum Command {
     /// List, declare, change or remove the list's questions.
     #[command(subcommand)]
     Input(InputCommand),
+    /// What the list includes: each file, where it comes from, and its mods.
+    Includes(IncludesArgs),
+    /// Move git includes to what their tag or branch means now, and say
+    /// which mods change.
+    Update(UpdateArgs),
     /// Validate and compile a source modlist into a machine-friendly artifact.
     Compile(CompileArgs),
     /// Resolve interactive inputs into a personalized install plan.
@@ -453,8 +458,9 @@ pub struct CompileArgs {
     /// Treat warnings as errors.
     #[arg(long)]
     pub strict: bool,
-    /// Accepted for older scripts: compile never uses the network.
-    #[arg(long, hide = true)]
+    /// Fetch nothing: resolve git includes from the lock file and the cache
+    /// only, and say which cannot be.
+    #[arg(long)]
     pub offline: bool,
 }
 
@@ -1013,6 +1019,28 @@ pub struct NewArgs {
     /// The list's name, as players see it.
     #[arg(long)]
     pub name: String,
+}
+
+#[derive(Debug, Args)]
+pub struct IncludesArgs {
+    /// The modlist.
+    pub input: PathBuf,
+}
+
+/// Each git include named (or all of them) is looked up again: a tag where
+/// it points now, a branch at its newest commit. The lock file next to the
+/// list (`<list>.lock`) records the new commits.
+#[derive(Debug, Args)]
+pub struct UpdateArgs {
+    /// The modlist.
+    pub input: PathBuf,
+    /// Only this include, by its id. Repeatable; without it, every git
+    /// include.
+    #[arg(long = "include", value_name = "ID")]
+    pub includes: Vec<String>,
+    /// Say what would change, and leave the lock file as it is.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]
