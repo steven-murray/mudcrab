@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { open } from "@tauri-apps/plugin-dialog";
   import { api, type ListView } from "./lib/api";
+  import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
   import { inline, markdown } from "./lib/markdown";
@@ -11,6 +12,7 @@
   let error = $state<string | null>(null);
   let opening = $state(false);
   let about = $state(false);
+  let mode = $state<"install" | "author">("install");
 
   async function openPath(path: string) {
     opening = true;
@@ -62,10 +64,18 @@
     <span class="spacer"></span>
     {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
-    <div class="modes" title="Author mode, for editing a list, comes later">
-      <span class="mode on">Install</span>
-      <span class="mode off">Author</span>
-    </div>
+    {#if list}
+      <div class="modes" role="group" aria-label="Mode">
+        <button class="mode" class:on={mode === "install"} onclick={() => (mode = "install")}>Install</button>
+        <button
+          class="mode"
+          class:on={mode === "author"}
+          onclick={() => (mode = "author")}
+          title="Look into the list as its author: each mod's files, the load order with masters, conflicts, check"
+          >Author</button
+        >
+      </div>
+    {/if}
   </header>
 
   {#if error}
@@ -102,10 +112,12 @@
 
   {#if list}
     {#key list.path}
-      <main>
+      <!-- Both stay mounted, so switching modes keeps an install's progress. -->
+      <main class:hidden={mode !== "install"}>
         <section class="left"><Guide document={list.document} /></section>
         <aside class="right"><Install {list} /></aside>
       </main>
+      <div class="authoring" class:hidden={mode !== "author"}><Author {list} /></div>
     {/key}
   {:else}
     <div class="welcome">
@@ -169,14 +181,21 @@
   }
   .mode {
     padding: 4px 10px;
+    border: none;
+    border-radius: 0;
+    background: none;
+    color: var(--dim);
   }
   .mode.on {
     background: var(--accent-soft);
     color: var(--accent);
     font-weight: 600;
   }
-  .mode.off {
-    color: var(--faint);
+  .authoring {
+    min-height: 0;
+  }
+  .hidden {
+    display: none !important;
   }
   .error {
     margin: 10px 16px 0;

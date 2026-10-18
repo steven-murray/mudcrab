@@ -5,7 +5,7 @@
 # Installing a modlist
 
 - [Getting started](getting-started.md)
-- [Installing with the GUI](gui.md)
+- [The GUI](gui.md)
 - [Troubleshooting](troubleshooting.md)
 - [Known issues](known-issues.md)
 

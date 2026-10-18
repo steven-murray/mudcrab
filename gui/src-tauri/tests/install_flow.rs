@@ -238,6 +238,55 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     );
     assert_eq!(steps[0]["steps"], json!(["1. Look.", "2. Smile."]));
 
+    // Author mode reads the same plan. Check has read the masters.
+    let order = call(&webview, "load_order", json!({})).unwrap();
+    assert_eq!(order["masters_read"], true, "{order}");
+    assert_eq!(order["plugins"][0]["name"], "Oblivion.esm");
+    let base = call(&webview, "mod_view", json!({ "id": "Base" })).unwrap();
+    assert_eq!(base["archives"][0]["label"], "Base.zip", "{base}");
+    let tree = call(&webview, "mod_files", json!({ "id": "Base", "number": 1 })).unwrap();
+    assert_eq!(tree["taken"], 1, "{tree}");
+    let rows: Vec<&str> = tree["rows"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["path"].as_str().unwrap())
+        .collect();
+    assert_eq!(rows, ["textures", "textures/base.dds"]);
+    assert_eq!(tree["rows"][1]["destination"], "textures/base.dds");
+    // Both mods install a texture of their own name, so share nothing.
+    let conflicts = call(&webview, "conflicts", json!({})).unwrap();
+    assert_eq!(conflicts["sweep"]["installed"], 2, "{conflicts}");
+    assert_eq!(conflicts["sweep"]["mods"], json!([]));
+    let between = call(
+        &webview,
+        "conflicts_between",
+        json!({ "id": "Base", "other": "Extra" }),
+    )
+    .unwrap();
+    assert_eq!(between["shared"]["overlap"], json!([]), "{between}");
+    assert!(
+        between["command"]
+            .as_str()
+            .unwrap()
+            .contains("--mod Base --with Extra")
+    );
+    // A list changed on disk is planned again, with the answers given.
+    let text = std::fs::read_to_string(&list).unwrap();
+    std::fs::write(&list, text.replace("name = \"Flow\"", "name = \"Flowing\"")).unwrap();
+    let filetime = std::time::SystemTime::now() + std::time::Duration::from_secs(5);
+    std::fs::File::options()
+        .write(true)
+        .open(&list)
+        .unwrap()
+        .set_modified(filetime)
+        .unwrap();
+    let base = call(&webview, "mod_view", json!({ "id": "Extra" })).unwrap();
+    assert_eq!(
+        base["left_out"], false,
+        "the remembered answer still brings it in"
+    );
+
     // The answers are remembered for next time.
     let again = call(&webview, "open_list", json!({ "path": list })).unwrap();
     assert_eq!(again["answers"]["extra"], "true");

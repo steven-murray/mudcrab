@@ -8,6 +8,7 @@
 //! generic over Tauri's runtime, so tests drive them on its mock runtime;
 //! `main.rs` only starts the window.
 
+mod author;
 pub mod settings;
 pub mod sink;
 
@@ -39,6 +40,11 @@ struct Session {
     /// Whether the list cleans plugins, and so needs xEdit set up.
     cleans: bool,
     plan: Option<PersonalizedPlan>,
+    /// When the list's file had last changed when `plan` was made, so author
+    /// mode can tell it is out of date.
+    planned_at: Option<std::time::SystemTime>,
+    /// Each plugin's masters, as the last `check` read them.
+    masters: Option<Vec<config::check::PluginMasters>>,
     /// Archives still to come by hand, and what watches for them.
     pending: Vec<Unfetched>,
     watcher: Option<Watcher>,
@@ -412,6 +418,18 @@ fn step_plan(
     answers: BTreeMap<String, String>,
 ) -> Result<Done, String> {
     let list = state.list()?;
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        settings.list_mut(&list).answers = answers.clone();
+        let _ = settings.save();
+    }
+    plan_with(&state, answers)
+}
+
+/// `compile` and `query` with these answers, keeping the plan for the steps
+/// after.
+fn plan_with(state: &State, answers: BTreeMap<String, String>) -> Result<Done, String> {
+    let list = state.list()?;
     let work = state
         .session
         .lock()
@@ -419,11 +437,7 @@ fn step_plan(
         .work
         .clone()
         .ok_or("no list is open")?;
-    {
-        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
-        settings.list_mut(&list).answers = answers.clone();
-        let _ = settings.save();
-    }
+    let planned_at = std::fs::metadata(&list).and_then(|m| m.modified()).ok();
     let compiled_path = work.join("compiled.json");
     let plan_path = work.join("plan.json");
     let compiled = config::pipeline::compile(&list, false).map_err(shown)?;
@@ -455,7 +469,9 @@ fn step_plan(
             quote(plan_path.display().to_string()),
         ),
     };
-    state.session.lock().map_err(|_| "a command panicked")?.plan = Some(plan);
+    let mut session = state.session.lock().map_err(|_| "a command panicked")?;
+    session.plan = Some(plan);
+    session.planned_at = planned_at;
     Ok(done)
 }
 
@@ -628,12 +644,40 @@ struct Checked {
     problems: usize,
     warnings: usize,
     findings: Vec<config::check::Finding>,
+    /// The findings under their headings, as the terminal shows them.
+    groups: Vec<FindingGroup>,
+}
+
+#[derive(Serialize)]
+struct FindingGroup {
+    heading: &'static str,
+    tone: mudcrab::events::Tone,
+    items: Vec<mudcrab::events::Item>,
+}
+
+/// Findings grouped by kind, in the order `check` reports them.
+fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
+    let mut by_kind: BTreeMap<config::check::Kind, Vec<mudcrab::events::Item>> = BTreeMap::new();
+    for finding in findings {
+        by_kind
+            .entry(finding.kind)
+            .or_default()
+            .push(finding.item.clone());
+    }
+    by_kind
+        .into_iter()
+        .map(|(kind, items)| FindingGroup {
+            heading: kind.heading(),
+            tone: kind.tone(),
+            items,
+        })
+        .collect()
 }
 
 /// Everything that can be known before installing (`check`).
 #[tauri::command]
 async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
-    let plan = plan_of(&state)?;
+    let plan = author::current_plan(&state)?;
     let downloads = locate(&state)?.downloads;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
     let command = format!(
@@ -649,6 +693,11 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         .await
         .map_err(|err| err.to_string())?
         .map_err(shown)?;
+    state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .masters = Some(report.plugins);
     Ok(Checked {
         done: Done {
             summary: format!(
@@ -660,6 +709,7 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         },
         problems: report.problems,
         warnings: report.warnings,
+        groups: grouped(&report.findings),
         findings: report.findings,
     })
 }
@@ -828,5 +878,10 @@ pub fn app<R: Runtime>(
             step_check,
             step_install,
             manual_steps,
+            author::load_order,
+            author::mod_view,
+            author::mod_files,
+            author::conflicts,
+            author::conflicts_between,
         ])
 }
