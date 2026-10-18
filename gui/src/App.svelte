@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
-  import { api, type ListView } from "./lib/api";
+  import { api, type ListView, type Locations } from "./lib/api";
+  import Places from "./lib/Places.svelte";
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
@@ -14,11 +15,22 @@
   let about = $state(false);
   let mode = $state<"install" | "author">("install");
 
+  // Where things go -- the MO2 instance, downloads, game, tools -- shared by
+  // both modes. Set in the Folders dialog, which opens by itself for a list
+  // with no MO2 instance chosen yet and stays until one is: installing and
+  // authoring both need it.
+  let locations = $state<Locations | null>(null);
+  let folders = $state(false);
+  let installing = $state(false);
+  const needsInstance = $derived(!!list && !!locations && !locations.instance.path);
+
   async function openPath(path: string) {
     opening = true;
     error = null;
     try {
       list = await api.openList(path);
+      locations = await api.locations();
+      folders = !locations.instance.path;
     } catch (err) {
       error = String(err);
     } finally {
@@ -89,6 +101,11 @@
     {/if}
     <span class="spacer"></span>
     {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
+    {#if list}
+      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, and tools.toml, for this list"
+        >Folders</button
+      >
+    {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
       <div class="modes" role="group" aria-label="Mode">
@@ -108,6 +125,33 @@
     <div class="error">
       <pre>{error}</pre>
       <button class="link" onclick={() => (error = null)}>Dismiss</button>
+    </div>
+  {/if}
+
+  {#if list && locations && (folders || needsInstance)}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => !needsInstance && (folders = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Folders" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>Where things go{list ? `: ${list.document.name}` : ""}</strong>
+          {#if !needsInstance}<button class="link" onclick={() => (folders = false)}>Done</button>{/if}
+        </div>
+        <div class="dbody">
+          {#if needsInstance}
+            <p class="dim small">
+              Choose the Mod Organizer 2 instance this list installs into -- and, writing a list, where you try it as
+              you go. Its downloads and game folders follow from it; change them after if they are not right.
+            </p>
+          {/if}
+          <Places bind:locations disabled={installing} />
+          {#if needsInstance}
+            <p class="dim small">
+              Not this list? <button class="link" onclick={choose}>Open another</button>
+            </p>
+          {/if}
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -141,9 +185,9 @@
       <!-- Both stay mounted, so switching modes keeps an install's progress. -->
       <main class:hidden={mode !== "install"}>
         <section class="left"><Guide document={list.document} /></section>
-        <aside class="right"><Install {list} /></aside>
+        <aside class="right"><Install {list} {locations} openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
-      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} /></div>
+      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
     {/key}
   {:else}
     <div class="welcome">

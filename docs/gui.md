@@ -40,9 +40,12 @@ The GUI's install mode reads a list and installs it from one window:
    (its `about`), or, for a list without one, its guide's introduction.
 2. **Answer its questions**, if it asks any. The list's defaults are chosen;
    your answers are remembered for next time.
-3. **Say where things go**: first the MO2 instance to install into -- a
-   portable instance, the folder with `ModOrganizer.exe` in it (any other
-   folder is refused). The downloads folder and the game folder then follow
+3. **Say where things go**, in **Folders** (by **About this list**), which
+   opens by itself for a list with no MO2 instance chosen yet and stays
+   until one is -- installing a list and writing one both need it, and the
+   choices are shared by both modes. First the MO2 instance to install into
+   -- a portable instance, the folder with `ModOrganizer.exe` in it (any
+   other folder is refused). The downloads folder and the game folder then follow
    from it: the downloads folder from `tools.toml` if it is set there, else
    the instance's own; the game folder from the instance's settings, or found
    as `game-dir` finds it. Change either if they are not right. **Tools**
@@ -78,8 +81,9 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 ## Author mode
 
 To start a list of your own, **Create a new list…** on the opening page asks
-its name and where to keep it (`mudcrab new`), and opens it here, empty,
-ready for its first mod.
+its name and where to keep it (`mudcrab new`), then the MO2 instance to try
+it in (**Folders**, as above), and opens it here, empty, ready for its first
+mod from the downloads folder.
 
 **Author** in the top right switches to working on the list as its author.
 It reads the list as planned with the answers given in Install, and plans it
