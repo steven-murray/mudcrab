@@ -8,6 +8,7 @@
 //! generic over Tauri's runtime, so tests drive them on its mock runtime;
 //! `main.rs` only starts the window.
 
+mod adding;
 mod author;
 mod edits;
 pub mod settings;
@@ -51,6 +52,9 @@ struct Session {
     /// Archives still to come by hand, and what watches for them.
     pending: Vec<Unfetched>,
     watcher: Option<Watcher>,
+    /// An archive being fetched by hand to add as a mod, and what watches
+    /// for it.
+    fetching: Option<(Unfetched, Watcher)>,
 }
 
 pub struct State {
@@ -945,5 +949,13 @@ pub fn app<R: Runtime>(
             edits::set_input,
             edits::remove_input,
             edits::set_docs,
+            adding::archives,
+            adding::add_start,
+            adding::add_walk,
+            adding::add_plan,
+            adding::add_mod,
+            adding::nexus_link,
+            adding::nexus_fetch,
+            adding::nexus_look,
         ])
 }

@@ -63,12 +63,36 @@ back and forward through this session's changes, as long as the file is
 still what this window last wrote; a change made in an editor ends the
 history there, rather than be undone by it.
 
+- **Archives** on the left, beside the list: every archive in the downloads
+  folder and the other folders chosen in Install, newest first, with what
+  its MO2 `.meta` says (the mod's name, its version, whether it came from
+  Nexus) and the mods that already use it (hidden unless asked for). Paste a
+  Nexus link above it to choose one of that mod's files: one already
+  downloaded is used as it is; otherwise it is downloaded (with a Premium
+  key), or its page is opened and it is picked up when the browser has
+  downloaded it. A Nexus API key is needed to list a mod's files.
+- **Adding a mod**: double-click an archive (or right-click, **Add to the
+  list**). Name it (the mod's name on Nexus, or the file's), choose its
+  section and where in it, and an `if` if it is optional. An archive whose
+  `.meta` does not say where it came from is looked up on Nexus by its
+  checksum, as `mudcrab identify` does; the source can be changed by hand.
+  Most archives install as they are; one with an installer asks its
+  questions, as `add` does in a terminal -- a FOMOD's steps in order (a step
+  hidden by an earlier answer is never asked), a BAIN wizard's questions, or
+  which BAIN packages -- with the installer's own choice ticked, and
+  **Defaults for the rest** to take it everywhere. The plugins it then
+  installs are listed to declare, with where they load (after the last
+  plugin of the mod before it, unless you say). The entry is shown as the
+  diff it makes, with the `mudcrab add` command that writes the same; **Add
+  to the list** writes it, undoably.
 - **The list** on the left: sections as a tree, each mod with a note of
   whether it is optional (`if`), left unticked in MO2 (`off`), or not made
   from archives. Choose one to see it on the right. Drag a mod by its handle
   onto another mod to put it before or after that one, or onto a section to
   put it at the end of it (`move`).
-- **Mod**: its notes, its actions (each can be removed: `action remove`),
+- **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
+  with a preview -- written where they already are, in the list or its docs
+  file (`mudcrab docs`); its actions (each can be removed: `action remove`),
   and each of its archives as a tree of files, marked with what `install`
   takes. What a tick does follows the archive's layout, so it works as the
   installer you know:

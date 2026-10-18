@@ -55,7 +55,7 @@ impl From<&Recorded> for Change {
 
 /// What is done and undone, after an edit, undo or redo.
 #[derive(Serialize)]
-pub(super) struct Edited {
+pub(crate) struct Edited {
     /// What this step did.
     change: Change,
     /// Whether there is an edit to undo, or to redo.
@@ -72,7 +72,7 @@ fn edited(history: &History, change: Change) -> Edited {
 }
 
 /// Write a planned edit, remember it, and mark the plan out of date.
-fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
+pub(super) fn apply(state: &State, command: String, edit: Edit) -> Result<Edited, String> {
     if !edit.changes() {
         return Err("That changes nothing in the list.".to_string());
     }

@@ -633,6 +633,79 @@ pub fn detect_archive_ext(path: &Path) -> &'static str {
     ""
 }
 
+/// An archive in a downloads folder, and what the MO2 `.meta` beside it says.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Listed {
+    pub path: PathBuf,
+    pub file_name: String,
+    pub size: u64,
+    /// Seconds since the Unix epoch.
+    pub modified: Option<u64>,
+    /// As a modlist writes it (`nexus:...`, a URL), when the `.meta` says.
+    pub source: Option<String>,
+    /// The mod's name, as Nexus gives it.
+    pub mod_name: Option<String>,
+    /// The file's own name on Nexus.
+    pub name: Option<String>,
+    pub version: Option<String>,
+}
+
+/// Whether a file name is an archive a mod can come in.
+pub fn is_archive_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    [".7z", ".zip", ".rar"]
+        .iter()
+        .any(|ext| lower.ends_with(ext))
+}
+
+/// Every archive at the top of each folder in `dirs` (as MO2 keeps them),
+/// each folder once, newest first.
+pub fn list_archives(dirs: &[PathBuf]) -> Vec<Listed> {
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for dir in dirs {
+        let Ok(canonical) = dir.canonicalize() else {
+            continue;
+        };
+        if !seen.insert(canonical) {
+            continue;
+        }
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let file_name = entry.file_name().to_string_lossy().into_owned();
+            let Ok(metadata) = entry.metadata() else {
+                continue;
+            };
+            if !metadata.is_file() || !is_archive_name(&file_name) {
+                continue;
+            }
+            let path = entry.path();
+            let meta = std::fs::read_to_string(meta_path(&path))
+                .map(|text| parse_meta(&text))
+                .unwrap_or_default();
+            let field = |key: &str| meta.get(key).filter(|v| !v.is_empty()).cloned();
+            out.push(Listed {
+                source: meta_source(&path),
+                mod_name: field("modname"),
+                name: field("name").filter(|name| name != &file_name),
+                version: field("version"),
+                size: metadata.len(),
+                modified: metadata
+                    .modified()
+                    .ok()
+                    .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|age| age.as_secs()),
+                file_name,
+                path,
+            });
+        }
+    }
+    out.sort_by(|a, b| b.modified.cmp(&a.modified));
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -822,5 +895,30 @@ mod tests {
             locate(dir.path(), &[], &source),
             Some(Found::Downloads(archive))
         );
+    }
+
+    #[test]
+    fn archives_are_listed_with_what_their_meta_says() {
+        let dir = tempfile::tempdir().unwrap();
+        touch(dir.path(), "Mod-123-1-0.7z", "x");
+        touch(dir.path(), "readme.txt", "x");
+        std::fs::write(
+            dir.path().join("Mod-123-1-0.7z.meta"),
+            "[General]\ngameName=oblivion\nmodID=123\nfileID=456\nmodName=The Mod\nversion=1.0\n",
+        )
+        .unwrap();
+        touch(dir.path(), "Other.zip", "x");
+        // The same folder twice is listed once.
+        let listed = list_archives(&[dir.path().to_path_buf(), dir.path().to_path_buf()]);
+        let mut names: Vec<&str> = listed.iter().map(|l| l.file_name.as_str()).collect();
+        names.sort_unstable();
+        assert_eq!(names, ["Mod-123-1-0.7z", "Other.zip"]);
+        let known = listed
+            .iter()
+            .find(|l| l.file_name.starts_with("Mod"))
+            .unwrap();
+        assert_eq!(known.source.as_deref(), Some("nexus:oblivion/123/456"));
+        assert_eq!(known.mod_name.as_deref(), Some("The Mod"));
+        assert_eq!(known.version.as_deref(), Some("1.0"));
     }
 }

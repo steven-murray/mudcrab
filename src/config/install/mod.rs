@@ -52,7 +52,7 @@ pub(crate) use stage::is_plugin_file;
 /// straight onto the mods directory. Archive *members* were carefully
 /// normalised against traversal while the mod id itself was not, so an id
 /// containing a separator or `..` could escape the mods directory.
-pub(crate) fn safe_mod_dir_name(mod_id: &str) -> anyhow::Result<&str> {
+pub fn safe_mod_dir_name(mod_id: &str) -> anyhow::Result<&str> {
     if mod_id.is_empty() {
         anyhow::bail!("mod id must not be empty");
     }
