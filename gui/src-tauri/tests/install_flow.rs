@@ -256,6 +256,21 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     assert_eq!(tree["rows"][1]["destination"], "textures/base.dds");
     // A folder too, so it can be moved as one (`file_move`).
     assert_eq!(tree["rows"][0]["destination"], "textures");
+    // Moved within the mod, the file is shown where it ends up.
+    call(
+        &webview,
+        "add_action",
+        json!({ "id": "Base", "action": "file_move",
+                "fields": ["from=\"textures\"", "to=\"optional/textures\""], "condition": null }),
+    )
+    .unwrap();
+    let tree = call(&webview, "mod_files", json!({ "id": "Base", "number": 1 })).unwrap();
+    assert_eq!(
+        tree["installed"],
+        json!([{ "path": "optional/textures/base.dds", "laid_out": "textures/base.dds", "hidden": false }]),
+        "{tree}"
+    );
+    call(&webview, "undo", json!({})).unwrap();
     // Both mods install a texture of their own name, so share nothing.
     let conflicts = call(&webview, "conflicts", json!({})).unwrap();
     assert_eq!(conflicts["sweep"]["installed"], 2, "{conflicts}");

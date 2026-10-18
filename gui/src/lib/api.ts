@@ -193,6 +193,12 @@ export interface FileRow {
   taken: number;
 }
 
+export interface InstalledFile {
+  path: string;
+  laid_out: string;
+  hidden: boolean;
+}
+
 export interface Tree {
   label: string;
   layout: string | null;
@@ -201,6 +207,7 @@ export interface Tree {
   bain_subpackages: string[];
   bain_conditional: string[];
   rows: FileRow[];
+  installed: InstalledFile[];
   entries: number;
   taken: number;
   command: string;

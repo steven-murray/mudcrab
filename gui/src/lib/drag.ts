@@ -7,7 +7,8 @@
 //
 // A row that can be dropped on carries `data-drop="<key>"`; with
 // `data-drop-into`, a drop on its middle means "into it" (a section), not
-// before or after it.
+// before or after it, and with `data-drop-into="only"` anywhere on it does
+// (a folder).
 
 export type Place = "before" | "after" | "into";
 
@@ -17,6 +18,8 @@ export interface DragOptions {
   /** Whether a drop on this key, at this place, would be accepted. */
   accepts?: (key: string, place: Place) => boolean;
   onDrop: (key: string, place: Place) => void;
+  /** The row the pointer is over changed (null: none), e.g. to open a folder. */
+  hover?: (key: string | null) => void;
 }
 
 export function startDrag(down: PointerEvent, options: DragOptions) {
@@ -33,6 +36,13 @@ export function startDrag(down: PointerEvent, options: DragOptions) {
   let lastX = down.clientX;
   let lastY = startY;
   let timer: ReturnType<typeof setInterval> | undefined;
+  let hovered: string | null = null;
+  const hoverOn = (key: string | null) => {
+    if (key !== hovered) {
+      hovered = key;
+      options.hover?.(key);
+    }
+  };
 
   const unmark = () => {
     marked?.classList.remove("drop-before", "drop-after", "drop-into");
@@ -44,12 +54,14 @@ export function startDrag(down: PointerEvent, options: DragOptions) {
     ghost.style.top = `${lastY - grab}px`;
     unmark();
     const under = document.elementFromPoint(lastX, lastY)?.closest<HTMLElement>("[data-drop]");
-    if (!under || under === row) return;
+    if (!under || under === row) return hoverOn(null);
     const box = under.getBoundingClientRect();
     const at = (lastY - box.top) / box.height;
+    const into = under.dataset.dropInto;
     const place: Place =
-      under.dataset.dropInto !== undefined && at > 0.25 && at < 0.75 ? "into" : at < 0.5 ? "before" : "after";
+      into === "only" || (into !== undefined && at > 0.25 && at < 0.75) ? "into" : at < 0.5 ? "before" : "after";
     const key = under.dataset.drop!;
+    hoverOn(key);
     if (options.accepts && !options.accepts(key, place)) return;
     marked = under;
     target = { key, place };
@@ -96,6 +108,7 @@ export function startDrag(down: PointerEvent, options: DragOptions) {
     row.classList.remove("dragged");
     const dropped = target;
     unmark();
+    hoverOn(null);
     if (ghost && dropped) options.onDrop(dropped.key, dropped.place);
   };
   window.addEventListener("pointermove", move);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { SvelteSet } from "svelte/reactivity";
   import type { FileRow, Tree } from "./api";
-  import { startDrag } from "./drag";
+  import ModFolder from "./ModFolder.svelte";
 
   // A mod's archive as a tree, marked with what install takes from it, with
   // ticks that follow the installer an author already knows:
@@ -13,9 +13,9 @@
   //   (`files --exclude`) and ticking back dropping it.
   //
   // For any layout, "exclude" on a row is the expert override: an `exclude`
-  // for what the filters see it as. An installed file or folder can be moved
-  // within the mod -- dragged onto a folder, or given a new path with
-  // "move…" -- which writes a `file_move` action.
+  // for what the filters see it as. "Mod folder" shows the same files where
+  // they end up in the mod, after its `file_move`s, and is where they are
+  // moved (see ModFolder).
   let {
     tree,
     edit,
@@ -29,28 +29,7 @@
     move: (from: string, to: string) => void;
   } = $props();
 
-  let list = $state<HTMLElement | null>(null);
-  const base = (path: string) => path.slice(path.lastIndexOf("/") + 1);
-
-  // A drop into a folder (or the mod's top, keyed ""): the row keeps its
-  // name there.
-  function dropped(row: FileRow, key: string) {
-    const from = row.destination!;
-    const to = key ? `${key}/${base(from)}` : base(from);
-    if (to.toLowerCase() === from.toLowerCase()) return;
-    if (to.toLowerCase().startsWith(`${from.toLowerCase()}/`)) return problem("A folder cannot be moved into itself.");
-    move(from, to);
-  }
-
-  // "move…": a new path typed for a row.
-  let moving = $state<string | null>(null);
-  let movingTo = $state("");
-  function moveTyped(event: SubmitEvent, row: FileRow) {
-    event.preventDefault();
-    const to = movingTo.trim().replace(/^\/+|\/+$/g, "");
-    if (to && to !== row.destination) move(row.destination!, to);
-    moving = null;
-  }
+  let view = $state<"archive" | "mod">("archive");
 
   const bain = $derived(tree.layout === "bain");
   const fomod = $derived(tree.layout === "fomod");
@@ -148,6 +127,15 @@
     {#if tree.include.length}<span class="dim">include: <code>{tree.include.join(", ")}</code></span>{/if}
     {#if tree.exclude.length}<span class="dim">exclude: <code>{tree.exclude.join(", ")}</code></span>{/if}
   </div>
+  <nav class="views">
+    <button class:on={view === "archive"} onclick={() => (view = "archive")} title="The archive's own files, and what is taken from it">Archive</button>
+    <button class:on={view === "mod"} onclick={() => (view = "mod")} title="Where its files end up in the mod's folder; move them here"
+      >Mod folder</button
+    >
+  </nav>
+  {#if view === "mod"}
+    <ModFolder files={tree.installed} {move} {problem} />
+  {:else}
   <div class="filters">
     {#each [{ key: "include", list: tree.include }, { key: "exclude", list: tree.exclude }] as filter}
       {#each filter.list as glob}
@@ -168,8 +156,7 @@
     ✔ installed · ◐ partly · ○ filtered out · · not chosen by the layout
     {#if bain}· tick a package to choose it, as in Wrye Bash{:else if fomod}· its options are chosen in the FOMOD installer, not here{:else}· untick to exclude{/if}
   </div>
-  <div class="top dim" data-drop="" data-drop-into>Drop here to move it to the top of the mod</div>
-  <ul bind:this={list}>
+  <ul>
     {#each rows as row (row.path)}
       <li
         class:out={row.state === "none"}
@@ -177,23 +164,7 @@
         class:package={row.package}
         style="--depth: {row.depth}"
         title={why(row)}
-        data-drop={row.folder && row.destination ? row.destination : undefined}
-        data-drop-into={row.folder && row.destination ? "" : undefined}
       >
-        {#if row.destination}
-          <span
-            class="grip"
-            role="button"
-            tabindex="-1"
-            title="Drag onto a folder to move it there (file_move)"
-            onpointerdown={(e) =>
-              startDrag(e, {
-                scroller: list!.closest(".content") as HTMLElement,
-                accepts: (_, place) => place === "into",
-                onDrop: (key) => dropped(row, key),
-              })}>⠿</span
-          >
-        {:else}<span class="nogrip"></span>{/if}
         {#if bain && row.package}
           <input
             type="checkbox"
@@ -238,30 +209,10 @@
             >
           {/if}
         {/if}
-        {#if row.destination}
-          <button
-            class="override"
-            onclick={() => {
-              moving = row.path;
-              movingTo = row.destination ?? "";
-            }}
-            title="Move it within the mod, to a path you type (file_move)">move…</button
-          >
-        {/if}
       </li>
-      {#if moving === row.path}
-        <li class="moveto" style="--depth: {row.depth}">
-          <form onsubmit={(e) => moveTyped(e, row)}>
-            <span class="dim">move <code>{row.destination}</code> to</span>
-            <!-- svelte-ignore a11y_autofocus -->
-            <input type="text" bind:value={movingTo} autofocus />
-            <button type="submit">Move</button>
-            <button type="button" onclick={() => (moving = null)}>Cancel</button>
-          </form>
-        </li>
-      {/if}
     {/each}
   </ul>
+  {/if}
   <p class="cmd dim">Same from a terminal: <code>{tree.command}</code></p>
 </div>
 
@@ -381,39 +332,22 @@
     font-size: 11px;
     overflow-wrap: anywhere;
   }
-  .top {
-    font-size: 11px;
-    padding: 2px 6px;
-    border: 1px dashed var(--line);
-    border-radius: 4px;
-    margin-bottom: 4px;
-  }
-  .grip,
-  .nogrip {
-    width: 10px;
-    flex: none;
-  }
-  li .grip {
-    visibility: hidden;
-  }
-  li:hover .grip {
-    visibility: visible;
-  }
-  .moveto form {
+  .views {
     display: flex;
-    gap: 6px;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 3px 0;
+    gap: 4px;
+    margin: 6px 0;
   }
-  .moveto input {
-    flex: 1;
-    min-width: 160px;
+  .views button {
     font-size: 12px;
+    padding: 2px 10px;
+    background: none;
+    border-color: transparent;
+    color: var(--dim);
   }
-  .moveto button {
-    font-size: 12px;
-    padding: 1px 8px;
+  .views button.on {
+    color: var(--text);
+    background: var(--card);
+    border-color: var(--line);
   }
   .cmd {
     font-size: 12px;
