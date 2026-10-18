@@ -7,7 +7,14 @@
     entry,
     words,
     matches,
-  }: { entry: Entry; words: string; matches: (entry: Entry, words: string) => boolean } = $props();
+    prose = true,
+  }: {
+    entry: Entry;
+    words: string;
+    matches: (entry: Entry, words: string) => boolean;
+    /** Show a mod's summary and notes (author mode shows its own). */
+    prose?: boolean;
+  } = $props();
 
   // Sections start closed, so a 700-mod list opens fast; a filter opens them.
   let opened = $state(false);
@@ -71,14 +78,14 @@
         <span class="kind" title="Installed, but left unticked in MO2: tick it there when you need it">off in MO2</span>
       {/if}
     </div>
-    {#if entry.docs.summary}<p class="summary">{@html inline(entry.docs.summary)}</p>{/if}
+    {#if prose && entry.docs.summary}<p class="summary">{@html inline(entry.docs.summary)}</p>{/if}
     {#if entry.plugins.length}
       <div class="plugins">{#each entry.plugins as plugin}<code>{plugin}</code>{/each}</div>
     {/if}
-    {#if entry.docs.body || entry.steps.length}
+    {#if (prose && entry.docs.body) || entry.steps.length}
       <button class="link more" onclick={() => (notes = !notes)}>{notes ? "Less" : "More"}</button>
       {#if notes}
-        {#if entry.docs.body}<div class="prose">{@html markdown(entry.docs.body)}</div>{/if}
+        {#if prose && entry.docs.body}<div class="prose">{@html markdown(entry.docs.body)}</div>{/if}
         {#if entry.steps.length}
           <ul class="steps">
             {#each entry.steps as step}<li><span class="dim">{step.kind}:</span> {step.text}</li>{/each}

@@ -20,6 +20,7 @@
   import FileTree from "./FileTree.svelte";
   import Inputs from "./Inputs.svelte";
   import LoadOrder from "./LoadOrder.svelte";
+  import Notes from "./Notes.svelte";
   import Text from "./Text.svelte";
 
   // Author mode: the list as a tree on the left; on the right, the chosen mod
@@ -343,7 +344,8 @@
             Every change is written to the list at once, as its command would, and can be undone.
           </p>
         {:else}
-          <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} />
+          <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
+          <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
           {#if actions.length}
             <h4>Actions</h4>
             <ol class="actions">

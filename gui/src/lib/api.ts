@@ -313,6 +313,7 @@ export const api = {
   setInput: (name: string, sets: string[], unsets: string[]) =>
     invoke<Edited>("set_input", { name, sets, unsets }),
   removeInput: (name: string) => invoke<Edited>("remove_input", { name }),
+  setDocs: (id: string, fields: [string, string | null][]) => invoke<Edited>("set_docs", { id, fields }),
 };
 
 /** A value for a `key=value` edit, as TOML: a string quoted, so any text is safe. */

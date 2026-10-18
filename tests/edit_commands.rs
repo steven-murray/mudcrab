@@ -364,3 +364,67 @@ fn files_chooses_a_bain_package_as_wrye_bash_ticks_one() {
         .stdout(predicates::str::contains("- textures/a.dds"));
     assert!(read(&list).contains("bain_subpackages = [\"10 Extra\"]"));
 }
+
+#[test]
+fn docs_writes_a_mods_notes_where_they_already_are() {
+    let dir = tempdir().unwrap();
+    // Inline: a list with no docs file.
+    let inline = dir.path().join("inline.toml");
+    std::fs::write(&inline, "name = \"I\"\n\n[[mods]]\nid = \"A\"\n").unwrap();
+    mudcrab(dir.path())
+        .args(["docs", inline.to_str().unwrap(), "--mod", "A"])
+        .args(["--summary", "One line.", "--body", "First.\n\nSecond.\n"])
+        .assert()
+        .success();
+    let text = read(&inline);
+    assert!(text.contains("docs.summary = \"One line.\""), "{text}");
+    assert!(
+        text.contains("docs.body = '''\nFirst.\n\nSecond.\n'''"),
+        "{text}"
+    );
+
+    // In the docs file, for a list that names one; removing the last field
+    // removes the mod's table.
+    let list = dir.path().join("list.toml");
+    let docs = dir.path().join("list.docs.toml");
+    std::fs::write(
+        &list,
+        "name = \"D\"\ndocs_file = \"list.docs.toml\"\n\n[[mods]]\nid = \"A\"\n",
+    )
+    .unwrap();
+    std::fs::write(&docs, "[mods.\"A\"]\ntitle = \"The A\"\n").unwrap();
+    mudcrab(dir.path())
+        .args([
+            "docs",
+            list.to_str().unwrap(),
+            "--mod",
+            "A",
+            "--summary",
+            "Why.",
+        ])
+        .assert()
+        .success();
+    assert_eq!(
+        read(&docs),
+        "[mods.\"A\"]\ntitle = \"The A\"\nsummary = \"Why.\"\n"
+    );
+    assert!(!read(&list).contains("Why."));
+    mudcrab(dir.path())
+        .args(["docs", list.to_str().unwrap(), "--mod", "A"])
+        .args(["--unset", "title", "--unset", "summary"])
+        .assert()
+        .success();
+    assert_eq!(read(&docs), "");
+    // A mod the list does not have is refused.
+    mudcrab(dir.path())
+        .args([
+            "docs",
+            list.to_str().unwrap(),
+            "--mod",
+            "Nope",
+            "--summary",
+            "x",
+        ])
+        .assert()
+        .failure();
+}

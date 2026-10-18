@@ -60,7 +60,7 @@ pub const COMMAND_GROUPS: &[(&str, &[&str])] = &[
     (
         "Editing a modlist",
         &[
-            "move", "set", "remove", "plugins", "files", "action", "input",
+            "move", "set", "docs", "remove", "plugins", "files", "action", "input",
         ],
     ),
     (
@@ -111,6 +111,9 @@ pub enum Command {
     Move(MoveArgs),
     /// Set or clear fields of a mod, or of one of its archives.
     Set(SetArgs),
+    /// Write a mod's notes: its title, summary, body or footer, in the list
+    /// or its docs file, wherever they already are.
+    Docs(DocsArgs),
     /// Remove a mod, and its plugins from the load order.
     Remove(RemoveArgs),
     /// The load order: list it, or move a plugin within it.
@@ -991,6 +994,36 @@ mod help_tests {
 /// (`true`, `3`, `["a", "b"]`) and as text otherwise; quote it to force text
 /// (`version='"1.0"'`). Comments, and a replaced value's own comment, are
 /// kept. The list is validated before anything is written.
+#[derive(Debug, Args)]
+pub struct DocsArgs {
+    /// The modlist (its docs file, if it names one, is found from it).
+    pub input: PathBuf,
+    /// The mod whose notes to write.
+    #[arg(long = "mod", value_name = "MOD_ID")]
+    pub mod_id: String,
+    /// The name to show for it, where its id is not.
+    #[arg(long)]
+    pub title: Option<String>,
+    /// One line: what it is, or why it is in the list. Markdown.
+    #[arg(long)]
+    pub summary: Option<String>,
+    /// The notes themselves. Markdown.
+    #[arg(long, conflicts_with = "body_file")]
+    pub body: Option<String>,
+    /// Read the body from this file (`-` for standard input).
+    #[arg(long, value_name = "FILE")]
+    pub body_file: Option<PathBuf>,
+    /// Prose for after its contents. Markdown.
+    #[arg(long)]
+    pub footer: Option<String>,
+    /// A field to remove: title, summary, body or footer; repeat for more.
+    #[arg(long, value_name = "FIELD")]
+    pub unset: Vec<String>,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
+}
+
 #[derive(Debug, Args)]
 pub struct SetArgs {
     /// The modlist to edit in place.

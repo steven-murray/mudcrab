@@ -27,6 +27,17 @@ fn load(path: &Path, with_docs: bool) -> anyhow::Result<SourceModlist> {
     Ok(parsed)
 }
 
+/// The docs file's `text` merged into the modlist at `list` (as read without
+/// its docs): for checking an edit of the docs file before it is written.
+pub fn check_docs(list: &Path, text: &str) -> anyhow::Result<()> {
+    let raw = std::fs::read_to_string(list)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", list.display()))?;
+    let mut parsed = parse_modlist(&raw, list)?;
+    let docs: DocsFile =
+        toml::from_str(text).map_err(|err| anyhow::anyhow!("not a valid docs file: {err}"))?;
+    merge_docs(&mut parsed, docs)
+}
+
 /// `text` as the modlist at `path` (without its docs file): for checking an
 /// edit before it is written.
 pub fn parse_modlist(text: &str, path: &Path) -> anyhow::Result<SourceModlist> {
