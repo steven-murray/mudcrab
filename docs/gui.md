@@ -51,7 +51,9 @@ The GUI's install mode reads a list and installs it from one window:
    as `game-dir` finds it. Change either if they are not right. **Tools**
    shows which `tools.toml` is used (the usual one, unless you choose
    another), and, for a list that cleans plugins with xEdit, anything in it
-   that is not set up; Install waits until it is. **Other folders to look in** are folders
+   that is not set up; Install waits until it is. **Nexus API key** is
+   where to paste yours (from Nexus's API keys page), kept in that
+   `tools.toml`. **Other folders to look in** are folders
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download
@@ -110,7 +112,12 @@ history there, rather than be undone by it.
   list**). Name it (the mod's name on Nexus, or the file's), choose its
   section (or start a new one) and where in it, and an `if` if it is optional. An archive whose
   `.meta` does not say where it came from is looked up on Nexus by its
-  checksum, as `mudcrab identify` does; the source can be changed by hand.
+  checksum, as `mudcrab identify` does, so it goes in as a Nexus file that
+  players' installs download for them. That needs a Nexus API key, which
+  **Folders** keeps in `tools.toml` (where the command line reads it too).
+  Failing that, a file whose name is plainly a Nexus download links its
+  mod's page; the dialog says which happened, and the source can be changed
+  by hand.
   Most archives install as they are; one with an installer asks its
   questions, as `add` does in a terminal -- a FOMOD's steps in order (a step
   hidden by an earlier answer is never asked), a BAIN wizard's questions, or

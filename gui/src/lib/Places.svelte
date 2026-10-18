@@ -49,6 +49,19 @@
   async function resetTools() {
     locations = await api.setToolsConfig(null);
   }
+  // The Nexus API key: what lets adding a mod find which Nexus file an
+  // archive is, and downloading fetch files (straight away with Premium).
+  let key = $state("");
+  async function saveKey(value: string | null) {
+    try {
+      locations = await api.setApiKey(value);
+      key = "";
+      placeError = null;
+    } catch (err) {
+      placeError = String(err);
+    }
+  }
+
   async function addSearch() {
     const path = await open({ directory: true, multiple: false });
     if (typeof path === "string") locations = await api.addSearchFolder(path);
@@ -120,6 +133,31 @@
         <div class="dim">Run <code>mudcrab setup-tools</code>, edit the file, or choose another.</div>
       </div>
     {/if}
+    <div class="place sub">
+      <div class="ptitle">Nexus API key</div>
+      <div class="pfrom dim">
+        {#if tools.nexus_key === "tools.toml"}
+          Set, in tools.toml · <button class="link" onclick={() => saveKey(null)} {disabled}>remove</button>
+        {:else if tools.nexus_key}
+          Set, from {tools.nexus_key}
+        {:else}
+          Not set. With one, mods are added from Nexus by name rather than as hand downloads, and archives are
+          downloaded for you. Yours is on <a href="https://www.nexusmods.com/settings/api-keys">Nexus's API keys page</a>.
+        {/if}
+      </div>
+    </div>
+    {#if tools.nexus_key !== "NEXUS_API_KEY"}
+      <form
+        class="key"
+        onsubmit={(e) => {
+          e.preventDefault();
+          if (key.trim()) saveKey(key.trim());
+        }}
+      >
+        <input type="password" bind:value={key} placeholder={tools.nexus_key ? "a new key" : "paste your key"} autocomplete="off" {disabled} />
+        <button type="submit" disabled={disabled || !key.trim()}>Save in tools.toml</button>
+      </form>
+    {/if}
     <div class="dim small">Profile: {locations.profile}</div>
   {/if}
 
@@ -177,6 +215,19 @@
     grid-column: 2;
     grid-row: 1 / span 3;
     align-self: center;
+  }
+  .key {
+    display: flex;
+    gap: 6px;
+    margin: 2px 0 8px 12px;
+  }
+  .key input {
+    flex: 1;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .key button {
+    font-size: 12px;
   }
   .search {
     display: flex;

@@ -86,6 +86,7 @@ fn a_list_installs_from_the_commands_the_page_calls() {
         std::env::set_var("HOME", root);
         std::env::set_var("LOCALAPPDATA", root.join("data"));
         std::env::set_var("APPDATA", root.join("config"));
+        std::env::remove_var("NEXUS_API_KEY");
     }
     let list = root.join("list.toml");
     std::fs::write(&list, LIST).unwrap();
@@ -178,6 +179,16 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     assert_eq!(chosen["tools"]["exists"], true);
     let usual = call(&webview, "set_tools_config", json!({ "path": null })).unwrap();
     assert_eq!(usual["tools"]["from"], "MUDCRAB_TOOLS_CONFIG");
+    // The Nexus API key, kept in the tools.toml in use, and taken out again.
+    let keyed = call(&webview, "set_api_key", json!({ "key": "abc" })).unwrap();
+    assert_eq!(keyed["tools"]["nexus_key"], "tools.toml", "{keyed}");
+    assert!(
+        std::fs::read_to_string(root.join("config/tools.toml"))
+            .unwrap()
+            .contains("nexus_api_key = \"abc\"")
+    );
+    let unkeyed = call(&webview, "set_api_key", json!({ "key": null })).unwrap();
+    assert_eq!(unkeyed["tools"]["nexus_key"], Value::Null);
     assert_eq!(locations["instance"]["from"], "chosen");
     assert_eq!(locations["downloads"]["exists"], true);
 

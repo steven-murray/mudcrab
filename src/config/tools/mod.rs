@@ -98,6 +98,38 @@ impl Tes4EditConfig {
 impl ToolsConfig {
     /// Load from a TOML file.  Returns `Default::default()` if the file does
     /// not exist, so callers don't need to special-case a missing tools.toml.
+    /// Write (or with `None`, take out) `nexus_api_key` in the tools.toml at
+    /// `path`, leaving everything else in it as it was; the file is started
+    /// if there is none. What `setup-tools` asks for, for a front end to set.
+    pub fn save_api_key(path: &Path, key: Option<&str>) -> anyhow::Result<()> {
+        let before = if path.exists() {
+            std::fs::read_to_string(path)
+                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?
+        } else {
+            String::new()
+        };
+        let mut doc = before
+            .parse::<toml_edit::DocumentMut>()
+            .map_err(|err| anyhow::anyhow!("{} is not valid TOML: {err}", path.display()))?;
+        match key.map(str::trim).filter(|key| !key.is_empty()) {
+            Some(key) => {
+                doc.insert("nexus_api_key", toml_edit::value(key));
+            }
+            None => {
+                doc.remove("nexus_api_key");
+            }
+        }
+        let after = doc.to_string();
+        toml::from_str::<Self>(&after).map_err(|err| {
+            anyhow::anyhow!("the change would leave {} invalid: {err}", path.display())
+        })?;
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir)
+                .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", dir.display()))?;
+        }
+        crate::config::edit::write_atomic(path, &after)
+    }
+
     pub fn load(path: &Path) -> anyhow::Result<Self> {
         if !path.exists() {
             return Ok(Self::default());
@@ -446,4 +478,35 @@ pub fn generate_tools_toml(required: &RequiredTools, values: &ToolValues) -> Str
     }
 
     out
+}
+
+#[cfg(test)]
+mod api_key_tests {
+
+    #[test]
+    fn the_api_key_is_written_into_tools_toml_and_nothing_else_changes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tools.toml");
+        std::fs::write(
+            &path,
+            "# mine\ndownloads_dir = \"/d\"\n\n[wine]\nprefix = \"/p\"\n",
+        )
+        .unwrap();
+        super::ToolsConfig::save_api_key(&path, Some(" abc ")).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(
+            text.starts_with("# mine\ndownloads_dir = \"/d\"\nnexus_api_key = \"abc\"\n"),
+            "{text}"
+        );
+        assert!(text.contains("[wine]\nprefix = \"/p\""), "{text}");
+        super::ToolsConfig::save_api_key(&path, None).unwrap();
+        assert!(!std::fs::read_to_string(&path).unwrap().contains("abc"));
+        // A file that is not there is started.
+        let new = dir.path().join("new/tools.toml");
+        super::ToolsConfig::save_api_key(&new, Some("k")).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(&new).unwrap(),
+            "nexus_api_key = \"k\"\n"
+        );
+    }
 }

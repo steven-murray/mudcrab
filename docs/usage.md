@@ -48,7 +48,10 @@ reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
 `--manual` for `manual:<file name>`, with the file's `size` and `md5` so a
 renamed copy is still found), the file name and the layout. An archive with
 no `.meta` saying where it came from is looked up on Nexus by its MD5, as
-`identify` does, when there is an API key to ask with. In a
+`identify` does, when there is an API key to ask with. One that stays a
+`manual:` archive, but whose name is plainly a Nexus download's
+(`<title>-<mod id>-<version>...`), gets that mod's page as its
+`download_page`, so whoever installs the list knows where to fetch it. In a
 terminal, an installer's choices are asked: a FOMOD step by step, through the
 same walk install makes (so a step shown only after certain answers is shown
 here only then), and a BAIN package's subpackages as one list. A BAIN package

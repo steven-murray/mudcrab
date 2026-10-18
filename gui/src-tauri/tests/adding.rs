@@ -146,6 +146,12 @@ fn a_mod_is_added_from_an_archive() {
     assert_eq!(started["suggested_id"], "New Thing", "{started}");
     assert_eq!(started["has_installer"], false);
     assert_eq!(started["source"], "manual:New Thing-12345-1-0.zip");
+    // Why: there is no key to ask Nexus with; its name gives the mod's page.
+    let why = started["why_manual"].as_str().unwrap();
+    assert!(
+        why.contains("no Nexus API key") && why.contains("Nexus mod 12345"),
+        "{why}"
+    );
     let walked = call(&webview, "add_walk", json!({ "path": new, "answers": [] })).unwrap();
     assert_eq!(walked["kind"], "done", "{walked}");
 
@@ -158,6 +164,12 @@ fn a_mod_is_added_from_an_archive() {
     };
     let plan = call(&webview, "add_plan", request(json!([]), Value::Null)).unwrap();
     assert_eq!(plan["installs_plugins"], json!(["New.esp"]), "{plan}");
+    assert!(
+        plan["block"].as_str().unwrap().contains(
+            "download_page = \"https://www.nexusmods.com/oblivion/mods/12345?tab=files\""
+        ),
+        "{plan}"
+    );
     assert_eq!(plan["files"], 2);
     assert_eq!(plan["suggested_after"], "Old.esp");
     // Declaring a plugin says where it loads.

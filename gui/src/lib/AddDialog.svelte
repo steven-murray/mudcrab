@@ -189,6 +189,7 @@
         <p class="dim small">
           {started.layout_label}{#if started.has_installer}; its installer's choices are asked below{:else}; it installs as it is{/if}.
           From <code>{started.source}</code>{#if started.identified} (found on Nexus by its checksum){/if}.
+          {#if started.why_manual}<br /><span class="note">{started.why_manual}</span>{/if}
         </p>
 
         <section>
