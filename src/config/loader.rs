@@ -353,7 +353,7 @@ fn only_an_include(entry: &ModEntry) -> anyhow::Result<()> {
     anyhow::ensure!(
         set.is_empty(),
         "'{}' includes a file, so it has only `id`, `section`, `include`, `if` and the include \
-         options (`prefix`, `only`, `except`, `override`); it also has {}",
+         options (`prefix`, `only`, `except`, `override`, `set`); it also has {}",
         entry.id,
         set.join(", ")
     );
@@ -367,6 +367,7 @@ fn no_include_options(entry: &ModEntry) -> anyhow::Result<()> {
         ("only", !entry.only.is_empty()),
         ("except", !entry.except.is_empty()),
         ("override", !entry.overrides.is_empty()),
+        ("set", !entry.set.is_empty()),
     ]
     .iter()
     .filter(|(_, set)| *set)
@@ -450,19 +451,11 @@ fn shape(entry: &ModEntry, mods: Vec<ModEntry>) -> anyhow::Result<(Vec<ModEntry>
 /// its conditions ask about.
 fn rename_in(m: &mut ModEntry, rename: &dyn Fn(&str) -> Option<String>) -> anyhow::Result<()> {
     use crate::config::condition::Condition;
-    use crate::config::schema::{BainSubpackage, ModAction};
+    use crate::config::schema::ModAction;
     let renamed = |id: &mut String| {
         if let Some(new) = rename(id) {
             *id = new;
         }
-    };
-    let condition = |text: &mut String| -> anyhow::Result<()> {
-        let mut parsed = Condition::parse(text)?;
-        if parsed.mods().iter().any(|id| rename(id).is_some()) {
-            parsed.rename_mods(rename);
-            *text = parsed.to_text();
-        }
-        Ok(())
     };
     if let Some(new) = rename(&m.id) {
         m.written_id
@@ -470,35 +463,11 @@ fn rename_in(m: &mut ModEntry, rename: &dyn Fn(&str) -> Option<String>) -> anyho
         m.id = new;
     }
     m.dependencies.iter_mut().for_each(renamed);
-    if let Some(text) = &mut m.condition {
-        condition(text)?;
-    }
     for action in &mut m.actions {
-        if let Some(text) = &mut action.condition {
-            condition(text)?;
-        }
         match &mut action.action {
             ModAction::FilePrune(prune) => prune.conflicts_with.iter_mut().for_each(renamed),
             ModAction::FileHide(hide) => hide.conflicts_with.iter_mut().for_each(renamed),
             _ => {}
-        }
-    }
-    for archive in &mut m.archives {
-        if let Some(text) = &mut archive.condition {
-            condition(text)?;
-        }
-        for selection in &mut archive.fomod_selections {
-            if let Some(text) = &mut selection.condition {
-                condition(text)?;
-            }
-        }
-        for package in &mut archive.bain_subpackages {
-            if let BainSubpackage::Conditional {
-                condition: text, ..
-            } = package
-            {
-                condition(text)?;
-            }
         }
     }
     if let Some(merge) = &mut m.merge {
@@ -506,7 +475,131 @@ fn rename_in(m: &mut ModEntry, rename: &dyn Fn(&str) -> Option<String>) -> anyho
             renamed(&mut source.mod_id);
         }
     }
+    each_condition(m, &mut |text| {
+        let mut parsed = Condition::parse(text)?;
+        if parsed.mods().iter().any(|id| rename(id).is_some()) {
+            parsed.rename_mods(rename);
+            *text = parsed.to_text();
+        }
+        Ok(())
+    })
+}
+
+/// The included file's questions renamed by `rename` in mod `m`'s
+/// conditions.
+fn rename_inputs_in(
+    m: &mut ModEntry,
+    rename: &dyn Fn(&str) -> Option<String>,
+) -> anyhow::Result<()> {
+    use crate::config::condition::Condition;
+    each_condition(m, &mut |text| {
+        let mut parsed = Condition::parse(text)?;
+        if parsed.inputs().iter().any(|key| rename(key).is_some()) {
+            parsed.rename_inputs(rename);
+            *text = parsed.to_text();
+        }
+        Ok(())
+    })
+}
+
+/// `change` run on each condition mod `m` has: its own `if`, its actions',
+/// its archives', and their FOMOD selections' and BAIN subpackages'.
+fn each_condition(
+    m: &mut ModEntry,
+    change: &mut dyn FnMut(&mut String) -> anyhow::Result<()>,
+) -> anyhow::Result<()> {
+    use crate::config::schema::BainSubpackage;
+    let id = m.id.clone();
+    let mut change =
+        |text: &mut String| change(text).map_err(|err| anyhow::anyhow!("mod '{id}': {err:#}"));
+    if let Some(text) = &mut m.condition {
+        change(text)?;
+    }
+    for action in &mut m.actions {
+        if let Some(text) = &mut action.condition {
+            change(text)?;
+        }
+    }
+    for archive in &mut m.archives {
+        if let Some(text) = &mut archive.condition {
+            change(text)?;
+        }
+        for selection in &mut archive.fomod_selections {
+            if let Some(text) = &mut selection.condition {
+                change(text)?;
+            }
+        }
+        for package in &mut archive.bain_subpackages {
+            if let BainSubpackage::Conditional {
+                condition: text, ..
+            } = package
+            {
+                change(text)?;
+            }
+        }
+    }
     Ok(())
+}
+
+/// The included file's questions as the including list asks them: each
+/// named `<include id>.<name>` (so two files' questions cannot meet), its
+/// mods' conditions renamed to match, and those `set` answers fixed.
+fn namespace_inputs(entry: &ModEntry, child: &mut SourceModlist) -> anyhow::Result<()> {
+    let space: String = entry
+        .id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    for key in entry.set.keys() {
+        anyhow::ensure!(
+            child.inputs.contains_key(key),
+            "set answers '{key}', which is not one of the included file's questions"
+        );
+    }
+    if child.inputs.is_empty() {
+        return Ok(());
+    }
+    let own: HashSet<String> = child.inputs.keys().cloned().collect();
+    let rename = |key: &str| own.contains(key).then(|| format!("{space}.{key}"));
+    for m in &mut child.mods {
+        rename_inputs_in(m, &rename)?;
+    }
+    child.inputs = std::mem::take(&mut child.inputs)
+        .into_iter()
+        .map(|(key, mut spec)| -> anyhow::Result<_> {
+            if let Some(value) = entry.set.get(&key) {
+                spec.fixed = Some(answer(&key, &spec, value)?);
+            }
+            Ok((format!("{space}.{key}"), spec))
+        })
+        .collect::<anyhow::Result<_>>()?;
+    Ok(())
+}
+
+/// `value`, from `set`, as an answer to the question `spec`.
+fn answer(
+    key: &str,
+    spec: &crate::config::schema::InputSpec,
+    value: &toml::Value,
+) -> anyhow::Result<crate::config::schema::InputValue> {
+    use crate::config::schema::{InputType, InputValue};
+    match (spec.input_type, value) {
+        (InputType::Bool, toml::Value::Boolean(b)) => Ok(InputValue::Bool(*b)),
+        (InputType::Text, toml::Value::String(text)) => Ok(InputValue::Text(text.clone())),
+        (InputType::Choice, toml::Value::String(text)) if spec.choices.contains(text) => {
+            Ok(InputValue::Text(text.clone()))
+        }
+        (InputType::Choice, _) => {
+            anyhow::bail!("set {key} = {value}: not one of {:?}", spec.choices)
+        }
+        (input_type, _) => anyhow::bail!("set {key} = {value}: {key} is {input_type:?}"),
+    }
 }
 
 /// Mod `m` with an override's `fields` in place of its own. A list field
@@ -564,13 +657,16 @@ fn absorb(
     entry: &ModEntry,
     include: &str,
     child_path: &Path,
-    child: SourceModlist,
+    mut child: SourceModlist,
 ) -> anyhow::Result<Vec<String>> {
-    anyhow::ensure!(
-        child.inputs.is_empty(),
-        "it has questions ([inputs]), which an included file cannot have yet: ask them in the \
-         including list, whose questions an included file's conditions can use"
-    );
+    namespace_inputs(entry, &mut child)?;
+    for (key, spec) in std::mem::take(&mut child.inputs) {
+        anyhow::ensure!(
+            !list.inputs.contains_key(&key),
+            "its question {key} is asked by the including list too"
+        );
+        list.inputs.insert(key, spec);
+    }
     anyhow::ensure!(
         child.docs.is_empty(),
         "it has the guide's [docs], which are for a whole list; an included file documents its \

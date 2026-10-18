@@ -215,19 +215,6 @@ fn an_include_entry_with_a_mods_fields_is_refused() {
 }
 
 #[test]
-fn questions_in_an_included_file_are_refused_for_now() {
-    let dir = tempdir().unwrap();
-    write(
-        dir.path(),
-        "parts/core.toml",
-        &format!("{CORE}\n[inputs.hd]\nquery = \"HD?\"\ntype = \"bool\"\n"),
-    );
-    let list = write(dir.path(), "list.toml", LIST);
-    let err = format!("{:#}", load_modlist(&list).unwrap_err());
-    assert!(err.contains("questions ([inputs])"), "{err}");
-}
-
-#[test]
 fn an_ini_key_set_two_ways_is_refused() {
     let dir = tempdir().unwrap();
     write(dir.path(), "parts/core.toml", CORE);

@@ -144,6 +144,23 @@ impl Condition {
         }
     }
 
+    /// The inputs this condition reads, renamed by `rename` where it gives a
+    /// new name.
+    pub fn rename_inputs(&mut self, rename: &dyn Fn(&str) -> Option<String>) {
+        match self {
+            Condition::Any(terms) | Condition::All(terms) => {
+                terms.iter_mut().for_each(|t| t.rename_inputs(rename));
+            }
+            Condition::Not(inner) => inner.rename_inputs(rename),
+            Condition::Input { key, .. } => {
+                if let Some(new) = rename(key) {
+                    *key = new;
+                }
+            }
+            Condition::Mod(_) => {}
+        }
+    }
+
     /// The condition as text `parse` reads back to the same answers. With no
     /// parentheses, that is terms joined by `&&`, joined by `||`: `!` is
     /// pushed down onto the terms, and an `&&` of `||`s multiplied out.
