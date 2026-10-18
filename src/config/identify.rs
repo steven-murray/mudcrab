@@ -123,6 +123,26 @@ pub enum Method {
     FileList,
 }
 
+/// The Nexus mod a download's filename names, where it is clearly one of
+/// Nexus's: `<title>-<mod id>-<version parts>[-<timestamp>].<ext>`, the mod id
+/// the first field after a `-` that is all digits and at least four long (no
+/// Oblivion mod on Nexus has a shorter id, and a version part rarely runs
+/// that long), and not a ten-digit upload time. Stricter than
+/// [`mod_id_from_file_name`] because what it says is written into a list as a
+/// page to download from, where a wrong guess would send a player to the
+/// wrong mod.
+pub fn nexus_mod_in_name(file_name: &str) -> Option<u64> {
+    let stem = file_name
+        .rsplit_once('.')
+        .map(|(head, _)| head)
+        .unwrap_or(file_name);
+    stem.split('-')
+        .skip(1)
+        .find(|field| field.len() >= 4 && field.chars().all(|c| c.is_ascii_digit()))
+        .filter(|field| field.len() != 10)
+        .and_then(|field| field.parse().ok())
+}
+
 /// The mod id Nexus embedded in a download's filename.
 ///
 /// Nexus names downloads `<title>-<mod id>-<version parts>-<timestamp>.<ext>`,
@@ -426,5 +446,23 @@ mod tests {
         assert!(snippet.contains("path = \"nexus:oblivion/24078/42364\""));
         let parsed: toml::Table = toml::from_str(&snippet).expect("snippet should be valid TOML");
         assert!(parsed.contains_key("mods"));
+    }
+
+    #[test]
+    fn a_nexus_download_names_its_mod() {
+        use super::nexus_mod_in_name;
+        assert_eq!(
+            nexus_mod_in_name("SMO-51073-1-6-2-1640189859.zip"),
+            Some(51073)
+        );
+        assert_eq!(nexus_mod_in_name("Formid Finder 451-16704.7z"), Some(16704));
+        assert_eq!(
+            nexus_mod_in_name("RefScope 2_1_2-21862-2-1-2.zip"),
+            Some(21862)
+        );
+        // Not clearly Nexus's: no id field, or a version where one would be.
+        assert_eq!(nexus_mod_in_name("A-B Mod-1-2.7z"), None);
+        assert_eq!(nexus_mod_in_name("Plain Name.zip"), None);
+        assert_eq!(nexus_mod_in_name("Thing-1640189859.7z"), None);
     }
 }

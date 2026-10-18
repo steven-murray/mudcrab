@@ -130,6 +130,14 @@ fn recent(state: tauri::State<'_, State>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Start a new, empty list at `path` (`new`); the page then opens it.
+#[tauri::command]
+fn new_list(path: String, name: String) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    config::edit::create_list(&path, &name).map_err(shown)?;
+    Ok(path.display().to_string())
+}
+
 #[tauri::command]
 fn open_list<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -264,6 +272,9 @@ struct Tools {
     from: String,
     exists: bool,
     problems: Vec<String>,
+    /// Where the Nexus API key comes from: `NEXUS_API_KEY`, `tools.toml`, or
+    /// nowhere (`None`).
+    nexus_key: Option<&'static str>,
 }
 
 #[derive(Serialize)]
@@ -349,6 +360,17 @@ fn locate(state: &State) -> Result<Located, String> {
         } else {
             Vec::new()
         },
+        nexus_key: if std::env::var("NEXUS_API_KEY").is_ok_and(|k| !k.trim().is_empty()) {
+            Some("NEXUS_API_KEY")
+        } else if tools
+            .nexus_api_key
+            .as_deref()
+            .is_some_and(|k| !k.trim().is_empty())
+        {
+            Some("tools.toml")
+        } else {
+            None
+        },
     };
     Ok(Located {
         search: chosen.search.clone(),
@@ -419,6 +441,16 @@ fn set_tools_config(
         settings.tools_config = path;
         settings.save().map_err(shown)?;
     }
+    locations(state)
+}
+
+/// Keep the Nexus API key in the tools.toml in use (or with `None`, take it
+/// out), where the command line reads it too, as `setup-tools` writes it.
+#[tauri::command]
+fn set_api_key(state: tauri::State<'_, State>, key: Option<String>) -> Result<Locations, String> {
+    let path = config::tools::ToolsConfig::default_path()
+        .ok_or("there is no tools.toml to keep the key in (no config folder)")?;
+    config::tools::ToolsConfig::save_api_key(&path, key.as_deref()).map_err(shown)?;
     locations(state)
 }
 
@@ -917,9 +949,11 @@ pub fn app<R: Runtime>(
             opening,
             recent,
             open_list,
+            new_list,
             locations,
             set_location,
             set_tools_config,
+            set_api_key,
             add_search_folder,
             remove_search_folder,
             step_plan,

@@ -9,8 +9,9 @@
 //! Detection reads `/proc`, which on Linux covers MO2 under Wine/Proton: the
 //! Windows process is an ordinary one there, with its `Z:\...` executable path
 //! in its command line. Only an MO2 whose executable sits in *this* instance
-//! counts, so a second instance open alongside is no obstacle. Elsewhere no
-//! check is made.
+//! counts, so a second instance open alongside is no obstacle. In a Flatpak,
+//! whose `/proc` holds only the sandbox's processes, the host's are read
+//! through `flatpak-spawn --host`. Elsewhere no check is made.
 
 use std::path::{Path, PathBuf};
 
@@ -21,25 +22,11 @@ pub fn running_in(instance: &Path) -> Vec<u32> {
         let Ok(instance) = std::fs::canonicalize(instance) else {
             return Vec::new();
         };
-        let Ok(entries) = std::fs::read_dir("/proc") else {
-            return Vec::new();
-        };
-        let mut pids = Vec::new();
-        for entry in entries.flatten() {
-            let Some(pid) = entry
-                .file_name()
-                .to_str()
-                .and_then(|n| n.parse::<u32>().ok())
-            else {
-                continue;
-            };
-            if let Ok(cmdline) = std::fs::read(entry.path().join("cmdline"))
-                && cmdline_runs_instance(&cmdline, &instance)
-            {
-                pids.push(pid);
-            }
-        }
-        pids
+        command_lines()
+            .into_iter()
+            .filter(|(_, cmdline)| cmdline_runs_instance(cmdline, &instance))
+            .map(|(pid, _)| pid)
+            .collect()
     }
     #[cfg(not(target_os = "linux"))]
     {
@@ -54,18 +41,7 @@ pub fn running_instances() -> Option<Vec<PathBuf>> {
     #[cfg(target_os = "linux")]
     {
         let mut out = Vec::new();
-        for entry in std::fs::read_dir("/proc").ok()?.flatten() {
-            if entry
-                .file_name()
-                .to_str()
-                .and_then(|n| n.parse::<u32>().ok())
-                .is_none()
-            {
-                continue;
-            }
-            let Ok(cmdline) = std::fs::read(entry.path().join("cmdline")) else {
-                continue;
-            };
+        for (_, cmdline) in command_lines() {
             if let Some(dir) = mo2_instance_of(&cmdline)
                 && !out.contains(&dir)
             {
@@ -78,6 +54,41 @@ pub fn running_instances() -> Option<Vec<PathBuf>> {
     {
         None
     }
+}
+
+/// Every process's id and command line (its arguments NUL-separated), as
+/// `/proc` has them -- the host's, when this runs in a Flatpak.
+#[cfg(target_os = "linux")]
+fn command_lines() -> Vec<(u32, Vec<u8>)> {
+    if crate::util::host::in_flatpak() {
+        // One line a process: its pid, a tab, its command line.
+        let script = r#"for d in /proc/[0-9]*; do printf '%s\t' "${d#/proc/}"; cat "$d/cmdline" 2>/dev/null; printf '\n'; done"#;
+        let Ok(output) = std::process::Command::new("flatpak-spawn")
+            .args(["--host", "sh", "-c", script])
+            .output()
+        else {
+            return Vec::new();
+        };
+        return output
+            .stdout
+            .split(|byte| *byte == b'\n')
+            .filter_map(|line| {
+                let tab = line.iter().position(|byte| *byte == b'\t')?;
+                let pid = std::str::from_utf8(&line[..tab]).ok()?.parse().ok()?;
+                Some((pid, line[tab + 1..].to_vec()))
+            })
+            .collect();
+    }
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    entries
+        .flatten()
+        .filter_map(|entry| {
+            let pid = entry.file_name().to_str()?.parse().ok()?;
+            Some((pid, std::fs::read(entry.path().join("cmdline")).ok()?))
+        })
+        .collect()
 }
 
 /// The folder `ModOrganizer.exe` runs from, when a command line's program is

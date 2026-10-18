@@ -65,6 +65,19 @@ pub fn set(args: SetArgs) -> anyhow::Result<()> {
     )
 }
 
+pub fn new_list(args: crate::cli::NewArgs) -> anyhow::Result<()> {
+    edit::create_list(&args.output, &args.name)?;
+    ui::status(
+        Tone::Good,
+        format!(
+            "Started {} at {}; add its mods with `mudcrab add`",
+            ui::name(args.name.trim()),
+            ui::dim(args.output.display())
+        ),
+    );
+    Ok(())
+}
+
 pub fn choose(args: crate::cli::ChooseArgs) -> anyhow::Result<()> {
     use std::io::IsTerminal;
     let overrides = crate::config::query::parse_overrides(&args.set)?;

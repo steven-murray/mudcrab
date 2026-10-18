@@ -100,6 +100,9 @@ pub(super) struct Started {
     has_installer: bool,
     /// The source came from asking Nexus by the archive's MD5.
     identified: bool,
+    /// Why the source is a manual one, when it is: no API key to ask Nexus
+    /// with, or Nexus not knowing the file.
+    why_manual: Option<String>,
 }
 
 fn report_of(path: &Path) -> Result<InspectReport, String> {
@@ -153,6 +156,7 @@ pub(super) async fn add_start(path: String) -> Result<Started, String> {
             plugins: report.plugins.clone(),
             has_installer,
             identified: false,
+            why_manual: None,
             layout: report.layout,
         })
     })
@@ -161,20 +165,46 @@ pub(super) async fn add_start(path: String) -> Result<Started, String> {
     // An archive whose `.meta` does not say where it came from: ask Nexus, by
     // its MD5, as `identify` does. Best effort; without a key or an answer it
     // stays a manual archive, which the author can change.
-    if started.source.starts_with("manual:")
-        && let Some(key) = config::tools::ToolsConfig::nexus_api_key()
-    {
-        let base = std::env::var("NEXUS_API_BASE").ok();
-        let hint = config::identify::mod_id_from_file_name(&started.file_name);
-        if let Ok(found) =
-            config::identify::identify(&client()?, &path, "oblivion", &key, base.as_deref(), hint)
-                .await
-        {
-            started.source = format!("nexus:oblivion/{}/{}", found.mod_id, found.file_id);
-            if let Some(name) = found.mod_name {
-                started.suggested_id = name.trim().to_string();
+    if started.source.starts_with("manual:") {
+        let page = config::identify::nexus_mod_in_name(&started.file_name)
+            .map(|id| format!(" Its name says Nexus mod {id}, so the entry links that mod's page."))
+            .unwrap_or_default();
+        match config::tools::ToolsConfig::nexus_api_key() {
+            None => {
+                started.why_manual = Some(format!(
+                    "Nexus was not asked where it came from: there is no Nexus API key (set one \
+                     in Folders).{page}"
+                ))
             }
-            started.identified = true;
+            Some(key) => {
+                let base = std::env::var("NEXUS_API_BASE").ok();
+                let hint = config::identify::mod_id_from_file_name(&started.file_name);
+                match config::identify::identify(
+                    &client()?,
+                    &path,
+                    "oblivion",
+                    &key,
+                    base.as_deref(),
+                    hint,
+                )
+                .await
+                {
+                    Ok(found) => {
+                        started.source =
+                            format!("nexus:oblivion/{}/{}", found.mod_id, found.file_id);
+                        if let Some(name) = found.mod_name {
+                            started.suggested_id = name.trim().to_string();
+                        }
+                        started.identified = true;
+                    }
+                    Err(_) => {
+                        started.why_manual = Some(format!(
+                            "Nexus does not know this file by its checksum (renamed, repacked, \
+                             or not from Nexus).{page}"
+                        ))
+                    }
+                }
+            }
         }
     }
     Ok(started)

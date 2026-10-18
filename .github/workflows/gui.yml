@@ -22,8 +22,10 @@ jobs:
         include:
           - os: ubuntu-22.04
             name: linux
+            bundles: appimage
           - os: windows-latest
             name: windows
+            bundles: nsis
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -47,11 +49,46 @@ jobs:
           npm run build
       - run: cargo clippy -p mudcrab-gui --all-targets -- -D warnings
       - run: cargo test -p mudcrab-gui
-      - run: cargo build --release -p mudcrab-gui --features custom-protocol
+      # The bundles a release ships -- an AppImage, a Windows installer -- so
+      # a change that breaks packaging shows here, and a pull request's build
+      # can be tried as a player would get it.
+      - name: Bundle
+        working-directory: gui
+        shell: bash
+        run: npx tauri build --bundles ${{ matrix.bundles }}
+      - name: Keep the binary for the Flatpak
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release/mudcrab-gui
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: mudcrab-gui-${{ matrix.name }}
           path: |
-            target/release/mudcrab-gui
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/nsis/*.exe
             target/release/mudcrab-gui.exe
           if-no-files-found: error
+
+  # The Flatpak, from the Linux binary above (see gui/flatpak/), uploaded as
+  # this run's artifact, so the manifest is tried on every change.
+  flatpak:
+    needs: build
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release
+      - run: chmod +x target/release/mudcrab-gui
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: mudcrab-gui.flatpak
+          manifest-path: gui/flatpak/io.github.steven_murray.mudcrab.yml
+          cache: false

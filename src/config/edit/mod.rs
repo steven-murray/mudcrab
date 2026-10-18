@@ -239,6 +239,44 @@ pub fn plan_enabled(
     })
 }
 
+/// The text of a new, empty modlist called `name`: valid as it is, with the
+/// game's master first in the load order, ready for `add`.
+pub fn new_list_text(name: &str) -> String {
+    let quoted = toml_edit::Value::from(name).to_string();
+    // The name on one line, for the comment heading the file.
+    let title = name.replace(['\n', '\r'], " ");
+    format!(
+        "# {title}: a modlist for mudcrab. What goes in it:\n\
+         # https://steven-murray.github.io/mudcrab/modlist-format.html\n\
+         name = {}\n\n\
+         # The load order, top to bottom: the game's own master first, then each\n\
+         # mod's plugins as it is added.\n\
+         plugins = [\n    \"Oblivion.esm\",\n]\n",
+        quoted.trim()
+    )
+}
+
+/// Write a new, empty modlist called `name` at `path`, which must not exist.
+pub fn create_list(path: &Path, name: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(!name.trim().is_empty(), "a list needs a name");
+    let text = new_list_text(name.trim());
+    check(path, &text)?;
+    use std::io::Write;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|err| match err.kind() {
+            std::io::ErrorKind::AlreadyExists => anyhow::anyhow!(
+                "{} already exists; a new list is never written over another file",
+                path.display()
+            ),
+            _ => anyhow::anyhow!("failed to create {}: {err}", path.display()),
+        })?;
+    file.write_all(text.as_bytes())
+        .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
+}
+
 /// `text` loads and validates as the modlist at `path`.
 pub fn check(path: &Path, text: &str) -> anyhow::Result<()> {
     parse_modlist(text, path)

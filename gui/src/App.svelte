@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { open } from "@tauri-apps/plugin-dialog";
-  import { api, type ListView } from "./lib/api";
+  import { open, save } from "@tauri-apps/plugin-dialog";
+  import { api, type ListView, type Locations } from "./lib/api";
+  import Places from "./lib/Places.svelte";
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
@@ -14,16 +15,53 @@
   let about = $state(false);
   let mode = $state<"install" | "author">("install");
 
+  // Where things go -- the MO2 instance, downloads, game, tools -- shared by
+  // both modes. Set in the Folders dialog, which opens by itself for a list
+  // with no MO2 instance chosen yet and stays until one is: installing and
+  // authoring both need it.
+  let locations = $state<Locations | null>(null);
+  let folders = $state(false);
+  let installing = $state(false);
+  const needsInstance = $derived(!!list && !!locations && !locations.instance.path);
+
   async function openPath(path: string) {
     opening = true;
     error = null;
     try {
       list = await api.openList(path);
+      locations = await api.locations();
+      folders = !locations.instance.path;
     } catch (err) {
       error = String(err);
     } finally {
       opening = false;
       recent = await api.recent();
+    }
+  }
+
+  // A new list: a name, then where to keep it; opened in author mode, where
+  // its mods are added.
+  let creating = $state(false);
+  let newName = $state("");
+  async function create(event: SubmitEvent) {
+    event.preventDefault();
+    const name = newName.trim();
+    if (!name) return;
+    const file = name.replace(/[^A-Za-z0-9 _-]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "modlist";
+    const path = await save({
+      defaultPath: `${file}.toml`,
+      filters: [{ name: "Modlist", extensions: ["toml"] }],
+    });
+    if (!path) return;
+    error = null;
+    try {
+      const made = await api.newList(path.endsWith(".toml") ? path : `${path}.toml`, name);
+      creating = false;
+      newName = "";
+      await openPath(made);
+      mode = "author";
+    } catch (err) {
+      error = String(err);
     }
   }
 
@@ -63,6 +101,11 @@
     {/if}
     <span class="spacer"></span>
     {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
+    {#if list}
+      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, and tools.toml, for this list"
+        >Folders</button
+      >
+    {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
       <div class="modes" role="group" aria-label="Mode">
@@ -82,6 +125,33 @@
     <div class="error">
       <pre>{error}</pre>
       <button class="link" onclick={() => (error = null)}>Dismiss</button>
+    </div>
+  {/if}
+
+  {#if list && locations && (folders || needsInstance)}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => !needsInstance && (folders = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Folders" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>Where things go{list ? `: ${list.document.name}` : ""}</strong>
+          {#if !needsInstance}<button class="link" onclick={() => (folders = false)}>Done</button>{/if}
+        </div>
+        <div class="dbody">
+          {#if needsInstance}
+            <p class="dim small">
+              Choose the Mod Organizer 2 instance this list installs into -- and, writing a list, where you try it as
+              you go. Its downloads and game folders follow from it; change them after if they are not right.
+            </p>
+          {/if}
+          <Places bind:locations disabled={installing} />
+          {#if needsInstance}
+            <p class="dim small">
+              Not this list? <button class="link" onclick={choose}>Open another</button>
+            </p>
+          {/if}
+        </div>
+      </div>
     </div>
   {/if}
 
@@ -115,18 +185,33 @@
       <!-- Both stay mounted, so switching modes keeps an install's progress. -->
       <main class:hidden={mode !== "install"}>
         <section class="left"><Guide document={list.document} /></section>
-        <aside class="right"><Install {list} /></aside>
+        <aside class="right"><Install {list} {locations} openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
-      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} /></div>
+      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
     {/key}
   {:else}
     <div class="welcome">
       <h1>Install a modlist</h1>
       <p class="dim">
         Open a list's <code>.toml</code> file to read it, answer its questions and install it into a
-        Mod Organizer 2 instance. Every step is one of mudcrab's commands, shown as it runs.
+        Mod Organizer 2 instance -- or start a list of your own. Every step is one of mudcrab's
+        commands, shown as it runs.
       </p>
-      <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
+      <div class="starts">
+        <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
+        <button onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
+      </div>
+      {#if creating}
+        <form class="create" onsubmit={create}>
+          <label for="new-name">Its name, as players will see it</label>
+          <div>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input id="new-name" type="text" bind:value={newName} placeholder="My Oblivion list" autofocus />
+            <button type="submit" class="primary" disabled={!newName.trim()}>Choose where to save it…</button>
+          </div>
+          <p class="dim small">It starts empty, and opens in author mode, where mods are added from your downloads or a Nexus link.</p>
+        </form>
+      {/if}
       {#if recent.length}
         <h2>Recent</h2>
         <ul>
@@ -273,6 +358,34 @@
     list-style: none;
     padding: 0;
     margin: 0;
+  }
+  .starts {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .create {
+    margin-top: 14px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--panel);
+  }
+  .create label {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .create div {
+    display: flex;
+    gap: 6px;
+  }
+  .create input {
+    flex: 1;
+    min-width: 0;
+  }
+  .create p {
+    margin: 8px 0 0;
   }
   .welcome li {
     padding: 3px 0;

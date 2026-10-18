@@ -1,9 +1,36 @@
 # The GUI
 
-**Preview.** The GUI is new and not yet in a release; build it from source
-(below) to try it. Everything it does is one of the commands in
+**New.** Everything the GUI does is one of the commands in
 [Getting started](getting-started.md), which stay the complete way to use
 mudcrab.
+
+## Getting it
+
+Each [release](https://github.com/steven-murray/mudcrab/releases) has the GUI
+beside the command line:
+
+- **Linux, and the Steam Deck in desktop mode**, either:
+  - `mudcrab-gui-<version>-x86_64.flatpak`, installed like any Flatpak and
+    then found among your applications (and updated by installing the next
+    one the same way):
+
+    ```bash
+    flatpak install --user mudcrab-gui-<version>-x86_64.flatpak
+    ```
+
+    It uses the GNOME runtime, which Flatpak fetches from Flathub the first
+    time. It sees your home folder, SD cards and other drives, and runs
+    Wine or Proton (for xEdit) and LOOT on the system itself, outside its
+    sandbox, so they need to be installed there as usual.
+  - or `mudcrab-gui-<version>-x86_64.AppImage`: make it executable (in a
+    file manager's Properties, or `chmod +x`) and run it; nothing is
+    installed. It carries its own WebKitGTK, so it is large, and needs glibc
+    2.35 or newer.
+- **Windows**: `mudcrab-gui-<version>-windows-x64-setup.exe` installs it for
+  your account (no administrator needed) with a Start menu entry and an
+  uninstaller; `mudcrab-gui-<version>-windows-x64.zip` is the program alone,
+  to unpack and run. Both use Windows' own WebView2, which Windows 10 and 11
+  have; the installer fetches it on the rare system without.
 
 The GUI's install mode reads a list and installs it from one window:
 
@@ -13,15 +40,20 @@ The GUI's install mode reads a list and installs it from one window:
    (its `about`), or, for a list without one, its guide's introduction.
 2. **Answer its questions**, if it asks any. The list's defaults are chosen;
    your answers are remembered for next time.
-3. **Say where things go**: first the MO2 instance to install into -- a
-   portable instance, the folder with `ModOrganizer.exe` in it (any other
-   folder is refused). The downloads folder and the game folder then follow
+3. **Say where things go**, in **Folders** (by **About this list**), which
+   opens by itself for a list with no MO2 instance chosen yet and stays
+   until one is -- installing a list and writing one both need it, and the
+   choices are shared by both modes. First the MO2 instance to install into
+   -- a portable instance, the folder with `ModOrganizer.exe` in it (any
+   other folder is refused). The downloads folder and the game folder then follow
    from it: the downloads folder from `tools.toml` if it is set there, else
    the instance's own; the game folder from the instance's settings, or found
    as `game-dir` finds it. Change either if they are not right. **Tools**
    shows which `tools.toml` is used (the usual one, unless you choose
    another), and, for a list that cleans plugins with xEdit, anything in it
-   that is not set up; Install waits until it is. **Other folders to look in** are folders
+   that is not set up; Install waits until it is. **Nexus API key** is
+   where to paste yours (from Nexus's API keys page), kept in that
+   `tools.toml`. **Other folders to look in** are folders
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download
@@ -50,6 +82,11 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 
 ## Author mode
 
+To start a list of your own, **Create a new list…** on the opening page asks
+its name and where to keep it (`mudcrab new`), then the MO2 instance to try
+it in (**Folders**, as above), and opens it here, empty, ready for its first
+mod from the downloads folder.
+
 **Author** in the top right switches to working on the list as its author.
 It reads the list as planned with the answers given in Install, and plans it
 again after each change.
@@ -73,9 +110,14 @@ history there, rather than be undone by it.
   downloaded it. A Nexus API key is needed to list a mod's files.
 - **Adding a mod**: double-click an archive (or right-click, **Add to the
   list**). Name it (the mod's name on Nexus, or the file's), choose its
-  section and where in it, and an `if` if it is optional. An archive whose
+  section (or start a new one) and where in it, and an `if` if it is optional. An archive whose
   `.meta` does not say where it came from is looked up on Nexus by its
-  checksum, as `mudcrab identify` does; the source can be changed by hand.
+  checksum, as `mudcrab identify` does, so it goes in as a Nexus file that
+  players' installs download for them. That needs a Nexus API key, which
+  **Folders** keeps in `tools.toml` (where the command line reads it too).
+  Failing that, a file whose name is plainly a Nexus download links its
+  mod's page; the dialog says which happened, and the source can be changed
+  by hand.
   Most archives install as they are; one with an installer asks its
   questions, as `add` does in a terminal -- a FOMOD's steps in order (a step
   hidden by an earlier answer is never asked), a BAIN wizard's questions, or
@@ -149,8 +191,9 @@ history there, rather than be undone by it.
 
 ## Building it
 
-You need Rust, Node.js, and on Linux WebKitGTK 4.1 (`webkit2gtk-4.1` on Arch,
-`libwebkit2gtk-4.1-dev` on Debian and Ubuntu). From the repository:
+To build it yourself, you need Rust, Node.js, and on Linux WebKitGTK 4.1
+(`webkit2gtk-4.1` on Arch, `libwebkit2gtk-4.1-dev` on Debian and Ubuntu).
+From the repository:
 
 ```bash
 cd gui
@@ -165,3 +208,11 @@ target/release/mudcrab-gui path/to/list.toml
 ```
 
 The list is optional; without it the GUI starts on its own page.
+
+The bundles a release ships are made by Tauri's bundler, from `gui/`:
+`npx tauri build --bundles appimage` on Linux, `--bundles nsis` on Windows,
+into `target/release/bundle/`. On a distribution newer than the AppImage
+tools (Arch and its family), their `strip` cannot read the system's
+libraries; `NO_STRIP=true` before the command skips it. The Flatpak is made from the
+binary that builds, with `flatpak-builder` and the manifest in
+`gui/flatpak/`, which says how.

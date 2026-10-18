@@ -32,7 +32,11 @@
   // questions, and this session's changes. Every edit is one of the editing
   // commands, written at once (as the CLI writes it), shown with its command
   // and diff, and undoable. See docs/design/gui.md.
-  let { list = $bindable(), active }: { list: ListView; active: boolean } = $props();
+  let {
+    list = $bindable(),
+    active,
+    locations,
+  }: { list: ListView; active: boolean; locations: import("./api").Locations | null } = $props();
 
   type Tab = "mod" | "load" | "conflicts" | "check" | "inputs" | "changes";
   let tab = $state<Tab>("mod");
@@ -287,6 +291,20 @@
   }
 
   const chosen = $derived(selected ? mods.get(selected)?.mod : undefined);
+
+  // The folders changed (in the Folders dialog): what is read from them --
+  // the archives, a mod's files, conflicts -- is read again.
+  let seenFolders = "";
+  $effect(() => {
+    const key = JSON.stringify(locations);
+    if (!locations || key === seenFolders) return;
+    const first = !seenFolders;
+    seenFolders = key;
+    if (first) return;
+    found = null;
+    archivesPane?.refresh();
+    if (selected && view?.archives.length) readTree(selected, archive, true);
+  });
 
   // Add the mod an archive makes, then show it.
   async function addMod(request: import("./api").AddRequest): Promise<boolean> {

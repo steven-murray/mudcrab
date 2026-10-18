@@ -139,7 +139,8 @@ pub(crate) fn run_loot_sort(
 
         let loot_started_at = std::time::SystemTime::now();
 
-        let mut child = cmd
+        // LOOT is the host's, when mudcrab runs in a Flatpak.
+        let mut child = crate::util::host::on_host(cmd)
             .spawn()
             .map_err(|err| anyhow::anyhow!("failed to execute LOOT: {err}"))?;
 

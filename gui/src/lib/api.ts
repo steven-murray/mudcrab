@@ -105,6 +105,8 @@ export interface Tools {
   from: string;
   exists: boolean;
   problems: string[];
+  /** Where the Nexus API key comes from, if anywhere. */
+  nexus_key: "NEXUS_API_KEY" | "tools.toml" | null;
 }
 
 export interface Locations {
@@ -300,6 +302,7 @@ export interface Started {
   suggested_id: string;
   has_installer: boolean;
   identified: boolean;
+  why_manual: string | null;
 }
 
 export type Availability = "free" | "recommended" | "required" | "unavailable";
@@ -366,10 +369,12 @@ export const api = {
   opening: () => invoke<string | null>("opening"),
   recent: () => invoke<string[]>("recent"),
   openList: (path: string) => invoke<ListView>("open_list", { path }),
+  newList: (path: string, name: string) => invoke<string>("new_list", { path, name }),
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
   setToolsConfig: (path: string | null) => invoke<Locations>("set_tools_config", { path }),
+  setApiKey: (key: string | null) => invoke<Locations>("set_api_key", { key }),
   addSearchFolder: (path: string) => invoke<Locations>("add_search_folder", { path }),
   removeSearchFolder: (path: string) => invoke<Locations>("remove_search_folder", { path }),
   plan: (answers: Record<string, string>) => invoke<Done>("step_plan", { answers }),

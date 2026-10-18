@@ -520,7 +520,16 @@ pub fn archive_block(
                     out.push(format!("md5 = \"{md5}\""));
                     // Printed by `download` and `check`, so whoever installs
                     // the list knows where to go without opening it.
-                    out.push("# download_page = \"https://...\"".to_string());
+                    // A Nexus download Nexus could not name (or that was
+                    // not asked) still names its mod: its page, at least.
+                    out.push(
+                        match crate::config::identify::nexus_mod_in_name(&report.file_name) {
+                            Some(id) => format!(
+                                "download_page = \"https://www.nexusmods.com/oblivion/mods/{id}?tab=files\"  # from the file's name"
+                            ),
+                            None => "# download_page = \"https://...\"".to_string(),
+                        },
+                    );
                     out.push("# download_note = \"Which file on the page, and how.\"".to_string());
                 }
                 out

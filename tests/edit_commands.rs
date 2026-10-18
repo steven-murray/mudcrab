@@ -527,3 +527,39 @@ fn a_mod_is_removed_with_its_notes_and_disabled_and_enabled_with_its_plugins() {
         .assert()
         .success();
 }
+
+#[test]
+fn new_starts_a_list_that_mods_can_be_added_to() {
+    let dir = tempdir().unwrap();
+    let list = dir.path().join("new.toml");
+    mudcrab(dir.path())
+        .args(["new", list.to_str().unwrap(), "--name", "Fresh"])
+        .assert()
+        .success();
+    assert!(read(&list).contains("name = \"Fresh\""));
+    mudcrab(dir.path())
+        .arg("validate")
+        .arg(&list)
+        .assert()
+        .success();
+    // Never over another file.
+    mudcrab(dir.path())
+        .args(["new", list.to_str().unwrap(), "--name", "Again"])
+        .assert()
+        .failure();
+    assert!(read(&list).contains("Fresh"));
+    // A first mod goes in.
+    mudcrab(dir.path())
+        .args([
+            "add",
+            list.to_str().unwrap(),
+            "--id",
+            "First",
+            "--nexus",
+            "1/2",
+        ])
+        .args(["--section", "Core", "--file-name", "First.zip"])
+        .assert()
+        .success();
+    assert!(read(&list).contains("id = \"First\""));
+}

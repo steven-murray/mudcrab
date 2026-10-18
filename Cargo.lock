@@ -2409,6 +2409,7 @@ version = "0.2.5"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "bzip2-sys",
  "clap",
  "console",
  "flate2",
@@ -2416,6 +2417,7 @@ dependencies = [
  "globset",
  "indexmap 2.14.0",
  "indicatif",
+ "lzma-sys",
  "md5",
  "minijinja",
  "predicates",

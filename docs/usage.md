@@ -48,7 +48,10 @@ reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
 `--manual` for `manual:<file name>`, with the file's `size` and `md5` so a
 renamed copy is still found), the file name and the layout. An archive with
 no `.meta` saying where it came from is looked up on Nexus by its MD5, as
-`identify` does, when there is an API key to ask with. In a
+`identify` does, when there is an API key to ask with. One that stays a
+`manual:` archive, but whose name is plainly a Nexus download's
+(`<title>-<mod id>-<version>...`), gets that mod's page as its
+`download_page`, so whoever installs the list knows where to fetch it. In a
 terminal, an installer's choices are asked: a FOMOD step by step, through the
 same walk install makes (so a step shown only after certain answers is shown
 here only then), and a BAIN package's subpackages as one list. A BAIN package
@@ -137,6 +140,15 @@ change are touched, comments stay where they are (a replaced value keeps its
 end-of-line comment), the result is validated before anything is written, and
 `--dry-run` prints the change as a diff instead. A GUI built on mudcrab makes
 its edits through these same commands, so anything it can do, they can.
+
+### new
+
+```bash
+mudcrab new <modlist.toml> --name "<name>"
+```
+
+Starts a list: its name, and a load order holding only the game's master,
+ready for `add`. Never written over a file that is already there.
 
 ### set
 

@@ -68,11 +68,12 @@ Reports from setups other than these are especially welcome: see
 
 Prebuilt binaries for Linux and Windows are attached to each
 [release](https://github.com/steven-murray/mudcrab/releases). Unpack and run —
-there is nothing to install.
+there is nothing to install. The GUI is there too: an AppImage for Linux and
+the Steam Deck, and an installer or a zip for Windows (see
+[docs/gui.md](docs/gui.md)).
 
 The Linux build needs glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35
-and later), plus `liblzma.so.5` and `libbz2.so.1.0`, which almost every distro
-already has.
+and later), and nothing else installed.
 
 If you only want the merge engine, that is all you need: `merge` and
 `new-merge` read plugin files and write one, with no configuration, no external

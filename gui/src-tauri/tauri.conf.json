@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "mudcrab",
-  "version": "0.2.5",
+  "mainBinaryName": "mudcrab-gui",
   "identifier": "io.github.steven-murray.mudcrab",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -24,7 +24,36 @@
     }
   },
   "bundle": {
-    "active": false,
-    "icon": ["icons/icon.png", "icons/icon.ico"]
+    "active": true,
+    "targets": [
+      "appimage",
+      "nsis"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "category": "Game",
+    "publisher": "Steven Murray",
+    "copyright": "MIT OR Apache-2.0",
+    "shortDescription": "Install and write modlists for Oblivion",
+    "longDescription": "mudcrab installs a modlist into a Mod Organizer 2 instance from one window, and lets a list's author read and edit it: its mods' files, load order, conflicts, installers and notes. Every step is one of the mudcrab command line's commands.",
+    "homepage": "https://github.com/steven-murray/mudcrab",
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    }
   }
 }

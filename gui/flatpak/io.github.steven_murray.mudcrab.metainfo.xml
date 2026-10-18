@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.steven_murray.mudcrab</id>
+  <name>mudcrab</name>
+  <summary>Install and write modlists for Oblivion</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT OR Apache-2.0</project_license>
+  <developer id="io.github.steven-murray">
+    <name>Steven Murray</name>
+  </developer>
+  <description>
+    <p>
+      mudcrab installs a modlist for The Elder Scrolls IV: Oblivion into a Mod Organizer 2
+      instance from one window: it reads the list, asks its questions, downloads what it can,
+      checks everything, and installs. A list's author can read and edit it there too: each mod's
+      files, the load order with masters, conflicts, installers and notes.
+    </p>
+    <p>Every step is one of the mudcrab command line's commands, shown as it runs.</p>
+  </description>
+  <launchable type="desktop-id">io.github.steven_murray.mudcrab.desktop</launchable>
+  <url type="homepage">https://github.com/steven-murray/mudcrab</url>
+  <url type="bugtracker">https://github.com/steven-murray/mudcrab/issues</url>
+  <url type="help">https://steven-murray.github.io/mudcrab/gui.html</url>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.2.5" date="2026-10-18" />
+  </releases>
+</component>

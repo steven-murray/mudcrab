@@ -62,3 +62,99 @@ jobs:
           # version is not.
           prerelease: ${{ contains(github.ref_name, '-') }}
           generate_release_notes: true
+
+  # The GUI, as players get it: an AppImage for Linux and the Steam Deck's
+  # desktop mode, and for Windows an installer (per user, no administrator
+  # needed) and a zip of the program for those who would rather not install.
+  # Built on Ubuntu 22.04 so the AppImage's glibc is old enough for most
+  # distributions. Attached to the same release as the CLI.
+  gui:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            bundles: appimage
+          - os: windows-latest
+            bundles: nsis
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: gui/package-lock.json
+      - name: WebKitGTK and friends
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev
+      # The version is the workspace's, in Cargo.toml; a release whose tag
+      # says otherwise would ship files named for the wrong version.
+      - name: Version matches the tag
+        shell: bash
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          test "v$version" = "${{ github.ref_name }}" || {
+            echo "Cargo.toml says $version, the tag ${{ github.ref_name }}"; exit 1; }
+      - name: Bundle
+        working-directory: gui
+        shell: bash
+        run: |
+          npm ci
+          npx tauri build --bundles ${{ matrix.bundles }}
+      - name: Name (linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir out
+          cp target/release/bundle/appimage/*.AppImage "out/mudcrab-gui-${{ github.ref_name }}-x86_64.AppImage"
+      # The same binary goes into the Flatpak, made in the job below.
+      - name: Keep the binary for the Flatpak
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release/mudcrab-gui
+          if-no-files-found: error
+      - name: Name (windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Path out | Out-Null
+          Copy-Item (Get-ChildItem target\release\bundle\nsis\*.exe | Select-Object -First 1).FullName "out\mudcrab-gui-${{ github.ref_name }}-windows-x64-setup.exe"
+          $name = "mudcrab-gui-${{ github.ref_name }}-windows-x64"
+          New-Item -ItemType Directory -Path $name | Out-Null
+          Copy-Item target\release\mudcrab-gui.exe $name
+          Copy-Item LICENSE-MIT, LICENSE-APACHE, readme.md $name
+          Compress-Archive -Path $name -DestinationPath "out\$name.zip"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: out/*
+          prerelease: ${{ contains(github.ref_name, '-') }}
+
+  # The Flatpak, for the Steam Deck and other systems that install programs
+  # that way: the Linux binary above, on the GNOME runtime (see
+  # gui/flatpak/). A single-file bundle, installed with
+  # `flatpak install --user <file>`.
+  flatpak:
+    needs: gui
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          name: mudcrab-gui-linux-binary
+          path: target/release
+      - run: chmod +x target/release/mudcrab-gui
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: mudcrab-gui-${{ github.ref_name }}-x86_64.flatpak
+          manifest-path: gui/flatpak/io.github.steven_murray.mudcrab.yml
+          cache: false
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: mudcrab-gui-${{ github.ref_name }}-x86_64.flatpak
+          prerelease: ${{ contains(github.ref_name, '-') }}

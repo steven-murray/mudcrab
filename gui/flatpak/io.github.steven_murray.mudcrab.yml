@@ -1,0 +1,75 @@
+# mudcrab's GUI as a Flatpak, for the Steam Deck and anywhere else Flatpaks
+# are the way programs are installed. Built from the release binary
+# (target/release/mudcrab-gui, made by `npx tauri build` in gui/), on the
+# GNOME runtime, which has the WebKitGTK it needs:
+#
+#   flatpak-builder --user --install-deps-from=flathub --force-clean \
+#     --repo=repo build gui/flatpak/io.github.steven_murray.mudcrab.yml
+#   flatpak build-bundle repo mudcrab-gui.flatpak io.github.steven_murray.mudcrab
+#
+# The sandbox is opened as far as mudcrab needs: the home folder (lists, MO2
+# instances, downloads and the game are wherever the player keeps them), SD
+# cards and other drives, the network (Nexus), and the host (Wine or Proton
+# for xEdit, LOOT, and seeing whether MO2 is open run there; see
+# src/util/host.rs).
+app-id: io.github.steven_murray.mudcrab
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: mudcrab-gui
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=/run/media
+  - --filesystem=/media
+  - --filesystem=/mnt
+  - --talk-name=org.freedesktop.Flatpak
+modules:
+  # 7-Zip, for archives mudcrab reads with it (a named subset of a solid
+  # archive); the static build, so it needs nothing from the runtime.
+  - name: 7zip
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 7zzs /app/bin/7z
+      - install -Dm644 License.txt /app/share/licenses/7zip/License.txt
+    sources:
+      - type: archive
+        url: https://github.com/ip7z/7zip/releases/download/24.09/7z2409-linux-x64.tar.xz
+        sha256: 914c7e20ad5ef8e4d3cf08620ff8894b28fe11b7eb99809d6930870fbe48a281
+        strip-components: 0
+
+  - name: mudcrab-gui
+    buildsystem: simple
+    build-commands:
+      - install -Dm755 mudcrab-gui /app/bin/mudcrab-gui
+      - install -Dm644 io.github.steven_murray.mudcrab.desktop /app/share/applications/io.github.steven_murray.mudcrab.desktop
+      - install -Dm644 io.github.steven_murray.mudcrab.metainfo.xml /app/share/metainfo/io.github.steven_murray.mudcrab.metainfo.xml
+      - install -Dm644 32x32.png /app/share/icons/hicolor/32x32/apps/io.github.steven_murray.mudcrab.png
+      - install -Dm644 128x128.png /app/share/icons/hicolor/128x128/apps/io.github.steven_murray.mudcrab.png
+      - install -Dm644 128x128@2x.png /app/share/icons/hicolor/256x256/apps/io.github.steven_murray.mudcrab.png
+      - install -Dm644 icon.svg /app/share/icons/hicolor/scalable/apps/io.github.steven_murray.mudcrab.svg
+      - install -Dm644 LICENSE-MIT /app/share/licenses/mudcrab/LICENSE-MIT
+      - install -Dm644 LICENSE-APACHE /app/share/licenses/mudcrab/LICENSE-APACHE
+    sources:
+      - type: file
+        path: ../../target/release/mudcrab-gui
+      - type: file
+        path: io.github.steven_murray.mudcrab.desktop
+      - type: file
+        path: io.github.steven_murray.mudcrab.metainfo.xml
+      - type: file
+        path: ../src-tauri/icons/32x32.png
+      - type: file
+        path: ../src-tauri/icons/128x128.png
+      - type: file
+        path: ../src-tauri/icons/128x128@2x.png
+      - type: file
+        path: ../src-tauri/icons/icon.svg
+      - type: file
+        path: ../../LICENSE-MIT
+      - type: file
+        path: ../../LICENSE-APACHE
