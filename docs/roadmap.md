@@ -15,13 +15,21 @@ reusable pieces can be published once and pointed at: a shim that fixes a
 badly packaged mod, or a core group of mods several lists share. The
 design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
 
-### A GUI, alongside the CLI
+### The GUI, in use
 
-An authoring mode (drag mods into order, pick a mod's files, move folders) and
-an install mode (view the list, one button from compile to install). The CLI
-stays complete: nothing will ever need the GUI. The library API and the CLI
-commands it needs are done, a spike chose Tauri, and install mode has a first cut ([docs/gui.md](gui.md)). The
-design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/gui.md).
+The GUI ([docs/gui.md](gui.md)) installs a list from one window and lets its
+author read and edit it -- files, load order, conflicts, installers, notes,
+adding mods from archives or Nexus links -- every change one of the CLI's
+commands. It ships as an AppImage, a Flatpak and a Windows installer. Still
+to do:
+
+- **Tried on the Steam Deck**, in desktop mode, from the Flatpak and the
+  AppImage.
+- **Cancelling a run** part way through an install.
+- **Opening a list from a URL**, which comes with composability.
+- **Polish found in use**: what players and authors run into.
+
+The design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/gui.md).
 
 ## Open
 
@@ -37,7 +45,8 @@ design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/
 ### Installing
 
 - **Is MO2 running, on Windows.** `install` refuses while MO2 has the instance
-  open on Linux (from `/proc`); Windows has no check yet.
+  open on Linux (from `/proc`, the host's from a Flatpak); Windows has no
+  check yet, which matters more now the GUI runs there.
 - **Parallel unpacking.** A first install unpacks archives one at a time;
   `check` already runs a thread per CPU. Install's ordering (mods recorded as
   they finish, conflict partners first, xEdit one plugin at a time, merges
