@@ -1093,6 +1093,13 @@ pub struct FilesArgs {
     /// Take an `exclude` glob out.
     #[arg(long = "drop-exclude", value_name = "GLOB")]
     pub drop_exclude: Vec<String>,
+    /// Choose a BAIN package, as Wrye Bash's installer tab ticks one: a
+    /// top-level folder of a BAIN archive, added to `bain_subpackages`.
+    #[arg(long = "package", value_name = "NAME")]
+    pub package: Vec<String>,
+    /// Stop choosing a BAIN package.
+    #[arg(long = "drop-package", value_name = "NAME")]
+    pub drop_package: Vec<String>,
     /// The downloads folder. Defaults to `downloads_dir` in tools.toml.
     #[arg(long = "downloads", value_name = "DIR")]
     pub downloads: Option<PathBuf>,

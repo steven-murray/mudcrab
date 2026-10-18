@@ -2443,6 +2443,7 @@ name = "mudcrab-gui"
 version = "0.2.5"
 dependencies = [
  "anyhow",
+ "globset",
  "mudcrab",
  "serde",
  "serde_json",
@@ -2452,6 +2453,7 @@ dependencies = [
  "tempfile",
  "tokio",
  "toml 0.8.23",
+ "toml_edit 0.22.27",
  "zip",
 ]
 

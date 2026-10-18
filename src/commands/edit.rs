@@ -186,7 +186,9 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
     let editing = !(args.include.is_empty()
         && args.exclude.is_empty()
         && args.drop_include.is_empty()
-        && args.drop_exclude.is_empty());
+        && args.drop_exclude.is_empty()
+        && args.package.is_empty()
+        && args.drop_package.is_empty());
 
     let before = std::fs::read_to_string(&args.input)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", args.input.display()))?;
@@ -232,13 +234,21 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
             &args.include,
             &args.drop_include,
         )?;
-        doc::edit_strings(
+        let text = doc::edit_strings(
             &text,
             &args.mod_id,
             archive,
             "exclude",
             &args.exclude,
             &args.drop_exclude,
+        )?;
+        doc::edit_strings(
+            &text,
+            &args.mod_id,
+            archive,
+            "bain_subpackages",
+            &args.package,
+            &args.drop_package,
         )
     })?;
     // What the change does to the files taken, where the archive is here to
@@ -275,7 +285,7 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
         edit,
         args.dry_run,
         format!(
-            "Filters of {}'s archive {} changed",
+            "Filters and packages of {}'s archive {} changed",
             ui::name(&args.mod_id),
             args.archive
         ),

@@ -9,6 +9,7 @@
 //! `main.rs` only starts the window.
 
 mod author;
+mod edits;
 pub mod settings;
 pub mod sink;
 
@@ -45,6 +46,8 @@ struct Session {
     planned_at: Option<std::time::SystemTime>,
     /// Each plugin's masters, as the last `check` read them.
     masters: Option<Vec<config::check::PluginMasters>>,
+    /// The edits made here, for undo, redo and the session's changes.
+    history: edits::History,
     /// Archives still to come by hand, and what watches for them.
     pending: Vec<Unfetched>,
     watcher: Option<Watcher>,
@@ -114,13 +117,7 @@ fn open_list<R: Runtime>(
     path: String,
 ) -> Result<ListView, String> {
     let path = PathBuf::from(path);
-    // The prose is in the docs file when the list has one; a list shared
-    // without it still opens, with less to read.
-    let modlist = config::loader::load_modlist_with_docs(&path)
-        .or_else(|_| config::loader::load_modlist(&path))
-        .map_err(shown)?;
-    config::validator::validate(&modlist).map_err(shown)?;
-    let document = mudcrab::export::build_document(&modlist, None, None).map_err(shown)?;
+    let (modlist, document) = read_list(&path)?;
 
     let work = app
         .path()
@@ -145,6 +142,40 @@ fn open_list<R: Runtime>(
         cleans,
         ..Session::default()
     };
+    Ok(ListView {
+        about: modlist.about.clone(),
+        path: path.display().to_string(),
+        document,
+        answers,
+    })
+}
+
+/// The list at `path` and the document the page shows of it. The prose is
+/// in the docs file when the list has one; a list shared without it still
+/// opens, with less to read.
+fn read_list(
+    path: &Path,
+) -> Result<(config::schema::SourceModlist, mudcrab::export::Document), String> {
+    let modlist = config::loader::load_modlist_with_docs(path)
+        .or_else(|_| config::loader::load_modlist(path))
+        .map_err(shown)?;
+    config::validator::validate(&modlist).map_err(shown)?;
+    let document = mudcrab::export::build_document(&modlist, None, None).map_err(shown)?;
+    Ok((modlist, document))
+}
+
+/// The open list read again, after an edit, keeping the session (its plan,
+/// history and checks).
+#[tauri::command]
+fn reload_list(state: tauri::State<'_, State>) -> Result<ListView, String> {
+    let path = state.list()?;
+    let (modlist, document) = read_list(&path)?;
+    let answers = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&path)
+        .answers;
     Ok(ListView {
         about: modlist.about.clone(),
         path: path.display().to_string(),
@@ -883,5 +914,19 @@ pub fn app<R: Runtime>(
             author::mod_files,
             author::conflicts,
             author::conflicts_between,
+            reload_list,
+            edits::undo,
+            edits::redo,
+            edits::changes,
+            edits::move_plugin,
+            edits::move_mod,
+            edits::edit_filter,
+            edits::set_fields,
+            edits::add_action,
+            edits::remove_action,
+            edits::actions,
+            edits::add_input,
+            edits::set_input,
+            edits::remove_input,
         ])
 }

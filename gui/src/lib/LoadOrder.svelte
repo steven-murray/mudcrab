@@ -1,20 +1,33 @@
 <script lang="ts">
   import type { LoadOrder, PluginRow } from "./api";
+  import { startDrag } from "./drag";
 
   // The load order with each plugin's masters, and a flag on any placed
-  // above one (check's rule, worked out here from the order, so it will
-  // follow a drag once editing comes).
+  // above one (check's rule, worked out here from the order, so it follows a
+  // drag). Drag a plugin by its handle to move it (`plugins move`).
   let {
     order,
     select,
     runCheck,
     checking,
+    move,
   }: {
     order: LoadOrder;
     select: (mod: string) => void;
     runCheck: () => void;
     checking: boolean;
+    move: (plugin: string, before: string | null) => void;
   } = $props();
+
+  let scroller = $state<HTMLElement | null>(null);
+
+  // A drop before or after a plugin, as `plugins move --before` (or --last).
+  function dropped(plugin: string, key: string, place: string) {
+    const at = order.plugins.findIndex((p) => p.name === key);
+    const before = place === "before" ? key : (order.plugins[at + 1]?.name ?? null);
+    if (before === plugin) return;
+    move(plugin, before);
+  }
 
   let filter = $state("");
   let onlyFlagged = $state(false);
@@ -70,10 +83,21 @@
   </p>
 {/if}
 
-<ol>
+<ol bind:this={scroller}>
   {#each shown as { plugin, index, problems } (plugin.name)}
-    <li class:inactive={plugin.inactive} class:flagged={problems.length > 0}>
+    <li class:inactive={plugin.inactive} class:flagged={problems.length > 0} data-drop={plugin.name}>
       <div class="row">
+        <span
+          class="grip"
+          role="button"
+          tabindex="-1"
+          title="Drag to move it"
+          onpointerdown={(e) =>
+            startDrag(e, {
+              scroller: scroller!.closest(".right") as HTMLElement,
+              onDrop: (key, place) => dropped(plugin.name, key, place),
+            })}>⠿</span
+        >
         <span class="n">{index + 1}</span>
         <button class="plugin" onclick={() => (opened = opened === plugin.name ? null : plugin.name)}>
           {plugin.name}
@@ -143,7 +167,7 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 40px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+    grid-template-columns: 14px 36px minmax(0, 1.2fr) minmax(0, 1fr) auto;
     gap: 8px;
     align-items: baseline;
   }
@@ -193,14 +217,14 @@
     border-color: var(--problem);
   }
   .why {
-    margin: 2px 0 2px 48px;
+    margin: 2px 0 2px 64px;
     padding: 0;
     list-style: none;
     font-size: 12px;
     color: var(--problem);
   }
   .masters {
-    margin: 4px 0 4px 48px;
+    margin: 4px 0 4px 64px;
     font-size: 12px;
     display: flex;
     flex-wrap: wrap;

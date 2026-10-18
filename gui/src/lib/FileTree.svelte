@@ -2,13 +2,81 @@
   import { SvelteSet } from "svelte/reactivity";
   import type { FileRow, Tree } from "./api";
 
-  // A mod's archive as a tree, marked with what install takes from it. Read
-  // only: phase 6 turns the marks into ticks.
-  let { tree }: { tree: Tree } = $props();
+  // A mod's archive as a tree, marked with what install takes from it, with
+  // ticks that follow the installer an author already knows:
+  //
+  // - BAIN: packages only, at the top level, as Wrye Bash's installer tab
+  //   ticks them (`files --package`); the files inside are shown read-only.
+  // - FOMOD: no ticks here; its options are chosen in its installer's steps.
+  // - Anything else: files and folders, unticking writing an `exclude`
+  //   (`files --exclude`) and ticking back dropping it.
+  //
+  // For any layout, "exclude" on a row is the expert override: an `exclude`
+  // for what the filters see it as.
+  let {
+    tree,
+    edit,
+    problem,
+  }: {
+    tree: Tree;
+    edit: (key: string, add: string[], drop: string[]) => void;
+    problem: (message: string) => void;
+  } = $props();
 
-  // Folders start closed, except the top level of a small archive.
+  const bain = $derived(tree.layout === "bain");
+  const fomod = $derived(tree.layout === "fomod");
+  const lower = (list: string[]) => list.map((v) => v.toLowerCase());
+
+  // BAIN: a top-level package ticked when chosen.
+  function packageTick(row: FileRow) {
+    const name = row.name;
+    if (lower(tree.bain_conditional).includes(name.toLowerCase()))
+      return problem(`${name} is chosen under a condition; change that in the list's file.`);
+    const chosen = lower(tree.bain_subpackages).includes(name.toLowerCase());
+    edit("bain_subpackages", chosen ? [] : [name], chosen ? [name] : []);
+  }
+
+  // Anything else: untick to exclude it, tick to drop the exclude that left
+  // it out.
+  function fileTick(row: FileRow) {
+    if (!row.offered || !row.exclude_glob)
+      return problem(
+        row.offered
+          ? `${row.path} is the mod's data folder itself; untick what is in it instead.`
+          : `${row.path} is left out by the layout, not a filter.`,
+      );
+    if (row.state !== "none") return edit("exclude", [row.exclude_glob], []);
+    const own = tree.exclude.find((g) => g.toLowerCase() === row.exclude_glob!.toLowerCase());
+    if (own) return edit("exclude", [], [own]);
+    problem(
+      `${row.path} is left out by a wider filter (${[
+        ...tree.include.map((g) => `include ${g}`),
+        ...tree.exclude.map((g) => `exclude ${g}`),
+      ].join(", ")}); change that below.`,
+    );
+  }
+
+  function exclude(row: FileRow) {
+    if (row.exclude_glob) edit("exclude", [row.exclude_glob], []);
+  }
+
+  let newGlob = $state("");
+  let newKey = $state<"exclude" | "include">("exclude");
+  function addGlob(event: SubmitEvent) {
+    event.preventDefault();
+    const glob = newGlob.trim();
+    if (!glob) return;
+    edit(newKey, [glob], []);
+    newGlob = "";
+  }
+
+  // Folders start closed, except in a small archive, and stay as they were
+  // when the same archive is read again after an edit.
   const open = new SvelteSet<string>();
+  let shownLabel = "";
   $effect(() => {
+    if (tree.label === shownLabel) return;
+    shownLabel = tree.label;
     open.clear();
     if (tree.rows.length <= 60) for (const row of tree.rows) if (row.folder) open.add(row.path);
   });
@@ -51,7 +119,26 @@
     {#if tree.include.length}<span class="dim">include: <code>{tree.include.join(", ")}</code></span>{/if}
     {#if tree.exclude.length}<span class="dim">exclude: <code>{tree.exclude.join(", ")}</code></span>{/if}
   </div>
-  <div class="legend dim">✔ installed · ◐ partly · ○ filtered out · · not chosen by the layout</div>
+  <div class="filters">
+    {#each [{ key: "include", list: tree.include }, { key: "exclude", list: tree.exclude }] as filter}
+      {#each filter.list as glob}
+        <span class="glob {filter.key}"
+          >{filter.key} <code>{glob}</code><button class="x" title="Take it out" onclick={() => edit(filter.key, [], [glob])}
+            >✕</button
+          ></span
+        >
+      {/each}
+    {/each}
+    <form onsubmit={addGlob}>
+      <select bind:value={newKey}><option>exclude</option><option>include</option></select>
+      <input type="text" placeholder="a glob, e.g. docs/**" bind:value={newGlob} />
+      <button type="submit" disabled={!newGlob.trim()}>Add</button>
+    </form>
+  </div>
+  <div class="legend dim">
+    ✔ installed · ◐ partly · ○ filtered out · · not chosen by the layout
+    {#if bain}· tick a package to choose it, as in Wrye Bash{:else if fomod}· its options are chosen in the FOMOD installer, not here{:else}· untick to exclude{/if}
+  </div>
   <ul>
     {#each rows as row (row.path)}
       <li
@@ -61,16 +148,48 @@
         style="--depth: {row.depth}"
         title={why(row)}
       >
-        <span class="mark">{mark(row)}</span>
+        {#if bain && row.package}
+          <input
+            type="checkbox"
+            checked={lower(tree.bain_subpackages).includes(row.name.toLowerCase())}
+            disabled={lower(tree.bain_conditional).includes(row.name.toLowerCase())}
+            onclick={(e) => {
+              e.preventDefault();
+              packageTick(row);
+            }}
+          />
+        {:else if !bain && !fomod && row.offered}
+          <input
+            type="checkbox"
+            checked={row.state === "all"}
+            indeterminate={row.state === "some"}
+            onclick={(e) => {
+              e.preventDefault();
+              fileTick(row);
+            }}
+          />
+        {:else}
+          <span class="mark">{mark(row)}</span>
+        {/if}
         {#if row.folder}
           <button class="name folder" onclick={() => toggle(row)}>
             <span class="twisty">{open.has(row.path) ? "▾" : "▸"}</span>{row.name}/
           </button>
           <span class="count dim">{row.taken}/{row.files}</span>
+          {#if (bain || fomod) && row.taken && row.exclude_glob}
+            <button class="override" onclick={() => exclude(row)} title={`Write exclude ${row.exclude_glob}${bain ? " -- it applies to every package" : ""}`}
+              >exclude</button
+            >
+          {/if}
         {:else}
           <span class="name">{row.name}</span>
           {#if row.destination && row.destination.toLowerCase() !== row.path.toLowerCase()}
             <span class="dest dim" title="Where it goes in the mod's folder">→ {row.destination}</span>
+          {/if}
+          {#if (bain || fomod) && row.taken && row.exclude_glob}
+            <button class="override" onclick={() => exclude(row)} title={`Write exclude ${row.exclude_glob}${bain ? " -- it applies to every package" : ""}`}
+              >exclude</button
+            >
           {/if}
         {/if}
       </li>
@@ -89,6 +208,60 @@
   .legend {
     font-size: 11px;
     margin: 4px 0 8px;
+  }
+  .filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    align-items: center;
+    margin: 6px 0;
+    font-size: 12px;
+  }
+  .glob {
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 0 0 0 6px;
+    color: var(--dim);
+  }
+  .glob.include {
+    border-color: var(--note);
+  }
+  .glob code {
+    color: var(--text);
+  }
+  .x {
+    border: none;
+    background: none;
+    padding: 0 5px;
+    color: var(--dim);
+  }
+  .x:hover {
+    color: var(--problem);
+  }
+  .filters form {
+    display: flex;
+    gap: 4px;
+  }
+  .filters input {
+    width: 180px;
+    font-size: 12px;
+  }
+  .filters select,
+  .filters button {
+    font-size: 12px;
+    padding: 2px 6px;
+  }
+  input[type="checkbox"] {
+    margin: 0;
+    flex: none;
+  }
+  .override {
+    font-size: 10px;
+    padding: 0 5px;
+    visibility: hidden;
+  }
+  li:hover .override {
+    visibility: visible;
   }
   ul {
     list-style: none;
