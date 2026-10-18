@@ -8,10 +8,7 @@
 
 use crate::cli::ConflictsArgs;
 use crate::config;
-use crate::config::install::index::staged_paths_detailed;
-use crate::config::install::safe_mod_dir_name;
 use crate::config::tools::ToolsConfig;
-use std::collections::BTreeSet;
 
 pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     let plan = config::pipeline::read_plan(&args.plan)?;
@@ -38,89 +35,43 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
         redo_actions: Vec::new(),
     };
 
-    let active_plugins: std::collections::HashSet<String> = plan
-        .plugins
-        .iter()
-        .map(|plugin| plugin.to_ascii_lowercase())
-        .collect();
-
-    let find = |id: &str| {
-        plan.mods
-            .iter()
-            .find(|entry| entry.id == id)
-            .ok_or_else(|| anyhow::anyhow!("no mod '{id}' in {}", args.plan.display()))
-    };
-
     let Some(mod_id) = &args.mod_id else {
-        return sweep(&plan, &args, &settings, &active_plugins);
+        return sweep(&plan, &args, &settings);
     };
-    let subject = find(mod_id)?;
-    let subject_paths = staged_paths_detailed(
-        subject,
-        Some(&args.mods_dir.join(safe_mod_dir_name(&subject.id)?)),
-        &settings,
-        &active_plugins,
-    )?;
-    let mine = subject_paths.visible;
 
     if args.with.is_empty() {
+        let mine = config::conflicts::files_of(&plan, &settings, mod_id)?;
         for path in &mine {
             println!("{path}");
         }
         crate::ui::status_err(
             crate::ui::Tone::Good,
-            format!("{}: {} files", subject.id, mine.len()),
+            format!("{mod_id}: {} files", mine.len()),
         );
         return Ok(());
     }
 
-    let mut theirs = BTreeSet::new();
-    for id in &args.with {
-        let other = find(id)?;
-        let paths = staged_paths_detailed(
-            other,
-            Some(&args.mods_dir.join(safe_mod_dir_name(&other.id)?)),
-            &settings,
-            &active_plugins,
-        )?;
+    let shared =
+        config::conflicts::shared(&plan, &settings, mod_id, &args.with, args.under.as_deref())?;
+    for other in &shared.others {
         eprintln!(
             "{}",
-            crate::ui::dim(format!("{id}: {} files", paths.visible.len()))
+            crate::ui::dim(format!("{}: {} files", other.mod_id, other.files))
         );
-        theirs.extend(paths.visible);
     }
-
-    let under = args.under.as_ref().map(|value| {
-        format!(
-            "{}/",
-            value.replace('\\', "/").trim_matches('/').to_lowercase()
-        )
-    });
-
-    let overlap: Vec<&String> = mine
-        .iter()
-        .filter(|path| {
-            under
-                .as_deref()
-                .is_none_or(|prefix| path.starts_with(prefix))
-        })
-        .filter(|path| theirs.contains(*path))
-        .collect();
-
-    for path in &overlap {
+    for path in &shared.overlap {
         println!("{path}");
     }
     crate::ui::status_err(
-        if overlap.is_empty() {
+        if shared.overlap.is_empty() {
             crate::ui::Tone::Note
         } else {
             crate::ui::Tone::Warning
         },
         format!(
-            "{} of {}'s {} files are also provided by [{}]",
-            overlap.len(),
-            subject.id,
-            mine.len(),
+            "{} of {mod_id}'s {} files are also provided by [{}]",
+            shared.overlap.len(),
+            shared.files,
             args.with.join(", ")
         ),
     );
@@ -129,30 +80,23 @@ pub async fn run(args: ConflictsArgs) -> anyhow::Result<()> {
     // "0", which reads as "the row was wrong" when it means "the row worked".
     // The hidden files are out of the VFS and so genuinely conflict with
     // nothing -- but that is not what the person asking wants to hear.
-    let already = subject_paths
-        .hidden
-        .iter()
-        .filter(|path| under.as_deref().is_none_or(|p| path.starts_with(p)))
-        .filter(|path| theirs.contains(*path))
-        .count();
+    let already = shared.already_hidden;
     if already > 0 {
         crate::ui::status_err(
             crate::ui::Tone::Note,
             format!(
-                "{already} further file{} {} already hidden in {}, so out of the \
+                "{already} further file{} {} already hidden in {mod_id}, so out of the \
              virtual file system and not counted above. Re-install the mod to see \
              the selection as it was first made.",
                 if already == 1 { "" } else { "s" },
                 if already == 1 { "is" } else { "are" },
-                subject.id,
             ),
         );
     }
     Ok(())
 }
 
-/// Every installed mod's files, compared with every other's, in MO2's order:
-/// a later mod wins a file an earlier one also provides.
+/// Every installed mod's files, compared with every other's, in MO2's order.
 ///
 /// `--mod` answers "what does this mod share", which is only a question once
 /// you know to ask it. This is what tells you to.
@@ -160,54 +104,13 @@ fn sweep(
     plan: &config::schema::PersonalizedPlan,
     args: &ConflictsArgs,
     settings: &config::install::InstallSettings,
-    active_plugins: &std::collections::HashSet<String>,
 ) -> anyhow::Result<()> {
-    use std::collections::{BTreeMap, HashMap};
-
-    // Each path, and the mods providing it in priority order.
-    let mut providers: HashMap<String, Vec<usize>> = HashMap::new();
-    let mut installed = Vec::new();
-    let mut missing = 0usize;
-    for (index, entry) in plan.mods.iter().enumerate() {
-        let dir = args.mods_dir.join(safe_mod_dir_name(&entry.id)?);
-        if !dir.is_dir() {
-            missing += 1;
-            continue;
-        }
-        installed.push(index);
-        let paths = staged_paths_detailed(entry, Some(&dir), settings, active_plugins)?;
-        for path in paths.visible {
-            // MO2 writes a meta.ini into every mod; it is not in the game's
-            // view, and would make every mod "conflict" with every other.
-            if path == "meta.ini" {
-                continue;
-            }
-            providers.entry(path).or_default().push(index);
-        }
-    }
-
-    let filter = args.filter.to_mod_filter();
-    // Per mod: how many files it wins from each earlier mod, and loses to
-    // each later one. A file three mods provide counts once per pair that
-    // matters: the winner over each loser.
-    let mut wins: BTreeMap<usize, BTreeMap<usize, usize>> = BTreeMap::new();
-    let mut losses: BTreeMap<usize, BTreeMap<usize, usize>> = BTreeMap::new();
-    for mods in providers.values().filter(|mods| mods.len() > 1) {
-        let winner = *mods.last().expect("more than one");
-        for &loser in &mods[..mods.len() - 1] {
-            *wins.entry(winner).or_default().entry(loser).or_default() += 1;
-            *losses.entry(loser).or_default().entry(winner).or_default() += 1;
-        }
-    }
-
-    let name = |index: usize| plan.mods[index].id.as_str();
-    let partners = |counts: &BTreeMap<usize, usize>| {
-        let mut list: Vec<(usize, usize)> = counts.iter().map(|(m, n)| (*m, *n)).collect();
-        list.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let found = config::conflicts::sweep(plan, settings, &args.filter.to_mod_filter())?;
+    let partners = |list: &[config::conflicts::Partner]| {
         let shown: Vec<String> = list
             .iter()
             .take(5)
-            .map(|(m, n)| format!("{} ({n})", name(*m)))
+            .map(|p| format!("{} ({})", p.mod_id, p.files))
             .collect();
         let more = list.len().saturating_sub(5);
         if more > 0 {
@@ -218,18 +121,7 @@ fn sweep(
     };
     let files = |n: usize| if n == 1 { "file" } else { "files" };
 
-    let mut reported = 0usize;
-    for &index in &installed {
-        let entry = &plan.mods[index];
-        if !filter.is_empty() && !filter.matches(&entry.section, &entry.id) {
-            continue;
-        }
-        let won = wins.get(&index);
-        let lost = losses.get(&index);
-        if won.is_none() && lost.is_none() {
-            continue;
-        }
-        reported += 1;
+    for entry in &found.mods {
         let section = if entry.section.is_empty() {
             String::new()
         } else {
@@ -239,33 +131,35 @@ fn sweep(
             )
         };
         println!("\n{}{section}", crate::ui::name(&entry.id));
-        if let Some(won) = won {
-            let total: usize = won.values().sum();
+        if !entry.wins.is_empty() {
+            let total: usize = entry.wins.iter().map(|p| p.files).sum();
             println!(
                 "  {} {total} {} over: {}",
                 console::style("wins").green(),
                 files(total),
-                partners(won)
+                partners(&entry.wins)
             );
         }
-        if let Some(lost) = lost {
-            let total: usize = lost.values().sum();
+        if !entry.losses.is_empty() {
+            let total: usize = entry.losses.iter().map(|p| p.files).sum();
             println!(
                 "  {} {total} {} to: {}",
                 console::style("loses").yellow(),
                 files(total),
-                partners(lost)
+                partners(&entry.losses)
             );
         }
     }
 
+    let reported = found.mods.len();
+    let missing = found.missing;
     eprintln!();
     crate::ui::status_err(
         crate::ui::Tone::Good,
         format!(
             "{reported} of {} installed mods share files with another (loose files and BSA \
          contents; a later mod wins){}.",
-            installed.len(),
+            found.installed,
             if missing > 0 {
                 format!(
                     "; {missing} in the plan {} not installed, so not compared",

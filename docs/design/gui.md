@@ -1,12 +1,12 @@
 # A GUI, alongside the CLI
 
-**Status: phases 1-3 done; phase 4, install mode, has its first cut.** The
+**Status: phases 1-4 done; phase 5, author mode reading, has its first cut.** The
 library API and CLI parity are in, the framework spike
 ([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes)) chose
 **Tauri**, and `gui/` has install mode: open a list, read it, answer its
 questions, choose where things go, and install, step by step, with
-downloads by hand and the manual-step checklist (user docs:
-[docs/gui.md](../gui.md)). Still to do in phase 4: cancelling a run, the
+downloads by hand and the manual-step checklist, and author mode's reading
+views (user docs: [docs/gui.md](../gui.md)). Left over from phase 4: cancelling a run, the
 GUI's own release artifacts (phase 7), and opening a list from a URL (with
 composability).
 
@@ -219,8 +219,12 @@ belong to a block.
 - **`config::pipeline`**: `compile`, `compile_text`, `read_compiled`,
   `read_plan`, `write_json`.
 
-Still printing directly, for later phases: `conflicts`' sweep and `assets`
-(their logic sits in the command; it moves to the library with phase 5), and
+- **`config::conflicts`** (phase 5): `sweep` (who wins which files, by mod)
+  and `shared` (the files one mod shares with others), which `conflicts`
+  prints and the GUI shows. `check`'s report also carries each plugin's
+  masters (`plugins`).
+
+Still printing directly: `assets` (its logic sits in the command) and
 `download`'s browser mode.
 
 ## Phases
@@ -239,7 +243,13 @@ Still printing directly, for later phases: `conflicts`' sweep and `assets`
    locations, the Install timeline, manual-step checklist. Ship it: it is
    useful to players on its own.
 5. **Author mode, reading.** Load order, a mod's files with the planner's
-   highlighting, conflicts, check results.
+   highlighting, conflicts, check results. Built: the mode switch, the list
+   as a tree, a mod's archives as file trees, the load order with masters
+   (read by `check`) and misplaced ones flagged in the page so a drag can
+   recompute them, the conflicts sweep with each pair's files, and `check`
+   with findings linking to their mod. It reads the plan made with install
+   mode's answers, made again when the file changes. The inputs view waits
+   for phase 6, where it is edited.
 6. **Author mode, editing.** Drag-and-drop through the parity commands, the
    command-and-diff panel, undo.
 7. **Packaging.** AppImage (and Flatpak) for Linux, an installer or zip for

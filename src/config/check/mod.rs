@@ -45,11 +45,22 @@ pub struct CheckReport {
     pub warnings: usize,
     /// Everything found, in report order.
     pub findings: Vec<Finding>,
+    /// Each plugin read from an archive: the mod installing it and its
+    /// masters, for showing the load order with them.
+    pub plugins: Vec<PluginMasters>,
+}
+
+/// A plugin a mod installs, and the masters its header names.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct PluginMasters {
+    pub plugin: String,
+    pub mod_id: String,
+    pub masters: Vec<String>,
 }
 
 /// The plugins shipped by the game itself. A master among these is present
 /// unless the list's load order says otherwise.
-pub(crate) const GAME_PLUGINS: &[&str] = &[
+pub const GAME_PLUGINS: &[&str] = &[
     "oblivion.esm",
     "dlcshiveringisles.esp",
     "knights.esp",
@@ -374,6 +385,19 @@ fn check_in(
         problems,
         warnings,
         findings: findings.0,
+        plugins: folders
+            .iter()
+            .flat_map(|(id, folder)| {
+                folder
+                    .plugins
+                    .values()
+                    .map(move |(name, masters)| PluginMasters {
+                        plugin: name.clone(),
+                        mod_id: id.clone(),
+                        masters: masters.clone(),
+                    })
+            })
+            .collect(),
     })
 }
 

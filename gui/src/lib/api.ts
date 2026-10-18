@@ -135,10 +135,90 @@ export interface Downloaded {
   browser_folder: string | null;
 }
 
+export interface FindingItem {
+  text: Span[];
+  mod_id: string | null;
+}
+
+export interface FindingGroup {
+  heading: string;
+  tone: Tone;
+  items: FindingItem[];
+}
+
 export interface Checked {
   done: Done;
   problems: number;
   warnings: number;
+  groups: FindingGroup[];
+}
+
+// Author mode, reading.
+
+export interface PluginRow {
+  name: string;
+  mods: string[];
+  inactive: boolean;
+  /** Read by check; null before it has run, or for a plugin made at install. */
+  masters: string[] | null;
+}
+
+export interface LoadOrder {
+  plugins: PluginRow[];
+  game: string[];
+  masters_read: boolean;
+  merged: Record<string, string>;
+}
+
+export interface ModView {
+  id: string;
+  left_out: boolean;
+  archives: { number: number; label: string; layout: string | null }[];
+}
+
+export interface FileRow {
+  path: string;
+  name: string;
+  depth: number;
+  folder: boolean;
+  state: "all" | "some" | "none";
+  offered: boolean;
+  package: boolean;
+  destination: string | null;
+  filtered_as: string | null;
+  files: number;
+  taken: number;
+}
+
+export interface Tree {
+  label: string;
+  layout: string | null;
+  include: string[];
+  exclude: string[];
+  bain_subpackages: string[];
+  rows: FileRow[];
+  entries: number;
+  taken: number;
+  command: string;
+}
+
+export interface Partner {
+  mod_id: string;
+  files: number;
+}
+
+export interface Conflicts {
+  sweep: {
+    mods: { id: string; section: string[]; wins: Partner[]; losses: Partner[] }[];
+    installed: number;
+    missing: number;
+  };
+  command: string;
+}
+
+export interface Between {
+  shared: { files: number; others: Partner[]; overlap: string[]; already_hidden: number };
+  command: string;
 }
 
 export interface StepByHand {
@@ -181,4 +261,10 @@ export const api = {
   check: () => invoke<Checked>("step_check"),
   install: () => invoke<Done>("step_install"),
   manualSteps: () => invoke<StepByHand[]>("manual_steps"),
+  loadOrder: () => invoke<LoadOrder>("load_order"),
+  modView: (id: string) => invoke<ModView>("mod_view", { id }),
+  modFiles: (id: string, number: number) => invoke<Tree>("mod_files", { id, number }),
+  conflicts: () => invoke<Conflicts>("conflicts"),
+  conflictsBetween: (id: string, other: string) =>
+    invoke<Between>("conflicts_between", { id, other }),
 };

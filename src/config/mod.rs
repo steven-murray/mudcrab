@@ -7,6 +7,7 @@ pub mod by_hand;
 pub mod check;
 pub mod compiler;
 pub mod condition;
+pub mod conflicts;
 pub mod diff;
 pub mod docs;
 pub mod download;

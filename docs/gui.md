@@ -1,4 +1,4 @@
-# Installing with the GUI
+# The GUI
 
 **Preview.** The GUI is new and not yet in a release; build it from source
 (below) to try it. Everything it does is one of the commands in
@@ -47,6 +47,33 @@ profile back when it exits.
 
 The GUI keeps its own settings -- recent lists, and where each list was
 installed -- in `gui.toml` beside `tools.toml`, never in the list.
+
+## Author mode
+
+**Author** in the top right switches to looking into the list as its author
+would. It reads the list as planned with the answers given in Install, and
+plans it again when the file changes on disk (or on **Reload**). Editing
+comes later; for now it reads.
+
+- **The list** on the left: sections as a tree, each mod with a note of
+  whether it is optional (`if`), left unticked in MO2 (`off`), or not made
+  from archives. Choose one to see it on the right.
+- **Mod**: its notes, and each of its archives as a tree of files, marked
+  with what `install` takes: ✔ installed (with where it goes, when that is
+  somewhere else), ◐ a folder partly installed, ○ left out by the archive's
+  `include` or `exclude`, and greyed out, what the layout itself does not
+  choose (a BAIN package or FOMOD option not picked). This needs the
+  downloads folder, as `mudcrab files` does.
+- **Load order**: every plugin, the mods that ship it, and once a check has
+  read them, its masters. A plugin placed above one of its masters, or
+  needing one that is not in the list, is inactive, or is merged away, is
+  flagged, with why.
+- **Conflicts**: which installed mods provide the same files, who wins (a
+  later mod in MO2's order), and, a click on a pair, the files both provide
+  -- `mudcrab conflicts`. This reads the instance chosen in Install, so the
+  list needs installing there first.
+- **Check**: `mudcrab check`, on demand, its findings under the same
+  headings; a finding about a mod opens that mod.
 
 ## Building it
 
