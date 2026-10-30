@@ -1140,6 +1140,10 @@ fn merge_source_problems(
                          {master} to `plugins`, or leave {} out of the merge",
                         source.plugin
                     ),
+                    (Some(&at), Some(out)) if at == out => format!(
+                        "needs {master}, the merge's own output: a plugin cannot be merged into \
+                         one it needs"
+                    ),
                     (Some(&at), Some(out)) if at > out => format!(
                         "needs {master}, which loads after the merge's output {} (move {master} \
                          above it in `plugins`)",
@@ -1326,11 +1330,19 @@ mod tests {
             ("Fort A.esp", &["Oblivion.esm"]),
             // Another source of the same merge is fine; a master out of the
             // list, or loading after the output, is not.
-            ("Patch.esp", &["Fort A.esp", "Cloudtop.esp", "Late.esp"]),
+            // Nor is the merge's own output.
+            (
+                "Patch.esp",
+                &["Fort A.esp", "Cloudtop.esp", "Late.esp", "Forts Merged.esp"],
+            ),
         ]);
         let (errors, checked) = master_problems(&plan, &shipped);
         assert_eq!(checked, 2, "{errors:#?}");
-        assert_eq!(errors.len(), 2, "{errors:#?}");
+        assert_eq!(errors.len(), 3, "{errors:#?}");
+        assert!(
+            errors[2].1.contains("the merge's own output"),
+            "{errors:#?}"
+        );
         assert!(
             errors[0]
                 .1
