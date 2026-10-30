@@ -45,6 +45,9 @@ pub struct NewMod {
     /// A complete `[[mods.archives]]` block, written as is in place of one
     /// built from `path` and `file_name`: what `inspect` makes of an archive.
     pub archive_block: Option<String>,
+    /// A shim whose definition the entry takes (`use`), in place of archives.
+    /// Its plugins are the shim's, so the entry does not repeat them.
+    pub use_source: Option<String>,
 }
 
 /// Where a rendered block will be spliced in.
@@ -197,7 +200,9 @@ pub fn render_block(new_mod: &NewMod) -> String {
     if let Some(condition) = &new_mod.condition {
         lines.push(format!("if = {}", toml_string(condition)));
     }
-    if !new_mod.plugins.is_empty() {
+    if let Some(source) = &new_mod.use_source {
+        lines.push(format!("use = {}", toml_string(source)));
+    } else if !new_mod.plugins.is_empty() {
         let joined = new_mod
             .plugins
             .iter()

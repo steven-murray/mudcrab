@@ -7,6 +7,12 @@ use crate::config::install::safe_mod_dir_name;
 use std::path::{Path, PathBuf};
 
 pub async fn run(mut args: AddArgs) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !(args.load_after.is_some() || args.load_last)
+            || !args.plugins.is_empty()
+            || args.use_source.is_some(),
+        "--load-after and --load-last place the mod's plugins: give them with --plugin"
+    );
     // An archive whose `.meta` does not say where it came from: ask Nexus
     // which file it is, by its MD5, as `identify` does.
     if let Some(archive) = args.archive.clone()
@@ -199,6 +205,9 @@ async fn nexus_file_name(path: Option<&str>) -> Option<String> {
 /// Build the entry to insert, plus the Oracle mod folder when there is one (it
 /// is scanned afterwards for plugins).
 fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
+    if let Some(source) = &args.use_source {
+        return Ok((from_shim(source, args)?, None));
+    }
     if let Some(archive) = &args.archive {
         return Ok((from_archive(archive, args)?, None));
     }
@@ -221,6 +230,20 @@ fn resolve(args: &AddArgs) -> anyhow::Result<(NewMod, Option<PathBuf>)> {
             unreachable!("clap declares --from-mo2 and --nexus as conflicting")
         }
     }
+}
+
+/// A `use` entry for the shim `source`: its id (unless --id gives another)
+/// and its plugins, for the load order.
+fn from_shim(source: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
+    let shim = config::loader::read_shim(&args.input, source)?;
+    Ok(NewMod {
+        id: args.id.clone().unwrap_or_else(|| shim.id.clone()),
+        section: args.sections.clone(),
+        condition: args.condition.clone(),
+        plugins: shim.plugins,
+        use_source: Some(source.to_string()),
+        ..NewMod::default()
+    })
 }
 
 /// An entry written from the archive itself, as `inspect` reads it. What the
@@ -503,6 +526,7 @@ fn from_nexus(spec: &str, args: &AddArgs) -> anyhow::Result<NewMod> {
         non_nexus: false,
         known_mod_id: None,
         archive_block: None,
+        use_source: None,
     })
 }
 
