@@ -3,6 +3,7 @@
 //! MO2 is the first concrete export target, not the internal abstraction --
 //! the install pipeline itself stays launcher-agnostic.
 
+pub mod layout;
 pub mod running;
 
 use super::install::InstallSettings;
@@ -112,16 +113,12 @@ pub(crate) fn unhide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<()> 
 }
 
 pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<()> {
-    let root =
-        mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
-    std::fs::create_dir_all(root.join("mods")).map_err(|err| {
-        anyhow::anyhow!("failed to create {}: {err}", root.join("mods").display())
-    })?;
-    std::fs::create_dir_all(root.join("downloads")).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to create {}: {err}",
-            root.join("downloads").display()
-        )
+    mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
+    // The mods folder where the instance's ModOrganizer.ini says (see
+    // `layout`). No `downloads/` beside it: MO2 is pointed at the downloads
+    // folder itself.
+    std::fs::create_dir_all(&settings.mods_dir).map_err(|err| {
+        anyhow::anyhow!("failed to create {}: {err}", settings.mods_dir.display())
     })?;
 
     let profile_dir =
@@ -349,54 +346,23 @@ pub(crate) fn point_at_downloads(
 }
 
 /// Where an MO2 instance saves downloads: `download_directory` in its
-/// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
-/// a Wine drive other than `Z:`.
-/// Why `dir` is not a Mod Organizer 2 instance, if it is not. A portable
-/// instance has `ModOrganizer.exe` at its top, and `ModOrganizer.ini` once MO2
-/// has been run there; a folder with neither is somewhere else, and
-/// installing into it would build a mods folder no MO2 reads.
-pub fn not_an_instance(dir: &Path) -> Option<String> {
-    if !dir.is_dir() {
-        return Some(format!("{} is not a folder", dir.display()));
-    }
-    let has = |name: &str| dir.join(name).is_file();
-    (!has("ModOrganizer.exe") && !has("ModOrganizer.ini")).then(|| {
-        format!(
-            "{} does not look like a Mod Organizer 2 instance: it has neither ModOrganizer.exe \
-             nor ModOrganizer.ini. Choose the folder MO2 is in (a portable instance).",
-            dir.display()
-        )
-    })
-}
-
+/// `ModOrganizer.ini` (which may name it from `%BASE_DIR%`), else
+/// `downloads/` in its base directory (see `layout`). `None` when the setting
+/// names a Wine drive other than `Z:`.
 pub fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
-    let mut in_settings = false;
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_settings = line.eq_ignore_ascii_case("[Settings]");
-            continue;
-        }
-        let Some(value) = line
-            .strip_prefix("download_directory=")
-            .filter(|_| in_settings)
-        else {
-            continue;
-        };
-        let value = value.trim();
-        if value.is_empty() {
-            break;
-        }
-        if cfg!(windows) {
-            return Some(PathBuf::from(value));
-        }
-        let unix = value
-            .strip_prefix("Z:")
-            .or_else(|| value.strip_prefix("z:"))?;
-        return Some(PathBuf::from(unix.replace('\\', "/")));
+    let base = layout::Layout::of(instance).base;
+    let Some(value) = layout::settings_value(&text, "download_directory") else {
+        return Some(base.join("downloads"));
+    };
+    let value = value.replace("%BASE_DIR%", &base.to_string_lossy());
+    if cfg!(windows) || value.starts_with('/') {
+        return Some(PathBuf::from(value));
     }
-    Some(instance.join("downloads"))
+    let unix = value
+        .strip_prefix("Z:")
+        .or_else(|| value.strip_prefix("z:"))?;
+    Some(PathBuf::from(unix.replace('\\', "/")))
 }
 
 /// Set MO2's theme to the list's, unless one is already chosen: a theme picked
@@ -876,11 +842,7 @@ pub(crate) fn mo2_instance_dir(settings: &InstallSettings) -> Option<&Path> {
 }
 
 pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
-    Some(
-        mo2_instance_dir(settings)?
-            .join("profiles")
-            .join(&settings.profile_name),
-    )
+    Some(layout::profiles_dir(mo2_instance_dir(settings)?).join(&settings.profile_name))
 }
 
 /// The game folder an MO2 instance was set up with: `gamePath` in its

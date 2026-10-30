@@ -694,7 +694,7 @@ fn plugin_copies(plugin: &str, settings: &InstallSettings) -> Vec<PathBuf> {
         .map(|entries| entries.flatten().flat_map(|e| named(&e.path())).collect())
         .unwrap_or_default();
     if let Some(dir) = &settings.mo2_instance_dir {
-        out.extend(named(&dir.join("overwrite")));
+        out.extend(named(&crate::config::mo2::layout::overwrite_dir(dir)));
     }
     out
 }

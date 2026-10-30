@@ -596,6 +596,17 @@ Example:
 mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads --mods-dir build/mods
 ```
 
+`--mo2-instance-dir` is the folder with the instance's `ModOrganizer.ini`. For
+a portable instance that is the folder MO2 is in, and on Linux usually holds
+everything. MO2 can keep its mods and profiles elsewhere -- on Windows its
+ini often sits with MO2 itself and names a **base directory** holding only
+`mods`, `profiles`, `overwrite` and `webcache` -- and `install`, like every
+command taking `--mo2-instance-dir`, puts things where the ini says (its
+`base_directory`, `mod_directory`, `profiles_directory`, `overwrite_directory`
+and `download_directory`). Given that base directory instead, it looks for the
+ini that names it among MO2's global instances (`%LOCALAPPDATA%\ModOrganizer`)
+and otherwise says to give the ini's folder.
+
 Into an MO2 instance, `install` writes the mods, the profile (`--profile-name`,
 default `Default`, which it then owns: its `modlist.txt` and `plugins.txt` are
 rewritten from the plan every run) and the load order, and points MO2 at the

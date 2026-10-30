@@ -52,11 +52,11 @@ impl VirtualData {
             files: BTreeSet::new(),
             plugins: HashMap::new(),
         };
-        let modlist =
-            std::fs::read_to_string(instance.join("profiles").join(profile).join("modlist.txt"))
-                .map_err(|err| {
-                    anyhow::anyhow!("failed to read profile {profile}'s modlist.txt: {err}")
-                })?;
+        let layout = crate::config::mo2::layout::Layout::of(instance);
+        let modlist = std::fs::read_to_string(layout.profiles.join(profile).join("modlist.txt"))
+            .map_err(|err| {
+                anyhow::anyhow!("failed to read profile {profile}'s modlist.txt: {err}")
+            })?;
         // Lowest priority first, so a later folder's plugin replaces an
         // earlier one's, as MO2's does.
         let mut folders = vec![game_dir.join("Data")];
@@ -64,13 +64,8 @@ impl VirtualData {
             .lines()
             .filter_map(|line| line.trim().strip_prefix('+'))
             .collect();
-        folders.extend(
-            enabled
-                .iter()
-                .rev()
-                .map(|name| instance.join("mods").join(name)),
-        );
-        folders.push(instance.join("overwrite"));
+        folders.extend(enabled.iter().rev().map(|name| layout.mods.join(name)));
+        folders.push(layout.overwrite.clone());
         for folder in folders.iter().filter(|f| f.is_dir()) {
             data.add_folder(folder)?;
         }
@@ -119,7 +114,7 @@ impl VirtualData {
 
 /// The active plugins of `profile`, in load order.
 pub fn active_plugins(instance: &Path, profile: &str) -> anyhow::Result<Vec<String>> {
-    let profile_dir = instance.join("profiles").join(profile);
+    let profile_dir = crate::config::mo2::layout::profiles_dir(instance).join(profile);
     let active = std::fs::read_to_string(profile_dir.join("plugins.txt"))
         .map_err(|err| anyhow::anyhow!("failed to read profile {profile}'s plugins.txt: {err}"))?;
     let active: Vec<String> = active
