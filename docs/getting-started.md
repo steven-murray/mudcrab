@@ -48,9 +48,11 @@ You need:
     "Portable" and point it at the game folder (`mudcrab game-dir` prints it).
   - On Linux, MO2 runs under Proton, and Jackify sets that up: see
     [Setting up MO2 on Linux](#setting-up-mo2-on-linux) below.
-- **`bsdtar` and `7z`** on your `PATH`, for `.7z` and `.rar` archives. Most
-  Linux distributions have both a package away; on Windows, install 7-Zip and
-  add it to `PATH`.
+- **7-Zip**, for `.7z` and `.rar` archives. On Windows, install it from
+  [7-zip.org](https://7-zip.org); mudcrab finds it in `Program Files`. On
+  Linux, `7z` (p7zip) or `7zz` on your `PATH`, which most distributions have
+  a package away, and `bsdtar` (libarchive) as well if you can. Anywhere
+  else, set `MUDCRAB_7Z` to the 7-Zip program.
 - **mudcrab** itself: download the build for your system from the
   [releases page](https://github.com/steven-murray/mudcrab/releases) and
   unpack it. There is nothing to install.
