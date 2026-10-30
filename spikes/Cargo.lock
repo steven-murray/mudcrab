@@ -4157,9 +4157,10 @@ dependencies = [
 
 [[package]]
 name = "mudcrab"
-version = "0.2.5"
+version = "0.4.0"
 dependencies = [
  "anyhow",
+ "bzip2-sys",
  "clap",
  "console",
  "flate2",
@@ -4167,6 +4168,7 @@ dependencies = [
  "globset",
  "indexmap 2.14.2",
  "indicatif",
+ "lzma-sys",
  "md5",
  "minijinja",
  "pulldown-cmark",
@@ -4183,7 +4185,7 @@ dependencies = [
  "toml_edit 0.22.27",
  "tracing",
  "tracing-subscriber",
- "zip",
+ "zip 2.6.1",
 ]
 
 [[package]]
@@ -6435,7 +6437,7 @@ dependencies = [
  "mudcrab",
  "serde",
  "tempfile",
- "zip",
+ "zip 9.0.5",
 ]
 
 [[package]]
@@ -7480,6 +7482,12 @@ dependencies = [
  "bincode",
  "serde",
 ]
+
+[[package]]
+name = "typed-path"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "54ec2755506471f54baf5e4bb5499d8e510cc1caf271270e778a736bd2d7336c"
 
 [[package]]
 name = "typeid"
@@ -9217,9 +9225,9 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "2.4.2"
+version = "2.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fabe6324e908f85a1c52063ce7aa26b68dcb7eb6dbc83a2d148403c9bc3eba50"
+checksum = "1dcb24d0152526ae49b9b96c1dcf71850ca1e0b882e4e28ed898a93c41334744"
 dependencies = [
  "aes",
  "arbitrary",
@@ -9228,7 +9236,6 @@ dependencies = [
  "crc32fast",
  "crossbeam-utils",
  "deflate64",
- "displaydoc",
  "flate2",
  "getrandom 0.3.4",
  "hmac",
@@ -9237,12 +9244,26 @@ dependencies = [
  "memchr",
  "pbkdf2",
  "sha1",
- "thiserror 2.0.21",
  "time",
  "xz2",
  "zeroize",
  "zopfli",
  "zstd",
+]
+
+[[package]]
+name = "zip"
+version = "9.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e04976da629d3b04204ba8105b396a193af8ad2583b2c79bfb3ab8af580a11e"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap 2.14.2",
+ "memchr",
+ "nix",
+ "typed-path",
+ "zopfli",
 ]
 
 [[package]]
