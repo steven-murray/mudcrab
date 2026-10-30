@@ -578,7 +578,7 @@ fn reading_settings(state: &State) -> Result<config::install::InstallSettings, S
         .ok_or("choose an MO2 instance with the list installed first (in Install)")?;
     Ok(config::install::InstallSettings {
         cache_dir: located.downloads.unwrap_or_default(),
-        mods_dir: instance.join("mods"),
+        mods_dir: config::mo2::layout::mods_dir(&instance),
         mo2_instance_dir: None,
         profile_name: String::new(),
         game_dir: None,

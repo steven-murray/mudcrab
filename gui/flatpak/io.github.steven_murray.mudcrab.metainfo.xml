@@ -23,6 +23,7 @@
   <url type="help">https://steven-murray.github.io/mudcrab/gui.html</url>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="0.4.1" date="2026-10-30" />
     <release version="0.4.0" date="2026-10-30" />
     <release version="0.3.0" date="2026-10-18" />
     <release version="0.2.5" date="2026-10-18" />

@@ -359,10 +359,13 @@ pub(crate) fn install_mod_from_files(
         let expanded = pattern.replace("%GAME_DIR%", &game_dir.to_string_lossy());
         let matches = resolve_file_pattern(&expanded)?;
         if matches.is_empty() {
+            // Say where it looked: what %GAME_DIR% stood for is the usual
+            // surprise.
             anyhow::bail!(
-                "mod {} build-from-files pattern matched no files: {}",
+                "mod {} build-from-files pattern matched no files: {} (looked for {})",
                 mod_entry.id,
-                pattern
+                pattern,
+                expanded
             );
         }
 
@@ -430,7 +433,10 @@ pub(crate) fn resolve_file_pattern(pattern: &str) -> anyhow::Result<Vec<PathBuf>
         return Ok(Vec::new());
     }
 
-    let matcher = globset::Glob::new(file_pat)
+    // As Windows and the game name files: in any case.
+    let matcher = globset::GlobBuilder::new(file_pat)
+        .case_insensitive(true)
+        .build()
         .map_err(|err| anyhow::anyhow!("invalid file glob '{}': {err}", file_pat))?
         .compile_matcher();
 

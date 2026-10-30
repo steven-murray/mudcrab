@@ -37,11 +37,14 @@ The game has not written its `Oblivion.ini` yet. Start Oblivion once from its
 own launcher, so it does, then install again. mudcrab copies it into the MO2
 profile and makes its edits there; the original is never changed.
 
-### `no system tool (7z, bsdtar) available to ...`
+### `7-Zip was not found`
 
-`.7z` and `.rar` archives are unpacked by `7z` or `bsdtar`, and neither is on
-your `PATH`. Install either (on Linux, `p7zip` or `libarchive`; on Windows,
-7-Zip, and add its folder to `PATH`).
+`.7z` and `.rar` archives are unpacked by 7-Zip, which mudcrab looks for on
+your `PATH` (`7z`, `7zz` or `7za`) and, on Windows, in 7-Zip's install folder
+(`Program Files\7-Zip`, or `AppData\Local\Programs\7-Zip` for a per-user
+install). Install it (on Linux, `p7zip`, or 7-Zip's own `7zz`; on Windows,
+from [7-zip.org](https://7-zip.org)), or set `MUDCRAB_7Z` to the 7-Zip
+program wherever it is.
 
 ### `qac: xEdit stopped cleaning X.esp: Fatal: ...` or `qac: xEdit closed before it finished cleaning X.esp`
 

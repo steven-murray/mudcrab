@@ -407,11 +407,20 @@ fn set_location(
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         let chosen = settings.list_mut(&list);
-        let path = path.map(PathBuf::from);
+        let mut path = path.map(PathBuf::from);
+        // The folder with ModOrganizer.ini; given the folder its
+        // `base_directory` names, the ini is looked for (see mo2::layout).
         if kind == "instance"
-            && let Some(problem) = path.as_deref().and_then(config::mo2::not_an_instance)
+            && let Some(dir) = &path
         {
-            return Err(problem);
+            if !dir.is_dir() {
+                return Err(format!("{} is not a folder", dir.display()));
+            }
+            let found = config::mo2::layout::find_instance(dir).map_err(shown)?;
+            if let Some(problem) = config::mo2::layout::not_an_instance(&found) {
+                return Err(problem);
+            }
+            path = Some(found);
         }
         match kind.as_str() {
             "instance" => chosen.instance = path,
@@ -816,7 +825,7 @@ fn install_settings(state: &State) -> Result<config::install::InstallSettings, S
         .unwrap_or_default();
     Ok(config::install::InstallSettings {
         cache_dir: downloads,
-        mods_dir: instance.join("mods"),
+        mods_dir: config::mo2::layout::mods_dir(&instance),
         mo2_instance_dir: Some(instance),
         profile_name: places.profile,
         game_dir: game,
@@ -855,17 +864,15 @@ async fn step_install(state: tauri::State<'_, State>) -> Result<Done, String> {
             .map(|dir| format!(" --game-dir {}", quote(dir.display().to_string())))
             .unwrap_or_default()
     );
-    let profile = instance.join("profiles").join(&settings.profile_name);
+    let profile = config::mo2::layout::profiles_dir(&instance).join(&settings.profile_name);
+    let mods = settings.mods_dir.clone();
     tokio::task::spawn_blocking(move || config::install::install_all(&plan, &settings))
         .await
         .map_err(|err| err.to_string())?
         .map_err(shown)?;
     Ok(Done {
         summary: "installed".to_string(),
-        writes: vec![
-            instance.join("mods").display().to_string(),
-            profile.display().to_string(),
-        ],
+        writes: vec![mods.display().to_string(), profile.display().to_string()],
         command,
     })
 }

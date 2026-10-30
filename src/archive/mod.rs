@@ -7,6 +7,13 @@ use std::process::Command;
 use tar::Archive as TarArchive;
 use zip::ZipArchive;
 
+pub mod seven_zip;
+
+/// libarchive's `bsdtar`, which Windows ships as its own `tar.exe`.
+fn bsdtar() -> &'static str {
+    if cfg!(windows) { "tar" } else { "bsdtar" }
+}
+
 pub trait ArchiveExtractor {
     fn name(&self) -> &'static str;
     fn can_handle(&self, source: &Path) -> bool;
@@ -452,7 +459,7 @@ fn system_extract_entries(
                 .ok_or_else(|| anyhow::anyhow!("non-UTF8 list path: {}", list_path.display()))?
         );
 
-        let status = Command::new("7z")
+        let status = Command::new(seven_zip::program())
             .args([
                 "x",
                 src,
@@ -466,7 +473,11 @@ fn system_extract_entries(
             .stderr(std::process::Stdio::null())
             .status()
             .map_err(|err| {
-                anyhow::anyhow!("7z is not available to extract {}: {err}", source.display())
+                anyhow::anyhow!(
+                    "cannot extract {}: {}",
+                    source.display(),
+                    seven_zip::missing(&err)
+                )
             })?;
         if !status.success() {
             anyhow::bail!("7z failed (exit {status}) extracting {}", source.display());
@@ -611,7 +622,9 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
 
-    if let Ok(output) = Command::new("7z").args(["l", "-slt", src]).output()
+    if let Ok(output) = Command::new(seven_zip::program())
+        .args(["l", "-slt", src])
+        .output()
         && output.status.success()
     {
         let listed = parse_7z_listing(&String::from_utf8_lossy(&output.stdout))?;
@@ -622,13 +635,14 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         return Ok(drop_directory_entries(listed));
     }
 
-    let output = Command::new("bsdtar")
+    let output = Command::new(bsdtar())
         .args(["-t", "-f", src])
         .output()
         .map_err(|err| {
             anyhow::anyhow!(
-                "no system tool (7z, bsdtar) available to list {}: {err}",
-                source.display()
+                "cannot list {}: neither 7-Zip nor bsdtar could be run. {}",
+                source.display(),
+                seven_zip::missing(&err)
             )
         })?;
     if !output.status.success() {
@@ -790,7 +804,7 @@ fn is_self_extracting(source: &Path) -> bool {
         return false;
     };
 
-    Command::new("7z")
+    Command::new(seven_zip::program())
         .args(["l", "-slt", src])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -818,7 +832,7 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 staging path: {}", staging.display()))?;
 
     // Try bsdtar first (handles rar, 7z, zip, tar via libarchive)
-    if let Ok(status) = Command::new("bsdtar")
+    if let Ok(status) = Command::new(bsdtar())
         .args(["-x", "-f", src, "-C", dst])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -829,15 +843,16 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     }
 
     // Fall back to 7z
-    let status = Command::new("7z")
+    let status = Command::new(seven_zip::program())
         .args(["x", src, &format!("-o{dst}"), "-y"])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .status()
         .map_err(|err| {
             anyhow::anyhow!(
-                "no supported system tool (bsdtar, 7z) available to extract {}: {err}",
-                source.display()
+                "cannot extract {}: neither bsdtar nor 7-Zip could be run. {}",
+                source.display(),
+                seven_zip::missing(&err)
             )
         })?;
 
@@ -988,7 +1003,7 @@ Attributes = A
         let inner = dir.path().join("inner.7z");
         let payload = dir.path().join("a.txt");
         std::fs::write(&payload, b"hi").expect("payload");
-        let made = Command::new("7z")
+        let made = Command::new(seven_zip::program())
             .args([
                 "a",
                 "-t7z",

@@ -51,6 +51,7 @@ jobs:
           $name = "mudcrab-${{ matrix.target }}"
           New-Item -ItemType Directory -Path $name | Out-Null
           Copy-Item "target\${{ matrix.target }}\release\mudcrab.exe" $name
+          Copy-Item packaging\windows\install.ps1 $name
           Copy-Item LICENSE-MIT, LICENSE-APACHE, readme.md $name
           Copy-Item docs\merge-standalone.md $name
           Compress-Archive -Path $name -DestinationPath "$name.zip"
@@ -98,12 +99,19 @@ jobs:
           version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
           test "v$version" = "${{ github.ref_name }}" || {
             echo "Cargo.toml says $version, the tag ${{ github.ref_name }}"; exit 1; }
+      # The Windows installer carries the command line too, and puts it on the
+      # user's PATH (gui/src-tauri/tauri.cli.conf.json, windows/hooks.nsh).
+      - name: Command line, for the Windows installer
+        if: runner.os == 'Windows'
+        run: cargo build --release -p mudcrab
       - name: Bundle
         working-directory: gui
         shell: bash
         run: |
           npm ci
-          npx tauri build --bundles ${{ matrix.bundles }}
+          extra=()
+          if [ "$RUNNER_OS" = Windows ]; then extra=(--config src-tauri/tauri.cli.conf.json); fi
+          npx tauri build --bundles ${{ matrix.bundles }} "${extra[@]}"
       - name: Name (linux)
         if: runner.os == 'Linux'
         run: |
@@ -124,7 +132,8 @@ jobs:
           Copy-Item (Get-ChildItem target\release\bundle\nsis\*.exe | Select-Object -First 1).FullName "out\mudcrab-gui-${{ github.ref_name }}-windows-x64-setup.exe"
           $name = "mudcrab-gui-${{ github.ref_name }}-windows-x64"
           New-Item -ItemType Directory -Path $name | Out-Null
-          Copy-Item target\release\mudcrab-gui.exe $name
+          Copy-Item target\release\mudcrab-gui.exe, target\release\mudcrab.exe $name
+          Copy-Item packaging\windows\install.ps1 $name
           Copy-Item LICENSE-MIT, LICENSE-APACHE, readme.md $name
           Compress-Archive -Path $name -DestinationPath "out\$name.zip"
       - uses: softprops/action-gh-release@v2

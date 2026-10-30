@@ -78,8 +78,8 @@
       <div class="ppath" class:missing={!instance.exists}>{instance.path}</div>
     {:else}
       <div class="pfrom dim">
-        The portable Mod Organizer 2 instance to install into and test with: the folder with
-        ModOrganizer.exe in it.
+        The Mod Organizer 2 instance to install into and test with: the folder with its
+        ModOrganizer.ini in it (for a portable instance, the folder ModOrganizer.exe is in).
       </div>
     {/if}
     <button class={instance.path ? "" : "primary"} onclick={() => choosePlace("instance")} {disabled}>

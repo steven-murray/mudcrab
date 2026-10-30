@@ -52,10 +52,18 @@ jobs:
       # The bundles a release ships -- an AppImage, a Windows installer -- so
       # a change that breaks packaging shows here, and a pull request's build
       # can be tried as a player would get it.
+      # The Windows installer carries the command line too, as a release's does
+      # (gui/src-tauri/tauri.cli.conf.json).
+      - name: Command line, for the Windows installer
+        if: runner.os == 'Windows'
+        run: cargo build --release -p mudcrab
       - name: Bundle
         working-directory: gui
         shell: bash
-        run: npx tauri build --bundles ${{ matrix.bundles }}
+        run: |
+          extra=()
+          if [ "$RUNNER_OS" = Windows ]; then extra=(--config src-tauri/tauri.cli.conf.json); fi
+          npx tauri build --bundles ${{ matrix.bundles }} "${extra[@]}"
       - name: Keep the binary for the Flatpak
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
