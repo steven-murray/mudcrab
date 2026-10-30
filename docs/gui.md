@@ -47,8 +47,10 @@ The GUI's install mode reads a list and installs it from one window:
    opens by itself for a list with no MO2 instance chosen yet and stays
    until one is -- installing a list and writing one both need it, and the
    choices are shared by both modes. First the MO2 instance to install into
-   -- a portable instance, the folder with `ModOrganizer.exe` in it (any
-   other folder is refused). The downloads folder and the game folder then follow
+   -- the folder with its `ModOrganizer.ini` in it (for a portable instance,
+   the folder `ModOrganizer.exe` is in; any other folder is refused, and the
+   folder of an instance's mods and profiles is found from it where it can
+   be). The mods and profiles go where that ini says (its base directory). The downloads folder and the game folder then follow
    from it: the downloads folder from `tools.toml` if it is set there, else
    the instance's own; the game folder from the instance's settings, or found
    as `game-dir` finds it. Change either if they are not right. **Tools**

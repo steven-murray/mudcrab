@@ -4,14 +4,15 @@ use crate::cli::StepsArgs;
 use crate::config;
 use crate::ui::{self, Tone};
 
-pub fn run(args: StepsArgs) -> anyhow::Result<()> {
+pub fn run(mut args: StepsArgs) -> anyhow::Result<()> {
+    args.mo2_instance_dir = config::mo2::layout::find_instance(&args.mo2_instance_dir)?;
     let plan = config::pipeline::read_plan(&args.input)?;
     let game_dir = super::resolve_game_dir(args.game_dir.clone(), Some(&args.mo2_instance_dir))
         .ok()
         .flatten();
     let settings = config::install::InstallSettings {
         cache_dir: Default::default(),
-        mods_dir: args.mo2_instance_dir.join("mods"),
+        mods_dir: config::mo2::layout::mods_dir(&args.mo2_instance_dir),
         mo2_instance_dir: Some(args.mo2_instance_dir.clone()),
         profile_name: "Default".to_string(),
         game_dir,

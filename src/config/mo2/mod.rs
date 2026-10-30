@@ -3,6 +3,7 @@
 //! MO2 is the first concrete export target, not the internal abstraction --
 //! the install pipeline itself stays launcher-agnostic.
 
+pub mod layout;
 pub mod running;
 
 use super::install::InstallSettings;
@@ -112,16 +113,12 @@ pub(crate) fn unhide_plugin(mod_dir: &Path, plugin: &str) -> anyhow::Result<()> 
 }
 
 pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<()> {
-    let root =
-        mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
-    std::fs::create_dir_all(root.join("mods")).map_err(|err| {
-        anyhow::anyhow!("failed to create {}: {err}", root.join("mods").display())
-    })?;
-    std::fs::create_dir_all(root.join("downloads")).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to create {}: {err}",
-            root.join("downloads").display()
-        )
+    mo2_instance_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 instance dir"))?;
+    // The mods folder where the instance's ModOrganizer.ini says (see
+    // `layout`). No `downloads/` beside it: MO2 is pointed at the downloads
+    // folder itself.
+    std::fs::create_dir_all(&settings.mods_dir).map_err(|err| {
+        anyhow::anyhow!("failed to create {}: {err}", settings.mods_dir.display())
     })?;
 
     let profile_dir =
@@ -130,12 +127,6 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", profile_dir.display()))?;
 
     if let Some(game_dir) = &settings.game_dir {
-        let source = locate_game_ini_source(game_dir, "Oblivion.ini").ok_or_else(|| {
-            anyhow::anyhow!(
-                "failed to locate Oblivion.ini for game directory {}; looked in the game folder, Documents/My Games/Oblivion and Steam Proton's compatdata. Run the game once from its launcher to create it",
-                game_dir.display()
-            )
-        })?;
         // Seed it once; never clobber it afterwards.
         //
         // This used to copy unconditionally on every run, which quietly made
@@ -148,14 +139,37 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
         //
         // `ini_set` is idempotent and edits in place, so an existing file is
         // the accumulated result of every section built so far. That is the
-        // thing worth keeping.
-        let destination = profile_dir.join("oblivion.ini");
-        if destination.exists() {
+        // thing worth keeping -- and a profile that has one (MO2 makes it when
+        // the profile is created) needs nothing from the game, which may never
+        // have been run to make its own.
+        let existing = std::fs::read_dir(&profile_dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case("oblivion.ini")
+            })
+            .map(|entry| entry.path());
+        if let Some(existing) = existing {
             tracing::debug!(
-                ini = %destination.display(),
+                ini = %existing.display(),
                 "profile Oblivion.ini already exists; keeping the edits it carries"
             );
         } else {
+            let source = locate_game_ini_source(game_dir, "Oblivion.ini").ok_or_else(|| {
+                anyhow::anyhow!(
+                    "the profile {} has no Oblivion.ini, and none was found to start it from for \
+                     game directory {}: looked in the game folder, Documents/My Games/Oblivion and \
+                     Steam Proton's compatdata. Run the game once from its launcher to create \
+                     one, or open the profile in Mod Organizer 2, which makes it",
+                    profile_dir.display(),
+                    game_dir.display()
+                )
+            })?;
+            let destination = profile_dir.join("oblivion.ini");
             std::fs::copy(&source, &destination).map_err(|err| {
                 anyhow::anyhow!(
                     "failed to copy {} to {}: {err}",
@@ -349,54 +363,23 @@ pub(crate) fn point_at_downloads(
 }
 
 /// Where an MO2 instance saves downloads: `download_directory` in its
-/// `ModOrganizer.ini`, else its own `downloads/`. `None` when the setting names
-/// a Wine drive other than `Z:`.
-/// Why `dir` is not a Mod Organizer 2 instance, if it is not. A portable
-/// instance has `ModOrganizer.exe` at its top, and `ModOrganizer.ini` once MO2
-/// has been run there; a folder with neither is somewhere else, and
-/// installing into it would build a mods folder no MO2 reads.
-pub fn not_an_instance(dir: &Path) -> Option<String> {
-    if !dir.is_dir() {
-        return Some(format!("{} is not a folder", dir.display()));
-    }
-    let has = |name: &str| dir.join(name).is_file();
-    (!has("ModOrganizer.exe") && !has("ModOrganizer.ini")).then(|| {
-        format!(
-            "{} does not look like a Mod Organizer 2 instance: it has neither ModOrganizer.exe \
-             nor ModOrganizer.ini. Choose the folder MO2 is in (a portable instance).",
-            dir.display()
-        )
-    })
-}
-
+/// `ModOrganizer.ini` (which may name it from `%BASE_DIR%`), else
+/// `downloads/` in its base directory (see `layout`). `None` when the setting
+/// names a Wine drive other than `Z:`.
 pub fn instance_download_dir(instance: &Path) -> Option<PathBuf> {
     let text = std::fs::read_to_string(instance.join("ModOrganizer.ini")).unwrap_or_default();
-    let mut in_settings = false;
-    for line in text.lines() {
-        let line = line.trim();
-        if line.starts_with('[') {
-            in_settings = line.eq_ignore_ascii_case("[Settings]");
-            continue;
-        }
-        let Some(value) = line
-            .strip_prefix("download_directory=")
-            .filter(|_| in_settings)
-        else {
-            continue;
-        };
-        let value = value.trim();
-        if value.is_empty() {
-            break;
-        }
-        if cfg!(windows) {
-            return Some(PathBuf::from(value));
-        }
-        let unix = value
-            .strip_prefix("Z:")
-            .or_else(|| value.strip_prefix("z:"))?;
-        return Some(PathBuf::from(unix.replace('\\', "/")));
+    let base = layout::Layout::of(instance).base;
+    let Some(value) = layout::settings_value(&text, "download_directory") else {
+        return Some(base.join("downloads"));
+    };
+    let value = value.replace("%BASE_DIR%", &base.to_string_lossy());
+    if cfg!(windows) || value.starts_with('/') {
+        return Some(PathBuf::from(value));
     }
-    Some(instance.join("downloads"))
+    let unix = value
+        .strip_prefix("Z:")
+        .or_else(|| value.strip_prefix("z:"))?;
+    Some(PathBuf::from(unix.replace('\\', "/")))
 }
 
 /// Set MO2's theme to the list's, unless one is already chosen: a theme picked
@@ -876,11 +859,7 @@ pub(crate) fn mo2_instance_dir(settings: &InstallSettings) -> Option<&Path> {
 }
 
 pub(crate) fn mo2_profile_dir(settings: &InstallSettings) -> Option<PathBuf> {
-    Some(
-        mo2_instance_dir(settings)?
-            .join("profiles")
-            .join(&settings.profile_name),
-    )
+    Some(layout::profiles_dir(mo2_instance_dir(settings)?).join(&settings.profile_name))
 }
 
 /// The game folder an MO2 instance was set up with: `gamePath` in its
@@ -1093,6 +1072,40 @@ mod tests {
         // A Wine drive other than Z: is inside a prefix; not guessed at.
         assert_eq!(parse_game_path(windows, false), None);
         assert_eq!(parse_game_path("[Settings]\ngamePath=x\n", false), None);
+    }
+
+    #[test]
+    fn a_profile_with_its_own_oblivion_ini_needs_none_from_the_game() {
+        let dir = tempfile::tempdir().unwrap();
+        let instance = dir.path().join("mo2");
+        let game = dir.path().join("game");
+        std::fs::create_dir_all(instance.join("profiles/Default")).unwrap();
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(
+            instance.join("profiles/Default/oblivion.ini"),
+            "[General]\n",
+        )
+        .unwrap();
+        let settings = InstallSettings {
+            cache_dir: dir.path().join("downloads"),
+            mods_dir: instance.join("mods"),
+            mo2_instance_dir: Some(instance.clone()),
+            profile_name: "Default".to_string(),
+            game_dir: Some(game),
+            execute_actions: true,
+            dry_run: false,
+            tools: Default::default(),
+            filter: Default::default(),
+            force_merges: false,
+            force: false,
+            redo_actions: Vec::new(),
+        };
+        // The game has never been run, so it has no Oblivion.ini of its own.
+        prepare_mo2_profile(&settings).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(instance.join("profiles/Default/oblivion.ini")).unwrap(),
+            "[General]\n"
+        );
     }
 
     #[test]
