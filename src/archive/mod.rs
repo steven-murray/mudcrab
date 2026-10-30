@@ -3,7 +3,6 @@ use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use std::collections::BTreeSet;
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
-use std::process::Command;
 use tar::Archive as TarArchive;
 use zip::ZipArchive;
 
@@ -459,7 +458,7 @@ fn system_extract_entries(
                 .ok_or_else(|| anyhow::anyhow!("non-UTF8 list path: {}", list_path.display()))?
         );
 
-        let status = Command::new(seven_zip::program())
+        let status = crate::util::process::console(seven_zip::program())
             .args([
                 "x",
                 src,
@@ -622,7 +621,7 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         .to_str()
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 source path: {}", source.display()))?;
 
-    if let Ok(output) = Command::new(seven_zip::program())
+    if let Ok(output) = crate::util::process::console(seven_zip::program())
         .args(["l", "-slt", src])
         .output()
         && output.status.success()
@@ -635,7 +634,7 @@ fn list_system_archive_paths(source: &Path) -> anyhow::Result<Vec<String>> {
         return Ok(drop_directory_entries(listed));
     }
 
-    let output = Command::new(bsdtar())
+    let output = crate::util::process::console(bsdtar())
         .args(["-t", "-f", src])
         .output()
         .map_err(|err| {
@@ -804,7 +803,7 @@ fn is_self_extracting(source: &Path) -> bool {
         return false;
     };
 
-    Command::new(seven_zip::program())
+    crate::util::process::console(seven_zip::program())
         .args(["l", "-slt", src])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -832,7 +831,7 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
         .ok_or_else(|| anyhow::anyhow!("non-UTF8 staging path: {}", staging.display()))?;
 
     // Try bsdtar first (handles rar, 7z, zip, tar via libarchive)
-    if let Ok(status) = Command::new(bsdtar())
+    if let Ok(status) = crate::util::process::console(bsdtar())
         .args(["-x", "-f", src, "-C", dst])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -843,7 +842,7 @@ fn system_extract_to(source: &Path, staging: &Path) -> anyhow::Result<()> {
     }
 
     // Fall back to 7z
-    let status = Command::new(seven_zip::program())
+    let status = crate::util::process::console(seven_zip::program())
         .args(["x", src, &format!("-o{dst}"), "-y"])
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
@@ -1003,7 +1002,7 @@ Attributes = A
         let inner = dir.path().join("inner.7z");
         let payload = dir.path().join("a.txt");
         std::fs::write(&payload, b"hi").expect("payload");
-        let made = Command::new(seven_zip::program())
+        let made = crate::util::process::console(seven_zip::program())
             .args([
                 "a",
                 "-t7z",

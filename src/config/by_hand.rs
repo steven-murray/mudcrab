@@ -81,7 +81,7 @@ pub fn default_watch_dir() -> Option<PathBuf> {
 pub fn open_url(url: &str) -> bool {
     use std::process::{Command, Stdio};
     let mut command = if cfg!(windows) {
-        let mut c = Command::new("cmd");
+        let mut c = crate::util::process::console("cmd");
         c.args(["/C", "start", "", url]);
         c
     } else if cfg!(target_os = "macos") {
