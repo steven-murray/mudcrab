@@ -11,7 +11,7 @@ repository = "https://github.com/steven-murray/mudcrab"
 readme = "readme.md"
 keywords = ["oblivion", "modding", "modlist", "bethesda", "mod-organizer"]
 categories = ["command-line-utilities", "game-development"]
-exclude = ["docs/design/bsa-header-flags.csv", "spikes/", "gui/"]
+exclude = ["docs/design/bsa-header-flags.csv", "gui/"]
 
 # The GUI is its own crate (gui/src-tauri), built only when asked for
 # (`cargo build -p mudcrab-gui`), so the CLI builds, tests and ships without
@@ -19,7 +19,6 @@ exclude = ["docs/design/bsa-header-flags.csv", "spikes/", "gui/"]
 [workspace]
 members = [".", "gui/src-tauri"]
 default-members = ["."]
-exclude = ["spikes"]
 
 # One version for the CLI and the GUI, which are released together: a tag
 # `v<version>` builds both (see .github/workflows/release.yml).

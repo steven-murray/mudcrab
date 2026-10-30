@@ -1,6 +1,6 @@
 // Dragging rows with pointer events. WebKitGTK (Tauri on Linux) does not
 // deliver HTML5 drag-and-drop reliably, and pointer events work everywhere
-// (the phase 3 spike, spikes/README.md). Rows stay where Svelte put them; a
+// (the phase 3 spike, docs/design/gui.md). Rows stay where Svelte put them; a
 // copy follows the pointer, the row it would land by is marked, and the
 // scrolling container scrolls when the pointer nears its edge. The listeners
 // are on the window, so the pointer is never lost.
