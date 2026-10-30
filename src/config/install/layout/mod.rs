@@ -433,7 +433,10 @@ pub(crate) fn resolve_file_pattern(pattern: &str) -> anyhow::Result<Vec<PathBuf>
         return Ok(Vec::new());
     }
 
-    let matcher = globset::Glob::new(file_pat)
+    // As Windows and the game name files: in any case.
+    let matcher = globset::GlobBuilder::new(file_pat)
+        .case_insensitive(true)
+        .build()
         .map_err(|err| anyhow::anyhow!("invalid file glob '{}': {err}", file_pat))?
         .compile_matcher();
 
