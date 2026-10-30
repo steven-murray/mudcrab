@@ -938,7 +938,10 @@ Then, across the finished folders:
 - **masters**: each plugin's header is read (only plugins are unpacked), and
   every master must be in the load order, active, and earlier. The game's own
   plugins count as present unless the list orders them. A master merged away
-  by a `hide_sources` merge is named with the merge.
+  by a `hide_sources` merge is named with the merge. A merge's sources, out
+  of the load order, are checked as the merge needs them: each master must
+  be another source of the same merge, or in the load order ahead of its
+  output.
 - **load order**: a plugin in `plugins` that no mod installs is an error (a
   merge's output and Wrye Bash's `Bashed Patch, 0.esp` are made later), as is
   a plugin a mod declares but does not install. A plugin a mod installs that
