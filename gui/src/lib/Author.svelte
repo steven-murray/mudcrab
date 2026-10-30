@@ -508,8 +508,19 @@
           </p>
         {:else}
           <EntryView entry={{ kind: "mod", ...chosen }} words="" matches={() => true} prose={false} />
+          {#if view?.used}
+            <p class="dim small">
+              Defined by the shim <code>{view.used}</code>: what the entry here sets is written over it.
+            </p>
+          {/if}
           {#if view?.origin}
-            <p class="dim small">Written in <code>{view.origin}</code>, which the list includes: changes here are made there.</p>
+            <p class="dim small">
+              Written in <code>{view.origin}</code>, which the list includes: changes here are made there.
+              {#if view.overridden.length}
+                The include overrides its <code>{view.overridden.join(", ")}</code>, which are changed in the include
+                instead.
+              {/if}
+            </p>
           {/if}
           <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
           <details class="form">

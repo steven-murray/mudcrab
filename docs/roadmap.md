@@ -10,13 +10,15 @@ and the git history.
 
 ### Composability
 
-`include` another modlist -- a file, or a file in a git repository -- so
-reusable pieces can be published once and pointed at: a shim that fixes a
-badly packaged mod, or a core group of mods several lists share.
-Including a local file works ([Lists in several files](modlist-format.md#lists-in-several-files-include)).
-Still to do: overrides and include options, git sources with a lock file,
-questions declared by an included file, shims (`use`), and a shared group in
-MOFAM. The design is in [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
+A list can be several files, and use groups of mods and single mod
+definitions (shims) written once elsewhere, from a folder or a git repository
+pinned by a lock file, taking part of them, renaming them, answering their
+questions and overriding their fields
+([Lists in several files](modlist-format.md#lists-in-several-files-include)).
+Still to do: publish a first shims repository, written from MOFAM's fixes,
+for lists to `use`; and let the editing commands write an override for a mod
+from a git include, rather than refusing to change it. The design is in
+[the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md).
 
 ### The GUI, in use
 

@@ -325,6 +325,10 @@ fn planned(
     let place = config::edit::place_beside(list, placement.before_mod.as_deref())?;
     let mut local = new_mod.clone();
     local.section = place.local(&new_mod.section)?;
+    let mut placement = placement;
+    if placement.before_mod.is_some() {
+        placement.before_mod = Some(place.id.clone());
+    }
     config::edit::plan_in(list, &place.file, |text, source| {
         Ok(
             plan_add(text, source, &local, &placement, position.as_ref())?

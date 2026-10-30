@@ -150,7 +150,8 @@ fn an_included_files_section_docs_take_its_section_and_folder() {
     let docs = &source.sections["Core - Patches"];
     assert_eq!(docs.summary.as_deref(), Some("The patches."));
     assert_eq!(docs.images[0].path.as_deref(), Some("parts/img/p.png"));
-    assert_eq!(source.included, [dir.path().join("parts/core.toml")]);
+    let included: Vec<_> = source.includes.iter().map(|i| &i.file).collect();
+    assert_eq!(included, [&dir.path().join("parts/core.toml")]);
 }
 
 #[test]
@@ -209,21 +210,8 @@ fn an_include_entry_with_a_mods_fields_is_refused() {
         ),
     );
     let err = load_modlist(&list).unwrap_err().to_string();
-    assert!(err.contains("only `id`, `section` and `include`"), "{err}");
+    assert!(err.contains("it also has plugins"), "{err}");
     assert!(err.contains("plugins"), "{err}");
-}
-
-#[test]
-fn questions_in_an_included_file_are_refused_for_now() {
-    let dir = tempdir().unwrap();
-    write(
-        dir.path(),
-        "parts/core.toml",
-        &format!("{CORE}\n[inputs.hd]\nquery = \"HD?\"\ntype = \"bool\"\n"),
-    );
-    let list = write(dir.path(), "list.toml", LIST);
-    let err = format!("{:#}", load_modlist(&list).unwrap_err());
-    assert!(err.contains("questions ([inputs])"), "{err}");
 }
 
 #[test]
@@ -274,7 +262,7 @@ fn an_included_mods_fields_are_set_in_its_own_file() {
     let dir = tempdir().unwrap();
     let list = split(dir.path());
     let pairs = doc::parse_pairs(&["oracle_name=\"Alpha\"".to_string()]).unwrap();
-    let edit = edit::plan_mod(&list, "A", |text, _| {
+    let edit = edit::plan_mod(&list, "A", |text, _, _| {
         doc::set_fields(text, "A", None, &pairs, &[])
     })
     .unwrap();

@@ -178,6 +178,10 @@ export interface ModView {
   left_out: boolean;
   /** The included file the mod is written in, relative to the list. */
   origin: string | null;
+  /** The fields the include that brings it overrides. */
+  overridden: string[];
+  /** The shim it takes its definition from (`use`), relative to the list. */
+  used: string | null;
   archives: { number: number; label: string; layout: string | null; condition: string | null }[];
 }
 

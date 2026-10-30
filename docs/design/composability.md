@@ -1,10 +1,10 @@
 # Composability: lists built from other lists
 
-**Status: phase 1 done** (local includes; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phases 2-6 are a plan. Where phase 1 settled something differently from the
-plan below, the notes under [Phases](#phases) say so.
+**Status: done** (see [the format](../modlist-format.md#lists-in-several-files-include)),
+but for publishing a first shims repository. Where a phase settled something
+differently from the plan below, the notes under [Phases](#phases) say so.
 
-Today a modlist is one file. This plan lets a list pull in other modlist files
+Before this, a modlist was one file. This plan lets a list pull in other modlist files
 -- from its own folder or from a git repository -- and have them resolve as if
 they had been written in place. It has two uses in mind, and one side effect:
 
@@ -219,16 +219,80 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
      definition hash, so splitting a list does not reinstall anything.
 2. **Overrides and include options.** `override`, `skip`, `.append`, `section`,
    `if`, `prefix`, `only`/`except`. Tests for each, and for an override that
-   names nothing.
+   names nothing. *Done.* As built:
+   - `.append` works on any list field of a mod, not a chosen few. `exclude`
+     is an archive's field, not a mod's, so changing it means overriding
+     `archives` whole.
+   - An override is applied by turning the mod back into TOML, replacing the
+     fields, and reading it again, so it is checked exactly as a mod written
+     out in full would be.
+   - Conditions have no parentheses, so a group's `if` is joined to a mod's
+     own by multiplying out to an `||` of `&&`s.
+   - `prefix` renames mentions within the included group only: an including
+     list naming one of its mods uses the prefixed id.
+   - Edits still go to the file a mod is written in, by its id there; a field
+     an override sets is refused rather than written where it would do
+     nothing. Writing overrides from the editing commands (for a git
+     include's mods) is left for later.
 3. **Git sources and the lock.** Fetch, cache, `tag`/`rev`/`branch`,
-   `mudcrab.lock`, `update`, `includes`, `--offline`.
+   `mudcrab.lock`, `update`, `includes`, `--offline`. *Done.* As built:
+   - The lock file is `<list>.lock`, not `mudcrab.lock`: one folder often
+     holds several lists (MOFAM's full and minimal), which should not move
+     together. It records the commit for each URL and reference; a commit
+     pins the file's content, so no file hash is kept.
+   - Each commit used is unpacked (`git archive`) into the cache, read only,
+     so a git include is then a file on disk: its own relative includes, docs
+     file and pictures resolve inside the same commit with no more code, and
+     a path leading out of the repository is refused.
+   - Nested git includes are recorded in the top list's lock like the rest;
+     a component repository's own lock file is not read.
+   - A fetch happens only when the lock lacks a reference (or the cache a
+     commit), so loading a list that resolved once never touches the network.
+     `update` drops the chosen lock entries and loads again; a `rev=` include
+     resolves to the same commit and so never moves.
+   - Following a branch is a `validate` warning.
+   - The editing commands refuse a file from a git include, pointing to its
+     repository and `update`, until overrides (phase 2) give the includer a
+     place to make such a change.
 4. **Inputs across includes.** Namespacing, `set`, conditions resolving
-   against namespaced inputs, `query` asking only what is left.
+   against namespaced inputs, `query` asking only what is left. *Done.* As
+   built:
+   - The namespace is the include's id with anything but letters, digits,
+     `-` and `_` turned into `_` (`Unofficial_Patches.install_dlc_patches`),
+     as a condition's input names cannot be quoted.
+   - A `set` answer is kept on the question as `fixed`: `query` uses it and
+     refuses `--set` for it, and `export` (so the GUI) leaves it out. Keeping
+     the question, rather than folding the answer into each condition, means
+     nothing about the conditions has to be rewritten.
+   - An included file's conditions can still ask the including list's
+     questions by their own names, as in phase 1: only names the file
+     declares are namespaced.
 5. **Shims.** `use`, field merging, `add --use`. Write the first real shims
    from MOFAM's own fixes (Oblivion Trees' layout, the T4UTXL split, WAC's
    prune) into a public `oblivion-shims` repository, and point MOFAM at them.
+   *Done, but for publishing.* As built:
+   - The entry's fields are read as written (from the file's TOML, not the
+     parsed entry, which cannot tell a field left out from one set to its
+     default) and laid over the shim's mod with the override mechanism, so
+     the result is checked as a mod written in full.
+   - The entry's `actions` are added after the shim's, since adding one is
+     what a list using a shim wants; every other field replaces.
+   - The mod is the list's own: its `origin` is the list, edits write the
+     entry, and its definition hash is the result's, so moving a mod into a
+     shim reinstalls nothing.
+   - The first three shims (WAC's include-and-rename, T4UTXL's Priory keep
+     list, Oblivion Trees' hand-download details) are written into a local
+     `oblivion-shims` repository, and a copy of MOFAM using them from it,
+     through a git source and lock file, plans identically. Publishing the
+     repository and pointing MOFAM at it is left to the list's author.
 6. **A shared group.** Move MOFAM's OBSE plugins section into a component
-   and include it, as the proof that groups work in a real list.
+   and include it, as the proof that groups work in a real list. *Done.*
+   MOFAM's Part 2 (35 mods) moved to `components/obse-plugins.toml`, included
+   under its section; the compiled list, the plans for three sets of answers
+   and the exported guide are identical to before. (OBSE plugins ship no
+   plugins, so the load order did not have to move with them.) A test has two
+   lists take different things from one group: one as it is, asking its
+   question; the other renamed, its question answered, a field overridden.
 
 Each phase ends with MOFAM compiling to the same plan it does today, except
 where the phase changes what is installed on purpose.

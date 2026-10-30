@@ -307,7 +307,7 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
     // while the merges that will bring it back under are still unwritten, and
     // refusing to install it would make the intermediate state unreachable.
     // What must not happen is running over *silently*.
-    let mut warnings = Vec::new();
+    let mut warnings = modlist.include_warnings.clone();
     if modlist.plugins.len() > PLUGIN_LIMIT {
         warnings.push(format!(
             "load order has {} active plugins, {} over Oblivion's limit of {PLUGIN_LIMIT}. \

@@ -2,6 +2,7 @@ use crate::cli::CompileArgs;
 use crate::config;
 
 pub async fn run(args: CompileArgs) -> anyhow::Result<()> {
+    config::git::set_offline(args.offline);
     let config::pipeline::Compiled {
         modlist: compiled,
         warnings,

@@ -36,12 +36,19 @@ Add one `[[mods]]` block to a source modlist, in place.
 mudcrab add <modlist.toml> --archive <archive> --id "<mod id>" --section "<name>" [--nexus <modid>/<fileid> | --manual] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --nexus <modid>/<fileid> --id "<mod id>" --section "<name>" [--file-name "<archive.7z>"] [--plugin <FILE>]... [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 mudcrab add <modlist.toml> --from-mo2 <MODS_DIR> --mod "<mod folder>" [--id "<mod id>"] [--section "<name>"] [--file-name "<archive.7z>"] [--dry-run]
+mudcrab add <modlist.toml> --use <shim> [--id "<mod id>"] [--section "<name>"] [--load-after <PLUGIN> | --load-last] [--if <CONDITION>] [--dry-run]
 ```
 
 [Writing a modlist](authoring.md) walks through using it on a new list.
 
 `add` only writes the mod's declaration into the list; nothing is installed or
 unpacked until `install`.
+
+`--use` writes an entry that takes its definition from a shim -- a file holding
+one mod, a path relative to the list or a `git+` source -- with
+`use = "<shim>"`, the shim's mod id (unless `--id` gives another), and the
+shim's plugins put into the load order where `--load-after` or `--load-last`
+says. See [Shims](modlist-format.md#shims-one-mod-defined-elsewhere-use).
 
 `--archive` writes the archive entry from the archive itself, as `inspect`
 reads it: the source from the MO2 `.meta` beside it (or `--nexus`, or
@@ -287,13 +294,33 @@ The list's questions. `add` writes them the way the list already does (dotted
 `inputs.<name>.<key>` lines at the top, if it has none yet). `remove` is
 refused while a condition still uses the question.
 
+## includes, update
+
+For a list split into several files, or using files from git repositories
+([Lists in several files](modlist-format.md#lists-in-several-files-include)):
+
+```bash
+mudcrab includes <modlist.toml>
+mudcrab update <modlist.toml> [--include <id>]... [--dry-run]
+```
+
+`includes` lists each include, nested ones indented under the file that
+includes them: its id, the file (a git include's as
+`repository@commit:file`) and how many mods it brings.
+
+`update` looks each git include up again -- or only those named with
+`--include` -- and moves it to what its tag or branch means now, writing the
+new commits to the lock file. It prints each include that moved and the mods
+added, removed or changed by it; `--dry-run` prints the same and leaves the
+lock file alone. An include pinned to `rev=` does not move.
+
 ## compile
 
 Check a source modlist and write it out compiled: sections flattened, the
 top-level INI tables turned into actions, each archive's fields checked.
 
 ```bash
-mudcrab compile <modlist.toml> --output <compiled.json> [--strict]
+mudcrab compile <modlist.toml> --output <compiled.json> [--strict] [--offline]
 ```
 
 What it checks is the list's own consistency, from the TOML alone:
@@ -313,6 +340,9 @@ for `conflicts`. (Whether each plugin's masters are present is not checked;
 MO2 flags a missing master.) Nor does it answer the list's questions; that is `query`. A list running over
 Oblivion's 255-plugin limit is a warning; `--strict` makes warnings errors.
 The docs file (`docs_file`) is not read: only `export` and `validate` need it.
+Files included from git repositories come from the lock file's commits,
+fetched if the cache lacks them; `--offline` fetches nothing, and fails
+naming any include the lock file and cache cannot supply.
 
 Example:
 

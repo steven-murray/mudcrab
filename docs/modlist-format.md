@@ -522,7 +522,7 @@ written in place:
 
 - **Its mods** go where the `include` entry is, in their order, each under the
   entry's `section` and then its own. An `include` entry has only `id`,
-  `section` and `include`.
+  `section`, `include`, and the options below.
 - **Its `plugins`** go where the including list's `plugins` has
   `{ include = "<the entry's id>" }`. Leaving them unplaced is an error, as a
   mod's plugin missing from the load order is. An included file can also leave
@@ -535,8 +535,12 @@ written in place:
   including list's docs file can document its mods too.
 - **Its `name`, `guide`, `mo2`, `export` and `about`** describe a whole list
   and are not read.
-- **Questions:** an included file cannot declare `inputs` yet. Its conditions
-  can ask the including list's questions.
+- **Its `inputs`** are asked of whoever installs the list, named for the
+  include: `hd` in a file included as `id = "Common"` becomes `Common.hd`
+  (characters other than letters, digits, `-` and `_` in the id become `_`),
+  and its mods' conditions are renamed to match. The including list can
+  answer them itself with `set` (below). Its conditions can also ask the
+  including list's questions, by their names there.
 
 `component = true` marks a file written only to be included: it may leave out
 `name`, its conditions may ask questions it does not declare, and `query`
@@ -555,9 +559,112 @@ writing. A mod moves only within its own file, and a plugin within the file
 that places it. `add --before-mod` adds a mod to the file the mod it goes
 before is in; without it, a new mod goes in the list's own file.
 
+### Choosing and changing what comes in
+
+An `include` entry can take part of a file, or change it, without copying
+it -- which matters most for a file from someone else's repository:
+
+```toml
+[[mods]]
+id = "Common"
+section = ["01 - Core"]
+include = "git+https://github.com/someone/oblivion-common?tag=v3#patches.toml"
+if = "!minimal"              # every included mod takes this condition too
+prefix = "Common - "         # put before every included mod's id
+except = ["Old Patch"]       # leave these out (or `only = [...]`: take just these)
+
+[mods.override."Display Stats"]
+fomod_selections = [{ step = "Main", group = "Size", option = "Large" }]
+actions.append = [{ action = "file_hide", paths = ["textures/menus/stats.dds"] }]
+
+[mods.override."Unofficial Patch"]
+skip = true                  # as `except`
+```
+
+| Option | Effect |
+| --- | --- |
+| `if` | A condition on the whole group: each included mod is left out when it is false, as well as when its own `if` is. |
+| `prefix` | Put before every included mod's id, so two files that use the same ids can both be included. Their mentions of each other -- `dependencies`, `conflicts_with`, merge sources, `mod:` in conditions -- are renamed too. |
+| `only`, `except` | Take only these of the file's mods, or all but these, by their ids in the file. Plugins only the left-out mods have are left out of the load order with them. |
+| `set` | Answers to the file's questions, by their names in the file, as `[mods.set]` with `hd = true`: nobody installing the list is asked them, and `query --set` cannot change them. |
+| `override."<id>"` | Fields of that mod (by its id in the file) to use instead of the file's. A list field given as `{ append = [...] }` -- written `actions.append = [...]` -- keeps the file's entries and adds these. `skip = true` leaves the mod out. A mod's `id` cannot be overridden. |
+
+Mods are named by their ids in the included file, before any `prefix`. An
+option naming a mod the file does not have is an error, so an override cannot
+quietly outlive the mod it was written for. An override's fields are checked
+as a mod's are, and its `docs` replace the file's prose for that mod.
+
+The editing commands still change an included mod in its own file, by the id
+it has there. They refuse to change a field an override sets, since the new
+value would have no effect: change the override instead.
+
+### Shims: one mod, defined elsewhere (`use`)
+
+A shim is a file holding a single mod, written once the way it installs
+properly -- a fix for a badly packaged archive -- for every list that has the
+mod. An entry takes it with `use`, a path or a [git source](#from-a-git-repository):
+
+```toml
+[[mods]]
+id = "Example Creatures"
+section = ["Creatures"]
+use = "git+https://github.com/someone/oblivion-shims?tag=v1#example-creatures.toml"
+```
+
+The entry is the shim's mod -- archives, layout, filters, actions, plugins,
+download page, prose -- with the fields the entry writes itself in place of
+the shim's: its `id` and `section`, and anything else it sets (an `if`, an
+archive's FOMOD choices). Its `actions` are added after the shim's rather than
+replacing them, so a list can add one. The shim's plugins still need a place in
+the list's `plugins`, and the list's docs file can replace the shim's prose.
+
+A shim holds one mod and nothing else: no `inputs`, `ini`, manual steps or
+post-install actions, which a file `include`d can have. The entry is the
+list's own, so the editing commands change it there: a field set with `set` is
+written into the entry, over the shim's. `add --use <shim>` writes one.
+
+### From a git repository
+
+`include` can name a file in a git repository -- on GitHub, or anywhere git
+can clone from -- so a group of mods published once can be used by many
+lists:
+
+```toml
+[[mods]]
+id = "Common"
+section = ["01 - Core"]
+include = "git+https://github.com/someone/oblivion-common?tag=v3#patches.toml"
+```
+
+After `git+` comes the repository's URL, then which commit -- `?tag=<tag>`,
+`?rev=<commit>`, or `?branch=<branch>` -- and after `#` the file, from the
+repository's top. A tag or a commit is the norm. A branch moves whenever its
+author pushes, so `validate` warns about one; it is for a component still
+being written.
+
+- **The lock file.** The first time a tag or branch is resolved, the commit
+  it means is written to `<list>.lock` beside the list (`mylist.lock` for
+  `mylist.toml`), and from then on the list uses that commit, wherever it is
+  installed. Keep the lock file with the list. `mudcrab update` moves includes
+  on (see [usage](usage.md#includes-update)).
+- **The cache.** Each repository is cloned once into mudcrab's cache
+  (`~/.cache/mudcrab/git`, `%LOCALAPPDATA%\mudcrab\git` on Windows), and each
+  commit used is unpacked there. With the lock file and the cache in place,
+  nothing is fetched. `compile --offline` makes sure of it, and says which
+  include it cannot resolve.
+- **Inside the repository**, the included file's own includes (by path), its
+  docs file and its pictures come from the same commit. A path leading out of
+  the repository is an error, and so is one the commit does not have.
+- **Read only.** Its mods are not edited where they are: the editing commands
+  refuse. Change it with an `override` in your list, or in the repository
+  itself and run `update`.
+- **git** must be installed (in the Flatpak, the host's is used). A private
+  repository works if git can already reach it without asking for a password.
+
+Messages name a mod from a git include by repository, commit and file:
+`oblivion-common@3f2a1c0:patches.toml`.
+
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema. Including a file from a git
-repository, overriding an included mod's fields, and questions declared by an
-included file are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).
+[roadmap](roadmap.md), not in the schema.

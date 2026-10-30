@@ -15,6 +15,7 @@ pub mod download;
 pub mod downloads_tidy;
 pub mod edit;
 pub mod filter;
+pub mod git;
 pub mod identify;
 pub mod inspect;
 pub mod install;

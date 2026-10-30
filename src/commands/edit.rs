@@ -66,8 +66,14 @@ pub fn set(args: SetArgs) -> anyhow::Result<()> {
         "nothing to set: give key=value, or --unset <key>"
     );
     let sets = doc::parse_pairs(&args.sets)?;
-    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
-        doc::set_fields(text, &args.mod_id, args.archive, &sets, &args.unsets)
+    let keys: Vec<String> = sets
+        .iter()
+        .map(|(key, _)| key.clone())
+        .chain(args.unsets.iter().cloned())
+        .collect();
+    edit::refuse_overridden(&args.input, &args.mod_id, args.archive, &keys)?;
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _, id| {
+        doc::set_fields(text, id, args.archive, &sets, &args.unsets)
     })?;
     let what = match args.archive {
         Some(n) => format!("{}'s archive {n}", ui::name(&args.mod_id)),
@@ -344,11 +350,11 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _, id| {
         let archive = Some(args.archive);
         let text = doc::edit_strings(
             text,
-            &args.mod_id,
+            id,
             archive,
             "include",
             &args.include,
@@ -356,7 +362,7 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
         )?;
         let text = doc::edit_strings(
             &text,
-            &args.mod_id,
+            id,
             archive,
             "exclude",
             &args.exclude,
@@ -364,7 +370,7 @@ pub fn files(args: FilesArgs) -> anyhow::Result<()> {
         )?;
         doc::edit_strings(
             &text,
-            &args.mod_id,
+            id,
             archive,
             "bain_subpackages",
             &args.package,
@@ -465,15 +471,9 @@ fn action_list(args: ActionListArgs) -> anyhow::Result<()> {
 
 fn action_add(args: ActionAddArgs) -> anyhow::Result<()> {
     let fields = doc::parse_pairs(&args.fields)?;
-    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, source| {
-        find_mod(source, &args.mod_id)?;
-        doc::add_action(
-            text,
-            &args.mod_id,
-            &args.action,
-            &fields,
-            args.condition.as_deref(),
-        )
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, source, id| {
+        find_mod(source, id)?;
+        doc::add_action(text, id, &args.action, &fields, args.condition.as_deref())
     })?;
     finish(
         edit,
@@ -483,8 +483,8 @@ fn action_add(args: ActionAddArgs) -> anyhow::Result<()> {
 }
 
 fn action_remove(args: ActionRemoveArgs) -> anyhow::Result<()> {
-    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _| {
-        doc::remove_action(text, &args.mod_id, args.number)
+    let edit = edit::plan_mod(&args.input, &args.mod_id, |text, _, id| {
+        doc::remove_action(text, id, args.number)
     })?;
     finish(
         edit,
@@ -514,10 +514,14 @@ fn input_list(args: InputListArgs) -> anyhow::Result<()> {
             InputType::Choice => format!("choice [{}]", spec.choices.join(", ")),
             InputType::Text => "text".to_string(),
         };
-        let default = match &spec.default {
-            Some(InputValue::Bool(b)) => b.to_string(),
-            Some(InputValue::Text(t)) => t.clone(),
-            None => "-".to_string(),
+        let text = |value: &InputValue| match value {
+            InputValue::Bool(b) => b.to_string(),
+            InputValue::Text(t) => t.clone(),
+        };
+        let default = match (&spec.fixed, &spec.default) {
+            (Some(fixed), _) => format!("{} (set by the list)", text(fixed)),
+            (None, Some(default)) => text(default),
+            (None, None) => "-".to_string(),
         };
         ui::data(format!("{name}\t{kind}\t{default}\t{}", spec.query));
     }
