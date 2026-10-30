@@ -2,7 +2,7 @@
 
 **Status: phases 1-6 done; phase 7, packaging, is next.** The
 library API and CLI parity are in, the framework spike
-([spikes/](https://github.com/steven-murray/mudcrab/tree/main/spikes)) chose
+([spikes/](https://github.com/steven-murray/mudcrab/tree/fc4f2e2ec509a9c9d9b1224ab8f2d9f5425a1f90/spikes), since removed) chose
 **Tauri**, and `gui/` has install mode: open a list, read it, answer its
 questions, choose where things go, and install, step by step, with
 downloads by hand and the manual-step checklist, and author mode, reading
@@ -233,7 +233,7 @@ Still printing directly: `assets` (its logic sits in the command) and
    byte-identical before and after.
 2. **CLI parity.** Done: the commands above, documented and tested.
 3. **Framework spike.** The two views in Tauri and Slint, on the four
-   platforms; decide. Built: see [spikes/README.md](https://github.com/steven-murray/mudcrab/blob/main/spikes/README.md)
+   platforms; decide. Built: see [spikes/README.md](https://github.com/steven-murray/mudcrab/blob/fc4f2e2ec509a9c9d9b1224ab8f2d9f5425a1f90/spikes/README.md)
    for what was measured. Both worked on Linux (Wayland and X11, Intel and
    NVIDIA) and Windows; Tauri needed a workaround to start on NVIDIA under
    Wayland and uses about five times the memory, Slint needed its tree,
