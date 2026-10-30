@@ -535,8 +535,12 @@ written in place:
   including list's docs file can document its mods too.
 - **Its `name`, `guide`, `mo2`, `export` and `about`** describe a whole list
   and are not read.
-- **Questions:** an included file cannot declare `inputs` yet. Its conditions
-  can ask the including list's questions.
+- **Its `inputs`** are asked of whoever installs the list, named for the
+  include: `hd` in a file included as `id = "Common"` becomes `Common.hd`
+  (characters other than letters, digits, `-` and `_` in the id become `_`),
+  and its mods' conditions are renamed to match. The including list can
+  answer them itself with `set` (below). Its conditions can also ask the
+  including list's questions, by their names there.
 
 `component = true` marks a file written only to be included: it may leave out
 `name`, its conditions may ask questions it does not declare, and `query`
@@ -582,6 +586,7 @@ skip = true                  # as `except`
 | `if` | A condition on the whole group: each included mod is left out when it is false, as well as when its own `if` is. |
 | `prefix` | Put before every included mod's id, so two files that use the same ids can both be included. Their mentions of each other -- `dependencies`, `conflicts_with`, merge sources, `mod:` in conditions -- are renamed too. |
 | `only`, `except` | Take only these of the file's mods, or all but these, by their ids in the file. Plugins only the left-out mods have are left out of the load order with them. |
+| `set` | Answers to the file's questions, by their names in the file, as `[mods.set]` with `hd = true`: nobody installing the list is asked them, and `query --set` cannot change them. |
 | `override."<id>"` | Fields of that mod (by its id in the file) to use instead of the file's. A list field given as `{ append = [...] }` -- written `actions.append = [...]` -- keeps the file's entries and adds these. `skip = true` leaves the mod out. A mod's `id` cannot be overridden. |
 
 Mods are named by their ids in the included file, before any `prefix`. An
@@ -637,5 +642,5 @@ Messages name a mod from a git include by repository, commit and file:
 ## Not implemented
 
 A `custom` mod type running arbitrary commands is on the
-[roadmap](roadmap.md), not in the schema. Questions declared by an included
-file, and `use` for a single shared mod definition, are planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).
+[roadmap](roadmap.md), not in the schema. `use`, for a single shared mod
+definition, is planned (see [the plan](https://github.com/steven-murray/mudcrab/blob/main/docs/design/composability.md)).

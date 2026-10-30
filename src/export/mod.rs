@@ -383,9 +383,11 @@ pub fn build_document(
         name: modlist.name.clone(),
         guide: modlist.guide.clone(),
         docs: modlist.docs.clone(),
+        // A question the list answers itself is nobody's to answer.
         inputs: modlist
             .inputs
             .iter()
+            .filter(|(_, spec)| spec.fixed.is_none())
             .map(|(id, spec)| InputDoc {
                 id: id.clone(),
                 input_type: spec.input_type,

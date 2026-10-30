@@ -514,10 +514,14 @@ fn input_list(args: InputListArgs) -> anyhow::Result<()> {
             InputType::Choice => format!("choice [{}]", spec.choices.join(", ")),
             InputType::Text => "text".to_string(),
         };
-        let default = match &spec.default {
-            Some(InputValue::Bool(b)) => b.to_string(),
-            Some(InputValue::Text(t)) => t.clone(),
-            None => "-".to_string(),
+        let text = |value: &InputValue| match value {
+            InputValue::Bool(b) => b.to_string(),
+            InputValue::Text(t) => t.clone(),
+        };
+        let default = match (&spec.fixed, &spec.default) {
+            (Some(fixed), _) => format!("{} (set by the list)", text(fixed)),
+            (None, Some(default)) => text(default),
+            (None, None) => "-".to_string(),
         };
         ui::data(format!("{name}\t{kind}\t{default}\t{}", spec.query));
     }

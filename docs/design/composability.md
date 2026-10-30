@@ -1,8 +1,8 @@
 # Composability: lists built from other lists
 
-**Status: phases 1-3 done** (local and git includes, overrides and include
-options; see [the format](../modlist-format.md#lists-in-several-files-include)).
-Phases 4-6 are a plan. Where a finished phase settled something
+**Status: phases 1-4 done** (local and git includes, overrides and include
+options, questions; see [the format](../modlist-format.md#lists-in-several-files-include)).
+Phases 5-6 are a plan. Where a finished phase settled something
 differently from the plan below, the notes under [Phases](#phases) say so.
 
 Today a modlist is one file. This plan lets a list pull in other modlist files
@@ -256,7 +256,18 @@ mod id. `export` can render it ("from the Oblivion Common patches, v3").
      repository and `update`, until overrides (phase 2) give the includer a
      place to make such a change.
 4. **Inputs across includes.** Namespacing, `set`, conditions resolving
-   against namespaced inputs, `query` asking only what is left.
+   against namespaced inputs, `query` asking only what is left. *Done.* As
+   built:
+   - The namespace is the include's id with anything but letters, digits,
+     `-` and `_` turned into `_` (`Unofficial_Patches.install_dlc_patches`),
+     as a condition's input names cannot be quoted.
+   - A `set` answer is kept on the question as `fixed`: `query` uses it and
+     refuses `--set` for it, and `export` (so the GUI) leaves it out. Keeping
+     the question, rather than folding the answer into each condition, means
+     nothing about the conditions has to be rewritten.
+   - An included file's conditions can still ask the including list's
+     questions by their own names, as in phase 1: only names the file
+     declares are namespaced.
 5. **Shims.** `use`, field merging, `add --use`. Write the first real shims
    from MOFAM's own fixes (Oblivion Trees' layout, the T4UTXL split, WAC's
    prune) into a public `oblivion-shims` repository, and point MOFAM at them.
