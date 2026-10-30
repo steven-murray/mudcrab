@@ -55,7 +55,18 @@ You need:
   else, set `MUDCRAB_7Z` to the 7-Zip program.
 - **mudcrab** itself: download the build for your system from the
   [releases page](https://github.com/steven-murray/mudcrab/releases) and
-  unpack it. There is nothing to install.
+  unpack it. On Linux, put `mudcrab` somewhere on your `PATH` (`~/.local/bin`,
+  say). On Windows, the GUI's installer installs the command line too; with
+  the command line's zip on its own, run its `install.ps1` from the unpacked
+  folder, which copies `mudcrab.exe` into your user's programs and puts it on
+  your `PATH`:
+
+  ```powershell
+  powershell -ExecutionPolicy Bypass -File .\install.ps1
+  ```
+
+  Either way, open a new terminal afterwards, and `mudcrab --help` runs from
+  anywhere.
 - **A Nexus Mods account.** With a premium account, mudcrab downloads
   everything itself. Without one, you download the archives by hand (Nexus
   only gives download links to premium accounts) and mudcrab takes it from

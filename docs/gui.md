@@ -28,8 +28,11 @@ beside the command line:
     2.35 or newer.
 - **Windows**: `mudcrab-gui-<version>-windows-x64-setup.exe` installs it for
   your account (no administrator needed) with a Start menu entry and an
-  uninstaller; `mudcrab-gui-<version>-windows-x64.zip` is the program alone,
-  to unpack and run. Both use Windows' own WebView2, which Windows 10 and 11
+  uninstaller, and the command line with it: `mudcrab` then runs from any
+  terminal opened afterwards (the installer puts its folder on your `PATH`,
+  and the uninstaller takes it off). `mudcrab-gui-<version>-windows-x64.zip`
+  is the programs alone, to unpack and run (its `install.ps1` puts the
+  command line on your `PATH`, as below). Both use Windows' own WebView2, which Windows 10 and 11
   have; the installer fetches it on the rare system without.
 
 The GUI's install mode reads a list and installs it from one window:
