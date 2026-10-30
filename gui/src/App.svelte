@@ -284,6 +284,12 @@
     grid-row: 3;
     min-height: 0;
   }
+  /* Author fills it by growing, not by `height: 100%`, which WebKitGTK does
+     not resolve against a grid row. */
+  .authoring {
+    display: flex;
+    flex-direction: column;
+  }
   .hidden {
     display: none !important;
   }

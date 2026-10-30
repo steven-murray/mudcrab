@@ -660,8 +660,8 @@
   .author {
     display: grid;
     grid-template-columns: minmax(260px, 380px) minmax(0, 1fr);
+    flex: 1;
     min-height: 0;
-    height: 100%;
   }
   .left {
     overflow: auto;
