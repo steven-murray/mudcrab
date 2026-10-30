@@ -127,12 +127,6 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
         .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", profile_dir.display()))?;
 
     if let Some(game_dir) = &settings.game_dir {
-        let source = locate_game_ini_source(game_dir, "Oblivion.ini").ok_or_else(|| {
-            anyhow::anyhow!(
-                "failed to locate Oblivion.ini for game directory {}; looked in the game folder, Documents/My Games/Oblivion and Steam Proton's compatdata. Run the game once from its launcher to create it",
-                game_dir.display()
-            )
-        })?;
         // Seed it once; never clobber it afterwards.
         //
         // This used to copy unconditionally on every run, which quietly made
@@ -145,14 +139,37 @@ pub(crate) fn prepare_mo2_profile(settings: &InstallSettings) -> anyhow::Result<
         //
         // `ini_set` is idempotent and edits in place, so an existing file is
         // the accumulated result of every section built so far. That is the
-        // thing worth keeping.
-        let destination = profile_dir.join("oblivion.ini");
-        if destination.exists() {
+        // thing worth keeping -- and a profile that has one (MO2 makes it when
+        // the profile is created) needs nothing from the game, which may never
+        // have been run to make its own.
+        let existing = std::fs::read_dir(&profile_dir)
+            .into_iter()
+            .flatten()
+            .flatten()
+            .find(|entry| {
+                entry
+                    .file_name()
+                    .to_string_lossy()
+                    .eq_ignore_ascii_case("oblivion.ini")
+            })
+            .map(|entry| entry.path());
+        if let Some(existing) = existing {
             tracing::debug!(
-                ini = %destination.display(),
+                ini = %existing.display(),
                 "profile Oblivion.ini already exists; keeping the edits it carries"
             );
         } else {
+            let source = locate_game_ini_source(game_dir, "Oblivion.ini").ok_or_else(|| {
+                anyhow::anyhow!(
+                    "the profile {} has no Oblivion.ini, and none was found to start it from for \
+                     game directory {}: looked in the game folder, Documents/My Games/Oblivion and \
+                     Steam Proton's compatdata. Run the game once from its launcher to create \
+                     one, or open the profile in Mod Organizer 2, which makes it",
+                    profile_dir.display(),
+                    game_dir.display()
+                )
+            })?;
+            let destination = profile_dir.join("oblivion.ini");
             std::fs::copy(&source, &destination).map_err(|err| {
                 anyhow::anyhow!(
                     "failed to copy {} to {}: {err}",
@@ -1055,6 +1072,40 @@ mod tests {
         // A Wine drive other than Z: is inside a prefix; not guessed at.
         assert_eq!(parse_game_path(windows, false), None);
         assert_eq!(parse_game_path("[Settings]\ngamePath=x\n", false), None);
+    }
+
+    #[test]
+    fn a_profile_with_its_own_oblivion_ini_needs_none_from_the_game() {
+        let dir = tempfile::tempdir().unwrap();
+        let instance = dir.path().join("mo2");
+        let game = dir.path().join("game");
+        std::fs::create_dir_all(instance.join("profiles/Default")).unwrap();
+        std::fs::create_dir_all(&game).unwrap();
+        std::fs::write(
+            instance.join("profiles/Default/oblivion.ini"),
+            "[General]\n",
+        )
+        .unwrap();
+        let settings = InstallSettings {
+            cache_dir: dir.path().join("downloads"),
+            mods_dir: instance.join("mods"),
+            mo2_instance_dir: Some(instance.clone()),
+            profile_name: "Default".to_string(),
+            game_dir: Some(game),
+            execute_actions: true,
+            dry_run: false,
+            tools: Default::default(),
+            filter: Default::default(),
+            force_merges: false,
+            force: false,
+            redo_actions: Vec::new(),
+        };
+        // The game has never been run, so it has no Oblivion.ini of its own.
+        prepare_mo2_profile(&settings).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(instance.join("profiles/Default/oblivion.ini")).unwrap(),
+            "[General]\n"
+        );
     }
 
     #[test]
