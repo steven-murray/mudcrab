@@ -359,10 +359,13 @@ pub(crate) fn install_mod_from_files(
         let expanded = pattern.replace("%GAME_DIR%", &game_dir.to_string_lossy());
         let matches = resolve_file_pattern(&expanded)?;
         if matches.is_empty() {
+            // Say where it looked: what %GAME_DIR% stood for is the usual
+            // surprise.
             anyhow::bail!(
-                "mod {} build-from-files pattern matched no files: {}",
+                "mod {} build-from-files pattern matched no files: {} (looked for {})",
                 mod_entry.id,
-                pattern
+                pattern,
+                expanded
             );
         }
 
