@@ -276,7 +276,12 @@
     color: var(--accent);
     font-weight: 600;
   }
+  /* Both views in the last row, the one that fills the window, whether or
+     not an error is shown above: placed by order, a view would land in the
+     error's row when there is none, and be only as tall as its content. */
+  main,
   .authoring {
+    grid-row: 3;
     min-height: 0;
   }
   .hidden {
@@ -298,7 +303,6 @@
   main {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
-    min-height: 0;
   }
   .left {
     overflow: auto;
