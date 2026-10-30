@@ -57,7 +57,9 @@ impl Setup {
             "name = \"Profiles\"\n\n[inputs.big]\nquery = \"Big?\"\ntype = \"bool\"\ndefault = false\n\n\
              [[mods]]\nid = \"shared\"\narchives = [{ path = \"manual:shared.zip\" }]\n\n\
              [[mods]]\nid = \"core\"\narchives = [\n    { path = \"manual:core.zip\" },\n    \
-             { path = \"manual:big.zip\", if = \"big\" },\n]\n",
+             { path = \"manual:big.zip\", if = \"big\" },\n]\n\n\
+             [[manual-steps]]\ntitle = \"Build the Bashed Patch\"\nsteps = \"Run Wrye Bash.\"\n\
+             done_when_plugin = \"Bashed Patch, 0.esp\"\n",
         )
         .unwrap();
         let compiled = d.join("compiled.json");
@@ -161,4 +163,62 @@ fn a_profile_changing_a_shared_mod_moves_to_its_own_folder() {
     assert!(s.has("core [Other]/big.txt"));
     assert_eq!(s.modlist("Other"), ["+core [Other]", "+shared"]);
     assert_eq!(s.modlist("Lean"), ["+core", "+shared"]);
+}
+
+impl Setup {
+    /// `steps` for `profile`, and what it printed.
+    fn steps(&self, profile: &str) -> String {
+        let plan = self.path(&format!("plan-{profile}-false.json"));
+        let out = mudcrab()
+            .arg("steps")
+            .arg(&plan)
+            .arg("--mo2-instance-dir")
+            .arg(self.path("mo2"))
+            .args(["--profile-name", profile])
+            .arg("--game-dir")
+            .arg(self.path("game"))
+            .output()
+            .unwrap();
+        assert!(out.status.success());
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&out.stdout),
+            String::from_utf8_lossy(&out.stderr)
+        )
+    }
+}
+
+#[test]
+fn a_bashed_patch_in_overwrite_moves_into_the_profiles_own_mod() {
+    let s = Setup::new();
+    s.install("Lean", false);
+    s.install("Other", false);
+    // Wrye Bash, run from MO2 in the lean profile, writes into overwrite/.
+    let overwrite = s.path("mo2/overwrite");
+    std::fs::create_dir_all(overwrite.join("Docs")).unwrap();
+    std::fs::write(overwrite.join("Bashed Patch, 0.esp"), "TES4 patch").unwrap();
+    std::fs::write(overwrite.join("Docs/Bashed Patch, 0.txt"), "what went in").unwrap();
+
+    let said = s.steps("Lean");
+    assert!(said.contains("Moved"), "{said}");
+    assert!(said.contains("1 of 1 step(s) done"), "{said}");
+    assert!(!overwrite.join("Bashed Patch, 0.esp").exists());
+    assert!(s.has("Bashed Patch, 0 [Lean]/Bashed Patch, 0.esp"));
+    assert!(s.has("Bashed Patch, 0 [Lean]/Docs/Bashed Patch, 0.txt"));
+    let first = |profile: &str| {
+        std::fs::read_to_string(s.path(&format!("mo2/profiles/{profile}/modlist.txt")))
+            .unwrap()
+            .lines()
+            .next()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(first("Lean"), "+Bashed Patch, 0 [Lean]");
+
+    // An install keeps it in the mod list, first.
+    s.install("Lean", false);
+    assert_eq!(first("Lean"), "+Bashed Patch, 0 [Lean]");
+    // It is the lean profile's patch, not the other's.
+    assert!(s.steps("Other").contains("0 of 1 step(s) done"));
+    assert_ne!(first("Other"), "+Bashed Patch, 0 [Lean]");
 }

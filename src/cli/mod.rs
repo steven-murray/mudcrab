@@ -855,6 +855,9 @@ pub struct StepsArgs {
     /// The MO2 instance the list is installed in.
     #[arg(long = "mo2-instance-dir", value_name = "DIR")]
     pub mo2_instance_dir: PathBuf,
+    /// The profile it is installed in.
+    #[arg(long, default_value = "Default")]
+    pub profile_name: String,
     /// The game folder, for where Wrye Bash is. Defaults as for `install`.
     #[arg(long = "game-dir", value_name = "DIR")]
     pub game_dir: Option<PathBuf>,

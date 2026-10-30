@@ -79,6 +79,7 @@
   let byHandTotal = $state(0);
   let browserFolder = $state<string | null>(null);
   let manual = $state<StepByHand[] | null>(null);
+  let notes = $state<Record<string, string>>({});
   let ticked = $state<Record<string, boolean>>({});
   let stopWaiting: (() => void) | null = null;
   let manualTimer: ReturnType<typeof setInterval> | null = null;
@@ -196,6 +197,8 @@
   async function refreshManual() {
     try {
       manual = await api.manualSteps();
+      // A move is said once, by the check that made it: keep it in view.
+      for (const m of manual) if (m.note) notes[m.title] = m.note;
     } catch {
       // Shown again on the next look.
     }
@@ -375,6 +378,7 @@
             <strong>{m.title}</strong>
             {#if m.done !== null}<span class="dim small">· ticks itself when done</span>{/if}
           </label>
+          {#if notes[m.title]}<p class="dim small">{notes[m.title]}</p>{/if}
           {#if !done}<ol>{#each m.steps as line}<li>{line.replace(/^\d+\.\s*/, "")}</li>{/each}</ol>{/if}
         </div>
       {/each}

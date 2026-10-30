@@ -214,10 +214,18 @@ pub(crate) fn export_mo2_instance(
         mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
     write_text_file(
         &profile_dir.join("modlist.txt"),
-        &render_mo2_modlist(
-            plan,
-            scope,
-            &crate::config::install::folders::ModFolders::load(settings),
+        &crate::config::install::by_hand_mods::list_first(
+            &render_mo2_modlist(
+                plan,
+                scope,
+                &crate::config::install::folders::ModFolders::load(settings),
+            ),
+            // The step plugins moved out of overwrite/ into this profile's
+            // own folders, listed first, as MO2 lists a patch.
+            &crate::config::install::by_hand_mods::recorded(settings)
+                .into_iter()
+                .filter(|m| settings.mods_dir.join(&m.folder).is_dir())
+                .collect::<Vec<_>>(),
         ),
     )?;
     // Both files, and they are not the same file twice. Oblivion has no

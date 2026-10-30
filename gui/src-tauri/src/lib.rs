@@ -908,6 +908,9 @@ struct StepByHand {
     steps: Vec<String>,
     /// Known done (its plugin exists), known not, or unknowable.
     done: Option<bool>,
+    /// What checking did with its plugin, if anything: moved out of
+    /// overwrite/ into a mod of the profile's own, or waiting for MO2 to close.
+    note: Option<String>,
 }
 
 /// The steps left to do by hand, and which are done.
@@ -915,9 +918,33 @@ struct StepByHand {
 fn manual_steps(state: tauri::State<'_, State>) -> Result<Vec<StepByHand>, String> {
     let plan = plan_of(&state)?;
     let settings = install_settings(&state)?;
+    let collected = config::install::by_hand_mods::collect(&plan, &settings).map_err(shown)?;
+    let note = |plugin: Option<&str>| -> Option<String> {
+        let plugin = plugin?;
+        if let Some(moved) = collected
+            .moved
+            .iter()
+            .find(|m| m.plugin.eq_ignore_ascii_case(plugin))
+        {
+            return Some(format!(
+                "Moved out of overwrite/ into the mod \"{}\", first in this profile's mod list.",
+                moved.folder
+            ));
+        }
+        collected
+            .waiting
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(plugin))
+            .then(|| {
+                "It is in overwrite/: close Mod Organizer 2 and check again, to move it into a \
+                 mod of this profile's own."
+                    .to_string()
+            })
+    };
     Ok(config::install::manual_steps(&plan, &settings)
         .into_iter()
         .map(|(step, done)| StepByHand {
+            note: note(step.done_when_plugin.as_deref()),
             done: step.done_when_plugin.is_some().then_some(done),
             steps: step
                 .steps

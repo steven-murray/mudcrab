@@ -13,16 +13,39 @@ pub fn run(args: StepsArgs) -> anyhow::Result<()> {
         cache_dir: Default::default(),
         mods_dir: args.mo2_instance_dir.join("mods"),
         mo2_instance_dir: Some(args.mo2_instance_dir.clone()),
-        profile_name: "Default".to_string(),
+        profile_name: args.profile_name.clone(),
         game_dir,
         execute_actions: false,
-        dry_run: true,
+        dry_run: false,
         tools: Default::default(),
         filter: Default::default(),
         force_merges: false,
         force: false,
         redo_actions: Vec::new(),
     };
+    // A step's plugin built in MO2 lands in overwrite/, which every profile
+    // shares: it goes into a mod of this profile's own.
+    let collected = config::install::by_hand_mods::collect(&plan, &settings)?;
+    for moved in &collected.moved {
+        ui::status(
+            Tone::Good,
+            format!(
+                "Moved {} out of overwrite/ into the mod {}, first in the profile's mod list",
+                ui::name(&moved.plugin),
+                ui::name(&moved.folder)
+            ),
+        );
+    }
+    for plugin in &collected.waiting {
+        ui::status(
+            Tone::Note,
+            format!(
+                "{} is in overwrite/; close Mod Organizer 2 and run this again to move it into \
+                 a mod of this profile's own",
+                ui::name(plugin)
+            ),
+        );
+    }
     let steps = config::install::manual_steps(&plan, &settings);
     if steps.is_empty() {
         ui::status(Tone::Good, "The list leaves nothing to do by hand.");

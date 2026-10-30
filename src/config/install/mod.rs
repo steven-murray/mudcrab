@@ -29,6 +29,7 @@ pub struct InstallSettings {
     pub redo_actions: Vec<String>,
 }
 
+pub mod by_hand_mods;
 pub mod folders;
 pub mod index;
 pub mod large_address;
@@ -153,6 +154,16 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
 
     let mut installed_mods = Vec::new();
     let manifest_path = get_install_manifest_path(settings);
+    // A step's plugin built since the last install (a Bashed Patch in
+    // overwrite/) goes into this profile's own folder before anything else.
+    let collected = by_hand_mods::collect(plan, settings)?;
+    for moved in &collected.moved {
+        tracing::info!(
+            plugin = %moved.plugin,
+            folder = %moved.folder,
+            "install: moved a step's plugin out of overwrite/ into a mod of this profile's own"
+        );
+    }
     let previous_manifest = if settings.dry_run {
         None
     } else {
@@ -499,7 +510,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
             Some(since) if since.installed == fingerprint => since,
             _ => ByHandSince {
                 installed: fingerprint,
-                found: found_plugin_copies(&by_hand(plan, settings), settings),
+                found: found_plugin_copies(&by_hand(plan, settings), plan, settings),
             },
         };
         write_install_manifest(
@@ -617,7 +628,7 @@ pub fn manual_steps(
         .map(|since| since.found)
         .unwrap_or_default();
     let built = |plugin: &str| {
-        plugin_copies(plugin, settings).iter().any(|copy| {
+        plugin_copies(plugin, plan, settings).iter().any(|copy| {
             let stale = found_before
                 .iter()
                 .filter(|found| found.plugin.eq_ignore_ascii_case(plugin))
@@ -679,12 +690,16 @@ fn by_hand(plan: &PersonalizedPlan, settings: &InstallSettings) -> Vec<ManualSte
 }
 
 /// What is already in the instance of each plugin these steps wait for.
-fn found_plugin_copies(steps: &[ManualStep], settings: &InstallSettings) -> Vec<FoundPlugin> {
+fn found_plugin_copies(
+    steps: &[ManualStep],
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+) -> Vec<FoundPlugin> {
     steps
         .iter()
         .filter_map(|step| step.done_when_plugin.as_deref())
         .flat_map(|plugin| {
-            plugin_copies(plugin, settings)
+            plugin_copies(plugin, plan, settings)
                 .into_iter()
                 .filter_map(|copy| hash_file(&copy).ok())
                 .map(|sha256| FoundPlugin {
@@ -695,9 +710,13 @@ fn found_plugin_copies(steps: &[ManualStep], settings: &InstallSettings) -> Vec<
         .collect()
 }
 
-/// Every copy of a plugin at the top of a mod folder, or in MO2's
-/// `overwrite/`, where a tool run from MO2 writes.
-fn plugin_copies(plugin: &str, settings: &InstallSettings) -> Vec<PathBuf> {
+/// Every copy of a plugin at the top of one of this profile's mod folders, or
+/// in MO2's `overwrite/`, where a tool run from MO2 writes.
+fn plugin_copies(
+    plugin: &str,
+    plan: &PersonalizedPlan,
+    settings: &InstallSettings,
+) -> Vec<PathBuf> {
     let named = |dir: &Path| -> Vec<PathBuf> {
         std::fs::read_dir(dir)
             .map(|entries| {
@@ -709,9 +728,31 @@ fn plugin_copies(plugin: &str, settings: &InstallSettings) -> Vec<PathBuf> {
             })
             .unwrap_or_default()
     };
-    let mut out: Vec<PathBuf> = std::fs::read_dir(&settings.mods_dir)
-        .map(|entries| entries.flatten().flat_map(|e| named(&e.path())).collect())
-        .unwrap_or_default();
+    // This profile's folders only: another profile's patch is not this one's.
+    // Those its mod list ticks count too, as a patch moved into a mod by hand
+    // (MO2's Create Mod) is one of those.
+    let folders = folders::ModFolders::load(settings);
+    let mut dirs: Vec<PathBuf> = plan
+        .mods
+        .iter()
+        .map(|entry| folders.dir(settings, &entry.id))
+        .collect();
+    if let Some(profile) = crate::config::mo2::mo2_profile_dir(settings) {
+        let ticked = std::fs::read_to_string(profile.join("modlist.txt")).unwrap_or_default();
+        dirs.extend(
+            ticked
+                .lines()
+                .filter_map(|line| line.strip_prefix('+'))
+                .filter(|name| !name.is_empty() && !name.contains(['/', '\\']))
+                .map(|name| settings.mods_dir.join(name)),
+        );
+    }
+    dirs.extend(
+        by_hand_mods::recorded(settings)
+            .into_iter()
+            .map(|m| settings.mods_dir.join(m.folder)),
+    );
+    let mut out: Vec<PathBuf> = dirs.iter().flat_map(|dir| named(dir)).collect();
     if let Some(dir) = &settings.mo2_instance_dir {
         out.extend(named(&dir.join("overwrite")));
     }
@@ -932,7 +973,13 @@ mod tests {
                 "build Bashed Patch, 0.esp with Wrye Bash"
             ]
         );
-        // Built: one in a mod, the other in MO2's overwrite.
+        // Built: one in a mod the profile ticks, the other in MO2's overwrite.
+        std::fs::create_dir_all(root.path().join("profiles/Default")).unwrap();
+        std::fs::write(
+            root.path().join("profiles/Default/modlist.txt"),
+            "+Some Mod\n",
+        )
+        .unwrap();
         std::fs::write(mods.join("Some Mod/other patch.esp"), b"").unwrap();
         std::fs::create_dir_all(root.path().join("overwrite")).unwrap();
         std::fs::write(root.path().join("overwrite/Bashed Patch, 0.esp"), b"").unwrap();
