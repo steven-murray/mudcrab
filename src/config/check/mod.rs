@@ -1100,6 +1100,63 @@ fn master_problems(
             }
         }
     }
+    let (merge_errors, merge_checked) = merge_source_problems(plan, shipped, &position);
+    errors.extend(merge_errors);
+    (errors, checked + merge_checked)
+}
+
+/// A merge's sources are out of the load order (the merge hides them), so
+/// their masters are not checked above, and a missing one used to surface
+/// only when `install` built the merge. The merge needs each source's masters
+/// to be its other sources, or in the load order ahead of its output -- as
+/// `merge::masters::build` does.
+fn merge_source_problems(
+    plan: &PersonalizedPlan,
+    shipped: &HashMap<String, Shipped>,
+    position: &HashMap<String, usize>,
+) -> (Vec<(String, String)>, usize) {
+    let mut errors = Vec::new();
+    let mut checked = 0usize;
+    for (merge_mod, spec) in plan.merges() {
+        let sources: HashSet<String> = spec
+            .sources
+            .iter()
+            .map(|source| source.plugin.to_ascii_lowercase())
+            .collect();
+        let output_at = position.get(&spec.output.to_ascii_lowercase()).copied();
+        for source in &spec.sources {
+            let Some(found) = shipped.get(&source.plugin.to_ascii_lowercase()) else {
+                continue;
+            };
+            checked += 1;
+            for master in &found.masters {
+                let wanted = master.to_ascii_lowercase();
+                if sources.contains(&wanted) {
+                    continue;
+                }
+                let problem = match (position.get(&wanted), output_at) {
+                    (None, _) => format!(
+                        "needs {master}, which is not in the list: add the mod that has it, and \
+                         {master} to `plugins`, or leave {} out of the merge",
+                        source.plugin
+                    ),
+                    (Some(&at), Some(out)) if at > out => format!(
+                        "needs {master}, which loads after the merge's output {} (move {master} \
+                         above it in `plugins`)",
+                        spec.output
+                    ),
+                    _ => continue,
+                };
+                errors.push((
+                    merge_mod.id.clone(),
+                    format!(
+                        "{} (merge source {} of {}): {problem}",
+                        source.mod_id, source.plugin, merge_mod.id
+                    ),
+                ));
+            }
+        }
+    }
     (errors, checked)
 }
 
@@ -1243,6 +1300,50 @@ mod tests {
                 )
             })
             .collect()
+    }
+
+    #[test]
+    fn a_merge_sources_masters_are_checked_though_it_is_out_of_the_load_order() {
+        let merge = serde_json::json!([{
+            "id": "Forts Merged",
+            "mod_type": "merge",
+            "dependencies": [],
+            "archives": [],
+            "merge": {
+                "output": "Forts Merged.esp",
+                "sources": [
+                    { "mod": "Fort A", "plugin": "Fort A.esp" },
+                    { "mod": "Patch", "plugin": "Patch.esp" },
+                ],
+            },
+        }]);
+        let plan = plan(
+            &["Oblivion.esm", "Forts Merged.esp", "Late.esp"],
+            &[],
+            merge,
+        );
+        let shipped = ships(&[
+            ("Fort A.esp", &["Oblivion.esm"]),
+            // Another source of the same merge is fine; a master out of the
+            // list, or loading after the output, is not.
+            ("Patch.esp", &["Fort A.esp", "Cloudtop.esp", "Late.esp"]),
+        ]);
+        let (errors, checked) = master_problems(&plan, &shipped);
+        assert_eq!(checked, 2, "{errors:#?}");
+        assert_eq!(errors.len(), 2, "{errors:#?}");
+        assert!(
+            errors[0]
+                .1
+                .contains("merge source Patch.esp of Forts Merged")
+                && errors[0]
+                    .1
+                    .contains("Cloudtop.esp, which is not in the list"),
+            "{errors:#?}"
+        );
+        assert!(
+            errors[1].1.contains("Late.esp, which loads after"),
+            "{errors:#?}"
+        );
     }
 
     #[test]
