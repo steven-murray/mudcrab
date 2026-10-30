@@ -57,7 +57,10 @@ The GUI's install mode reads a list and installs it from one window:
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download
-   --archive-search-path`).
+   --archive-search-path`). **MO2 profile** is the profile to install into:
+   one the instance has, or a new one by name. The answers to the list's
+   questions are kept per profile, so one instance can hold the list twice
+   with different choices; see [Several profiles](usage.md#several-profiles-in-one-instance).
 4. **Install.** The steps run one after another -- plan, download, check,
    install -- each showing what it is doing, what it writes, and the command
    that does the same from a terminal (with a button to copy it).

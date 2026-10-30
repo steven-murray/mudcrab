@@ -52,7 +52,8 @@ pub(super) fn conflicting_files(
             );
         };
 
-        let installed_at = cx.settings.mods_dir.join(safe_mod_dir_name(&other.id)?);
+        safe_mod_dir_name(&other.id)?;
+        let installed_at = crate::config::install::folders::mod_dir(cx.settings, &other.id);
         match staged_paths(other, Some(&installed_at), cx.settings, cx.active_plugins) {
             Ok(paths) => theirs.extend(paths),
             // A partial build legitimately has not fetched a later section's

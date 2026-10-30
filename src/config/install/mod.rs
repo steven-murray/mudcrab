@@ -29,6 +29,7 @@ pub struct InstallSettings {
     pub redo_actions: Vec<String>,
 }
 
+pub mod folders;
 pub mod index;
 pub mod large_address;
 pub mod layout;
@@ -212,6 +213,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         );
     }
 
+    let other_profiles = folders::OtherProfiles::load(settings);
     let bar = crate::events::progress(
         plan.mods
             .iter()
@@ -256,38 +258,55 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
         bar.inc(1);
         bar.set_message(&mod_entry.id);
 
-        let mut mod_target = settings.mods_dir.join(safe_mod_dir_name(&mod_entry.id)?);
+        safe_mod_dir_name(&mod_entry.id)?;
         let definition_hash = hash_personalized_mod(mod_entry)?;
         let previous = previous_by_id.get(&mod_entry.id);
 
-        // If this mod was previously installed, use its stored installed_path (in case it was renamed).
-        if let Some(prev) = previous
-            && !prev.installed_path.is_empty()
-        {
-            mod_target = settings.mods_dir.join(&prev.installed_path);
-        }
-        // Handle mod conflicts: if another mod target exists but belongs to a different profile
-        // with a different version, rename current profile's target to avoid collision.
-        if !settings.dry_run {
-            mod_target =
-                handle_mod_conflict(&mod_target, &mod_entry.id, &definition_hash, settings)?;
+        // Which folder: this profile's own, or one another profile already
+        // has exactly this mod in. A folder another profile uses is never
+        // changed; see `folders`.
+        let hidden = folders::hidden_by_plan(plan, &mod_entry.id);
+        let place = folders::place(
+            mod_entry,
+            &definition_hash,
+            &hidden,
+            previous,
+            &other_profiles,
+            settings,
+        );
+        let shared = matches!(place, folders::Place::Shared(_));
+        let mod_target = match &place {
+            folders::Place::Own(folder) | folders::Place::Shared(folder) => {
+                settings.mods_dir.join(folder)
+            }
+        };
+        if let folders::Place::Shared(folder) = &place {
+            tracing::info!(
+                mod_id = %mod_entry.id,
+                folder = %folder,
+                "install: another profile has this mod installed exactly so; sharing its folder"
+            );
         }
 
-        if should_skip_mod_install(
-            &mod_target,
-            &definition_hash,
-            previous,
-            settings.dry_run,
-            settings.force
-                || mod_entry.actions.iter().any(|action| {
-                    settings
-                        .redo_actions
-                        .iter()
-                        .any(|name| name == action.name())
-                }),
-        ) {
+        if shared
+            || should_skip_mod_install(
+                &mod_target,
+                &definition_hash,
+                previous,
+                settings.dry_run,
+                settings.force
+                    || mod_entry.actions.iter().any(|action| {
+                        settings
+                            .redo_actions
+                            .iter()
+                            .any(|name| name == action.name())
+                    }),
+            )
+        {
             let previous_extracted = previous.map(|entry| entry.extracted_files).unwrap_or(0);
-            let mut actions_applied = previous.map(|entry| entry.actions_applied).unwrap_or(false);
+            // A shared folder's own actions were applied by the profile that
+            // installed it; what writes outside it is still this profile's.
+            let mut actions_applied = shared || previous.is_some_and(|entry| entry.actions_applied);
             unchanged += 1;
 
             tracing::info!(
@@ -743,139 +762,6 @@ fn clear_install_target(mod_target: &Path) -> anyhow::Result<()> {
     }
 
     Ok(())
-}
-
-/// Handle mod conflicts when installing to a shared mods/ directory used by multiple profiles.
-///
-/// When a mod name conflicts with an existing mod that (1) exists on disk and (2) is owned by
-/// another profile and (3) has a different definition hash, we rename the current profile's mod
-/// by appending ` - <profilename>` to its folder name. This preserves all other profiles' state
-/// and only modifies the current profile's manifest, which stores the renamed path.
-///
-/// Returns the actual target path that should be used for this installation.
-fn handle_mod_conflict(
-    intended_target: &Path,
-    mod_id: &str,
-    new_hash: &str,
-    settings: &InstallSettings,
-) -> anyhow::Result<PathBuf> {
-    if !intended_target.exists() {
-        return Ok(intended_target.to_path_buf());
-    }
-
-    // Try to find which profile owns this existing mod by scanning all manifests in profiles/
-    let owning_profile = find_mod_owner_profile(&settings.mods_dir, mod_id)?;
-
-    // If we can't determine ownership or it's owned by the current profile, leave it alone
-    let Some((old_profile_name, old_hash)) = owning_profile else {
-        return Ok(intended_target.to_path_buf());
-    };
-
-    // If same profile owns it, let the normal logic handle it
-    if old_profile_name == settings.profile_name {
-        return Ok(intended_target.to_path_buf());
-    }
-
-    // If same version (hash matches), both profiles can share it
-    if old_hash == new_hash {
-        return Ok(intended_target.to_path_buf());
-    }
-
-    // Conflict detected: different profile owns it with different version.
-    // Rename *this* profile's target folder to avoid overwriting the other profile's mod.
-    let parent = intended_target.parent().ok_or_else(|| {
-        anyhow::anyhow!(
-            "mod target has no parent directory: {}",
-            intended_target.display()
-        )
-    })?;
-    let renamed_target = parent.join(format!("{} - {}", mod_id, settings.profile_name));
-
-    // If the renamed target already exists, remove it to avoid conflicts
-    if renamed_target.exists() {
-        tracing::warn!(
-            mod_id = mod_id,
-            renamed_path = %renamed_target.display(),
-            "install: removing existing {} folder from previous conflict resolution",
-            renamed_target.file_name().unwrap_or_default().to_string_lossy()
-        );
-        clear_install_target(&renamed_target)?;
-    }
-
-    tracing::info!(
-        mod_id = mod_id,
-        other_profile = old_profile_name,
-        renamed_path = %renamed_target.display(),
-        "install: resolved mod conflict; installing current profile's mod as {} to avoid overwriting {}",
-        renamed_target.file_name().unwrap_or_default().to_string_lossy(),
-        old_profile_name
-    );
-
-    Ok(renamed_target)
-}
-
-/// Scan the profiles/ directory to find which profile currently claims ownership of a mod.
-///
-/// Returns `Some((profile_name, definition_hash))` if found, `None` if not found or if
-/// the current profile already owns it or if ownership cannot be determined.
-fn find_mod_owner_profile(
-    mods_dir: &Path,
-    mod_id: &str,
-) -> anyhow::Result<Option<(String, String)>> {
-    let mo2_root = mods_dir.parent().and_then(|p| p.parent());
-    let Some(mo2_root) = mo2_root else {
-        // Not an MO2 setup; no other profiles to check
-        return Ok(None);
-    };
-
-    let profiles_dir = mo2_root.join("profiles");
-    if !profiles_dir.exists() || !profiles_dir.is_dir() {
-        return Ok(None);
-    }
-
-    for profile_entry in std::fs::read_dir(&profiles_dir).map_err(|err| {
-        anyhow::anyhow!(
-            "failed to scan profiles dir {}: {err}",
-            profiles_dir.display()
-        )
-    })? {
-        let entry =
-            profile_entry.map_err(|err| anyhow::anyhow!("failed to read profile entry: {err}"))?;
-        let profile_path = entry.path();
-        if !profile_path.is_dir() {
-            continue;
-        }
-
-        let manifest_path = profile_path.join("install_manifest.json");
-        if !manifest_path.exists() {
-            continue;
-        }
-
-        // Try to read and parse this profile's manifest
-        let raw = match std::fs::read_to_string(&manifest_path) {
-            Ok(content) => content,
-            Err(_) => continue, // Skip if unreadable
-        };
-
-        let manifest: InstallManifest = match serde_json::from_str(&raw) {
-            Ok(parsed) => parsed,
-            Err(_) => continue, // Skip if unparseable
-        };
-
-        // Check if this profile has the mod and return its hash
-        for installed in &manifest.installed_mods {
-            if installed.id == mod_id {
-                let profile_name = profile_path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-                return Ok(Some((profile_name, installed.definition_hash.clone())));
-            }
-        }
-    }
-
-    Ok(None)
 }
 
 fn run_post_install_actions(

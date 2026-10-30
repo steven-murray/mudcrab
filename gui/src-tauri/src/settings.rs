@@ -34,9 +34,37 @@ pub struct ListSettings {
     /// before anything is downloaded (`download --archive-search-path`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub search: Vec<PathBuf>,
-    /// The answers last given to the list's questions.
+    /// The answers last given to the list's questions, in any profile: what
+    /// a profile not yet installed starts from.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub answers: BTreeMap<String, String>,
+    /// The answers given for each profile, by its name: one list can be
+    /// installed into several profiles with different answers.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub profile_answers: BTreeMap<String, BTreeMap<String, String>>,
+}
+
+impl ListSettings {
+    /// The profile the list is installed into.
+    pub fn profile(&self) -> String {
+        self.profile
+            .clone()
+            .unwrap_or_else(|| "Default".to_string())
+    }
+
+    /// The answers for the chosen profile, or the last given anywhere.
+    pub fn current_answers(&self) -> BTreeMap<String, String> {
+        self.profile_answers
+            .get(&self.profile())
+            .cloned()
+            .unwrap_or_else(|| self.answers.clone())
+    }
+
+    /// Remember `answers` for the chosen profile.
+    pub fn set_answers(&mut self, answers: BTreeMap<String, String>) {
+        self.profile_answers.insert(self.profile(), answers.clone());
+        self.answers = answers;
+    }
 }
 
 /// `gui.toml`, beside the usual `tools.toml` (or the one
@@ -84,5 +112,28 @@ impl Settings {
 
     pub fn list_mut(&mut self, list: &std::path::Path) -> &mut ListSettings {
         self.lists.entry(list.display().to_string()).or_default()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn each_profile_keeps_its_own_answers() {
+        let mut list = ListSettings::default();
+        let answers = |big: &str| BTreeMap::from([("big".to_string(), big.to_string())]);
+        list.set_answers(answers("false"));
+        assert_eq!(list.profile(), "Default");
+
+        // A new profile starts from the last answers given anywhere...
+        list.profile = Some("Big".to_string());
+        assert_eq!(list.current_answers(), answers("false"));
+        list.set_answers(answers("true"));
+        // ...and each keeps its own after.
+        list.profile = None;
+        assert_eq!(list.current_answers(), answers("false"));
+        list.profile = Some("Big".to_string());
+        assert_eq!(list.current_answers(), answers("true"));
     }
 }

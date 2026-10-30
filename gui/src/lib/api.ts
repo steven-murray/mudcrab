@@ -115,6 +115,10 @@ export interface Locations {
   downloads: Location;
   game: Location;
   profile: string;
+  /** The instance's profiles, by name. */
+  profiles: string[];
+  /** The answers given for the chosen profile, or the last given anywhere. */
+  answers: Record<string, string>;
   search: Location[];
 }
 

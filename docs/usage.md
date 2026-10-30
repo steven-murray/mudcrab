@@ -660,6 +660,36 @@ MO2 restamps the files from `loadorder.txt` when it loads the profile.
 profile load. Part 37 of the MOFAM guide says the same thing about pasting in
 its own copy: "close & restart MO2 to have the plugins in order".
 
+### Several profiles in one instance
+
+One MO2 instance can hold a list several times, a profile each
+(`--profile-name`), with different answers -- or different lists. MO2's
+profiles share the instance's `mods/` folder, and each profile's
+`modlist.txt` names the folders it uses, so `install` decides per mod:
+
+- **Shared**: another profile already has the mod installed exactly as this
+  one would (the same definition, and the same plugins hidden by its merges).
+  This profile uses that folder, and nothing is unpacked.
+- **Its own**: this profile's folder, as before, when no other profile uses
+  it -- reinstalled there if its definition changed.
+- **A new folder**, `<mod id> [<profile>]`, when the folder this profile
+  would use belongs to another profile too and what is installed there is not
+  what this profile wants (a different FOMOD choice, an action only these
+  answers ask for).
+
+An install never changes a folder another profile uses, and `unhide-merges`
+leaves hidden a plugin another profile's merge hides in a shared folder. A
+merge's own output is never shared, since it depends on the load order and on
+its sources' contents. Each profile keeps its own `install_manifest.json`, and
+its own INI files.
+
+A folder no profile uses any more (a profile whose answers came to match
+another's, and so moved to the other's folder) is left on disk; delete it in
+MO2 if you want the space back. MO2's `overwrite/` folder is the instance's,
+not a profile's: a Bashed Patch Wrye Bash writes there serves whichever
+profile built it last, so with two profiles, move each one's patch into a mod
+of its own (MO2: **Create Mod...** on the overwrite folder) after building it.
+
 ### What a re-run does not redo
 
 Building a list section by section means running `install` dozens of times over

@@ -40,6 +40,19 @@
     return out;
   });
   let answers = $state<Record<string, string>>(initial);
+  // Each profile has its own answers: choosing another in Folders brings its
+  // answers back (or the last given anywhere, for a new one).
+  let shownProfile = untrack(() => locations?.profile);
+  $effect(() => {
+    if (!locations || locations.profile === shownProfile) return;
+    shownProfile = locations.profile;
+    const saved = locations.answers;
+    untrack(() => {
+      for (const input of list.document.inputs) {
+        answers[input.id] = saved[input.id] ?? (input.default === undefined ? "" : String(input.default));
+      }
+    });
+  });
   const unanswered = $derived(list.document.inputs.filter((i) => answers[i.id] === ""));
 
   // --- The run ----------------------------------------------------------------

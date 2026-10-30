@@ -214,7 +214,11 @@ pub(crate) fn export_mo2_instance(
         mo2_profile_dir(settings).ok_or_else(|| anyhow::anyhow!("missing MO2 profile dir"))?;
     write_text_file(
         &profile_dir.join("modlist.txt"),
-        &render_mo2_modlist(plan, scope),
+        &render_mo2_modlist(
+            plan,
+            scope,
+            &crate::config::install::folders::ModFolders::load(settings),
+        ),
     )?;
     // Both files, and they are not the same file twice. Oblivion has no
     // load-order file: the order *is* the plugins' modification times, oldest
@@ -630,7 +634,13 @@ fn set_ini_key(text: &str, section: &str, key: &str, value: &str) -> String {
     out
 }
 
-pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>) -> String {
+/// The profile's `modlist.txt`: each mod by the folder it is installed in
+/// for this profile, which `folders` names.
+pub(crate) fn render_mo2_modlist(
+    plan: &PersonalizedPlan,
+    scope: ExportScope<'_>,
+    folders: &crate::config::install::folders::ModFolders,
+) -> String {
     // Installed but left unticked: a mod the list says the player switches on.
     let selected: HashSet<&str> = plan
         .mods
@@ -654,7 +664,7 @@ pub(crate) fn render_mo2_modlist(plan: &PersonalizedPlan, scope: ExportScope<'_>
                     '-'
                 };
                 out.push(prefix);
-                out.push_str(id);
+                out.push_str(folders.name(id));
             }
             Mo2ModlistEntry::Section { name } => {
                 // A separator with nothing under it yet is noise, so drop the
@@ -732,8 +742,9 @@ fn scoped_plugins(
     };
 
     let mut available: HashSet<String> = HashSet::new();
+    let folders = crate::config::install::folders::ModFolders::load(settings);
     for mod_id in ids {
-        let mod_dir = settings.mods_dir.join(mod_id);
+        let mod_dir = folders.dir(settings, mod_id);
         if !mod_dir.exists() {
             continue;
         }
@@ -803,13 +814,14 @@ pub(crate) fn render_archive_list(
     scope: ExportScope<'_>,
 ) -> anyhow::Result<String> {
     let mut out = String::new();
+    let folders = crate::config::install::folders::ModFolders::load(settings);
 
     for mod_id in &plan.mod_order {
         if !in_scope(scope, mod_id) {
             continue;
         }
 
-        let mod_dir = settings.mods_dir.join(mod_id);
+        let mod_dir = folders.dir(settings, mod_id);
         if !mod_dir.exists() {
             continue;
         }

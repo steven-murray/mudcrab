@@ -157,7 +157,7 @@ fn open_list<R: Runtime>(
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         settings.opened(&path);
         let _ = settings.save();
-        settings.list(&path).answers
+        settings.list(&path).current_answers()
     };
     let cleans = modlist.mods.iter().any(|m| {
         m.actions
@@ -203,7 +203,7 @@ fn reload_list(state: tauri::State<'_, State>) -> Result<ListView, String> {
         .lock()
         .map_err(|_| "a command panicked")?
         .list(&path)
-        .answers;
+        .current_answers();
     Ok(ListView {
         about: modlist.about.clone(),
         path: path.display().to_string(),
@@ -284,6 +284,10 @@ struct Locations {
     downloads: Location,
     game: Location,
     profile: String,
+    /// The instance's profiles, by name, for choosing one.
+    profiles: Vec<String>,
+    /// The answers given for the chosen profile, or the last given anywhere.
+    answers: std::collections::BTreeMap<String, String>,
     /// Other folders to look in for archives, before downloading.
     search: Vec<Location>,
 }
@@ -382,7 +386,13 @@ fn locate(state: &State) -> Result<Located, String> {
             instance: Location::of(instance),
             downloads: Location::of(downloads),
             game: Location::of(game),
-            profile: chosen.profile.unwrap_or_else(|| "Default".to_string()),
+            profile: chosen.profile(),
+            profiles: chosen
+                .instance
+                .as_deref()
+                .map(instance_profiles)
+                .unwrap_or_default(),
+            answers: chosen.current_answers(),
             search: chosen
                 .search
                 .iter()
@@ -390,6 +400,19 @@ fn locate(state: &State) -> Result<Located, String> {
                 .collect(),
         },
     })
+}
+
+/// The profiles of the MO2 instance at `instance`, by name.
+fn instance_profiles(instance: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(instance.join("profiles"))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort_by_key(|name| name.to_lowercase());
+    names
 }
 
 #[tauri::command]
@@ -417,7 +440,16 @@ fn set_location(
             "instance" => chosen.instance = path,
             "downloads" => chosen.downloads = path,
             "game" => chosen.game = path,
-            "profile" => chosen.profile = path.map(|p| p.display().to_string()),
+            "profile" => {
+                // A profile is a folder in the instance's `profiles/`: a
+                // name, not a path.
+                let name = path.map(|p| p.display().to_string().trim().to_string());
+                if let Some(name) = &name {
+                    config::install::safe_mod_dir_name(name)
+                        .map_err(|_| format!("'{name}' cannot be a profile's name"))?;
+                }
+                chosen.profile = name.filter(|name| !name.is_empty());
+            }
             other => return Err(format!("no location called {other}")),
         }
         settings.save().map_err(shown)?;
@@ -503,7 +535,7 @@ fn step_plan(
     let list = state.list()?;
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
-        settings.list_mut(&list).answers = answers.clone();
+        settings.list_mut(&list).set_answers(answers.clone());
         let _ = settings.save();
     }
     plan_with(&state, answers)

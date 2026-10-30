@@ -619,12 +619,13 @@ pub(crate) fn stage_installed_mod_plugins(
     let selected: HashSet<&str> = plan.selected_mods.iter().map(String::as_str).collect();
     let mut winning_plugins: HashMap<String, PathBuf> = HashMap::new();
 
+    let folders = crate::config::install::folders::ModFolders::load(settings);
     for mod_id in &plan.mod_order {
         if !selected.contains(mod_id.as_str()) {
             continue;
         }
 
-        let mod_dir = settings.mods_dir.join(mod_id);
+        let mod_dir = folders.dir(settings, mod_id);
         if !mod_dir.exists() {
             continue;
         }
