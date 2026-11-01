@@ -69,7 +69,7 @@ pub fn collect(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyhow::R
     let Some(instance) = settings.mo2_instance_dir.as_deref() else {
         return Ok(Collected::default());
     };
-    let overwrite = instance.join("overwrite");
+    let overwrite = crate::config::mo2::layout::overwrite_dir(instance);
     let found: Vec<(String, PathBuf)> = plan
         .manual_steps
         .iter()

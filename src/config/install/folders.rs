@@ -86,7 +86,8 @@ impl OtherProfiles {
         let Some(instance) = settings.mo2_instance_dir.as_deref() else {
             return Self::default();
         };
-        let Ok(entries) = std::fs::read_dir(instance.join("profiles")) else {
+        let Ok(entries) = std::fs::read_dir(crate::config::mo2::layout::profiles_dir(instance))
+        else {
             return Self::default();
         };
         let mut uses: HashMap<String, Vec<Use>> = HashMap::new();
@@ -247,7 +248,7 @@ pub(crate) fn hidden_by_others(
     instance: &std::path::Path,
     profile: &str,
 ) -> std::collections::HashSet<(String, String)> {
-    let Ok(entries) = std::fs::read_dir(instance.join("profiles")) else {
+    let Ok(entries) = std::fs::read_dir(crate::config::mo2::layout::profiles_dir(instance)) else {
         return Default::default();
     };
     entries

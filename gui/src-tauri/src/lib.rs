@@ -404,7 +404,7 @@ fn locate(state: &State) -> Result<Located, String> {
 
 /// The profiles of the MO2 instance at `instance`, by name.
 fn instance_profiles(instance: &std::path::Path) -> Vec<String> {
-    let mut names: Vec<String> = std::fs::read_dir(instance.join("profiles"))
+    let mut names: Vec<String> = std::fs::read_dir(config::mo2::layout::profiles_dir(instance))
         .into_iter()
         .flatten()
         .flatten()
