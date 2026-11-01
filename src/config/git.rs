@@ -509,7 +509,7 @@ fn rev_parse(bare: &Path, revision: &str) -> Option<String> {
 }
 
 fn git_command() -> Command {
-    let mut command = Command::new("git");
+    let mut command = crate::util::process::console("git");
     // Never stop to ask for a password: a private repository fails, saying so.
     command.env("GIT_TERMINAL_PROMPT", "0");
     command

@@ -39,26 +39,52 @@ pub fn resolve_game_dir(
     explicit: Option<PathBuf>,
     mo2_instance: Option<&std::path::Path>,
 ) -> anyhow::Result<Option<PathBuf>> {
-    if let Some(path) = explicit {
-        return Ok(Some(path));
-    }
-    if let Ok(value) = std::env::var("GAME_DIR") {
+    let (path, from) = if let Some(path) = explicit {
+        (path, "--game-dir".to_string())
+    } else if let Ok(value) = std::env::var("GAME_DIR") {
         let trimmed = value.trim();
         if trimmed.is_empty() {
             anyhow::bail!("GAME_DIR is defined but empty");
         }
-        return Ok(Some(PathBuf::from(trimmed)));
-    }
-    let Some(instance) = mo2_instance else {
-        return Ok(None);
+        (PathBuf::from(trimmed), "GAME_DIR".to_string())
+    } else {
+        let Some(instance) = mo2_instance else {
+            return Ok(None);
+        };
+        match crate::config::mo2::instance_game_path(instance) {
+            Some(path) => (
+                path,
+                format!(
+                    "gamePath in {}",
+                    instance.join("ModOrganizer.ini").display()
+                ),
+            ),
+            None => anyhow::bail!(
+                "no game folder: pass --game-dir or set GAME_DIR (the MO2 instance's \
+                 ModOrganizer.ini names none this can read)"
+            ),
+        }
     };
-    match crate::config::mo2::instance_game_path(instance) {
-        Some(path) => Ok(Some(path)),
-        None => anyhow::bail!(
-            "no game folder: pass --game-dir or set GAME_DIR (the MO2 instance's \
-             ModOrganizer.ini names none this can read)"
-        ),
-    }
+    // A quoted Windows path ending in a backslash (`"C:\Games\Oblivion\"`)
+    // arrives with the closing quote still on it, as the shell reads `\"` as
+    // a quote in the name.
+    let path = PathBuf::from(path.to_string_lossy().trim_end_matches('"').to_string());
+    anyhow::ensure!(
+        path.is_dir(),
+        "the game folder {} (from {from}) does not exist",
+        path.display()
+    );
+    let is_data = path
+        .file_name()
+        .is_some_and(|name| name.to_string_lossy().eq_ignore_ascii_case("data"));
+    anyhow::ensure!(
+        !is_data || path.join("Data").is_dir(),
+        "the game folder {} (from {from}) is the game's Data folder: give the folder \
+         Oblivion.exe is in, the one above it",
+        path.display()
+    );
+    tracing::info!(game_dir = %path.display(), from = %from, "game folder");
+    Ok(Some(path))
 }
 
 /// The downloads folder: `--downloads`, else `downloads_dir` in tools.toml,

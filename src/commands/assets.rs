@@ -8,7 +8,7 @@ use crate::ui::Tone;
 const EXAMPLES: usize = 5;
 
 pub fn run(args: AssetsArgs) -> anyhow::Result<()> {
-    let instance = &args.mo2_instance_dir;
+    let instance = &crate::config::mo2::layout::find_instance(&args.mo2_instance_dir)?;
     let game_dir = super::resolve_game_dir(args.game_dir.clone(), Some(instance))?
         .ok_or_else(|| anyhow::anyhow!("no game folder: pass --game-dir"))?;
     let data = assets::VirtualData::of_instance(instance, &args.profile_name, &game_dir)?;

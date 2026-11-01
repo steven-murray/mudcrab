@@ -1,10 +1,15 @@
 use crate::cli::UnhideMergesArgs;
 use crate::config::install::merge::unhide_merges;
 
-pub async fn run(args: UnhideMergesArgs) -> anyhow::Result<()> {
+pub async fn run(mut args: UnhideMergesArgs) -> anyhow::Result<()> {
+    args.mo2_instance_dir = args
+        .mo2_instance_dir
+        .as_deref()
+        .map(crate::config::mo2::layout::find_instance)
+        .transpose()?;
     let mods_dir = match (&args.mods_dir, &args.mo2_instance_dir) {
         (Some(path), _) => path.clone(),
-        (None, Some(instance_dir)) => instance_dir.join("mods"),
+        (None, Some(instance_dir)) => crate::config::mo2::layout::mods_dir(instance_dir),
         (None, None) => {
             anyhow::bail!("unhide-merges requires either --mods-dir or --mo2-instance-dir")
         }

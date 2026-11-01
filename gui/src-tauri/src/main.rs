@@ -5,7 +5,7 @@
 fn main() {
     // WebKitGTK's DMA-BUF renderer dies on NVIDIA under Wayland ("Error 71
     // (Protocol error) dispatching to Wayland display"); without it, it draws
-    // fine. Found by the phase 3 spike (spikes/README.md); Tauri's docs give
+    // fine. Found by the phase 3 spike (docs/design/gui.md); Tauri's docs give
     // the same workaround.
     #[cfg(target_os = "linux")]
     if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {

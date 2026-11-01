@@ -1,7 +1,7 @@
 # Build output
 /target
-/spikes/target
-/spikes/tauri/gen
+# Build leftovers of the GUI framework spike, since removed.
+/spikes/
 
 # Python venv
 .venv/

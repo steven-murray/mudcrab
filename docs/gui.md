@@ -28,8 +28,11 @@ beside the command line:
     2.35 or newer.
 - **Windows**: `mudcrab-gui-<version>-windows-x64-setup.exe` installs it for
   your account (no administrator needed) with a Start menu entry and an
-  uninstaller; `mudcrab-gui-<version>-windows-x64.zip` is the program alone,
-  to unpack and run. Both use Windows' own WebView2, which Windows 10 and 11
+  uninstaller, and the command line with it: `mudcrab` then runs from any
+  terminal opened afterwards (the installer puts its folder on your `PATH`,
+  and the uninstaller takes it off). `mudcrab-gui-<version>-windows-x64.zip`
+  is the programs alone, to unpack and run (its `install.ps1` puts the
+  command line on your `PATH`, as below). Both use Windows' own WebView2, which Windows 10 and 11
   have; the installer fetches it on the rare system without.
 
 The GUI's install mode reads a list and installs it from one window:
@@ -44,8 +47,10 @@ The GUI's install mode reads a list and installs it from one window:
    opens by itself for a list with no MO2 instance chosen yet and stays
    until one is -- installing a list and writing one both need it, and the
    choices are shared by both modes. First the MO2 instance to install into
-   -- a portable instance, the folder with `ModOrganizer.exe` in it (any
-   other folder is refused). The downloads folder and the game folder then follow
+   -- the folder with its `ModOrganizer.ini` in it (for a portable instance,
+   the folder `ModOrganizer.exe` is in; any other folder is refused, and the
+   folder of an instance's mods and profiles is found from it where it can
+   be). The mods and profiles go where that ini says (its base directory). The downloads folder and the game folder then follow
    from it: the downloads folder from `tools.toml` if it is set there, else
    the instance's own; the game folder from the instance's settings, or found
    as `game-dir` finds it. Change either if they are not right. **Tools**

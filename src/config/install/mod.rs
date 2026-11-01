@@ -754,7 +754,7 @@ fn plugin_copies(
     );
     let mut out: Vec<PathBuf> = dirs.iter().flat_map(|dir| named(dir)).collect();
     if let Some(dir) = &settings.mo2_instance_dir {
-        out.extend(named(&dir.join("overwrite")));
+        out.extend(named(&crate::config::mo2::layout::overwrite_dir(dir)));
     }
     out
 }

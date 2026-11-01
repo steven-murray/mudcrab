@@ -3,7 +3,14 @@ use crate::config;
 use crate::config::tools::ToolsConfig;
 use std::path::PathBuf;
 
-pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
+pub async fn run(mut args: InstallArgs) -> anyhow::Result<()> {
+    // The folder with ModOrganizer.ini, which says where the rest is; given
+    // the folder its `base_directory` names, the ini is looked for.
+    args.mo2_instance_dir = args
+        .mo2_instance_dir
+        .as_deref()
+        .map(config::mo2::layout::find_instance)
+        .transpose()?;
     if let Some(instance) = &args.mo2_instance_dir
         && !args.dry_run
         && !args.ignore_running_mo2
@@ -30,7 +37,7 @@ pub async fn run(args: InstallArgs) -> anyhow::Result<()> {
         super::resolve_downloads_dir(args.downloads.clone(), args.mo2_instance_dir.as_deref())?;
     let mods_dir = match (&args.mods_dir, &args.mo2_instance_dir) {
         (Some(path), _) => path.clone(),
-        (None, Some(instance_dir)) => instance_dir.join("mods"),
+        (None, Some(instance_dir)) => config::mo2::layout::mods_dir(instance_dir),
         (None, None) => anyhow::bail!("install requires either --mods-dir or --mo2-instance-dir"),
     };
     // Staging hangs off the mods folder's parent, so a relative path must not

@@ -99,8 +99,7 @@ pub fn manifest_path(
     profile_name: &str,
 ) -> PathBuf {
     match mo2_instance_dir {
-        Some(instance) => instance
-            .join("profiles")
+        Some(instance) => crate::config::mo2::layout::profiles_dir(instance)
             .join(profile_name)
             .join("install_manifest.json"),
         None => mods_dir.join("install_manifest.json"),

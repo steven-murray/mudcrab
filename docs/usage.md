@@ -596,6 +596,17 @@ Example:
 mudcrab install build/plan.json --downloads ~/Games/OblivionModDownloads --mods-dir build/mods
 ```
 
+`--mo2-instance-dir` is the folder with the instance's `ModOrganizer.ini`. For
+a portable instance that is the folder MO2 is in, and on Linux usually holds
+everything. MO2 can keep its mods and profiles elsewhere -- on Windows its
+ini often sits with MO2 itself and names a **base directory** holding only
+`mods`, `profiles`, `overwrite` and `webcache` -- and `install`, like every
+command taking `--mo2-instance-dir`, puts things where the ini says (its
+`base_directory`, `mod_directory`, `profiles_directory`, `overwrite_directory`
+and `download_directory`). Given that base directory instead, it looks for the
+ini that names it among MO2's global instances (`%LOCALAPPDATA%\ModOrganizer`)
+and otherwise says to give the ini's folder.
+
 Into an MO2 instance, `install` writes the mods, the profile (`--profile-name`,
 default `Default`, which it then owns: its `modlist.txt` and `plugins.txt` are
 rewritten from the plan every run) and the load order, and points MO2 at the
@@ -956,7 +967,10 @@ Then, across the finished folders:
 - **masters**: each plugin's header is read (only plugins are unpacked), and
   every master must be in the load order, active, and earlier. The game's own
   plugins count as present unless the list orders them. A master merged away
-  by a `hide_sources` merge is named with the merge.
+  by a `hide_sources` merge is named with the merge. A merge's sources, out
+  of the load order, are checked as the merge needs them: each master must
+  be another source of the same merge, or in the load order ahead of its
+  output.
 - **load order**: a plugin in `plugins` that no mod installs is an error (a
   merge's output and Wrye Bash's `Bashed Patch, 0.esp` are made later), as is
   a plugin a mod declares but does not install. A plugin a mod installs that
