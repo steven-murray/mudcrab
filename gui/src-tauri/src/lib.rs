@@ -92,6 +92,21 @@ fn quote(text: impl AsRef<str>) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_plan_fingerprints_the_same_whatever_its_maps_order() {
+        let a: serde_json::Value =
+            serde_json::from_str(r#"{"b": 1, "a": {"y": [1, {"q": 2, "p": 3}], "x": "s"}}"#)
+                .unwrap();
+        let b: serde_json::Value =
+            serde_json::from_str(r#"{"a": {"x": "s", "y": [1, {"p": 3, "q": 2}]}, "b": 1}"#)
+                .unwrap();
+        assert_eq!(super::canonical(&a), super::canonical(&b));
+        assert_eq!(
+            super::canonical(&a),
+            r#"{"a":{"x":"s","y":[1,{"p":3,"q":2}]},"b":1}"#
+        );
+    }
     #[test]
     fn a_quoted_value_is_taken_literally_by_a_shell() {
         use super::quote;
@@ -829,7 +844,10 @@ async fn step_check(
     let fingerprint = {
         use sha2::{Digest, Sha256};
         let mut hash = Sha256::new();
-        hash.update(serde_json::to_vec(&plan).map_err(|err| err.to_string())?);
+        // With its maps' keys in order: the plan's answers are a HashMap,
+        // whose order differs from one run to the next.
+        let plan = serde_json::to_value(&plan).map_err(|err| err.to_string())?;
+        hash.update(canonical(&plan).as_bytes());
         hash.update(downloads.to_string_lossy().as_bytes());
         hash.update(env!("CARGO_PKG_VERSION").as_bytes());
         format!("{:x}", hash.finalize())
@@ -889,6 +907,35 @@ async fn step_check(
         groups: grouped(&report.findings),
         findings: report.findings,
     })
+}
+
+/// `value` as JSON text with every object's keys sorted, so equal values
+/// give equal text whatever order their maps were built in.
+fn canonical(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            let fields: Vec<String> = keys
+                .into_iter()
+                .map(|key| {
+                    format!(
+                        "{}:{}",
+                        serde_json::Value::from(key.as_str()),
+                        canonical(&map[key])
+                    )
+                })
+                .collect();
+            format!("{{{}}}", fields.join(","))
+        }
+        serde_json::Value::Array(items) => {
+            format!(
+                "[{}]",
+                items.iter().map(canonical).collect::<Vec<_>>().join(",")
+            )
+        }
+        other => other.to_string(),
+    }
 }
 
 /// Install settings for the open list, as `install --mo2-instance-dir` makes
