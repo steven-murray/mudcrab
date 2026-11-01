@@ -1,9 +1,9 @@
 # mudcrab
 
-A platform-independent, declarative modlist compiler and installer for TES4: Oblivion, 
+A platform-independent, declarative modlist compiler and installer for TES4: Oblivion,
 written in Rust.
 
-**[Documentation[(https://steven-murray.github.io/mudcrab/)** 
+**[Documentation[(https://steven-murray.github.io/mudcrab/)**
 
 **I've fought mudcrabs more fearsome than you!**
 
@@ -19,7 +19,7 @@ Wabbajack — a way to install someone else's curated list — with one huge dif
 
 **A Wabbajack install is data with no relationships in it.** The files are
 there, but nothing records why a mod was included, what it was patched against,
-or which other mods a change would disturb. 
+or which other mods a change would disturb.
 
 A mudcrab modlist is the list *and* the reasoning, in one file you can read,
 diff and send to someone. Because it is declarative and compiled rather than
@@ -64,7 +64,7 @@ Reports from setups other than these are especially welcome: see
 ## Getting it
 
 Prebuilt binaries for Linux and Windows can be downloaded from the
-[release](https://github.com/steven-murray/mudcrab/releases) page. 
+[release](https://github.com/steven-murray/mudcrab/releases) page.
 
 The Linux build needs glibc 2.34 or newer (Ubuntu 22.04, Debian 12, Fedora 35
 and later).
