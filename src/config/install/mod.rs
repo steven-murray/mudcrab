@@ -234,6 +234,7 @@ pub fn install_all(plan: &PersonalizedPlan, settings: &InstallSettings) -> anyho
     );
     let (mut changed, mut unchanged) = (0usize, 0usize);
     for mod_entry in install_order(&plan.mods) {
+        crate::util::cancel::check()?;
         // Whatever happens to this mod below, this run now owns its record:
         // the copy the previous manifest holds must not also be carried
         // forward, or a mod that is cleared and then fails to extract would

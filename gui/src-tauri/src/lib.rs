@@ -130,6 +130,27 @@ fn recent(state: tauri::State<'_, State>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// The parts of the guided tour already shown.
+#[tauri::command]
+fn toured(state: tauri::State<'_, State>) -> Vec<String> {
+    state
+        .settings
+        .lock()
+        .map(|s| s.toured.clone())
+        .unwrap_or_default()
+}
+
+/// Remember that a part of the tour was shown (seen through or skipped).
+#[tauri::command]
+fn tour_shown(state: tauri::State<'_, State>, part: String) -> Result<(), String> {
+    let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+    if !settings.toured.contains(&part) {
+        settings.toured.push(part);
+        settings.save().map_err(shown)?;
+    }
+    Ok(())
+}
+
 /// Start a new, empty list at `path` (`new`); the page then opens it.
 #[tauri::command]
 fn new_list(path: String, name: String) -> Result<String, String> {
@@ -471,7 +492,7 @@ fn set_location(
 fn set_tools_config(
     state: tauri::State<'_, State>,
     path: Option<String>,
-) -> Result<Locations, String> {
+) -> Result<ToolSettings, String> {
     let path = path.map(PathBuf::from);
     if let Some(path) = &path {
         config::tools::ToolsConfig::load(path).map_err(shown)?;
@@ -482,7 +503,7 @@ fn set_tools_config(
         settings.tools_config = path;
         settings.save().map_err(shown)?;
     }
-    locations(state)
+    Ok(tool_settings())
 }
 
 /// Keep the Nexus API key in the tools.toml in use (or with `None`, take it
@@ -493,6 +514,106 @@ fn set_api_key(state: tauri::State<'_, State>, key: Option<String>) -> Result<Lo
         .ok_or("there is no tools.toml to keep the key in (no config folder)")?;
     config::tools::ToolsConfig::save_api_key(&path, key.as_deref()).map_err(shown)?;
     locations(state)
+}
+
+/// The settings in tools.toml, which every list shares: where it is, and
+/// each setting the Settings dialog edits.
+#[derive(Serialize)]
+struct ToolSettings {
+    path: Option<String>,
+    /// "chosen" here, "MUDCRAB_TOOLS_CONFIG", or "usual".
+    from: String,
+    exists: bool,
+    /// Whether Wine and Proton apply (not on Windows).
+    wine: bool,
+    /// Whether `NEXUS_API_KEY` is set, which comes before the file's key.
+    key_from_env: bool,
+    /// Each setting by its key (`downloads_dir`, `tes4edit.exe`, ...), with
+    /// its value, or `None` where it is not set. The Nexus key is shown only
+    /// as whether it is set.
+    values: std::collections::BTreeMap<&'static str, Option<String>>,
+    /// What stops xEdit running, with these settings.
+    xedit_problems: Vec<String>,
+    /// The file could not be read: the settings shown are empty.
+    error: Option<String>,
+}
+
+/// The settings the Settings dialog edits, by their tools.toml keys.
+const TOOL_KEYS: &[&str] = &[
+    "downloads_dir",
+    "nexus_api_key",
+    "tes4edit.exe",
+    "tes4edit.qac_exe",
+    "loot.exe",
+    "loot.game_appdata_path",
+    "wine.prefix",
+    "wine.proton",
+];
+
+#[tauri::command]
+fn tool_settings() -> ToolSettings {
+    use config::tools::ToolsConfig;
+    let path = ToolsConfig::default_path();
+    let (tools, error) = match path.as_deref().map(ToolsConfig::load) {
+        Some(Ok(tools)) => (tools, None),
+        Some(Err(err)) => (ToolsConfig::default(), Some(format!("{err:#}"))),
+        None => (ToolsConfig::default(), None),
+    };
+    let shown = |p: &Option<PathBuf>| p.as_ref().map(|p| p.display().to_string());
+    let values = TOOL_KEYS
+        .iter()
+        .map(|&key| {
+            let value = match key {
+                "downloads_dir" => shown(&tools.downloads_dir),
+                "nexus_api_key" => tools
+                    .nexus_api_key
+                    .as_deref()
+                    .filter(|k| !k.trim().is_empty())
+                    .map(|_| "set".to_string()),
+                "tes4edit.exe" => tools.tes4edit.as_ref().map(|t| t.exe.display().to_string()),
+                "tes4edit.qac_exe" => tools.tes4edit.as_ref().and_then(|t| shown(&t.qac_exe)),
+                "loot.exe" => tools.loot.as_ref().and_then(|l| l.exe.clone()),
+                "loot.game_appdata_path" => tools
+                    .loot
+                    .as_ref()
+                    .and_then(|l| shown(&l.game_appdata_path)),
+                "wine.prefix" => tools.wine.as_ref().map(|w| w.prefix.display().to_string()),
+                "wine.proton" => tools.wine.as_ref().and_then(|w| shown(&w.proton)),
+                _ => None,
+            };
+            (key, value)
+        })
+        .collect();
+    ToolSettings {
+        from: match ToolsConfig::chosen_path() {
+            Some((_, "--tools-config")) => "chosen".to_string(),
+            Some((_, from)) => from.to_string(),
+            None => "usual".to_string(),
+        },
+        exists: path.as_ref().is_some_and(|p| p.is_file()),
+        path: path.as_ref().map(|p| p.display().to_string()),
+        wine: !cfg!(windows),
+        key_from_env: std::env::var("NEXUS_API_KEY").is_ok_and(|k| !k.trim().is_empty()),
+        xedit_problems: if tools.tes4edit.is_some() {
+            tools.xedit_problems()
+        } else {
+            Vec::new()
+        },
+        values,
+        error,
+    }
+}
+
+/// Set one setting in tools.toml (or with `None`, take it out).
+#[tauri::command]
+fn set_tool(key: String, value: Option<String>) -> Result<ToolSettings, String> {
+    if !TOOL_KEYS.contains(&key.as_str()) {
+        return Err(format!("no tools.toml setting called {key}"));
+    }
+    let path = config::tools::ToolsConfig::default_path()
+        .ok_or("there is no tools.toml to keep it in (no config folder)")?;
+    config::tools::ToolsConfig::save_field(&path, &key, value.as_deref()).map_err(shown)?;
+    Ok(tool_settings())
 }
 
 /// Look in another folder for archives, before downloading them.
@@ -542,12 +663,21 @@ fn step_plan(
     answers: BTreeMap<String, String>,
 ) -> Result<Done, String> {
     let list = state.list()?;
+    // A new run: a stop asked of the last one is not this one's.
+    mudcrab::util::cancel::reset();
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         settings.list_mut(&list).set_answers(answers.clone());
         let _ = settings.save();
     }
     plan_with(&state, answers)
+}
+
+/// Stop the run in progress at its next archive or mod
+/// (`mudcrab::util::cancel`).
+#[tauri::command]
+fn cancel_run() {
+    mudcrab::util::cancel::request();
 }
 
 /// `compile` and `query` with these answers, keeping the plan for the steps
@@ -765,6 +895,8 @@ fn open_page(url: String) -> Result<(), String> {
 #[derive(Serialize)]
 struct Checked {
     done: Done,
+    /// Not run: this plan, with these downloads, passed check before.
+    skipped: bool,
     problems: usize,
     warnings: usize,
     findings: Vec<config::check::Finding>,
@@ -800,7 +932,11 @@ fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
 
 /// Everything that can be known before installing (`check`).
 #[tauri::command]
-async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
+async fn step_check(
+    state: tauri::State<'_, State>,
+    again: Option<bool>,
+) -> Result<Checked, String> {
+    let again = again.unwrap_or(false);
     let plan = author::current_plan(&state)?;
     let downloads = locate(&state)?.downloads;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
@@ -809,9 +945,42 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         quote(plan_path(&state)?.display().to_string()),
         quote(downloads.display().to_string())
     );
+    // Checking again what passed is minutes for nothing: the same plan, the
+    // same downloads folder and the same mudcrab are skipped, unless asked.
+    let fingerprint = {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        hash.update(serde_json::to_vec(&plan).map_err(|err| err.to_string())?);
+        hash.update(downloads.to_string_lossy().as_bytes());
+        hash.update(env!("CARGO_PKG_VERSION").as_bytes());
+        format!("{:x}", hash.finalize())
+    };
+    let list = state.list()?;
+    let passed = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&list)
+        .checked;
+    if !again && passed.as_deref() == Some(fingerprint.as_str()) {
+        return Ok(Checked {
+            done: Done {
+                summary: "skipped: this plan passed check already, with the same downloads folder"
+                    .to_string(),
+                writes: Vec::new(),
+                command,
+            },
+            skipped: true,
+            problems: 0,
+            warnings: 0,
+            groups: Vec::new(),
+            findings: Vec::new(),
+        });
+    }
     let settings = config::check::CheckSettings {
         cache_dir: downloads,
         filter: Default::default(),
+        masters_only: false,
     };
     let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
         .await
@@ -822,7 +991,13 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         .lock()
         .map_err(|_| "a command panicked")?
         .masters = Some(report.plugins);
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        settings.list_mut(&list).checked = (report.problems == 0).then_some(fingerprint);
+        let _ = settings.save();
+    }
     Ok(Checked {
+        skipped: false,
         done: Done {
             summary: format!(
                 "{} archive(s) in {} mod(s): {} problem(s), {} warning(s)",
@@ -836,6 +1011,31 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         groups: grouped(&report.findings),
         findings: report.findings,
     })
+}
+
+/// Each plugin's masters, for the load order (`check --masters-only`): read
+/// from the archives once, then kept, so it is quick after the first time.
+#[tauri::command]
+async fn read_masters(state: tauri::State<'_, State>) -> Result<(), String> {
+    let plan = author::current_plan(&state)?;
+    let downloads = locate(&state)?
+        .downloads
+        .ok_or("say where the downloads folder is first")?;
+    let settings = config::check::CheckSettings {
+        cache_dir: downloads,
+        filter: Default::default(),
+        masters_only: true,
+    };
+    let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(shown)?;
+    state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .masters = Some(report.plugins);
+    Ok(())
 }
 
 /// Install settings for the open list, as `install --mo2-instance-dir` makes
@@ -1014,12 +1214,16 @@ pub fn app<R: Runtime>(
         .invoke_handler(tauri::generate_handler![
             opening,
             recent,
+            toured,
+            tour_shown,
             open_list,
             new_list,
             locations,
             set_location,
             set_tools_config,
             set_api_key,
+            tool_settings,
+            set_tool,
             add_search_folder,
             remove_search_folder,
             step_plan,
@@ -1027,7 +1231,9 @@ pub fn app<R: Runtime>(
             look_for_downloads,
             open_page,
             step_check,
+            read_masters,
             step_install,
+            cancel_run,
             manual_steps,
             author::load_order,
             author::mod_view,
@@ -1039,6 +1245,7 @@ pub fn app<R: Runtime>(
             edits::redo,
             edits::changes,
             edits::move_plugin,
+            edits::set_plugin_active,
             edits::move_mod,
             edits::edit_filter,
             edits::set_fields,

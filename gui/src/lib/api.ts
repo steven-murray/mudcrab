@@ -109,6 +109,20 @@ export interface Tools {
   nexus_key: "NEXUS_API_KEY" | "tools.toml" | null;
 }
 
+/** tools.toml, which every list shares. */
+export interface ToolSettings {
+  path: string | null;
+  from: string;
+  exists: boolean;
+  /** Whether Wine and Proton apply (not on Windows). */
+  wine: boolean;
+  key_from_env: boolean;
+  /** By tools.toml key; the Nexus key is "set" or null. */
+  values: Record<string, string | null>;
+  xedit_problems: string[];
+  error: string | null;
+}
+
 export interface Locations {
   tools: Tools;
   instance: Location;
@@ -155,6 +169,8 @@ export interface FindingGroup {
 
 export interface Checked {
   done: Done;
+  /** Not run: this plan, with these downloads, passed check before. */
+  skipped: boolean;
   problems: number;
   warnings: number;
   groups: FindingGroup[];
@@ -209,6 +225,11 @@ export interface InstalledFile {
   path: string;
   laid_out: string;
   hidden: boolean;
+  /** As the archive names it. */
+  source: string;
+  /** False for a file the archive's include or exclude leaves out. */
+  taken: boolean;
+  filtered_as: string;
 }
 
 export interface Tree {
@@ -220,6 +241,8 @@ export interface Tree {
   bain_conditional: string[];
   rows: FileRow[];
   installed: InstalledFile[];
+  /** How many files the layout offers each include and exclude matches. */
+  matches: { key: "include" | "exclude"; glob: string; files: number }[];
   entries: number;
   taken: number;
   command: string;
@@ -380,12 +403,17 @@ export interface Fetched {
 export const api = {
   opening: () => invoke<string | null>("opening"),
   recent: () => invoke<string[]>("recent"),
+  /** The parts of the guided tour already shown. */
+  toured: () => invoke<string[]>("toured"),
+  tourShown: (part: string) => invoke<void>("tour_shown", { part }),
   openList: (path: string) => invoke<ListView>("open_list", { path }),
   newList: (path: string, name: string) => invoke<string>("new_list", { path, name }),
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
-  setToolsConfig: (path: string | null) => invoke<Locations>("set_tools_config", { path }),
+  setToolsConfig: (path: string | null) => invoke<ToolSettings>("set_tools_config", { path }),
+  toolSettings: () => invoke<ToolSettings>("tool_settings"),
+  setTool: (key: string, value: string | null) => invoke<ToolSettings>("set_tool", { key, value }),
   setApiKey: (key: string | null) => invoke<Locations>("set_api_key", { key }),
   addSearchFolder: (path: string) => invoke<Locations>("add_search_folder", { path }),
   removeSearchFolder: (path: string) => invoke<Locations>("remove_search_folder", { path }),
@@ -393,7 +421,10 @@ export const api = {
   download: () => invoke<Downloaded>("step_download"),
   lookForDownloads: () => invoke<ByHand[]>("look_for_downloads"),
   openPage: (url: string) => invoke<void>("open_page", { url }),
-  check: () => invoke<Checked>("step_check"),
+  check: (again = false) => invoke<Checked>("step_check", { again }),
+  readMasters: () => invoke<void>("read_masters"),
+  /** Stop the run in progress at its next archive or mod. */
+  cancelRun: () => invoke<void>("cancel_run"),
   install: () => invoke<Done>("step_install"),
   manualSteps: () => invoke<StepByHand[]>("manual_steps"),
   loadOrder: () => invoke<LoadOrder>("load_order"),
@@ -406,6 +437,7 @@ export const api = {
   undo: () => invoke<Edited>("undo"),
   redo: () => invoke<Edited>("redo"),
   changes: () => invoke<Changes>("changes"),
+  setPluginActive: (plugin: string, active: boolean) => invoke<Edited>("set_plugin_active", { plugin, active }),
   movePlugin: (plugin: string, before: string | null) =>
     invoke<Edited>("move_plugin", { plugin, before }),
   moveMod: (id: string, section: string[], beforeMod: string | null) =>

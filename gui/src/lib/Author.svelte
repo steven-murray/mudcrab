@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import {
     api,
@@ -20,8 +21,8 @@
   import Conflicts from "./Conflicts.svelte";
   import { startDrag, type Place } from "./drag";
   import EntryView from "./EntryView.svelte";
-  import Fields from "./Fields.svelte";
-  import FileTree from "./FileTree.svelte";
+  import ModFields from "./ModFields.svelte";
+  import ModFiles, { type Archive as ModArchive } from "./ModFiles.svelte";
   import Inputs from "./Inputs.svelte";
   import LoadOrder from "./LoadOrder.svelte";
   import Notes from "./Notes.svelte";
@@ -46,10 +47,8 @@
 
   let error = $state<string | null>(null);
   let view = $state<ModView | null>(null);
-  let archive = $state(1);
-  let tree = $state<Tree | null>(null);
-  let treeError = $state<string | null>(null);
-  let loadingTree = $state(false);
+  // The mod's archives, each with its files once read.
+  let files = $state<ModArchive[]>([]);
   let actions = $state<string[]>([]);
   let order = $state<Order | null>(null);
   let found = $state<Found | null>(null);
@@ -57,6 +56,11 @@
   let checked = $state<Checked | null>(null);
   let checking = $state(false);
   let busy = $state(false);
+  // The masters, read for the load order (`check --masters-only`).
+  let readingMasters = $state(false);
+  let mastersError = $state<string | null>(null);
+  // The mods of the plugin chosen in the load order, marked in the list.
+  const marked = new SvelteSet<string>();
 
   // The last edit, and whether there is one to undo or redo.
   let last = $state<Change | null>(null);
@@ -85,7 +89,7 @@
       if (selected === id) {
         selected = null;
         view = null;
-        tree = null;
+        files = [];
       }
       await archivesPane?.refresh();
     }
@@ -143,8 +147,7 @@
     tab = "mod";
     for (const anchor of mods.get(id)?.path ?? []) opened.add(anchor);
     view = null;
-    tree = null;
-    treeError = null;
+    files = [];
     await readMod(id, 1);
   }
 
@@ -152,31 +155,38 @@
     try {
       view = await api.modView(id);
       actions = await api.actions(id);
-      if (view.archives.length) await readTree(id, Math.min(number, view.archives.length));
+      await readFiles(id);
     } catch (err) {
       error = String(err);
     }
   }
 
-  async function readTree(id: string, number: number, quietly = false) {
-    archive = number;
-    if (!quietly) tree = null;
-    treeError = null;
-    loadingTree = !quietly;
-    try {
-      tree = await api.modFiles(id, number);
-    } catch (err) {
-      treeError = String(err);
-    } finally {
-      loadingTree = false;
-    }
+  // Every archive's files, read side by side; quietly, after an edit, the
+  // old ones stay shown until the new are read.
+  async function readFiles(id: string, quietly = false) {
+    if (!view) return;
+    const base: ModArchive[] = view.archives.map((a) => ({ number: a.number, label: a.label, condition: a.condition, tree: null, error: null }));
+    if (!quietly) files = base;
+    const read = await Promise.all(
+      base.map(async (a) => {
+        try {
+          return { ...a, tree: await api.modFiles(id, a.number) };
+        } catch (err) {
+          return { ...a, error: String(err) };
+        }
+      }),
+    );
+    if (selected === id) files = read;
   }
 
   async function show(next: Tab) {
     tab = next;
     error = null;
     try {
-      if (next === "load" && !order) order = await api.loadOrder();
+      if (next === "load") {
+        if (!order) order = await api.loadOrder();
+        if (!order.masters_read) readMasters();
+      }
       if (next === "changes") changes = await api.changes();
       if (next === "conflicts" && !found) {
         busy = true;
@@ -189,6 +199,35 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function readMasters() {
+    if (readingMasters) return;
+    readingMasters = true;
+    mastersError = null;
+    try {
+      await api.readMasters();
+      order = await api.loadOrder();
+    } catch (err) {
+      mastersError = String(err);
+    } finally {
+      readingMasters = false;
+    }
+  }
+
+  // Mark a plugin's mods in the list, their sections opened, the first
+  // scrolled to.
+  async function mark(ids: string[]) {
+    marked.clear();
+    for (const id of ids) {
+      marked.add(id);
+      for (const anchor of mods.get(id)?.path ?? []) opened.add(anchor);
+    }
+    if (!ids.length) return;
+    await tick();
+    scroller
+      ?.querySelector(`[data-drop="mod:${CSS.escape(ids[0])}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }
 
   async function runCheck() {
@@ -206,15 +245,30 @@
 
   // Everything shown, read again: after an edit, or when the list may have
   // changed outside. What has to be asked for again (conflicts) is dropped.
+  // Side by side: the list (large, for a large list) need not hold up the
+  // mod shown.
   async function refresh() {
-    list = await api.reloadList();
-    if (order) order = await api.loadOrder();
-    if (tab === "changes") changes = await api.changes();
-    if (selected && mods.has(selected)) {
-      view = await api.modView(selected);
-      actions = await api.actions(selected);
-      if (view.archives.length) await readTree(selected, Math.min(archive, view.archives.length), true);
-    }
+    const id = selected && mods.has(selected) ? selected : null;
+    const reads: Promise<unknown>[] = [api.reloadList().then((read) => (list = read))];
+    if (order)
+      reads.push(
+        api.loadOrder().then((read) => {
+          order = read;
+          // A mod added brings plugins whose masters are not read yet.
+          if (tab === "load") readMasters();
+        }),
+      );
+    if (tab === "changes") reads.push(api.changes().then((read) => (changes = read)));
+    if (id)
+      reads.push(
+        (async () => {
+          const [read, acts] = await Promise.all([api.modView(id), api.actions(id)]);
+          view = read;
+          actions = acts;
+          await readFiles(id, true);
+        })(),
+      );
+    await Promise.all(reads);
   }
 
   async function reload() {
@@ -303,7 +357,7 @@
     if (first) return;
     found = null;
     archivesPane?.refresh();
-    if (selected && view?.archives.length) readTree(selected, archive, true);
+    if (selected && view?.archives.length) readFiles(selected, true);
   });
 
   // Add the mod an archive makes, then show it.
@@ -376,8 +430,8 @@
 {/if}
 
 <div class="author">
-  <section class="left" bind:this={scroller}>
-    <nav class="panes">
+  <section class="left" bind:this={scroller} data-tour="author-list">
+    <nav class="panes" data-tour="author-archives">
       <button class:on={pane === "list"} onclick={() => (pane = "list")}>The list</button>
       <button class:on={pane === "archives"} onclick={() => (pane = "archives")} title="The archives in the downloads folders, to add mods from">Archives</button>
     </nav>
@@ -389,6 +443,7 @@
       <div class="addwrap">
         <button
           class="plus"
+          data-tour="author-add"
           onclick={(e) => {
             e.stopPropagation();
             addMenu = !addMenu;
@@ -438,6 +493,7 @@
             <div
               class="mod"
               class:on={selected === e.id}
+              class:marked={marked.has(e.id)}
               class:off={e.enabled === false}
               style="--depth: {depth}"
               data-drop={"mod:" + e.id}
@@ -478,7 +534,7 @@
 
   <aside class="right">
     <div class="bar">
-      <nav>
+      <nav data-tour="author-tabs">
         <button class:on={tab === "mod"} onclick={() => show("mod")}>Mod</button>
         <button class:on={tab === "load"} onclick={() => show("load")}>Load order</button>
         <button class:on={tab === "conflicts"} onclick={() => show("conflicts")}>Conflicts</button>
@@ -490,7 +546,7 @@
         <button class:on={tab === "inputs"} onclick={() => show("inputs")}>Questions</button>
         <button class:on={tab === "changes"} onclick={() => show("changes")}>Changes</button>
       </nav>
-      <span class="edits">
+      <span class="edits" data-tour="author-undo">
         <button onclick={undo} disabled={!canUndo || editing} title="Undo the last edit (Ctrl+Z)">↶ Undo</button>
         <button onclick={redo} disabled={!canRedo || editing} title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
         <button onclick={reload} title="Read the list again, if it has changed on disk">Reload</button>
@@ -523,10 +579,12 @@
             </p>
           {/if}
           <Notes id={chosen.id} docs={chosen.docs} save={(fields) => run(() => api.setDocs(chosen.id, fields))} />
-          <details class="form">
-            <summary>The mod's fields</summary>
-            <Fields id={chosen.id} archive={null} save={(sets, unsets) => run(() => api.setFields(chosen.id, null, sets, unsets))} />
-          </details>
+          <ModFields
+            mod={chosen}
+            inputs={list.document.inputs}
+            mods={[...mods.values()].map((m) => ({ id: m.mod.id, title: m.mod.title }))}
+            {run}
+          />
           {#if actions.length}
             <h4>Actions</h4>
             <ol class="actions">
@@ -543,46 +601,29 @@
           {:else if view && !view.archives.length}
             <p class="dim">No archives: this mod is made at install.</p>
           {:else if view}
-            {#if view.archives.length > 1}
-              <nav class="archives">
-                {#each view.archives as a}
-                  <button class:on={archive === a.number} onclick={() => readTree(view!.id, a.number)}
-                    >{a.number}. {a.label}{#if a.condition}<span class="dim"> (if {a.condition})</span>{/if}</button
-                  >
-                {/each}
-              </nav>
-            {/if}
-            {@const shownArchive = view.archives.find((a) => a.number === archive)}
-            {@const fomod = tree?.layout === "fomod" || !!tree?.rows.some((r) => r.path.toLowerCase().endsWith("fomod/moduleconfig.xml"))}
-            {#if tree && (fomod || tree.layout === "bain")}
-              <button
-                class="chooser"
-                onclick={() => (choosing = { id: chosen.id, number: archive, label: shownArchive?.label ?? "" })}
-                title="Walk its installer again, starting at what the list chooses now (mudcrab choose)"
-                >Choose its {fomod ? "FOMOD options" : "BAIN packages"}…</button
-              >
-            {/if}
-            <details class="form">
-              <summary>Archive {archive}'s fields</summary>
-              <Fields id={chosen.id} {archive} save={(sets, unsets) => run(() => api.setFields(chosen.id, archive, sets, unsets))} />
-            </details>
-            {#if loadingTree}
-              <p class="dim">Reading the archive…</p>
-            {:else if treeError}
-              <pre class="error">{treeError}</pre>
-            {:else if tree}
-              <FileTree
-                {tree}
-                edit={(key, add, drop) => run(() => api.editFilter(chosen.id, archive, key, add, drop))}
-                problem={(message) => (error = message)}
-                move={(from, to) => run(() => api.addAction(chosen.id, "file_move", [`from=${JSON.stringify(from)}`, `to=${JSON.stringify(to)}`], null))}
-              />
-            {/if}
+            <ModFiles
+              id={chosen.id}
+              archives={files}
+              edit={(number, key, add, drop) => run(() => api.editFilter(chosen.id, number, key, add, drop))}
+              move={(from, to) => run(() => api.addAction(chosen.id, "file_move", [`from=${JSON.stringify(from)}`, `to=${JSON.stringify(to)}`], null))}
+              problem={(message) => (error = message)}
+              choose={(number, label) => (choosing = { id: chosen.id, number, label })}
+              inputs={list.document.inputs}
+              {run}
+            />
           {/if}
         {/if}
       {:else if tab === "load"}
         {#if order}
-          <LoadOrder {order} {select} {runCheck} {checking} move={(plugin, before) => run(() => api.movePlugin(plugin, before))} />
+          <LoadOrder
+            {order}
+            {select}
+            {mark}
+            reading={readingMasters}
+            readError={mastersError}
+            move={(plugin, before) => run(() => api.movePlugin(plugin, before))}
+            setActive={(plugin, active) => run(() => api.setPluginActive(plugin, active))}
+          />
         {:else}<p class="dim">Reading…</p>{/if}
       {:else if tab === "conflicts"}
         {#if busy}
@@ -752,6 +793,10 @@
     background: var(--accent-soft);
     color: var(--accent);
   }
+  .mod.marked {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
   .twisty {
     width: 12px;
     color: var(--dim);
@@ -888,19 +933,6 @@
     font-size: 12px;
     padding: 3px 8px;
   }
-  .chooser {
-    font-size: 12px;
-    margin: 6px 0;
-  }
-  details.form {
-    margin: 8px 0;
-  }
-  details.form summary {
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-bottom: 4px;
-  }
   h4 {
     font-size: 13px;
     margin: 12px 0 4px;
@@ -951,14 +983,6 @@
   }
   .content {
     padding: 12px 18px 40px;
-  }
-  .archives {
-    margin: 8px 0;
-  }
-  .archives button {
-    font-size: 12px;
-    overflow-wrap: anywhere;
-    text-align: left;
   }
   .error {
     color: var(--problem);

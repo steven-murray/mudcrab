@@ -173,7 +173,7 @@ pub(super) async fn add_start(path: String) -> Result<Started, String> {
             None => {
                 started.why_manual = Some(format!(
                     "Nexus was not asked where it came from: there is no Nexus API key (set one \
-                     in Folders).{page}"
+                     in Settings).{page}"
                 ))
             }
             Some(key) => {
@@ -529,7 +529,7 @@ fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existin
     let located = locate(state)?;
     let downloads = located
         .downloads
-        .ok_or("say where the downloads folder is first (in Install)")?;
+        .ok_or("say where the downloads folder is first (in Settings)")?;
     let answers: config::query::Overrides = state
         .settings
         .lock()
@@ -730,7 +730,7 @@ pub(super) async fn nexus_fetch(
 ) -> Result<Fetched, String> {
     let downloads = locate(&state)?
         .downloads
-        .ok_or("say where the downloads folder is first (in Install)")?;
+        .ok_or("say where the downloads folder is first (in Settings)")?;
     std::fs::create_dir_all(&downloads).map_err(|err| format!("{}: {err}", downloads.display()))?;
     // A plan of one archive, so the download is `download`'s own.
     let plan: config::schema::PersonalizedPlan = serde_json::from_value(serde_json::json!({

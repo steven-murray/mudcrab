@@ -3,9 +3,12 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { api, type ListView, type Locations } from "./lib/api";
   import Places from "./lib/Places.svelte";
+  import ToolSettings from "./lib/ToolSettings.svelte";
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
+  import Tour from "./lib/Tour.svelte";
+  import { tours } from "./lib/tours";
   import { inline, markdown } from "./lib/markdown";
 
   let list = $state<ListView | null>(null);
@@ -22,6 +25,51 @@
   let locations = $state<Locations | null>(null);
   let folders = $state(false);
   let installing = $state(false);
+
+  // The guided tour: its opening part plays on first launch, its list part
+  // the first time a list is open (once its instance is chosen); `?` plays
+  // the part for what is on screen again.
+  let tour = $state<"start" | "list" | null>(null);
+  let toured = $state<string[] | null>(null);
+  // Parts finished before the record of those already shown has loaded.
+  let finished: string[] = [];
+  let started = $state(false);
+  onMount(async () => {
+    let shown: string[] = [];
+    try {
+      shown = await api.toured();
+    } catch {
+      // Played again; no harm.
+    }
+    toured = [...new Set([...shown, ...finished])];
+  });
+  $effect(() => {
+    // Not over the Settings dialog, nor before a list given at start has
+    // opened.
+    if (!toured || tour || !started || folders) return;
+    const part = list ? (!locations || needsInstance ? null : "list") : "start";
+    if (part && !toured.includes(part)) tour = part;
+  });
+  function startTour() {
+    folders = false;
+    about = false;
+    tour = list ? "list" : "start";
+  }
+  async function endTour() {
+    const part = tour;
+    tour = null;
+    if (!part) return;
+    if (toured) {
+      if (!toured.includes(part)) toured = [...toured, part];
+    } else {
+      finished.push(part);
+    }
+    try {
+      await api.tourShown(part);
+    } catch {
+      // Shown again next time; no harm.
+    }
+  }
   const needsInstance = $derived(!!list && !!locations && !locations.instance.path);
 
   async function openPath(path: string) {
@@ -84,9 +132,15 @@
   }
 
   onMount(async () => {
-    recent = await api.recent();
-    const start = await api.opening();
-    if (start) await openPath(start);
+    try {
+      recent = await api.recent();
+      const start = await api.opening();
+      if (start) await openPath(start);
+    } finally {
+      // Only now is it known whether this starts on a list or the opening
+      // page, and so which part of the tour is for it.
+      started = true;
+    }
   });
 </script>
 
@@ -100,15 +154,18 @@
       <span class="path dim" title={list.path}>{list.path}</span>
     {/if}
     <span class="spacer"></span>
-    {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
-    {#if list}
-      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, and tools.toml, for this list"
-        >Folders</button
+    <button class="help" data-tour="help" onclick={startTour} title="A tour of the window: what is where, and what to do">?</button>
+    {#if list}<button data-tour="about" onclick={() => (about = true)}>About this list</button>{/if}
+    <button data-tour="settings" onclick={() => (folders = true)} title="This list's MO2 instance and folders, and mudcrab's own: tools.toml, the Nexus key, xEdit, LOOT"
+        ><svg class="cog" viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.66 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+          /></svg
+        >Settings</button
       >
-    {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
-      <div class="modes" role="group" aria-label="Mode">
+      <div class="modes" role="group" aria-label="Mode" data-tour="modes">
         <button class="mode" class:on={mode === "install"} onclick={() => (mode = "install")}>Install</button>
         <button
           class="mode"
@@ -132,9 +189,9 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="veil" onclick={() => !needsInstance && (folders = false)}>
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="dialog" role="dialog" tabindex="-1" aria-label="Folders" onclick={(e) => e.stopPropagation()}>
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
         <div class="dhead">
-          <strong>Where things go{list ? `: ${list.document.name}` : ""}</strong>
+          <strong>Settings{list ? `: ${list.document.name}` : ""}</strong>
           {#if !needsInstance}<button class="link" onclick={() => (folders = false)}>Done</button>{/if}
         </div>
         <div class="dbody">
@@ -144,12 +201,34 @@
               you go. Its downloads and game folders follow from it; change them after if they are not right.
             </p>
           {/if}
+          <h4 class="part">This list</h4>
           <Places bind:locations disabled={installing} />
+          {#if !needsInstance}
+            <h4 class="part">mudcrab, for every list</h4>
+            <ToolSettings disabled={installing} changed={async () => (locations = await api.locations())} />
+          {/if}
           {#if needsInstance}
             <p class="dim small">
               Not this list? <button class="link" onclick={choose}>Open another</button>
             </p>
           {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if !list && folders}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => (folders = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>Settings</strong>
+          <button class="link" onclick={() => (folders = false)}>Done</button>
+        </div>
+        <div class="dbody">
+          <p class="dim small">mudcrab's own, for every list. A list's MO2 instance and folders are set once it is open.</p>
+          <ToolSettings changed={() => {}} />
         </div>
       </div>
     </div>
@@ -184,8 +263,8 @@
     {#key list.path}
       <!-- Both stay mounted, so switching modes keeps an install's progress. -->
       <main class:hidden={mode !== "install"}>
-        <section class="left"><Guide document={list.document} /></section>
-        <aside class="right"><Install {list} {locations} openFolders={() => (folders = true)} bind:running={installing} /></aside>
+        <section class="left" data-tour="guide"><Guide document={list.document} /></section>
+        <aside class="right"><Install {list} bind:locations openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
       <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
     {/key}
@@ -198,8 +277,8 @@
         commands, shown as it runs.
       </p>
       <div class="starts">
-        <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
-        <button onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
+        <button class="primary" data-tour="open" onclick={choose} disabled={opening}>Open a list…</button>
+        <button data-tour="new" onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
       </div>
       {#if creating}
         <form class="create" onsubmit={create}>
@@ -221,6 +300,10 @@
         </ul>
       {/if}
     </div>
+  {/if}
+
+  {#if tour}
+    <Tour stops={tours[tour]} setMode={(m) => (mode = m)} onclose={endTour} />
   {/if}
 </div>
 
@@ -256,6 +339,28 @@
   }
   .spacer {
     flex: 1;
+  }
+  .part {
+    margin: 4px 0 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .part + :global(*) {
+    margin-top: 6px;
+  }
+  .cog {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    vertical-align: -2px;
+    margin-right: 5px;
+  }
+  .help {
+    width: 28px;
+    padding: 4px 0;
+    border-radius: 50%;
+    font-weight: 600;
   }
   .modes {
     display: flex;

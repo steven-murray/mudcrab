@@ -15,15 +15,15 @@
 
   let {
     list,
-    locations,
+    locations = $bindable(),
     openFolders,
     running = $bindable(false),
   }: {
     list: ListView;
-    /** Where things go, set in the Folders dialog. */
+    /** Where things go, set in the Settings dialog; the profile is chosen here. */
     locations: Locations | null;
     openFolders: () => void;
-    /** Whether an install is running, for the Folders dialog to wait on. */
+    /** Whether an install is running, for the Settings dialog to wait on. */
     running?: boolean;
   } = $props();
 
@@ -40,7 +40,7 @@
     return out;
   });
   let answers = $state<Record<string, string>>(initial);
-  // Each profile has its own answers: choosing another in Folders brings its
+  // Each profile has its own answers: choosing another brings its
   // answers back (or the last given anywhere, for a new one).
   let shownProfile = untrack(() => locations?.profile);
   $effect(() => {
@@ -95,6 +95,7 @@
 
   async function run() {
     running = true;
+    cancelling = false;
     steps = fresh();
     manual = null;
     byHand = [];
@@ -127,7 +128,7 @@
         return result.done;
       });
       const checked = await step(2, async () => {
-        const result = await api.check();
+        const result = await api.check(recheck);
         if (result.problems > 0) throw new Error(`${result.done.summary}. Fix these before installing.`);
         return result.done;
       });
@@ -152,8 +153,35 @@
       return true;
     } catch (err) {
       steps[index].state = "failed";
-      steps[index].error = String(err instanceof Error ? err.message : err);
+      const message = String(err instanceof Error ? err.message : err);
+      steps[index].error = cancelling
+        ? "Stopped. What was finished is kept: installing again carries on from here."
+        : message;
       throw err;
+    }
+  }
+
+  // Stop the run at its next archive or mod: nothing is left half done.
+  let cancelling = $state(false);
+  async function cancel() {
+    cancelling = true;
+    stopWaiting?.();
+    await api.cancelRun();
+  }
+
+  // Check again a plan that already passed, rather than skipping it.
+  let recheck = $state(false);
+
+  // The profile: its name (the MO2 profile it installs into) and its answers.
+  let newProfile = $state("");
+  let profileError = $state<string | null>(null);
+  async function chooseProfile(name: string) {
+    try {
+      locations = await api.setLocation("profile", name);
+      newProfile = "";
+      profileError = null;
+    } catch (err) {
+      profileError = String(err);
     }
   }
 
@@ -240,62 +268,92 @@
 </script>
 
 <div class="install">
-  {#if list.document.inputs.length}
-    <section>
-      <h3>Questions</h3>
-      {#each list.document.inputs as input}
-        <div class="question">
-          <div class="query">{input.query}</div>
-          {#if input.type === "bool"}
-            <div class="choices">
-              {#each ["true", "false"] as value}
-                <label><input type="radio" name={input.id} {value} bind:group={answers[input.id]} disabled={running} /> {value === "true" ? "Yes" : "No"}</label>
-              {/each}
-            </div>
-          {:else if input.type === "choice"}
-            <select bind:value={answers[input.id]} disabled={running}>
-              {#if answers[input.id] === ""}<option value="">Choose…</option>{/if}
-              {#each input.choices ?? [] as choice}<option value={choice}>{choice}</option>{/each}
-            </select>
-          {:else}
-            <input type="text" bind:value={answers[input.id]} disabled={running} />
-          {/if}
+  <section data-tour="profile">
+    <h3
+      title="A profile is a set of answers to the list's questions, installed into the MO2 profile of the same name. One MO2 instance can hold several, with different answers; a mod they install alike is shared."
+    >
+      Profile
+    </h3>
+    <div class="question">
+      <div class="query">Name</div>
+      {#if locations}
+        <div class="profile">
+          <select
+            value={locations.profiles.includes(locations.profile) ? locations.profile : ""}
+            onchange={(e) => {
+              const value = (e.target as HTMLSelectElement).value;
+              if (value) chooseProfile(value);
+            }}
+            disabled={running}
+          >
+            {#if !locations.profiles.includes(locations.profile)}
+              <option value="">{locations.profile} (new)</option>
+            {/if}
+            {#each locations.profiles as name}<option value={name}>{name}</option>{/each}
+          </select>
+          <form
+            onsubmit={(e) => {
+              e.preventDefault();
+              if (newProfile.trim()) chooseProfile(newProfile.trim());
+            }}
+          >
+            <input type="text" bind:value={newProfile} placeholder="a new profile" disabled={running} />
+            <button type="submit" disabled={running || !newProfile.trim()}>Use</button>
+          </form>
         </div>
-      {/each}
-    </section>
-  {/if}
-
-  <section>
-    <h3>Where things go</h3>
-    {#if locations?.instance.path}
-      <dl class="where">
-        <dt>MO2 instance</dt>
-        <dd class:missing={!locations.instance.exists}>{locations.instance.path}</dd>
-        <dt>Downloads</dt>
-        <dd class:missing={!locations.downloads.exists}>{locations.downloads.path ?? "not chosen"}</dd>
-        <dt>Game</dt>
-        <dd class:missing={!locations.game.exists}>{locations.game.path ?? "not found"}</dd>
-        {#if locations.search.length}<dt>Also looked in</dt><dd>{locations.search.length} folder(s)</dd>{/if}
-      </dl>
-    {/if}
-    <button class="link" onclick={openFolders} disabled={running}>{locations?.instance.path ? "Change…" : "Choose the MO2 instance…"}</button>
+        {#if profileError}<div class="small err">{profileError}</div>{/if}
+      {/if}
+    </div>
+    {#each list.document.inputs as input}
+      <div class="question">
+        <div class="query">{input.query}</div>
+        {#if input.type === "bool"}
+          <div class="choices">
+            {#each ["true", "false"] as value}
+              <label><input type="radio" name={input.id} {value} bind:group={answers[input.id]} disabled={running} /> {value === "true" ? "Yes" : "No"}</label>
+            {/each}
+          </div>
+        {:else if input.type === "choice"}
+          <select bind:value={answers[input.id]} disabled={running}>
+            {#if answers[input.id] === ""}<option value="">Choose…</option>{/if}
+            {#each input.choices ?? [] as choice}<option value={choice}>{choice}</option>{/each}
+          </select>
+        {:else}
+          <input type="text" bind:value={answers[input.id]} disabled={running} />
+        {/if}
+      </div>
+    {/each}
   </section>
 
   <section>
-    <button class="primary go" onclick={run} disabled={running || !ready}>
-      {running ? "Installing…" : steps[3].state === "done" ? "Install again" : "Install"}
-    </button>
+    <div class="row" data-tour="install">
+      <button class="primary go" onclick={run} disabled={running || !ready}>
+        {running ? "Installing…" : steps[3].state === "done" ? "Install again" : "Install"}
+      </button>
+      {#if running}
+        <button onclick={cancel} disabled={cancelling} title="Stop at the next archive or mod; what is finished is kept">
+          {cancelling ? "Stopping…" : "Cancel"}
+        </button>
+      {/if}
+    </div>
+    <label class="small dim recheck">
+      <input type="checkbox" bind:checked={recheck} disabled={running} />
+      Check again, even a plan that passed check before
+    </label>
     {#if !ready && !running}
       <p class="dim small">
         {#if !locations?.instance.path}Choose the MO2 instance. {/if}
         {#if !locations?.downloads.path}Choose the downloads folder. {/if}
         {#if locations?.tools.problems.length}Set up xEdit in tools.toml. {/if}
         {#if unanswered.length}Answer every question.{/if}
+        {#if !locations?.instance.path || !locations?.downloads.path || locations?.tools.problems.length}
+          <button class="link" onclick={openFolders}>Open Settings</button>
+        {/if}
       </p>
     {/if}
   </section>
 
-  <section class="timeline">
+  <section class="timeline" data-tour="steps">
     {#each steps as s, i}
       <div class="step {s.state}">
         <div class="shead">
@@ -409,6 +467,21 @@
   .small {
     font-size: 12px;
   }
+  .profile {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .profile form {
+    display: flex;
+    gap: 6px;
+  }
+  .recheck {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-top: 6px;
+  }
   .question {
     margin: 8px 0 12px;
   }
@@ -422,24 +495,6 @@
   .question select,
   .question input[type="text"] {
     width: 100%;
-  }
-  .where {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    gap: 2px 10px;
-    margin: 0 0 6px;
-    font-size: 12px;
-  }
-  .where dt {
-    color: var(--dim);
-  }
-  .where dd {
-    margin: 0;
-    font-family: var(--mono);
-    overflow-wrap: anywhere;
-  }
-  .where dd.missing {
-    color: var(--warning);
   }
   .go {
     width: 100%;

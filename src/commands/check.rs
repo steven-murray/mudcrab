@@ -8,6 +8,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
     let settings = config::check::CheckSettings {
         cache_dir,
         filter: args.filter.to_mod_filter(),
+        masters_only: args.masters_only,
     };
 
     let report = config::check::check_all(&plan, &settings)?;

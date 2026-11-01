@@ -253,10 +253,56 @@ pub(super) struct Tree {
     /// The files this archive puts in the mod's folder, where they end up
     /// once the mod's `file_move`s have run.
     installed: Vec<InstalledFile>,
+    /// How many of the files the layout offers each `include` and `exclude`
+    /// matches: none, and it does nothing.
+    matches: Vec<FilterMatches>,
     entries: usize,
     taken: usize,
     /// The command that shows the same from a terminal.
     command: String,
+}
+
+#[derive(Serialize)]
+pub(super) struct FilterMatches {
+    key: &'static str,
+    glob: String,
+    files: usize,
+}
+
+/// How many offered files each of the archive's filters matches, by the
+/// path the filters see each as.
+fn filter_matches(
+    contents: &config::check::ArchiveContents,
+    include: &[String],
+    exclude: &[String],
+) -> Vec<FilterMatches> {
+    let count = |glob: &String, keeps: bool| {
+        let filters = if keeps {
+            mudcrab::archive::ArchiveFilters::new(std::slice::from_ref(glob), &[])
+        } else {
+            mudcrab::archive::ArchiveFilters::new(&[], std::slice::from_ref(glob))
+        };
+        filters.map_or(0, |filters| {
+            contents
+                .available
+                .iter()
+                .filter(|t| filters.should_extract(&t.filtered_as) == keeps)
+                .count()
+        })
+    };
+    include
+        .iter()
+        .map(|glob| FilterMatches {
+            key: "include",
+            glob: glob.clone(),
+            files: count(glob, true),
+        })
+        .chain(exclude.iter().map(|glob| FilterMatches {
+            key: "exclude",
+            glob: glob.clone(),
+            files: count(glob, false),
+        }))
+        .collect()
 }
 
 /// Mod `id`'s `number`th archive (from 1, as the list declares them) as a
@@ -270,7 +316,7 @@ pub(super) async fn mod_files(
 ) -> Result<Tree, String> {
     let downloads = locate(&state)?
         .downloads
-        .ok_or("say where the downloads folder is first (in Install)")?;
+        .ok_or("say where the downloads folder is first (in Settings)")?;
     let list = state.list()?;
     let answers: config::query::Overrides = state
         .settings
@@ -323,6 +369,7 @@ pub(super) async fn mod_files(
             .collect(),
         rows: rows(&contents, archive.layout == Some(ArchiveLayout::Bain)),
         installed: installed(&contents, &actions),
+        matches: filter_matches(&contents, &archive.include, &archive.exclude),
         entries: contents.entries.len(),
         taken: contents.taken.len(),
         command: format!(
@@ -338,20 +385,27 @@ pub(super) async fn mod_files(
     })
 }
 
-/// A file in the mod's folder.
+/// A file in the mod's folder, or one the archive's filters leave out of it.
 #[derive(Serialize)]
 pub(super) struct InstalledFile {
-    /// Where it ends up.
+    /// Where it ends up (or would, were it taken).
     path: String,
     /// Where the archive's layout puts it, before any `file_move`.
     laid_out: String,
     /// Named by a `file_hide`'s `paths`: kept, but hidden from the game.
     hidden: bool,
+    /// As the archive names it.
+    source: String,
+    /// Whether `install` takes it: false for one an `include` or `exclude`
+    /// leaves out.
+    taken: bool,
+    /// The path the archive's `include` and `exclude` match it as.
+    filtered_as: String,
 }
 
-/// The files `contents` puts in the mod's folder, with the mod's `file_move`
-/// actions applied in order, as install runs them; a moved folder takes
-/// everything in it.
+/// The files `contents` puts in the mod's folder, and those its filters
+/// leave out, with the mod's `file_move` actions applied in order, as
+/// install runs them; a moved folder takes everything in it.
 fn installed(
     contents: &config::check::ArchiveContents,
     actions: &[config::schema::ModAction],
@@ -364,14 +418,26 @@ fn installed(
             .is_some_and(|head| head.eq_ignore_ascii_case(folder))
             && path.as_bytes().get(folder.len()) == Some(&b'/')
     };
+    let taken: BTreeSet<&str> = contents.taken.iter().map(|t| t.source.as_str()).collect();
+    let file = |t: &config::check::Taken, taken: bool| InstalledFile {
+        path: t.destination.clone(),
+        laid_out: t.destination.clone(),
+        hidden: false,
+        source: t.source.clone(),
+        taken,
+        filtered_as: t.filtered_as.clone(),
+    };
     let mut out: Vec<InstalledFile> = contents
         .taken
         .iter()
-        .map(|t| InstalledFile {
-            path: t.destination.clone(),
-            laid_out: t.destination.clone(),
-            hidden: false,
-        })
+        .map(|t| file(t, true))
+        .chain(
+            contents
+                .available
+                .iter()
+                .filter(|t| !taken.contains(t.source.as_str()))
+                .map(|t| file(t, false)),
+        )
         .collect();
     for action in actions {
         match action {
@@ -575,7 +641,7 @@ fn reading_settings(state: &State) -> Result<config::install::InstallSettings, S
     let located = locate(state)?;
     let instance = located
         .instance
-        .ok_or("choose an MO2 instance with the list installed first (in Install)")?;
+        .ok_or("choose an MO2 instance with the list installed first (in Settings)")?;
     Ok(config::install::InstallSettings {
         cache_dir: located.downloads.unwrap_or_default(),
         mods_dir: config::mo2::layout::mods_dir(&instance),

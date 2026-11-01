@@ -172,15 +172,19 @@ pub async fn download_report(
             let client = &client;
             let bar = bar.clone();
             async move {
-                let result = download_with_retry(
-                    client,
-                    job.path,
-                    job.file_name,
-                    job.content,
-                    job.handler,
-                    settings,
-                )
-                .await;
+                let result = if crate::util::cancel::requested() {
+                    Err(anyhow::Error::new(crate::util::cancel::Cancelled))
+                } else {
+                    download_with_retry(
+                        client,
+                        job.path,
+                        job.file_name,
+                        job.content,
+                        job.handler,
+                        settings,
+                    )
+                    .await
+                };
                 bar.inc(1);
                 bar.set_message(job.mod_id);
                 (job, result)
@@ -191,6 +195,8 @@ pub async fn download_report(
         .await;
 
     bar.finish();
+    // What did arrive is in the downloads folder; the rest is for next time.
+    crate::util::cancel::check()?;
     let mut fetched = 0usize;
     for (job, result) in results {
         match result {

@@ -237,6 +237,8 @@ nearest mod before it that has any.
 ```bash
 mudcrab plugins list <modlist.toml>
 mudcrab plugins move <modlist.toml> <plugin> (--after <plugin> | --before <plugin> | --first | --last) [--dry-run]
+mudcrab plugins deactivate <modlist.toml> <plugin> [--dry-run]
+mudcrab plugins activate <modlist.toml> <plugin> [--dry-run]
 ```
 
 `list` prints the load order, a plugin a line, tab-separated: the plugin, the
@@ -247,6 +249,9 @@ game)` for the game's own), and `inactive` for one the list leaves unticked.
 such as `# Part 3` stays above whatever followed it; `--before` puts the
 plugin directly above the named one, below any heading over it, and the
 plugin's own end-of-line comment goes with it.
+
+`deactivate` leaves a plugin unticked in MO2, in its place in the load order
+(it goes in `inactive-plugins`, in load order); `activate` ticks it again.
 
 ### files
 
@@ -933,7 +938,7 @@ Everything about the plan that can be known before installing, with every
 archive in the downloads folder. Changes nothing.
 
 ```bash
-mudcrab check <plan.json> [--downloads <dir>] [--section <name>]... [--only <mod id>]...
+mudcrab check <plan.json> [--downloads <dir>] [--masters-only] [--section <name>]... [--only <mod id>]...
 ```
 
 It looks only in the downloads folder: `download` puts every archive there,
@@ -988,6 +993,16 @@ they can be; the summary says how many plugins it could not read. Every
 problem is reported together, and the summary and warnings are printed even
 when the check fails. Mods are checked in parallel, a thread per CPU; a
 700-mod list takes under a minute.
+
+Each plugin's masters are kept, by archive, in `~/.cache/mudcrab/masters`,
+so a plugin is unpacked only the first time its archive is checked: in a
+solid 7z, unpacking one file means unpacking everything before it, which for
+a large archive takes a while.
+
+`--masters-only` checks only the masters: no MD5s, no filters, no actions
+rehearsed, nothing about the load order or BSAs. Once the masters are kept,
+it takes moments, which is what the GUI's load order runs. A mod whose
+actions change its files is read as its archives lay it out.
 
 ## steps
 

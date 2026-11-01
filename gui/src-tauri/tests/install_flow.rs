@@ -175,10 +175,27 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     let other = root.join("other-tools.toml");
     std::fs::write(&other, "downloads_dir = '/nowhere'\n").unwrap();
     let chosen = call(&webview, "set_tools_config", json!({ "path": other })).unwrap();
-    assert_eq!(chosen["tools"]["from"], "chosen");
-    assert_eq!(chosen["tools"]["exists"], true);
+    assert_eq!(chosen["from"], "chosen");
+    assert_eq!(chosen["exists"], true);
+    assert_eq!(chosen["values"]["downloads_dir"], "/nowhere");
     let usual = call(&webview, "set_tools_config", json!({ "path": null })).unwrap();
-    assert_eq!(usual["tools"]["from"], "MUDCRAB_TOOLS_CONFIG");
+    assert_eq!(usual["from"], "MUDCRAB_TOOLS_CONFIG");
+    // A setting written into the tools.toml in use, and taken out again.
+    let set = call(
+        &webview,
+        "set_tool",
+        json!({ "key": "loot.exe", "value": "/opt/LOOT" }),
+    )
+    .unwrap();
+    assert_eq!(set["values"]["loot.exe"], "/opt/LOOT", "{set}");
+    let unset = call(
+        &webview,
+        "set_tool",
+        json!({ "key": "loot.exe", "value": null }),
+    )
+    .unwrap();
+    assert_eq!(unset["values"]["loot.exe"], serde_json::Value::Null);
+    assert!(call(&webview, "set_tool", json!({ "key": "wine", "value": "x" })).is_err());
     // The Nexus API key, kept in the tools.toml in use, and taken out again.
     let keyed = call(&webview, "set_api_key", json!({ "key": "abc" })).unwrap();
     assert_eq!(keyed["tools"]["nexus_key"], "tools.toml", "{keyed}");
@@ -229,6 +246,12 @@ fn a_list_installs_from_the_commands_the_page_calls() {
 
     let checked = call(&webview, "step_check", json!({})).unwrap();
     assert_eq!(checked["problems"], 0, "{checked}");
+    assert_eq!(checked["skipped"], false, "{checked}");
+    // The same plan, passed: not checked again unless asked.
+    let again = call(&webview, "step_check", json!({})).unwrap();
+    assert_eq!(again["skipped"], true, "{again}");
+    let forced = call(&webview, "step_check", json!({ "again": true })).unwrap();
+    assert_eq!(forced["skipped"], false, "{forced}");
 
     let installed = call(&webview, "step_install", json!({})).unwrap();
     assert!(
@@ -278,9 +301,25 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     let tree = call(&webview, "mod_files", json!({ "id": "Base", "number": 1 })).unwrap();
     assert_eq!(
         tree["installed"],
-        json!([{ "path": "optional/textures/base.dds", "laid_out": "textures/base.dds", "hidden": false }]),
+        json!([{ "path": "optional/textures/base.dds", "laid_out": "textures/base.dds", "hidden": false,
+                 "source": "textures/base.dds", "taken": true, "filtered_as": "textures/base.dds" }]),
         "{tree}"
     );
+    // An exclude leaves the file out, still shown where it would go, and
+    // says how many files it matches.
+    call(
+        &webview,
+        "edit_filter",
+        json!({ "id": "Base", "number": 1, "key": "exclude", "add": ["textures/**"], "drop": [] }),
+    )
+    .unwrap();
+    let tree = call(&webview, "mod_files", json!({ "id": "Base", "number": 1 })).unwrap();
+    assert_eq!(tree["installed"][0]["taken"], false, "{tree}");
+    assert_eq!(
+        tree["matches"],
+        json!([{ "key": "exclude", "glob": "textures/**", "files": 1 }])
+    );
+    call(&webview, "undo", json!({})).unwrap();
     call(&webview, "undo", json!({})).unwrap();
     // Both mods install a texture of their own name, so share nothing.
     let conflicts = call(&webview, "conflicts", json!({})).unwrap();

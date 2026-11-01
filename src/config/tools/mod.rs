@@ -102,6 +102,15 @@ impl ToolsConfig {
     /// `path`, leaving everything else in it as it was; the file is started
     /// if there is none. What `setup-tools` asks for, for a front end to set.
     pub fn save_api_key(path: &Path, key: Option<&str>) -> anyhow::Result<()> {
+        Self::save_field(path, "nexus_api_key", key)
+    }
+
+    /// Write (or with `None` or nothing but spaces, take out) one setting in
+    /// the tools.toml at `path`: a top-level key, or `section.key` (as
+    /// `tes4edit.exe`), leaving everything else as it was. A section left
+    /// empty goes; the file is started if there is none. Refused if it would
+    /// leave the file unreadable, as a `[wine]` with no `prefix`.
+    pub fn save_field(path: &Path, key: &str, value: Option<&str>) -> anyhow::Result<()> {
         let before = if path.exists() {
             std::fs::read_to_string(path)
                 .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?
@@ -111,13 +120,34 @@ impl ToolsConfig {
         let mut doc = before
             .parse::<toml_edit::DocumentMut>()
             .map_err(|err| anyhow::anyhow!("{} is not valid TOML: {err}", path.display()))?;
-        match key.map(str::trim).filter(|key| !key.is_empty()) {
-            Some(key) => {
-                doc.insert("nexus_api_key", toml_edit::value(key));
-            }
-            None => {
-                doc.remove("nexus_api_key");
-            }
+        let value = value.map(str::trim).filter(|value| !value.is_empty());
+        match key.split_once('.') {
+            None => match value {
+                Some(value) => {
+                    doc.insert(key, toml_edit::value(value));
+                }
+                None => {
+                    doc.remove(key);
+                }
+            },
+            Some((section, field)) => match value {
+                Some(value) => {
+                    let table = doc
+                        .entry(section)
+                        .or_insert_with(toml_edit::table)
+                        .as_table_like_mut()
+                        .ok_or_else(|| anyhow::anyhow!("`{section}` is not a section"))?;
+                    table.insert(field, toml_edit::value(value));
+                }
+                None => {
+                    if let Some(table) = doc.get_mut(section).and_then(|t| t.as_table_like_mut()) {
+                        table.remove(field);
+                        if table.is_empty() {
+                            doc.remove(section);
+                        }
+                    }
+                }
+            },
         }
         let after = doc.to_string();
         toml::from_str::<Self>(&after).map_err(|err| {
@@ -508,5 +538,42 @@ mod api_key_tests {
             std::fs::read_to_string(&new).unwrap(),
             "nexus_api_key = \"k\"\n"
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ToolsConfig;
+
+    #[test]
+    fn a_field_is_set_and_taken_out_leaving_the_rest() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tools.toml");
+        std::fs::write(&path, "# mine\nnexus_api_key = \"k\"\n").unwrap();
+        ToolsConfig::save_field(&path, "tes4edit.exe", Some("/x/TES4Edit.exe")).unwrap();
+        ToolsConfig::save_field(&path, "downloads_dir", Some("/d")).unwrap();
+        let loaded = ToolsConfig::load(&path).unwrap();
+        assert_eq!(
+            loaded.tes4edit.unwrap().exe,
+            std::path::PathBuf::from("/x/TES4Edit.exe")
+        );
+        assert_eq!(
+            loaded.downloads_dir.unwrap(),
+            std::path::PathBuf::from("/d")
+        );
+
+        ToolsConfig::save_field(&path, "tes4edit.exe", None).unwrap();
+        ToolsConfig::save_field(&path, "downloads_dir", Some("  ")).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text, "# mine\nnexus_api_key = \"k\"\n");
+    }
+
+    #[test]
+    fn a_change_that_leaves_it_unreadable_is_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("tools.toml");
+        // [wine] needs its prefix.
+        assert!(ToolsConfig::save_field(&path, "wine.proton", Some("/p/proton")).is_err());
+        assert!(!path.exists());
     }
 }

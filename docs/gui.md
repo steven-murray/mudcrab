@@ -35,37 +35,46 @@ beside the command line:
   command line on your `PATH`, as below). Both use Windows' own WebView2, which Windows 10 and 11
   have; the installer fetches it on the rare system without.
 
+The first time it opens, and the first time a list is open, a short tour
+shows what is where; **?** at the top plays it again.
+
 The GUI's install mode reads a list and installs it from one window:
 
 1. **Open a list**: its `.toml` file. Its guide is on the left -- sections,
    each mod with its notes and plugins, and the load order -- read-only.
    **About this list** shows what its author wrote for whoever installs it
    (its `about`), or, for a list without one, its guide's introduction.
-2. **Answer its questions**, if it asks any. The list's defaults are chosen;
-   your answers are remembered for next time.
-3. **Say where things go**, in **Folders** (by **About this list**), which
-   opens by itself for a list with no MO2 instance chosen yet and stays
-   until one is -- installing a list and writing one both need it, and the
-   choices are shared by both modes. First the MO2 instance to install into
-   -- the folder with its `ModOrganizer.ini` in it (for a portable instance,
-   the folder `ModOrganizer.exe` is in; any other folder is refused, and the
-   folder of an instance's mods and profiles is found from it where it can
-   be). The mods and profiles go where that ini says (its base directory). The downloads folder and the game folder then follow
-   from it: the downloads folder from `tools.toml` if it is set there, else
-   the instance's own; the game folder from the instance's settings, or found
-   as `game-dir` finds it. Change either if they are not right. **Tools**
-   shows which `tools.toml` is used (the usual one, unless you choose
-   another), and, for a list that cleans plugins with xEdit, anything in it
-   that is not set up; Install waits until it is. **Nexus API key** is
-   where to paste yours (from Nexus's API keys page), kept in that
-   `tools.toml`. **Other folders to look in** are folders
-   that may already hold some of the list's archives -- another instance's
-   downloads, a backup -- looked in before anything is downloaded; an archive
-   found there is linked into the downloads folder (`download
-   --archive-search-path`). **MO2 profile** is the profile to install into:
-   one the instance has, or a new one by name. The answers to the list's
-   questions are kept per profile, so one instance can hold the list twice
-   with different choices; see [Several profiles](usage.md#several-profiles-in-one-instance).
+2. **Set up its profile**, in **Profile**: a name, which is the MO2 profile
+   it installs into (an existing one, or a new one typed in), and the
+   answers to the list's questions. The list's defaults are chosen, and each
+   profile's answers are remembered, so one MO2 instance can hold the list
+   several times with different choices; see
+   [Several profiles](usage.md#several-profiles-in-one-instance).
+3. **Say where things go**, in **Settings** (the cog), which opens by
+   itself for a list with no MO2 instance chosen yet and stays until one is
+   -- installing a list and writing one both need it, and the choices are
+   shared by both modes. It has two parts:
+   - **This list**: first the MO2 instance to install into -- the folder
+     with its `ModOrganizer.ini` in it (for a portable instance, the folder
+     `ModOrganizer.exe` is in; any other folder is refused, and the folder of
+     an instance's mods and profiles is found from it where it can be). The
+     mods and profiles go where that ini says (its base directory). The
+     downloads folder and the game folder then follow from it: the downloads
+     folder from `tools.toml` if it is set there, else the instance's own;
+     the game folder from the instance's settings, or found as `game-dir`
+     finds it. Change either if they are not right. **Other folders to
+     search for archives** are folders that may already hold some of the
+     list's archives -- another instance's downloads, a backup -- looked in
+     before anything is downloaded; an archive found there is linked into the
+     downloads folder (`download --archive-search-path`).
+   - **mudcrab, for every list**: what is in `tools.toml`, which the command
+     line reads too -- which `tools.toml` (the usual one, unless you choose
+     another), your **Nexus API key** (from Nexus's API keys page), the usual
+     downloads folder, and where xEdit (and its Quick Auto Clean), LOOT and,
+     off Windows, the Wine prefix or Proton are. For a list that cleans
+     plugins with xEdit, what is not set up yet is shown, and Install waits
+     until it is. These are also here from the opening page, with no list
+     open.
 4. **Install.** The steps run one after another -- plan, download, check,
    install -- each showing what it is doing, what it writes, and the command
    that does the same from a terminal (with a button to copy it).
@@ -77,7 +86,13 @@ The GUI's install mode reads a list and installs it from one window:
    carries on once all have arrived.
 
    If `check` finds a problem, the run stops there, with the findings listed,
-   as the command would.
+   as the command would. A plan that passed check before -- the same answers,
+   list and downloads folder -- is not checked again, unless **Check again**
+   is ticked.
+
+   **Cancel** stops a run at its next archive or mod: nothing is left half
+   unpacked, and what was installed is kept, so installing again carries on
+   from where it stopped.
 5. **Still to do by hand**: the list's steps that no tool can take, such as
    building the Bashed Patch in Wrye Bash. Each ticks itself when it is done
    (when the plugin it makes appears); the rest you tick yourself.
@@ -92,7 +107,7 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 
 To start a list of your own, **Create a new list…** on the opening page asks
 its name and where to keep it (`mudcrab new`), then the MO2 instance to try
-it in (**Folders**, as above), and opens it here, empty, ready for its first
+it in (**Settings**, as above), and opens it here, empty, ready for its first
 mod from the downloads folder.
 
 **Author** in the top right switches to working on the list as its author.
@@ -122,7 +137,7 @@ history there, rather than be undone by it.
   `.meta` does not say where it came from is looked up on Nexus by its
   checksum, as `mudcrab identify` does, so it goes in as a Nexus file that
   players' installs download for them. That needs a Nexus API key, which
-  **Folders** keeps in `tools.toml` (where the command line reads it too).
+  **Settings** keeps in `tools.toml` (where the command line reads it too).
   Failing that, a file whose name is plainly a Nexus download links its
   mod's page; the dialog says which happened, and the source can be changed
   by hand.
@@ -145,43 +160,58 @@ history there, rather than be undone by it.
   the search box adds a mod, from an archive or a Nexus link.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
-  file (`mudcrab docs`); its actions (each can be removed: `action remove`),
-  and each of its archives as a tree of files, marked with what `install`
-  takes. What a tick does follows the archive's layout, so it works as the
+  file (`mudcrab docs`). Then its settings:
+  - **Optional**: **Make this mod optional…** chooses the answers that bring
+    it in -- one of the list's questions and which answers, a new question
+    (added to the list with it: `input add`), or an `if` written out -- and
+    writes the mod's `if`. **Always install it** takes the `if` out.
+  - **Inactive**: ticked, the mod is installed but left unticked in MO2,
+    its plugins inactive (`disable`; unticked again, `enable`).
+  - **Needs**: **Choose…** ticks the mods it needs from every mod in the
+    list, found by name (`dependencies`).
+
+  Its actions follow (each can be removed: `action remove`), then each of
+  its archives: its installer's choices, its filters and its fields (`set`),
+  each written as it is changed -- its source, whether it is optional (as
+  for a mod), its layout (**Automatic**, the default, finds the data folder
+  in the archive), the data folder for a layout that names one, a folder
+  in the mod to put it under, its game folder files, and, for one not from
+  Nexus, its download page and note. Its file name is what the download
+  gave it, so it is shown, not changed. What a BAIN or FOMOD archive installs is chosen as in the
   installer you know:
-  - **BAIN**: the packages at the top are ticked to choose them, as in Wrye
-    Bash's installer tab (`files --package`); the files inside show what
-    each brings, read-only.
-  - **FOMOD**: its options are chosen in its installer's steps, not here:
-    **Choose its FOMOD options…** walks them again, each step starting at
-    what the list chooses now, and writes the new choices (`mudcrab
-    choose`); the tree shows what they install. A BAIN archive has
-    **Choose its BAIN packages…** too, which runs its wizard if it has one.
-  - **Anything else**: untick a file or folder to leave it out (an
-    `exclude`, `files --exclude`), tick it to bring it back.
+  - **BAIN**: its packages are ticked to choose them, as in Wrye Bash's
+    installer tab (`files --package`); **Choose its BAIN packages…** runs
+    its wizard, if it has one.
+  - **FOMOD**: **Choose its FOMOD options…** walks its installer's steps
+    again, each starting at what the list chooses now, and writes the new
+    choices (`mudcrab choose`).
 
-  **Mod folder**, beside **Archive**, shows the same files where they end up
-  in the mod, after its `file_move` actions (moved ones marked, and those a
-  `file_hide` names struck through). Move a file or folder there: drag it
-  by its handle onto a folder (a closed one opens as you hover), or onto the
-  top of the mod, or **move…** to type its new path -- `optional/` for a
-  plugin kept but not loaded, say. Each adds a `file_move` action. Below the notes, **the mod's fields** and each
-  **archive's fields** are a form for what `set` changes: the `if`,
-  whether it is ticked in MO2, what it needs, an archive's source, layout,
-  data folder, game folder files, download page and note.
+  Each archive's `include` and `exclude` are listed, each with how many
+  files it matches (one that matches nothing is marked: filters match a
+  file by its path as the archive lays it out, which hovering a file
+  shows), a ✕ to take it out, and a box to add one.
 
-  For any layout, **exclude** beside a file or folder (on hover) is the
-  expert override: an `exclude` for that path as the filters see it -- under
-  BAIN, for that path in every package. The archive's `include` and
-  `exclude` are listed above the tree, each with a ✕ to take it out, and a
-  box to add one. Greyed out is what the layout does not choose; ○ is what a
-  filter leaves out. This needs the downloads folder, as `mudcrab files`
-  does.
-- **Load order**: every plugin, the mods that ship it, and once a check has
-  read them, its masters. A plugin placed above one of its masters, or
-  needing one that is not in the list, is inactive, or is merged away, is
-  flagged, with why -- and the flags follow as you drag a plugin by its
-  handle to a new place (`plugins move`).
+  **Files**, below, is the mod's folder as installed, from all its
+  archives together (hover a file for the archive and path it comes from).
+  Untick a file or folder to leave it out -- an `exclude` on its archive,
+  for the path the filters see it as (`files --exclude`); under BAIN it
+  applies in every package -- and tick it to bring it back. A file left out
+  stays in the tree, greyed, where it would go. Drag a file or folder by its
+  handle onto a folder (a closed one opens as you hover), or onto the top of
+  the mod, or **move…** to type its new path -- `optional/` for a plugin kept
+  but not loaded, say: each adds a `file_move` action, and the tree shows it
+  in its new place (moved ones marked, and those a `file_hide` names struck
+  through). Files of BAIN packages or FOMOD options not chosen are not
+  listed. This needs the downloads folder, as `mudcrab files` does.
+- **Load order**: every plugin, the mods that ship it, and its masters,
+  read when the tab opens (`check --masters-only`: slow the first time for a
+  large solid archive, then moments). Untick a plugin to leave it inactive
+  in MO2 (`plugins deactivate`), tick it to make it active (`plugins
+  activate`). Click a plugin to see its masters: it is shaded, its masters
+  shaded in another colour, and its mods marked in the list on the left. A
+  plugin placed above one of its masters, or needing one that is not in the
+  list, is inactive, or is merged away, is flagged, with why -- and the flags
+  follow as you drag a plugin by its handle to a new place (`plugins move`).
 - **Conflicts**: which installed mods provide the same files, who wins (a
   later mod in MO2's order), and, a click on a pair, the files both provide
   -- `mudcrab conflicts`. **Hide these in** a mod adds a `file_hide` with

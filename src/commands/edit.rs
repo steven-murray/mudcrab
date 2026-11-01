@@ -5,8 +5,8 @@
 
 use crate::cli::{
     ActionAddArgs, ActionCommand, ActionListArgs, ActionRemoveArgs, FilesArgs, InputAddArgs,
-    InputCommand, InputListArgs, InputRemoveArgs, InputSetArgs, PluginsCommand, PluginsListArgs,
-    PluginsMoveArgs, RemoveArgs, SetArgs,
+    InputCommand, InputListArgs, InputRemoveArgs, InputSetArgs, PluginsActiveArgs, PluginsCommand,
+    PluginsListArgs, PluginsMoveArgs, RemoveArgs, SetArgs,
 };
 use crate::config::edit::{self, Edit, doc};
 use crate::config::schema::{InputType, InputValue, SourceModlist};
@@ -246,6 +246,8 @@ pub fn plugins(command: PluginsCommand) -> anyhow::Result<()> {
     match command {
         PluginsCommand::List(args) => plugins_list(args),
         PluginsCommand::Move(args) => plugins_move(args),
+        PluginsCommand::Activate(args) => plugins_active(args, true),
+        PluginsCommand::Deactivate(args) => plugins_active(args, false),
     }
 }
 
@@ -303,6 +305,19 @@ fn plugins_move(args: PluginsMoveArgs) -> anyhow::Result<()> {
         edit,
         args.dry_run,
         format!("Moved {} {place} in the load order", ui::name(&args.plugin)),
+    )
+}
+
+fn plugins_active(args: PluginsActiveArgs, active: bool) -> anyhow::Result<()> {
+    let edit = edit::plan_plugin_active(&args.input, &args.plugin, active)?;
+    finish(
+        edit,
+        args.dry_run,
+        format!(
+            "{} {} in the load order",
+            if active { "Ticked" } else { "Unticked" },
+            ui::name(&args.plugin)
+        ),
     )
 }
 

@@ -13,6 +13,7 @@
 //! load it. Nothing is unpacked but plugin headers (and a BSA an action
 //! unpacks), and nothing the user owns is changed.
 
+mod masters_cache;
 mod rehearse;
 
 use crate::archive::{self, ArchiveFilters};
@@ -34,6 +35,10 @@ pub struct CheckSettings {
     pub cache_dir: PathBuf,
     /// Which mods to check. Empty means the whole plan.
     pub filter: ModFilter,
+    /// Only read each plugin's masters and check them: no MD5s, no filters,
+    /// no actions rehearsed, nothing about the load order or BSAs. What the
+    /// author's load order wants, quickly.
+    pub masters_only: bool,
 }
 
 pub struct CheckReport {
@@ -272,6 +277,9 @@ fn check_in(
                     let Some(mod_entry) = in_scope.get(index) else {
                         break;
                     };
+                    if crate::util::cancel::requested() {
+                        break;
+                    }
                     bar.set_message(&mod_entry.id);
                     let own = scratch.join(format!("mod-{index}"));
                     let mut found = Findings::default();
@@ -295,6 +303,8 @@ fn check_in(
         }
     });
     bar.finish();
+    // Some mods unchecked: a report on the rest would say the list is fine.
+    crate::util::cancel::check()?;
     let results = results
         .into_inner()
         .map_err(|_| anyhow::anyhow!("a check thread panicked"))?;
@@ -327,9 +337,11 @@ fn check_in(
         });
     }
     let whole_plan = settings.filter.is_empty();
-    load_order_problems(plan, &folders, whole_plan, &mut findings);
-    bsa_problems(plan, &folders, &mut findings);
-    duplicate_plugins(plan, &folders, &mut findings);
+    if !settings.masters_only {
+        load_order_problems(plan, &folders, whole_plan, &mut findings);
+        bsa_problems(plan, &folders, &mut findings);
+        duplicate_plugins(plan, &folders, &mut findings);
+    }
 
     let unread = plan
         .plugins
@@ -425,7 +437,12 @@ fn check_mod(
     let mut planned: Vec<(String, Option<PathBuf>)> = Vec::new();
     // Masters of every plugin the archives hold, at any depth, by destination.
     let mut masters_at: HashMap<String, Vec<String>> = HashMap::new();
-    let extract_bsas = rehearse::bsas_to_extract(mod_entry);
+    // BSAs are unpacked only for a rehearsal.
+    let extract_bsas = if settings.masters_only {
+        BTreeSet::new()
+    } else {
+        rehearse::bsas_to_extract(mod_entry)
+    };
     let real = scratch.join("real");
 
     for (archive_index, archive) in mod_entry.archives.iter().enumerate() {
@@ -476,6 +493,16 @@ fn check_mod(
                 folder.complete = false;
             }
         }
+    }
+    // Rehearsing the actions is the slow part; without it, the plugins are
+    // those the archives lay out (an action's renames and dummies unknown).
+    if settings.masters_only
+        && mod_entry
+            .actions
+            .iter()
+            .any(crate::config::actions::changes_files)
+    {
+        folder.complete = false;
     }
     if !folder.complete {
         // Still worth reading what is known, for the masters check.
@@ -602,6 +629,7 @@ pub fn archive_contents(
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<Option<ArchiveContents>> {
     let settings = CheckSettings {
+        masters_only: false,
         cache_dir: cache_dir.to_path_buf(),
         filter: ModFilter::default(),
     };
@@ -615,7 +643,12 @@ pub fn archive_contents(
     }
     let paths = archive::list_archive_paths(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
-    let scratch = crate::util::fs::cache_scratch_dir("files");
+    // Its own: a front end reads a mod's archives side by side.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let scratch = crate::util::fs::cache_scratch_dir(&format!(
+        "files-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     let reader = EntryReader::new(&source, scratch.join("entry"));
     let exclude: Vec<String> = archive
         .exclude
@@ -712,7 +745,7 @@ fn check_single_archive(
     // or misnamed download.
     let paths = archive::list_archive_paths(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
-    if let Some(md5) = &archive.md5 {
+    if let Some(md5) = archive.md5.as_ref().filter(|_| !settings.masters_only) {
         let actual = crate::config::identify::md5_of_file(&source)?;
         anyhow::ensure!(
             actual.eq_ignore_ascii_case(md5),
@@ -760,7 +793,12 @@ fn check_single_archive(
 
     // A filter that does nothing has usually outlived a mod update.
     let file_name = archive.file_name.as_deref().unwrap_or(&label);
-    for pattern in &archive.include {
+    let filters_checked: &[String] = if settings.masters_only {
+        &[]
+    } else {
+        &archive.include
+    };
+    for pattern in filters_checked {
         if plan_with(std::slice::from_ref(pattern), &archive.exclude)
             .is_ok_and(|plan| plan.is_empty())
         {
@@ -772,6 +810,7 @@ fn check_single_archive(
         }
     }
     if !archive.exclude.is_empty()
+        && !settings.masters_only
         && let Ok(unfiltered) = plan_with(&archive.include, &[])
     {
         for pattern in &archive.exclude {
@@ -804,13 +843,15 @@ fn check_single_archive(
     };
 
     // Plugins (at any depth: a `file_move` may bring one up) and BSAs an
-    // action unpacks are the files whose bytes matter.
+    // action unpacks are the files whose bytes matter -- a plugin's only
+    // until its masters are known from an earlier check.
+    let mut known = masters_cache::ArchiveMasters::load(&source);
     let wanted: BTreeMap<String, String> = planned
         .files
         .iter()
         .map(|file| (format!("{prefix}{}", file.destination), file.source.clone()))
-        .filter(|(destination, _)| {
-            layout::plan::is_plugin_name(destination)
+        .filter(|(destination, source)| {
+            (layout::plan::is_plugin_name(destination) && known.get(source).is_none())
                 || extract_bsas.contains(&destination.to_lowercase())
         })
         .collect();
@@ -823,20 +864,27 @@ fn check_single_archive(
     for file in &planned.files {
         let destination = format!("{prefix}{}", file.destination);
         let bytes_at = wanted.get(&destination).map(|from| real.join(from));
-        if let Some(path) = &bytes_at
-            && layout::plan::is_plugin_name(&destination)
-        {
-            let bytes = std::fs::read(path)
-                .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", file.source))?;
-            let masters = crate::plugin::Plugin::masters_of(&bytes)
-                .map_err(|err| anyhow::anyhow!("{destination} is not a readable plugin: {err}"))?;
-            contents.masters.insert(destination.clone(), masters);
+        if layout::plan::is_plugin_name(&destination) {
+            if let Some(masters) = known.get(&file.source) {
+                contents
+                    .masters
+                    .insert(destination.clone(), masters.clone());
+            } else if let Some(path) = &bytes_at {
+                let bytes = std::fs::read(path)
+                    .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", file.source))?;
+                let masters = crate::plugin::Plugin::masters_of(&bytes).map_err(|err| {
+                    anyhow::anyhow!("{destination} is not a readable plugin: {err}")
+                })?;
+                known.put(&file.source, &masters);
+                contents.masters.insert(destination.clone(), masters);
+            }
         }
         let keep_bytes = extract_bsas.contains(&destination.to_lowercase());
         contents
             .files
             .push((destination, bytes_at.filter(|_| keep_bytes)));
     }
+    known.save();
     Ok(Some(contents))
 }
 
