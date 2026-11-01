@@ -35,7 +35,7 @@ pub(super) fn current_plan(state: &State) -> Result<PersonalizedPlan, String> {
             .lock()
             .map_err(|_| "a command panicked")?
             .list(&list)
-            .answers;
+            .current_answers();
         super::plan_with(state, answers)?;
     }
     plan_of(state)
@@ -277,7 +277,7 @@ pub(super) async fn mod_files(
         .lock()
         .map_err(|_| "a command panicked")?
         .list(&list)
-        .answers
+        .current_answers()
         .into_iter()
         .collect();
     let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;

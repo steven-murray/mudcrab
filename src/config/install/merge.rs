@@ -323,9 +323,32 @@ pub fn unhide_merges(
     };
 
     let recorded = manifest.hidden_plugins.len();
-    let restored = unhide_all(mods_dir, &manifest.hidden_plugins)?;
+    // A folder another profile shares, where its own merge hides the same
+    // plugin, keeps it hidden: un-hiding it would change that profile too.
+    let others = mo2_instance_dir
+        .map(|instance| super::folders::hidden_by_others(instance, profile_name))
+        .unwrap_or_default();
+    let (kept, restore): (Vec<HiddenPlugin>, Vec<HiddenPlugin>) =
+        std::mem::take(&mut manifest.hidden_plugins)
+            .into_iter()
+            .partition(|entry| {
+                others.contains(&(
+                    entry.installed_path.to_ascii_lowercase(),
+                    entry.plugin.to_ascii_lowercase(),
+                ))
+            });
+    for entry in &kept {
+        tracing::warn!(
+            mod_id = %entry.mod_id,
+            plugin = %entry.plugin,
+            folder = %entry.installed_path,
+            "unhide: left hidden, as another profile shares this folder and its merge hides the \
+             plugin too; install this profile again to give it a copy of its own"
+        );
+    }
+    let restored = unhide_all(mods_dir, &restore)?;
 
-    manifest.hidden_plugins.clear();
+    manifest.hidden_plugins = kept;
     let payload = serde_json::to_string_pretty(&manifest)
         .map_err(|err| anyhow::anyhow!("failed to serialize install manifest: {err}"))?;
     std::fs::write(&path, payload)

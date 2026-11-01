@@ -40,6 +40,21 @@
     return out;
   });
   let answers = $state<Record<string, string>>(initial);
+  // Each profile has its own answers: choosing another in Folders brings its
+  // answers back (or the last given anywhere, for a new one).
+  let shownProfile = untrack(() => locations?.profile);
+  $effect(() => {
+    if (!locations || locations.profile === shownProfile) return;
+    shownProfile = locations.profile;
+    // What a check said about another profile's steps is not this one's.
+    notes = {};
+    const saved = locations.answers;
+    untrack(() => {
+      for (const input of list.document.inputs) {
+        answers[input.id] = saved[input.id] ?? (input.default === undefined ? "" : String(input.default));
+      }
+    });
+  });
   const unanswered = $derived(list.document.inputs.filter((i) => answers[i.id] === ""));
 
   // --- The run ----------------------------------------------------------------
@@ -66,6 +81,7 @@
   let byHandTotal = $state(0);
   let browserFolder = $state<string | null>(null);
   let manual = $state<StepByHand[] | null>(null);
+  let notes = $state<Record<string, string>>({});
   let ticked = $state<Record<string, boolean>>({});
   let stopWaiting: (() => void) | null = null;
   let manualTimer: ReturnType<typeof setInterval> | null = null;
@@ -183,6 +199,8 @@
   async function refreshManual() {
     try {
       manual = await api.manualSteps();
+      // A move is said once, by the check that made it: keep it in view.
+      for (const m of manual) if (m.note) notes[m.title] = m.note;
     } catch {
       // Shown again on the next look.
     }
@@ -362,6 +380,7 @@
             <strong>{m.title}</strong>
             {#if m.done !== null}<span class="dim small">· ticks itself when done</span>{/if}
           </label>
+          {#if notes[m.title]}<p class="dim small">{notes[m.title]}</p>{/if}
           {#if !done}<ol>{#each m.steps as line}<li>{line.replace(/^\d+\.\s*/, "")}</li>{/each}</ol>{/if}
         </div>
       {/each}

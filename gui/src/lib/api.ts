@@ -115,6 +115,10 @@ export interface Locations {
   downloads: Location;
   game: Location;
   profile: string;
+  /** The instance's profiles, by name. */
+  profiles: string[];
+  /** The answers given for the chosen profile, or the last given anywhere. */
+  answers: Record<string, string>;
   search: Location[];
 }
 
@@ -244,6 +248,8 @@ export interface StepByHand {
   title: string;
   steps: string[];
   done: boolean | null;
+  /** What checking did with its plugin: moved out of overwrite/, or waiting for MO2 to close. */
+  note: string | null;
 }
 
 // Events from mudcrab's library (mudcrab::events), as the backend emits them.

@@ -56,8 +56,10 @@ pub fn sweep(
     let mut providers: HashMap<String, Vec<usize>> = HashMap::new();
     let mut installed = Vec::new();
     let mut missing = 0usize;
+    let folders = crate::config::install::folders::ModFolders::load(settings);
     for (index, entry) in plan.mods.iter().enumerate() {
-        let dir = settings.mods_dir.join(safe_mod_dir_name(&entry.id)?);
+        safe_mod_dir_name(&entry.id)?;
+        let dir = folders.dir(settings, &entry.id);
         if !dir.is_dir() {
             missing += 1;
             continue;
@@ -202,9 +204,12 @@ fn paths_of(
     id: &str,
 ) -> anyhow::Result<crate::config::install::index::StagedPaths> {
     let entry = find(plan, id)?;
+    safe_mod_dir_name(&entry.id)?;
     staged_paths_detailed(
         entry,
-        Some(&settings.mods_dir.join(safe_mod_dir_name(&entry.id)?)),
+        Some(&crate::config::install::folders::mod_dir(
+            settings, &entry.id,
+        )),
         settings,
         active,
     )

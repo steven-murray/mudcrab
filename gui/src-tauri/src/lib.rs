@@ -157,7 +157,7 @@ fn open_list<R: Runtime>(
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         settings.opened(&path);
         let _ = settings.save();
-        settings.list(&path).answers
+        settings.list(&path).current_answers()
     };
     let cleans = modlist.mods.iter().any(|m| {
         m.actions
@@ -203,7 +203,7 @@ fn reload_list(state: tauri::State<'_, State>) -> Result<ListView, String> {
         .lock()
         .map_err(|_| "a command panicked")?
         .list(&path)
-        .answers;
+        .current_answers();
     Ok(ListView {
         about: modlist.about.clone(),
         path: path.display().to_string(),
@@ -284,6 +284,10 @@ struct Locations {
     downloads: Location,
     game: Location,
     profile: String,
+    /// The instance's profiles, by name, for choosing one.
+    profiles: Vec<String>,
+    /// The answers given for the chosen profile, or the last given anywhere.
+    answers: std::collections::BTreeMap<String, String>,
     /// Other folders to look in for archives, before downloading.
     search: Vec<Location>,
 }
@@ -382,7 +386,13 @@ fn locate(state: &State) -> Result<Located, String> {
             instance: Location::of(instance),
             downloads: Location::of(downloads),
             game: Location::of(game),
-            profile: chosen.profile.unwrap_or_else(|| "Default".to_string()),
+            profile: chosen.profile(),
+            profiles: chosen
+                .instance
+                .as_deref()
+                .map(instance_profiles)
+                .unwrap_or_default(),
+            answers: chosen.current_answers(),
             search: chosen
                 .search
                 .iter()
@@ -390,6 +400,19 @@ fn locate(state: &State) -> Result<Located, String> {
                 .collect(),
         },
     })
+}
+
+/// The profiles of the MO2 instance at `instance`, by name.
+fn instance_profiles(instance: &std::path::Path) -> Vec<String> {
+    let mut names: Vec<String> = std::fs::read_dir(config::mo2::layout::profiles_dir(instance))
+        .into_iter()
+        .flatten()
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .collect();
+    names.sort_by_key(|name| name.to_lowercase());
+    names
 }
 
 #[tauri::command]
@@ -426,7 +449,16 @@ fn set_location(
             "instance" => chosen.instance = path,
             "downloads" => chosen.downloads = path,
             "game" => chosen.game = path,
-            "profile" => chosen.profile = path.map(|p| p.display().to_string()),
+            "profile" => {
+                // A profile is a folder in the instance's `profiles/`: a
+                // name, not a path.
+                let name = path.map(|p| p.display().to_string().trim().to_string());
+                if let Some(name) = &name {
+                    config::install::safe_mod_dir_name(name)
+                        .map_err(|_| format!("'{name}' cannot be a profile's name"))?;
+                }
+                chosen.profile = name.filter(|name| !name.is_empty());
+            }
             other => return Err(format!("no location called {other}")),
         }
         settings.save().map_err(shown)?;
@@ -512,7 +544,7 @@ fn step_plan(
     let list = state.list()?;
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
-        settings.list_mut(&list).answers = answers.clone();
+        settings.list_mut(&list).set_answers(answers.clone());
         let _ = settings.save();
     }
     plan_with(&state, answers)
@@ -883,6 +915,9 @@ struct StepByHand {
     steps: Vec<String>,
     /// Known done (its plugin exists), known not, or unknowable.
     done: Option<bool>,
+    /// What checking did with its plugin, if anything: moved out of
+    /// overwrite/ into a mod of the profile's own, or waiting for MO2 to close.
+    note: Option<String>,
 }
 
 /// The steps left to do by hand, and which are done.
@@ -890,9 +925,33 @@ struct StepByHand {
 fn manual_steps(state: tauri::State<'_, State>) -> Result<Vec<StepByHand>, String> {
     let plan = plan_of(&state)?;
     let settings = install_settings(&state)?;
+    let collected = config::install::by_hand_mods::collect(&plan, &settings).map_err(shown)?;
+    let note = |plugin: Option<&str>| -> Option<String> {
+        let plugin = plugin?;
+        if let Some(moved) = collected
+            .moved
+            .iter()
+            .find(|m| m.plugin.eq_ignore_ascii_case(plugin))
+        {
+            return Some(format!(
+                "Moved out of overwrite/ into the mod \"{}\", first in this profile's mod list.",
+                moved.folder
+            ));
+        }
+        collected
+            .waiting
+            .iter()
+            .any(|p| p.eq_ignore_ascii_case(plugin))
+            .then(|| {
+                "It is in overwrite/: close Mod Organizer 2 and check again, to move it into a \
+                 mod of this profile's own."
+                    .to_string()
+            })
+    };
     Ok(config::install::manual_steps(&plan, &settings)
         .into_iter()
         .map(|(step, done)| StepByHand {
+            note: note(step.done_when_plugin.as_deref()),
             done: step.done_when_plugin.is_some().then_some(done),
             steps: step
                 .steps
