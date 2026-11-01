@@ -376,8 +376,8 @@
 {/if}
 
 <div class="author">
-  <section class="left" bind:this={scroller}>
-    <nav class="panes">
+  <section class="left" bind:this={scroller} data-tour="author-list">
+    <nav class="panes" data-tour="author-archives">
       <button class:on={pane === "list"} onclick={() => (pane = "list")}>The list</button>
       <button class:on={pane === "archives"} onclick={() => (pane = "archives")} title="The archives in the downloads folders, to add mods from">Archives</button>
     </nav>
@@ -389,6 +389,7 @@
       <div class="addwrap">
         <button
           class="plus"
+          data-tour="author-add"
           onclick={(e) => {
             e.stopPropagation();
             addMenu = !addMenu;
@@ -478,7 +479,7 @@
 
   <aside class="right">
     <div class="bar">
-      <nav>
+      <nav data-tour="author-tabs">
         <button class:on={tab === "mod"} onclick={() => show("mod")}>Mod</button>
         <button class:on={tab === "load"} onclick={() => show("load")}>Load order</button>
         <button class:on={tab === "conflicts"} onclick={() => show("conflicts")}>Conflicts</button>
@@ -490,7 +491,7 @@
         <button class:on={tab === "inputs"} onclick={() => show("inputs")}>Questions</button>
         <button class:on={tab === "changes"} onclick={() => show("changes")}>Changes</button>
       </nav>
-      <span class="edits">
+      <span class="edits" data-tour="author-undo">
         <button onclick={undo} disabled={!canUndo || editing} title="Undo the last edit (Ctrl+Z)">↶ Undo</button>
         <button onclick={redo} disabled={!canRedo || editing} title="Redo (Ctrl+Shift+Z)">↷ Redo</button>
         <button onclick={reload} title="Read the list again, if it has changed on disk">Reload</button>

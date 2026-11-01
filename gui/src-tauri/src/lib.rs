@@ -145,6 +145,27 @@ fn recent(state: tauri::State<'_, State>) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// The parts of the guided tour already shown.
+#[tauri::command]
+fn toured(state: tauri::State<'_, State>) -> Vec<String> {
+    state
+        .settings
+        .lock()
+        .map(|s| s.toured.clone())
+        .unwrap_or_default()
+}
+
+/// Remember that a part of the tour was shown (seen through or skipped).
+#[tauri::command]
+fn tour_shown(state: tauri::State<'_, State>, part: String) -> Result<(), String> {
+    let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+    if !settings.toured.contains(&part) {
+        settings.toured.push(part);
+        settings.save().map_err(shown)?;
+    }
+    Ok(())
+}
+
 /// Start a new, empty list at `path` (`new`); the page then opens it.
 #[tauri::command]
 fn new_list(path: String, name: String) -> Result<String, String> {
@@ -1114,6 +1135,8 @@ pub fn app<R: Runtime>(
         .invoke_handler(tauri::generate_handler![
             opening,
             recent,
+            toured,
+            tour_shown,
             open_list,
             new_list,
             locations,

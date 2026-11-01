@@ -6,6 +6,8 @@
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
+  import Tour from "./lib/Tour.svelte";
+  import { tours } from "./lib/tours";
   import { inline, markdown } from "./lib/markdown";
 
   let list = $state<ListView | null>(null);
@@ -22,6 +24,51 @@
   let locations = $state<Locations | null>(null);
   let folders = $state(false);
   let installing = $state(false);
+
+  // The guided tour: its opening part plays on first launch, its list part
+  // the first time a list is open (once its instance is chosen); `?` plays
+  // the part for what is on screen again.
+  let tour = $state<"start" | "list" | null>(null);
+  let toured = $state<string[] | null>(null);
+  // Parts finished before the record of those already shown has loaded.
+  let finished: string[] = [];
+  let started = $state(false);
+  onMount(async () => {
+    let shown: string[] = [];
+    try {
+      shown = await api.toured();
+    } catch {
+      // Played again; no harm.
+    }
+    toured = [...new Set([...shown, ...finished])];
+  });
+  $effect(() => {
+    // Not over the Settings dialog, nor before a list given at start has
+    // opened.
+    if (!toured || tour || !started || folders) return;
+    const part = list ? (!locations || needsInstance ? null : "list") : "start";
+    if (part && !toured.includes(part)) tour = part;
+  });
+  function startTour() {
+    folders = false;
+    about = false;
+    tour = list ? "list" : "start";
+  }
+  async function endTour() {
+    const part = tour;
+    tour = null;
+    if (!part) return;
+    if (toured) {
+      if (!toured.includes(part)) toured = [...toured, part];
+    } else {
+      finished.push(part);
+    }
+    try {
+      await api.tourShown(part);
+    } catch {
+      // Shown again next time; no harm.
+    }
+  }
   const needsInstance = $derived(!!list && !!locations && !locations.instance.path);
 
   async function openPath(path: string) {
@@ -84,9 +131,15 @@
   }
 
   onMount(async () => {
-    recent = await api.recent();
-    const start = await api.opening();
-    if (start) await openPath(start);
+    try {
+      recent = await api.recent();
+      const start = await api.opening();
+      if (start) await openPath(start);
+    } finally {
+      // Only now is it known whether this starts on a list or the opening
+      // page, and so which part of the tour is for it.
+      started = true;
+    }
   });
 </script>
 
@@ -100,15 +153,16 @@
       <span class="path dim" title={list.path}>{list.path}</span>
     {/if}
     <span class="spacer"></span>
-    {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
+    <button class="help" data-tour="help" onclick={startTour} title="A tour of the window: what is where, and what to do">?</button>
+    {#if list}<button data-tour="about" onclick={() => (about = true)}>About this list</button>{/if}
     {#if list}
-      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, tools.toml and the Nexus key, for this list"
+      <button data-tour="settings" onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, tools.toml and the Nexus key, for this list"
         >Settings</button
       >
     {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
-      <div class="modes" role="group" aria-label="Mode">
+      <div class="modes" role="group" aria-label="Mode" data-tour="modes">
         <button class="mode" class:on={mode === "install"} onclick={() => (mode = "install")}>Install</button>
         <button
           class="mode"
@@ -184,7 +238,7 @@
     {#key list.path}
       <!-- Both stay mounted, so switching modes keeps an install's progress. -->
       <main class:hidden={mode !== "install"}>
-        <section class="left"><Guide document={list.document} /></section>
+        <section class="left" data-tour="guide"><Guide document={list.document} /></section>
         <aside class="right"><Install {list} bind:locations openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
       <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
@@ -198,8 +252,8 @@
         commands, shown as it runs.
       </p>
       <div class="starts">
-        <button class="primary" onclick={choose} disabled={opening}>Open a list…</button>
-        <button onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
+        <button class="primary" data-tour="open" onclick={choose} disabled={opening}>Open a list…</button>
+        <button data-tour="new" onclick={() => (creating = !creating)} disabled={opening}>Create a new list…</button>
       </div>
       {#if creating}
         <form class="create" onsubmit={create}>
@@ -221,6 +275,10 @@
         </ul>
       {/if}
     </div>
+  {/if}
+
+  {#if tour}
+    <Tour stops={tours[tour]} setMode={(m) => (mode = m)} onclose={endTour} />
   {/if}
 </div>
 
@@ -256,6 +314,12 @@
   }
   .spacer {
     flex: 1;
+  }
+  .help {
+    width: 28px;
+    padding: 4px 0;
+    border-radius: 50%;
+    font-weight: 600;
   }
   .modes {
     display: flex;
