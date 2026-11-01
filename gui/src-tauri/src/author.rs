@@ -253,10 +253,56 @@ pub(super) struct Tree {
     /// The files this archive puts in the mod's folder, where they end up
     /// once the mod's `file_move`s have run.
     installed: Vec<InstalledFile>,
+    /// How many of the files the layout offers each `include` and `exclude`
+    /// matches: none, and it does nothing.
+    matches: Vec<FilterMatches>,
     entries: usize,
     taken: usize,
     /// The command that shows the same from a terminal.
     command: String,
+}
+
+#[derive(Serialize)]
+pub(super) struct FilterMatches {
+    key: &'static str,
+    glob: String,
+    files: usize,
+}
+
+/// How many offered files each of the archive's filters matches, by the
+/// path the filters see each as.
+fn filter_matches(
+    contents: &config::check::ArchiveContents,
+    include: &[String],
+    exclude: &[String],
+) -> Vec<FilterMatches> {
+    let count = |glob: &String, keeps: bool| {
+        let filters = if keeps {
+            mudcrab::archive::ArchiveFilters::new(std::slice::from_ref(glob), &[])
+        } else {
+            mudcrab::archive::ArchiveFilters::new(&[], std::slice::from_ref(glob))
+        };
+        filters.map_or(0, |filters| {
+            contents
+                .available
+                .iter()
+                .filter(|t| filters.should_extract(&t.filtered_as) == keeps)
+                .count()
+        })
+    };
+    include
+        .iter()
+        .map(|glob| FilterMatches {
+            key: "include",
+            glob: glob.clone(),
+            files: count(glob, true),
+        })
+        .chain(exclude.iter().map(|glob| FilterMatches {
+            key: "exclude",
+            glob: glob.clone(),
+            files: count(glob, false),
+        }))
+        .collect()
 }
 
 /// Mod `id`'s `number`th archive (from 1, as the list declares them) as a
@@ -323,6 +369,7 @@ pub(super) async fn mod_files(
             .collect(),
         rows: rows(&contents, archive.layout == Some(ArchiveLayout::Bain)),
         installed: installed(&contents, &actions),
+        matches: filter_matches(&contents, &archive.include, &archive.exclude),
         entries: contents.entries.len(),
         taken: contents.taken.len(),
         command: format!(

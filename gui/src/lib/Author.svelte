@@ -245,19 +245,30 @@
 
   // Everything shown, read again: after an edit, or when the list may have
   // changed outside. What has to be asked for again (conflicts) is dropped.
+  // Side by side: the list (large, for a large list) need not hold up the
+  // mod shown.
   async function refresh() {
-    list = await api.reloadList();
-    if (order) {
-      order = await api.loadOrder();
-      // A mod added brings plugins whose masters are not read yet.
-      if (tab === "load") readMasters();
-    }
-    if (tab === "changes") changes = await api.changes();
-    if (selected && mods.has(selected)) {
-      view = await api.modView(selected);
-      actions = await api.actions(selected);
-      await readFiles(selected, true);
-    }
+    const id = selected && mods.has(selected) ? selected : null;
+    const reads: Promise<unknown>[] = [api.reloadList().then((read) => (list = read))];
+    if (order)
+      reads.push(
+        api.loadOrder().then((read) => {
+          order = read;
+          // A mod added brings plugins whose masters are not read yet.
+          if (tab === "load") readMasters();
+        }),
+      );
+    if (tab === "changes") reads.push(api.changes().then((read) => (changes = read)));
+    if (id)
+      reads.push(
+        (async () => {
+          const [read, acts] = await Promise.all([api.modView(id), api.actions(id)]);
+          view = read;
+          actions = acts;
+          await readFiles(id, true);
+        })(),
+      );
+    await Promise.all(reads);
   }
 
   async function reload() {
@@ -597,7 +608,8 @@
               move={(from, to) => run(() => api.addAction(chosen.id, "file_move", [`from=${JSON.stringify(from)}`, `to=${JSON.stringify(to)}`], null))}
               problem={(message) => (error = message)}
               choose={(number, label) => (choosing = { id: chosen.id, number, label })}
-              saveFields={(number, sets, unsets) => run(() => api.setFields(chosen.id, number, sets, unsets))}
+              inputs={list.document.inputs}
+              {run}
             />
           {/if}
         {/if}

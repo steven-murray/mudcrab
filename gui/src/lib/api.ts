@@ -241,6 +241,8 @@ export interface Tree {
   bain_conditional: string[];
   rows: FileRow[];
   installed: InstalledFile[];
+  /** How many files the layout offers each include and exclude matches. */
+  matches: { key: "include" | "exclude"; glob: string; files: number }[];
   entries: number;
   taken: number;
   command: string;

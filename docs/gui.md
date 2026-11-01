@@ -171,9 +171,13 @@ history there, rather than be undone by it.
     list, found by name (`dependencies`).
 
   Its actions follow (each can be removed: `action remove`), then each of
-  its archives: its layout, its installer's choices, its filters and its
-  fields (`set`: source, layout, data folder, game folder files, download
-  page and note). What a BAIN or FOMOD archive installs is chosen as in the
+  its archives: its installer's choices, its filters and its fields (`set`),
+  each written as it is changed -- its source, whether it is optional (as
+  for a mod), its layout (**Automatic**, the default, finds the data folder
+  in the archive), the data folder for a layout that names one, a folder
+  in the mod to put it under, its game folder files, and, for one not from
+  Nexus, its download page and note. Its file name is what the download
+  gave it, so it is shown, not changed. What a BAIN or FOMOD archive installs is chosen as in the
   installer you know:
   - **BAIN**: its packages are ticked to choose them, as in Wrye Bash's
     installer tab (`files --package`); **Choose its BAIN packages…** runs
@@ -182,8 +186,10 @@ history there, rather than be undone by it.
     again, each starting at what the list chooses now, and writes the new
     choices (`mudcrab choose`).
 
-  Each archive's `include` and `exclude` are listed, each with a ✕ to take
-  it out, and a box to add one.
+  Each archive's `include` and `exclude` are listed, each with how many
+  files it matches (one that matches nothing is marked: filters match a
+  file by its path as the archive lays it out, which hovering a file
+  shows), a ✕ to take it out, and a box to add one.
 
   **Files**, below, is the mod's folder as installed, from all its
   archives together (hover a file for the archive and path it comes from).

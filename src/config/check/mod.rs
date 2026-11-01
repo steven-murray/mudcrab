@@ -643,7 +643,12 @@ pub fn archive_contents(
     }
     let paths = archive::list_archive_paths(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
-    let scratch = crate::util::fs::cache_scratch_dir("files");
+    // Its own: a front end reads a mod's archives side by side.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let scratch = crate::util::fs::cache_scratch_dir(&format!(
+        "files-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     let reader = EntryReader::new(&source, scratch.join("entry"));
     let exclude: Vec<String> = archive
         .exclude

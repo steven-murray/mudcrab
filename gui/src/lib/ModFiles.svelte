@@ -5,9 +5,10 @@
 </script>
 
 <script lang="ts">
-  import { SvelteSet } from "svelte/reactivity";
+  import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { startDrag } from "./drag";
-  import Fields from "./Fields.svelte";
+  import type { InputDoc } from "./api";
+  import ArchiveFields from "./ArchiveFields.svelte";
 
   // A mod's files, from all its archives, as one tree of the mod's folder as
   // installed. Each file is ticked when install takes it: untick it to leave
@@ -25,19 +26,24 @@
     move,
     problem,
     choose,
-    saveFields,
+    inputs,
+    run,
   }: {
     id: string;
     archives: Archive[];
     /** Add and drop values of an archive's `include`, `exclude` or
      *  `bain_subpackages`; resolves true when written. */
     edit: (number: number, key: string, add: string[], drop: string[]) => Promise<boolean>;
-    /** Move `from` to `to`, both in the mod's folder (`file_move`). */
-    move: (from: string, to: string) => void;
+    /** Move `from` to `to`, both in the mod's folder (`file_move`);
+     *  resolves true when written. */
+    move: (from: string, to: string) => Promise<boolean>;
     problem: (message: string) => void;
     /** Walk an archive's installer again. */
     choose: (number: number, label: string) => void;
-    saveFields: (number: number, sets: string[], unsets: string[]) => Promise<boolean>;
+    /** The list's questions, for an archive's `if`. */
+    inputs: InputDoc[];
+    /** Run an edit; resolves true when written. */
+    run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
 
   const lower = (list: string[]) => list.map((v) => v.toLowerCase());
@@ -53,9 +59,39 @@
     filtered_as: string;
     archive: Archive;
   };
+  // A tick or move shows at once, before it is written and the archives
+  // read again; what they then say replaces it.
+  const ticked = new SvelteMap<string, boolean>();
+  let moved = $state<[string, string][]>([]);
+  $effect(() => {
+    void archives;
+    ticked.clear();
+    moved = [];
+  });
+  function movedTo(path: string): string {
+    for (const [from, to] of moved) {
+      if (path.toLowerCase() === from.toLowerCase()) path = to;
+      else if (path.toLowerCase().startsWith(`${from.toLowerCase()}/`)) path = `${to}${path.slice(from.length)}`;
+    }
+    return path;
+  }
   const files = $derived<File[]>(
-    archives.flatMap((a) => (a.tree?.installed ?? []).map((f) => ({ ...f, archive: a }))).sort((x, y) => x.path.localeCompare(y.path)),
+    archives
+      .flatMap((a) =>
+        (a.tree?.installed ?? []).map((f) => ({
+          ...f,
+          path: movedTo(f.path),
+          taken: ticked.get(f.path) ?? f.taken,
+          archive: a,
+        })),
+      )
+      .sort((x, y) => x.path.localeCompare(y.path)),
   );
+  // Shown at once; put back if the edit is not written.
+  async function showing(paths: string[], taken: boolean, write: () => Promise<boolean>) {
+    for (const path of paths) ticked.set(path, taken);
+    if (!(await write())) for (const path of paths) ticked.delete(path);
+  }
   const several = $derived(archives.length > 1);
 
   type Row = {
@@ -164,10 +200,11 @@
 
   async function tick(row: Row) {
     if (row.file) {
-      const glob = escape(row.file.filtered_as);
-      if (row.file.taken) return edit(row.file.archive.number, "exclude", [glob], []);
-      const own = ownExclude(row.file.archive, glob);
-      return own ? edit(row.file.archive.number, "exclude", [], [own]) : widerFilter(row.path, row.file.archive);
+      const file = row.file;
+      const glob = escape(file.filtered_as);
+      if (file.taken) return showing([file.path], false, () => edit(file.archive.number, "exclude", [glob], []));
+      const own = ownExclude(file.archive, glob);
+      return own ? showing([file.path], true, () => edit(file.archive.number, "exclude", [], [own])) : widerFilter(row.path, file.archive);
     }
     // A folder: per archive whose files are in it, one edit after another.
     const inside = files.filter((f) => f.path.startsWith(`${row.path}/`));
@@ -194,7 +231,14 @@
         edits.push([archive.number, [], drop]);
       }
     }
-    for (const [number, add, drop] of edits) if (!(await edit(number, "exclude", add, drop))) return;
+    await showing(
+      inside.map((f) => f.path),
+      !leaving,
+      async () => {
+        for (const [number, add, drop] of edits) if (!(await edit(number, "exclude", add, drop))) return false;
+        return true;
+      },
+    );
   }
 
   function why(row: Row): string {
@@ -216,7 +260,11 @@
     if (to.toLowerCase() === row.path.toLowerCase()) return;
     if (`${to.toLowerCase()}/`.startsWith(`${row.path.toLowerCase()}/`)) return problem("A folder cannot go inside itself.");
     if (files.some((f) => f.path.toLowerCase() === to.toLowerCase())) return problem(`The mod already has ${to}.`);
-    move(row.path, to);
+    moveShown(row.path, to);
+  }
+  async function moveShown(from: string, to: string) {
+    moved = [...moved, [from, to]];
+    if (!(await move(from, to))) moved = moved.filter(([f, t]) => f !== from || t !== to);
   }
 
   // Hovering a closed folder while dragging opens it, after a moment.
@@ -232,7 +280,7 @@
   function moveTyped(event: SubmitEvent, row: Row) {
     event.preventDefault();
     const to = movingTo.trim().replace(/^\/+|\/+$/g, "");
-    if (to && to !== row.path) move(row.path, to);
+    if (to && to !== row.path) moveShown(row.path, to);
     moving = null;
   }
 
@@ -265,7 +313,7 @@
     <div class="ahead">
       <strong>{several ? `${archive.number}. ` : ""}{archive.label}</strong>
       {#if archive.condition}<span class="dim">if {archive.condition}</span>{/if}
-      {#if archive.tree?.layout}<span class="tag">{archive.tree.layout}</span>{/if}
+      {#if archive.tree}<span class="tag" title="Its layout">{archive.tree.layout ?? "automatic"}</span>{/if}
       {#if archive.tree && (fomodOf(archive.tree) || archive.tree.layout === "bain")}
         <button
           class="small"
@@ -303,8 +351,15 @@
       <div class="filters">
         {#each [{ key: "include", list: tree.include }, { key: "exclude", list: tree.exclude }] as filter}
           {#each filter.list as glob}
-            <span class="glob {filter.key}"
-              >{filter.key} <code>{glob}</code><button class="x" title="Take it out" onclick={() => edit(archive.number, filter.key, [], [glob])}
+            {@const matched = tree.matches.find((m) => m.key === filter.key && m.glob === glob)?.files}
+            <span
+              class="glob {filter.key}"
+              class:idle={matched === 0}
+              title={matched === 0
+                ? `Matches nothing: filters match each file by its path in the mod as the archive lays it out (hover a file to see it), and case counts`
+                : `${filter.key === "exclude" ? "Leaves out" : "Keeps"} ${matched} file(s)`}
+              >{filter.key} <code>{glob}</code>
+              <span class="n">{matched === 0 ? "matches nothing" : matched}</span><button class="x" title="Take it out" onclick={() => edit(archive.number, filter.key, [], [glob])}
                 >✕</button
               ></span
             >
@@ -323,7 +378,7 @@
     {/if}
     <details class="form">
       <summary>Its fields</summary>
-      <Fields {id} archive={archive.number} save={(sets, unsets) => saveFields(archive.number, sets, unsets)} />
+      <ArchiveFields {id} number={archive.number} label={archive.label} {inputs} {run} />
     </details>
   </div>
 {/each}
@@ -457,6 +512,16 @@
   }
   .glob code {
     color: var(--text);
+  }
+  .glob .n {
+    font-size: 11px;
+    margin-left: 2px;
+  }
+  .glob.idle {
+    border-color: var(--warning);
+  }
+  .glob.idle .n {
+    color: var(--warning);
   }
   .x {
     border: none;

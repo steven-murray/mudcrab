@@ -13,12 +13,14 @@
   // answers, a new question, or (for anything else) the `if` written out.
   let {
     id,
+    title = `When is ${id} installed?`,
     inputs,
     current,
     save,
     close,
   }: {
     id: string;
+    title?: string;
     inputs: InputDoc[];
     /** The mod's `if` now, if any. */
     current: string | null;
@@ -114,7 +116,7 @@
   }
 </script>
 
-<Dialog title="When is {id} installed?" {close}>
+<Dialog {title} {close}>
   <nav class="modes">
     <button class:on={mode === "existing"} onclick={() => (mode = "existing")} disabled={!inputs.length}>A question the list asks</button>
     <button class:on={mode === "new"} onclick={() => (mode = "new")}>A new question</button>
