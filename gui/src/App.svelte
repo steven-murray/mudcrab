@@ -30,15 +30,22 @@
   // the part for what is on screen again.
   let tour = $state<"start" | "list" | null>(null);
   let toured = $state<string[] | null>(null);
+  // Parts finished before the record of those already shown has loaded.
+  let finished: string[] = [];
+  let started = $state(false);
   onMount(async () => {
+    let shown: string[] = [];
     try {
-      toured = await api.toured();
+      shown = await api.toured();
     } catch {
-      toured = [];
+      // Played again; no harm.
     }
+    toured = [...new Set([...shown, ...finished])];
   });
   $effect(() => {
-    if (!toured || tour) return;
+    // Not over the Settings dialog, nor before a list given at start has
+    // opened.
+    if (!toured || tour || !started || folders) return;
     const part = list ? (!locations || needsInstance ? null : "list") : "start";
     if (part && !toured.includes(part)) tour = part;
   });
@@ -50,13 +57,16 @@
   async function endTour() {
     const part = tour;
     tour = null;
-    if (part && toured && !toured.includes(part)) {
-      toured = [...toured, part];
-      try {
-        await api.tourShown(part);
-      } catch {
-        // Shown again next time; no harm.
-      }
+    if (!part) return;
+    if (toured) {
+      if (!toured.includes(part)) toured = [...toured, part];
+    } else {
+      finished.push(part);
+    }
+    try {
+      await api.tourShown(part);
+    } catch {
+      // Shown again next time; no harm.
     }
   }
   const needsInstance = $derived(!!list && !!locations && !locations.instance.path);
@@ -121,9 +131,15 @@
   }
 
   onMount(async () => {
-    recent = await api.recent();
-    const start = await api.opening();
-    if (start) await openPath(start);
+    try {
+      recent = await api.recent();
+      const start = await api.opening();
+      if (start) await openPath(start);
+    } finally {
+      // Only now is it known whether this starts on a list or the opening
+      // page, and so which part of the tour is for it.
+      started = true;
+    }
   });
 </script>
 

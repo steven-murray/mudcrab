@@ -70,6 +70,9 @@
     }
     at = i;
     measure(true);
+    // The keyboard in the tour, on its way on.
+    await tick();
+    card?.querySelector<HTMLButtonElement>("button.primary")?.focus();
   }
 
   function measure(scroll = false) {
@@ -97,28 +100,53 @@
     return { left: clampLeft(rect.left + rect.width / 2 - w / 2), top: middle };
   });
 
+  // Every key is the tour's while it is open: its own, and nothing for the
+  // window behind it (Ctrl+Z would undo an edit there). Tab moves between
+  // its buttons only.
   function key(e: KeyboardEvent) {
+    const inCard = card?.contains(e.target as Node) ?? false;
     if (e.key === "Escape") onclose();
-    else if (e.key === "ArrowRight" || e.key === "Enter") show(at + 1, 1);
-    else if (e.key === "ArrowLeft" && at > 0) show(at - 1, -1);
-    else return;
+    else if (e.key === "ArrowRight" || (e.key === "Enter" && !inCard)) show(at + 1, 1);
+    else if (e.key === "ArrowLeft") {
+      if (at > 0) show(at - 1, -1);
+    } else if (e.key === "Tab") {
+      const buttons = [...(card?.querySelectorAll<HTMLButtonElement>("button") ?? [])];
+      if (!buttons.length) return;
+      const i = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      const next = buttons[(i + (e.shiftKey ? -1 : 1) + buttons.length) % buttons.length];
+      next.focus();
+    } else if (inCard && (e.key === "Enter" || e.key === " ")) {
+      // A button of the tour's own, pressed from the keyboard.
+      e.stopImmediatePropagation();
+      return;
+    }
     e.preventDefault();
+    e.stopImmediatePropagation();
   }
 
+  let root = $state<HTMLDivElement | null>(null);
   onMount(() => {
+    // The window behind is out of reach -- of the keyboard as of the mouse --
+    // until the tour closes.
+    const behind = [...(root?.parentElement?.children ?? [])].filter(
+      (el): el is HTMLElement => el instanceof HTMLElement && el !== root && !el.inert,
+    );
+    behind.forEach((el) => (el.inert = true));
     show(0, 1);
     const again = () => measure();
     window.addEventListener("resize", again);
     window.addEventListener("scroll", again, true);
     return () => {
+      behind.forEach((el) => (el.inert = false));
       window.removeEventListener("resize", again);
       window.removeEventListener("scroll", again, true);
     };
   });
 </script>
 
-<svelte:window onkeydown={key} />
+<svelte:window onkeydowncapture={key} />
 
+<div class="tour" bind:this={root}>
 <!-- Catches clicks, so the window is looked at rather than used meanwhile. -->
 <div class="block" aria-hidden="true"></div>
 {#if rect}
@@ -148,6 +176,7 @@
     {#if at > 0}<button onclick={() => show(at - 1, -1)}>Back</button>{/if}
     <button class="primary" onclick={() => show(at + 1, 1)}>{at + 1 === stops.length ? "Done" : "Next"}</button>
   </div>
+</div>
 </div>
 
 <style>
