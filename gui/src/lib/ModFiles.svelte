@@ -5,6 +5,7 @@
 </script>
 
 <script lang="ts">
+  import { tick as rendered } from "svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { startDrag } from "./drag";
   import type { InputDoc } from "./api";
@@ -241,6 +242,23 @@
     );
   }
 
+  // A click toggles the box itself; once what it does is shown (or refused,
+  // or nothing to do), the box is put to what the tree says. Cancelling the
+  // click instead would have the browser put the old tick back after
+  // the new one was shown.
+  async function settle(box: HTMLInputElement, work: unknown, state: () => { checked: boolean; indeterminate: boolean } | null) {
+    await work;
+    await rendered();
+    const now = state();
+    if (!now) return;
+    box.checked = now.checked;
+    box.indeterminate = now.indeterminate;
+  }
+  function rowState(path: string) {
+    const row = all.find((r) => r.path === path);
+    return row ? { checked: row.taken === row.files, indeterminate: row.taken > 0 && row.taken < row.files } : null;
+  }
+
   function why(row: Row): string {
     if (row.folder) return `${row.taken} of ${row.files} file(s) installed`;
     const f = row.file!;
@@ -294,7 +312,7 @@
     if (lower(tree.bain_conditional).includes(name.toLowerCase()))
       return problem(`${name} is chosen under a condition; change that in the list's file.`);
     const chosen = lower(tree.bain_subpackages).includes(name.toLowerCase());
-    edit(archive.number, "bain_subpackages", chosen ? [] : [name], chosen ? [name] : []);
+    return edit(archive.number, "bain_subpackages", chosen ? [] : [name], chosen ? [name] : []);
   }
 
   let newGlob = $state<Record<number, string>>({});
@@ -338,10 +356,11 @@
                 type="checkbox"
                 checked={lower(tree.bain_subpackages).includes(pkg.name.toLowerCase())}
                 disabled={lower(tree.bain_conditional).includes(pkg.name.toLowerCase())}
-                onclick={(e) => {
-                  e.preventDefault();
-                  packageTick(archive, pkg.name);
-                }}
+                onclick={(e) =>
+                  settle(e.currentTarget, packageTick(archive, pkg.name), () => {
+                    const now = archives.find((a) => a.number === archive.number)?.tree;
+                    return now ? { checked: lower(now.bain_subpackages).includes(pkg.name.toLowerCase()), indeterminate: false } : null;
+                  })}
               />
               {pkg.name}
             </label>
@@ -418,10 +437,7 @@
         type="checkbox"
         checked={row.taken === row.files}
         indeterminate={row.taken > 0 && row.taken < row.files}
-        onclick={(e) => {
-          e.preventDefault();
-          tick(row);
-        }}
+        onclick={(e) => settle(e.currentTarget, tick(row), () => rowState(row.path))}
       />
       {#if row.folder}
         <button class="name folder" onclick={() => toggle(row.path)}>

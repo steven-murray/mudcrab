@@ -22,7 +22,7 @@
     reading: boolean;
     readError: string | null;
     move: (plugin: string, before: string | null) => void;
-    setActive: (plugin: string, active: boolean) => void;
+    setActive: (plugin: string, active: boolean) => Promise<unknown>;
     /** The chosen plugin's mods, to mark in the list on the left. */
     mark: (mods: string[]) => void;
   } = $props();
@@ -127,7 +127,12 @@
           type="checkbox"
           checked={!plugin.inactive}
           title={plugin.inactive ? "Inactive: unticked in MO2. Tick to make it active" : "Active. Untick to leave it unticked in MO2"}
-          onchange={(e) => setActive(plugin.name, e.currentTarget.checked)}
+          onchange={async (e) => {
+            const box = e.currentTarget;
+            await setActive(plugin.name, box.checked);
+            // Refused, the box shows what the list still says.
+            box.checked = !(order.plugins.find((p) => p.name === plugin.name)?.inactive ?? !box.checked);
+          }}
         />
         <span class="n">{index + 1}</span>
         <button class="plugin" onclick={() => choose(plugin)}>
