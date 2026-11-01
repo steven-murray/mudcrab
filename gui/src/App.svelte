@@ -102,8 +102,8 @@
     <span class="spacer"></span>
     {#if list}<button onclick={() => (about = true)}>About this list</button>{/if}
     {#if list}
-      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, and tools.toml, for this list"
-        >Folders</button
+      <button onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, tools.toml and the Nexus key, for this list"
+        >Settings</button
       >
     {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
@@ -132,9 +132,9 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="veil" onclick={() => !needsInstance && (folders = false)}>
       <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-      <div class="dialog" role="dialog" tabindex="-1" aria-label="Folders" onclick={(e) => e.stopPropagation()}>
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
         <div class="dhead">
-          <strong>Where things go{list ? `: ${list.document.name}` : ""}</strong>
+          <strong>Settings{list ? `: ${list.document.name}` : ""}</strong>
           {#if !needsInstance}<button class="link" onclick={() => (folders = false)}>Done</button>{/if}
         </div>
         <div class="dbody">
@@ -185,7 +185,7 @@
       <!-- Both stay mounted, so switching modes keeps an install's progress. -->
       <main class:hidden={mode !== "install"}>
         <section class="left"><Guide document={list.document} /></section>
-        <aside class="right"><Install {list} {locations} openFolders={() => (folders = true)} bind:running={installing} /></aside>
+        <aside class="right"><Install {list} bind:locations openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
       <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
     {/key}

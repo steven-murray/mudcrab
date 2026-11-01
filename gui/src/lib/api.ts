@@ -155,6 +155,8 @@ export interface FindingGroup {
 
 export interface Checked {
   done: Done;
+  /** Not run: this plan, with these downloads, passed check before. */
+  skipped: boolean;
   problems: number;
   warnings: number;
   groups: FindingGroup[];
@@ -393,7 +395,9 @@ export const api = {
   download: () => invoke<Downloaded>("step_download"),
   lookForDownloads: () => invoke<ByHand[]>("look_for_downloads"),
   openPage: (url: string) => invoke<void>("open_page", { url }),
-  check: () => invoke<Checked>("step_check"),
+  check: (again = false) => invoke<Checked>("step_check", { again }),
+  /** Stop the run in progress at its next archive or mod. */
+  cancelRun: () => invoke<void>("cancel_run"),
   install: () => invoke<Done>("step_install"),
   manualSteps: () => invoke<StepByHand[]>("manual_steps"),
   loadOrder: () => invoke<LoadOrder>("load_order"),

@@ -42,6 +42,10 @@ pub struct ListSettings {
     /// installed into several profiles with different answers.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub profile_answers: BTreeMap<String, BTreeMap<String, String>>,
+    /// The fingerprint of the last plan that passed check (with its
+    /// downloads folder), so installing it again need not check it again.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checked: Option<String>,
 }
 
 impl ListSettings {

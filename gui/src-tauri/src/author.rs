@@ -270,7 +270,7 @@ pub(super) async fn mod_files(
 ) -> Result<Tree, String> {
     let downloads = locate(&state)?
         .downloads
-        .ok_or("say where the downloads folder is first (in Install)")?;
+        .ok_or("say where the downloads folder is first (in Settings)")?;
     let list = state.list()?;
     let answers: config::query::Overrides = state
         .settings
@@ -575,7 +575,7 @@ fn reading_settings(state: &State) -> Result<config::install::InstallSettings, S
     let located = locate(state)?;
     let instance = located
         .instance
-        .ok_or("choose an MO2 instance with the list installed first (in Install)")?;
+        .ok_or("choose an MO2 instance with the list installed first (in Settings)")?;
     Ok(config::install::InstallSettings {
         cache_dir: located.downloads.unwrap_or_default(),
         mods_dir: config::mo2::layout::mods_dir(&instance),

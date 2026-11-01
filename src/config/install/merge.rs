@@ -57,6 +57,7 @@ pub(crate) fn run_merges(
         "merging",
     );
     for (mod_entry, spec) in plan.merges() {
+        crate::util::cancel::check()?;
         if settings.filter.matches(&mod_entry.section, &mod_entry.id) {
             bar.inc(1);
             bar.set_message(&mod_entry.id);

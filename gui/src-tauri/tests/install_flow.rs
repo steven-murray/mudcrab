@@ -229,6 +229,12 @@ fn a_list_installs_from_the_commands_the_page_calls() {
 
     let checked = call(&webview, "step_check", json!({})).unwrap();
     assert_eq!(checked["problems"], 0, "{checked}");
+    assert_eq!(checked["skipped"], false, "{checked}");
+    // The same plan, passed: not checked again unless asked.
+    let again = call(&webview, "step_check", json!({})).unwrap();
+    assert_eq!(again["skipped"], true, "{again}");
+    let forced = call(&webview, "step_check", json!({ "again": true })).unwrap();
+    assert_eq!(forced["skipped"], false, "{forced}");
 
     let installed = call(&webview, "step_install", json!({})).unwrap();
     assert!(

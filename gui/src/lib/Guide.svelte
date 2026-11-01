@@ -21,7 +21,7 @@
 
 <div class="guide">
   <div class="bar">
-    <nav>
+    <nav role="group" aria-label="Show">
       <button class:on={tab === "guide"} onclick={() => (tab = "guide")}>Guide · {document.mod_count} mods</button>
       <button class:on={tab === "load"} onclick={() => (tab = "load")}>Load order · {document.load_order.length}</button>
     </nav>
@@ -69,19 +69,31 @@
     background: var(--bg);
     border-bottom: 1px solid var(--line);
   }
+  /* A switch between the two, drawn as the Install / Author one is. */
   nav {
     display: flex;
-    gap: 4px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    overflow: hidden;
   }
   nav button {
+    padding: 4px 12px;
+    border: none;
+    border-radius: 0;
     background: none;
-    border-color: transparent;
     color: var(--dim);
   }
-  nav button.on {
+  nav button + button {
+    border-left: 1px solid var(--line);
+  }
+  nav button:hover:not(.on) {
     color: var(--text);
     background: var(--card);
-    border-color: var(--line);
+  }
+  nav button.on {
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-weight: 600;
   }
   .bar input {
     margin-left: auto;
