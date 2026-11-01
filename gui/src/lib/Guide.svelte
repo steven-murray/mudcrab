@@ -21,7 +21,7 @@
 
 <div class="guide">
   <div class="bar">
-    <nav role="group" aria-label="Show">
+    <nav role="group" aria-label="Show" data-tour="guide-switch">
       <button class:on={tab === "guide"} onclick={() => (tab = "guide")}>Guide · {document.mod_count} mods</button>
       <button class:on={tab === "load"} onclick={() => (tab = "load")}>Load order · {document.load_order.length}</button>
     </nav>

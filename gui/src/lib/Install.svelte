@@ -268,7 +268,7 @@
 </script>
 
 <div class="install">
-  <section>
+  <section data-tour="profile">
     <h3>Profile</h3>
     <p class="dim small">
       A profile is a set of answers to the list's questions, installed into the MO2 profile of the same
@@ -326,7 +326,7 @@
   </section>
 
   <section>
-    <div class="row">
+    <div class="row" data-tour="install">
       <button class="primary go" onclick={run} disabled={running || !ready}>
         {running ? "Installing…" : steps[3].state === "done" ? "Install again" : "Install"}
       </button>
@@ -353,7 +353,7 @@
     {/if}
   </section>
 
-  <section class="timeline">
+  <section class="timeline" data-tour="steps">
     {#each steps as s, i}
       <div class="step {s.state}">
         <div class="shead">

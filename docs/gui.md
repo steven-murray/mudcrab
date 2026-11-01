@@ -35,6 +35,9 @@ beside the command line:
   command line on your `PATH`, as below). Both use Windows' own WebView2, which Windows 10 and 11
   have; the installer fetches it on the rare system without.
 
+The first time it opens, and the first time a list is open, a short tour
+shows what is where; **?** at the top plays it again.
+
 The GUI's install mode reads a list and installs it from one window:
 
 1. **Open a list**: its `.toml` file. Its guide is on the left -- sections,

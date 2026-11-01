@@ -382,6 +382,9 @@ export interface Fetched {
 export const api = {
   opening: () => invoke<string | null>("opening"),
   recent: () => invoke<string[]>("recent"),
+  /** The parts of the guided tour already shown. */
+  toured: () => invoke<string[]>("toured"),
+  tourShown: (part: string) => invoke<void>("tour_shown", { part }),
   openList: (path: string) => invoke<ListView>("open_list", { path }),
   newList: (path: string, name: string) => invoke<string>("new_list", { path, name }),
   locations: () => invoke<Locations>("locations"),

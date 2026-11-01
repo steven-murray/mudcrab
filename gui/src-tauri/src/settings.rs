@@ -14,6 +14,10 @@ pub struct Settings {
     /// Per list, by its path.
     #[serde(default)]
     pub lists: BTreeMap<String, ListSettings>,
+    /// The parts of the guided tour already shown (`start`, `list`), so each
+    /// plays by itself once.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub toured: Vec<String>,
     /// The tools.toml to use, when not the usual one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tools_config: Option<PathBuf>,
