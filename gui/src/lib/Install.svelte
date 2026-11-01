@@ -46,6 +46,8 @@
   $effect(() => {
     if (!locations || locations.profile === shownProfile) return;
     shownProfile = locations.profile;
+    // What a check said about another profile's steps is not this one's.
+    notes = {};
     const saved = locations.answers;
     untrack(() => {
       for (const input of list.document.inputs) {
