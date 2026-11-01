@@ -44,7 +44,7 @@ export const tours: Record<"start" | "list", Stop[]> = {
     {
       target: "settings",
       title: "Settings",
-      text: "Where things go: the Mod Organizer 2 instance, the downloads folder, the game folder, other folders that may already hold archives, tools.toml (for xEdit), and your Nexus API key.",
+      text: "Where things go for this list: the Mod Organizer 2 instance, the downloads and game folders, other folders that may already hold archives. And mudcrab's own, for every list: your Nexus API key, and where xEdit, LOOT and Wine are.",
     },
     {
       target: "profile",

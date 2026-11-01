@@ -109,6 +109,20 @@ export interface Tools {
   nexus_key: "NEXUS_API_KEY" | "tools.toml" | null;
 }
 
+/** tools.toml, which every list shares. */
+export interface ToolSettings {
+  path: string | null;
+  from: string;
+  exists: boolean;
+  /** Whether Wine and Proton apply (not on Windows). */
+  wine: boolean;
+  key_from_env: boolean;
+  /** By tools.toml key; the Nexus key is "set" or null. */
+  values: Record<string, string | null>;
+  xedit_problems: string[];
+  error: string | null;
+}
+
 export interface Locations {
   tools: Tools;
   instance: Location;
@@ -211,6 +225,11 @@ export interface InstalledFile {
   path: string;
   laid_out: string;
   hidden: boolean;
+  /** As the archive names it. */
+  source: string;
+  /** False for a file the archive's include or exclude leaves out. */
+  taken: boolean;
+  filtered_as: string;
 }
 
 export interface Tree {
@@ -390,7 +409,9 @@ export const api = {
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
-  setToolsConfig: (path: string | null) => invoke<Locations>("set_tools_config", { path }),
+  setToolsConfig: (path: string | null) => invoke<ToolSettings>("set_tools_config", { path }),
+  toolSettings: () => invoke<ToolSettings>("tool_settings"),
+  setTool: (key: string, value: string | null) => invoke<ToolSettings>("set_tool", { key, value }),
   setApiKey: (key: string | null) => invoke<Locations>("set_api_key", { key }),
   addSearchFolder: (path: string) => invoke<Locations>("add_search_folder", { path }),
   removeSearchFolder: (path: string) => invoke<Locations>("remove_search_folder", { path }),

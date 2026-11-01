@@ -1,18 +1,18 @@
 <script lang="ts">
   import { api, tomlString } from "./api";
 
-  // A mod's fields, or one of its archives', as a form: each one `set`
-  // changes (`mudcrab set --mod <id> [--archive N] key=value --unset key`).
-  // What has a command of its own -- the id, section, plugins, filters,
-  // actions, installer choices -- is changed there instead.
+  // One of a mod's archives' fields, as a form: each one `set` changes
+  // (`mudcrab set --mod <id> --archive N key=value --unset key`). What has a
+  // command of its own -- filters, installer choices -- is changed there.
+  // (The mod's own are in ModFields.)
   let {
     id,
     archive,
     save,
   }: {
     id: string;
-    /** An archive's number (from 1), or null for the mod itself. */
-    archive: number | null;
+    /** The archive's number, from 1. */
+    archive: number;
     /** Write the changes; resolves true when written. */
     save: (sets: string[], unsets: string[]) => Promise<boolean>;
   } = $props();
@@ -20,12 +20,6 @@
   type Kind = "text" | "bool" | "list" | { choose: string[] };
   type Field = { key: string; label: string; kind: Kind; hint: string };
 
-  const MOD: Field[] = [
-    { key: "if", label: "Only if", kind: "text", hint: "A condition on the list's questions; the mod is left out when it is false." },
-    { key: "enabled", label: "Ticked in MO2", kind: "bool", hint: "Unticked: installed, but switched off in MO2 until the player ticks it." },
-    { key: "dependencies", label: "Needs", kind: "list", hint: "Mods it needs, by id, one per line." },
-    { key: "oracle_name", label: "Reference name", kind: "text", hint: "Its folder name in a reference instance, for `diff`, when that differs from the id." },
-  ];
   const ARCHIVE: Field[] = [
     { key: "path", label: "Source", kind: "text", hint: "nexus:oblivion/<mod>/<file>, a URL, or manual:<file name>." },
     { key: "file_name", label: "File name", kind: "text", hint: "The archive's own name, as downloaded." },
@@ -43,7 +37,7 @@
     { key: "download_page", label: "Download page", kind: "text", hint: "Where to get it by hand, printed by download and check." },
     { key: "download_note", label: "Download note", kind: "text", hint: "Which file on the page, and how." },
   ];
-  const known = $derived(archive === null ? MOD : ARCHIVE);
+  const known = ARCHIVE;
 
   type Value = string | number | boolean | (string | number | boolean)[];
   let current = $state<Map<string, Value>>(new Map());
@@ -108,8 +102,6 @@
     if (await save(changes.sets, changes.unsets)) await load();
   }
 
-  // The fields this form does not know, shown as they are.
-  const others = $derived([...current.entries()].filter(([key]) => key !== "id" && !known.some((f) => f.key === key)));
 </script>
 
 <div class="fields">
@@ -130,12 +122,6 @@
       {/if}
     </div>
   {/each}
-  {#if others.length}
-    <div class="others dim">
-      Also set, changed by their own commands or in the file:
-      {#each others as [key, value]}<code title={JSON.stringify(value)}>{key}</code>{/each}
-    </div>
-  {/if}
   <div class="buttons">
     <button class="primary" onclick={write} disabled={!changed}>Save</button>
     <button onclick={load} disabled={!changed}>Revert</button>
@@ -173,13 +159,6 @@
   select:disabled,
   textarea:disabled {
     opacity: 0.5;
-  }
-  .others {
-    font-size: 12px;
-    margin: 6px 0;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
   }
   .buttons {
     display: flex;

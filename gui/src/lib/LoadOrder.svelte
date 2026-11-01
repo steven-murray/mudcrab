@@ -57,6 +57,8 @@
   // What is wrong with each master of the plugin at `index`, if anything.
   function problems(plugin: PluginRow, index: number): { master: string; why: string }[] {
     const out: { master: string; why: string }[] = [];
+    // An inactive plugin is not loaded, so needs nothing (as check has it).
+    if (plugin.inactive) return out;
     for (const master of plugin.masters ?? []) {
       const key = master.toLowerCase();
       const where = at.get(key);

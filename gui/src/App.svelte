@@ -3,6 +3,7 @@
   import { open, save } from "@tauri-apps/plugin-dialog";
   import { api, type ListView, type Locations } from "./lib/api";
   import Places from "./lib/Places.svelte";
+  import ToolSettings from "./lib/ToolSettings.svelte";
   import Author from "./lib/Author.svelte";
   import Guide from "./lib/Guide.svelte";
   import Install from "./lib/Install.svelte";
@@ -155,15 +156,13 @@
     <span class="spacer"></span>
     <button class="help" data-tour="help" onclick={startTour} title="A tour of the window: what is where, and what to do">?</button>
     {#if list}<button data-tour="about" onclick={() => (about = true)}>About this list</button>{/if}
-    {#if list}
-      <button data-tour="settings" onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, tools.toml and the Nexus key, for this list"
+    <button data-tour="settings" onclick={() => (folders = true)} title="This list's MO2 instance and folders, and mudcrab's own: tools.toml, the Nexus key, xEdit, LOOT"
         ><svg class="cog" viewBox="0 0 24 24" aria-hidden="true"
           ><path
             d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.66 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
           /></svg
         >Settings</button
       >
-    {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
       <div class="modes" role="group" aria-label="Mode" data-tour="modes">
@@ -202,12 +201,34 @@
               you go. Its downloads and game folders follow from it; change them after if they are not right.
             </p>
           {/if}
+          <h4 class="part">This list</h4>
           <Places bind:locations disabled={installing} />
+          {#if !needsInstance}
+            <h4 class="part">mudcrab, for every list</h4>
+            <ToolSettings disabled={installing} changed={async () => (locations = await api.locations())} />
+          {/if}
           {#if needsInstance}
             <p class="dim small">
               Not this list? <button class="link" onclick={choose}>Open another</button>
             </p>
           {/if}
+        </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if !list && folders}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => (folders = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Settings" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>Settings</strong>
+          <button class="link" onclick={() => (folders = false)}>Done</button>
+        </div>
+        <div class="dbody">
+          <p class="dim small">mudcrab's own, for every list. A list's MO2 instance and folders are set once it is open.</p>
+          <ToolSettings changed={() => {}} />
         </div>
       </div>
     </div>
@@ -318,6 +339,15 @@
   }
   .spacer {
     flex: 1;
+  }
+  .part {
+    margin: 4px 0 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .part + :global(*) {
+    margin-top: 6px;
   }
   .cog {
     width: 14px;

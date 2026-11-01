@@ -3,9 +3,10 @@
   import { api, type Locations } from "./api";
 
   // Where things go, for the open list: the MO2 instance first, then the
-  // folders that follow from it (downloads, game), other folders to look in
-  // for archives, and the tools.toml in use. Installing and authoring both
-  // need them, so they are set here, in the Folders dialog, for both.
+  // folders that follow from it (downloads, game), and other folders to look
+  // in for archives. Installing and authoring both need them, so they are
+  // set here, in the Settings dialog, for both. What every list shares is in
+  // ToolSettings.
   let {
     locations = $bindable(),
     disabled = false,
@@ -36,32 +37,6 @@
   async function resetPlace(kind: string) {
     locations = await api.setLocation(kind, null);
   }
-  async function chooseTools() {
-    const path = await open({ multiple: false, filters: [{ name: "tools.toml", extensions: ["toml"] }] });
-    if (typeof path !== "string") return;
-    try {
-      locations = await api.setToolsConfig(path);
-      placeError = null;
-    } catch (err) {
-      placeError = String(err);
-    }
-  }
-  async function resetTools() {
-    locations = await api.setToolsConfig(null);
-  }
-  // The Nexus API key: what lets adding a mod find which Nexus file an
-  // archive is, and downloading fetch files (straight away with Premium).
-  let key = $state("");
-  async function saveKey(value: string | null) {
-    try {
-      locations = await api.setApiKey(value);
-      key = "";
-      placeError = null;
-    } catch (err) {
-      placeError = String(err);
-    }
-  }
-
   async function addSearch() {
     const path = await open({ directory: true, multiple: false });
     if (typeof path === "string") locations = await api.addSearchFolder(path);
@@ -119,47 +94,12 @@
         <button class="link small" onclick={() => removeSearch(folder.path!)} {disabled}>Remove</button>
       </div>
     {/each}
-    {@const tools = locations.tools}
-    <div class="place sub">
-      <div class="ptitle">Tools (tools.toml)</div>
-      {#if tools.path}<div class="ppath" class:missing={!tools.exists}>{tools.path}</div>{/if}
-      <div class="pfrom dim">
-        {tools.exists ? "" : "not there · "}{tools.from === "chosen" ? "chosen here" : tools.from === "usual" ? "the usual one" : `from ${tools.from}`}
-        {#if tools.from === "chosen"}· <button class="link" onclick={resetTools} {disabled}>reset</button>{/if}
-      </div>
-      <button class="link" onclick={chooseTools} {disabled}>Change…</button>
-    </div>
-    {#if tools.problems.length}
+    {#if locations.tools.problems.length}
       <div class="toolsbad">
-        <div>This list cleans plugins with xEdit, and this tools.toml is not set up for it:</div>
-        <ul>{#each tools.problems as problem}<li>{problem}</li>{/each}</ul>
-        <div class="dim">Run <code>mudcrab setup-tools</code>, edit the file, or choose another.</div>
+        <div>This list cleans plugins with xEdit, which is not set up yet:</div>
+        <ul>{#each locations.tools.problems as problem}<li>{problem}</li>{/each}</ul>
+        <div class="dim">Set it under xEdit below, or run <code>mudcrab setup-tools</code>.</div>
       </div>
-    {/if}
-    <div class="place sub">
-      <div class="ptitle">Nexus API key</div>
-      <div class="pfrom dim">
-        {#if tools.nexus_key === "tools.toml"}
-          Set, in tools.toml · <button class="link" onclick={() => saveKey(null)} {disabled}>remove</button>
-        {:else if tools.nexus_key}
-          Set, from {tools.nexus_key}
-        {:else}
-          Not set. With one, mods are added from Nexus by name rather than as hand downloads, and archives are
-          downloaded for you. Yours is on <a href="https://www.nexusmods.com/settings/api-keys">Nexus's API keys page</a>.
-        {/if}
-      </div>
-    </div>
-    {#if tools.nexus_key !== "NEXUS_API_KEY"}
-      <form
-        class="key"
-        onsubmit={(e) => {
-          e.preventDefault();
-          if (key.trim()) saveKey(key.trim());
-        }}
-      >
-        <input type="password" bind:value={key} placeholder={tools.nexus_key ? "a new key" : "paste your key"} autocomplete="off" {disabled} />
-        <button type="submit" disabled={disabled || !key.trim()}>Save in tools.toml</button>
-      </form>
     {/if}
   {/if}
 
@@ -217,19 +157,6 @@
     grid-column: 2;
     grid-row: 1 / span 3;
     align-self: center;
-  }
-  .key {
-    display: flex;
-    gap: 6px;
-    margin: 2px 0 8px 12px;
-  }
-  .key input {
-    flex: 1;
-    min-width: 0;
-    font-size: 12px;
-  }
-  .key button {
-    font-size: 12px;
   }
   .search {
     display: flex;

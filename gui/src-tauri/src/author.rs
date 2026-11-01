@@ -338,20 +338,27 @@ pub(super) async fn mod_files(
     })
 }
 
-/// A file in the mod's folder.
+/// A file in the mod's folder, or one the archive's filters leave out of it.
 #[derive(Serialize)]
 pub(super) struct InstalledFile {
-    /// Where it ends up.
+    /// Where it ends up (or would, were it taken).
     path: String,
     /// Where the archive's layout puts it, before any `file_move`.
     laid_out: String,
     /// Named by a `file_hide`'s `paths`: kept, but hidden from the game.
     hidden: bool,
+    /// As the archive names it.
+    source: String,
+    /// Whether `install` takes it: false for one an `include` or `exclude`
+    /// leaves out.
+    taken: bool,
+    /// The path the archive's `include` and `exclude` match it as.
+    filtered_as: String,
 }
 
-/// The files `contents` puts in the mod's folder, with the mod's `file_move`
-/// actions applied in order, as install runs them; a moved folder takes
-/// everything in it.
+/// The files `contents` puts in the mod's folder, and those its filters
+/// leave out, with the mod's `file_move` actions applied in order, as
+/// install runs them; a moved folder takes everything in it.
 fn installed(
     contents: &config::check::ArchiveContents,
     actions: &[config::schema::ModAction],
@@ -364,14 +371,26 @@ fn installed(
             .is_some_and(|head| head.eq_ignore_ascii_case(folder))
             && path.as_bytes().get(folder.len()) == Some(&b'/')
     };
+    let taken: BTreeSet<&str> = contents.taken.iter().map(|t| t.source.as_str()).collect();
+    let file = |t: &config::check::Taken, taken: bool| InstalledFile {
+        path: t.destination.clone(),
+        laid_out: t.destination.clone(),
+        hidden: false,
+        source: t.source.clone(),
+        taken,
+        filtered_as: t.filtered_as.clone(),
+    };
     let mut out: Vec<InstalledFile> = contents
         .taken
         .iter()
-        .map(|t| InstalledFile {
-            path: t.destination.clone(),
-            laid_out: t.destination.clone(),
-            hidden: false,
-        })
+        .map(|t| file(t, true))
+        .chain(
+            contents
+                .available
+                .iter()
+                .filter(|t| !taken.contains(t.source.as_str()))
+                .map(|t| file(t, false)),
+        )
         .collect();
     for action in actions {
         match action {

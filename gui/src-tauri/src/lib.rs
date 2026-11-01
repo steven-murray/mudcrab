@@ -492,7 +492,7 @@ fn set_location(
 fn set_tools_config(
     state: tauri::State<'_, State>,
     path: Option<String>,
-) -> Result<Locations, String> {
+) -> Result<ToolSettings, String> {
     let path = path.map(PathBuf::from);
     if let Some(path) = &path {
         config::tools::ToolsConfig::load(path).map_err(shown)?;
@@ -503,7 +503,7 @@ fn set_tools_config(
         settings.tools_config = path;
         settings.save().map_err(shown)?;
     }
-    locations(state)
+    Ok(tool_settings())
 }
 
 /// Keep the Nexus API key in the tools.toml in use (or with `None`, take it
@@ -514,6 +514,106 @@ fn set_api_key(state: tauri::State<'_, State>, key: Option<String>) -> Result<Lo
         .ok_or("there is no tools.toml to keep the key in (no config folder)")?;
     config::tools::ToolsConfig::save_api_key(&path, key.as_deref()).map_err(shown)?;
     locations(state)
+}
+
+/// The settings in tools.toml, which every list shares: where it is, and
+/// each setting the Settings dialog edits.
+#[derive(Serialize)]
+struct ToolSettings {
+    path: Option<String>,
+    /// "chosen" here, "MUDCRAB_TOOLS_CONFIG", or "usual".
+    from: String,
+    exists: bool,
+    /// Whether Wine and Proton apply (not on Windows).
+    wine: bool,
+    /// Whether `NEXUS_API_KEY` is set, which comes before the file's key.
+    key_from_env: bool,
+    /// Each setting by its key (`downloads_dir`, `tes4edit.exe`, ...), with
+    /// its value, or `None` where it is not set. The Nexus key is shown only
+    /// as whether it is set.
+    values: std::collections::BTreeMap<&'static str, Option<String>>,
+    /// What stops xEdit running, with these settings.
+    xedit_problems: Vec<String>,
+    /// The file could not be read: the settings shown are empty.
+    error: Option<String>,
+}
+
+/// The settings the Settings dialog edits, by their tools.toml keys.
+const TOOL_KEYS: &[&str] = &[
+    "downloads_dir",
+    "nexus_api_key",
+    "tes4edit.exe",
+    "tes4edit.qac_exe",
+    "loot.exe",
+    "loot.game_appdata_path",
+    "wine.prefix",
+    "wine.proton",
+];
+
+#[tauri::command]
+fn tool_settings() -> ToolSettings {
+    use config::tools::ToolsConfig;
+    let path = ToolsConfig::default_path();
+    let (tools, error) = match path.as_deref().map(ToolsConfig::load) {
+        Some(Ok(tools)) => (tools, None),
+        Some(Err(err)) => (ToolsConfig::default(), Some(format!("{err:#}"))),
+        None => (ToolsConfig::default(), None),
+    };
+    let shown = |p: &Option<PathBuf>| p.as_ref().map(|p| p.display().to_string());
+    let values = TOOL_KEYS
+        .iter()
+        .map(|&key| {
+            let value = match key {
+                "downloads_dir" => shown(&tools.downloads_dir),
+                "nexus_api_key" => tools
+                    .nexus_api_key
+                    .as_deref()
+                    .filter(|k| !k.trim().is_empty())
+                    .map(|_| "set".to_string()),
+                "tes4edit.exe" => tools.tes4edit.as_ref().map(|t| t.exe.display().to_string()),
+                "tes4edit.qac_exe" => tools.tes4edit.as_ref().and_then(|t| shown(&t.qac_exe)),
+                "loot.exe" => tools.loot.as_ref().and_then(|l| l.exe.clone()),
+                "loot.game_appdata_path" => tools
+                    .loot
+                    .as_ref()
+                    .and_then(|l| shown(&l.game_appdata_path)),
+                "wine.prefix" => tools.wine.as_ref().map(|w| w.prefix.display().to_string()),
+                "wine.proton" => tools.wine.as_ref().and_then(|w| shown(&w.proton)),
+                _ => None,
+            };
+            (key, value)
+        })
+        .collect();
+    ToolSettings {
+        from: match ToolsConfig::chosen_path() {
+            Some((_, "--tools-config")) => "chosen".to_string(),
+            Some((_, from)) => from.to_string(),
+            None => "usual".to_string(),
+        },
+        exists: path.as_ref().is_some_and(|p| p.is_file()),
+        path: path.as_ref().map(|p| p.display().to_string()),
+        wine: !cfg!(windows),
+        key_from_env: std::env::var("NEXUS_API_KEY").is_ok_and(|k| !k.trim().is_empty()),
+        xedit_problems: if tools.tes4edit.is_some() {
+            tools.xedit_problems()
+        } else {
+            Vec::new()
+        },
+        values,
+        error,
+    }
+}
+
+/// Set one setting in tools.toml (or with `None`, take it out).
+#[tauri::command]
+fn set_tool(key: String, value: Option<String>) -> Result<ToolSettings, String> {
+    if !TOOL_KEYS.contains(&key.as_str()) {
+        return Err(format!("no tools.toml setting called {key}"));
+    }
+    let path = config::tools::ToolsConfig::default_path()
+        .ok_or("there is no tools.toml to keep it in (no config folder)")?;
+    config::tools::ToolsConfig::save_field(&path, &key, value.as_deref()).map_err(shown)?;
+    Ok(tool_settings())
 }
 
 /// Look in another folder for archives, before downloading them.
@@ -1122,6 +1222,8 @@ pub fn app<R: Runtime>(
             set_location,
             set_tools_config,
             set_api_key,
+            tool_settings,
+            set_tool,
             add_search_folder,
             remove_search_folder,
             step_plan,
