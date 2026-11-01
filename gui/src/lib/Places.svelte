@@ -82,9 +82,11 @@
         ModOrganizer.ini in it (for a portable instance, the folder ModOrganizer.exe is in).
       </div>
     {/if}
-    <button class={instance.path ? "" : "primary"} onclick={() => choosePlace("instance")} {disabled}>
-      {instance.path ? "Change…" : "Choose…"}
-    </button>
+    {#if instance.path}
+      <button class="link" onclick={() => choosePlace("instance")} {disabled}>Change…</button>
+    {:else}
+      <button class="primary" onclick={() => choosePlace("instance")} {disabled}>Choose…</button>
+    {/if}
   </div>
   {#if placeError}<div class="perror">{placeError}</div>{/if}
 
@@ -106,8 +108,9 @@
       </div>
     {/each}
     <div class="place sub">
-      <div class="ptitle">Other folders to look in</div>
-      <div class="pfrom dim">Archives already in these are linked into the downloads folder, not downloaded again.</div>
+      <div class="ptitle" title="Archives already in these are linked into the downloads folder, not downloaded again.">
+        Other folders to search for archives
+      </div>
       <button class="link" onclick={addSearch} {disabled}>Add…</button>
     </div>
     {#each locations.search as folder}

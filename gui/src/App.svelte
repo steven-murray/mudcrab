@@ -157,6 +157,10 @@
     {#if list}<button data-tour="about" onclick={() => (about = true)}>About this list</button>{/if}
     {#if list}
       <button data-tour="settings" onclick={() => (folders = true)} title="The MO2 instance, downloads and game folders, tools.toml and the Nexus key, for this list"
+        ><svg class="cog" viewBox="0 0 24 24" aria-hidden="true"
+          ><path
+            d="M19.14 12.94a7.5 7.5 0 0 0 .05-.94 7.5 7.5 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7 7 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54a7 7 0 0 0-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.66 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.5 7.5 0 0 0 0 1.88l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.39 1.05.7 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .5-.42l.36-2.54a7 7 0 0 0 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
+          /></svg
         >Settings</button
       >
     {/if}
@@ -314,6 +318,13 @@
   }
   .spacer {
     flex: 1;
+  }
+  .cog {
+    width: 14px;
+    height: 14px;
+    fill: currentColor;
+    vertical-align: -2px;
+    margin-right: 5px;
   }
   .help {
     width: 28px;

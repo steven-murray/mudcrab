@@ -269,11 +269,11 @@
 
 <div class="install">
   <section data-tour="profile">
-    <h3>Profile</h3>
-    <p class="dim small">
-      A profile is a set of answers to the list's questions, installed into the MO2 profile of the same
-      name. One MO2 instance can hold several, with different answers; a mod they install alike is shared.
-    </p>
+    <h3
+      title="A profile is a set of answers to the list's questions, installed into the MO2 profile of the same name. One MO2 instance can hold several, with different answers; a mod they install alike is shared."
+    >
+      Profile
+    </h3>
     <div class="question">
       <div class="query">Name</div>
       {#if locations}

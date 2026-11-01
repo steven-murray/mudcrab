@@ -65,7 +65,7 @@ The GUI's install mode reads a list and installs it from one window:
    another), and, for a list that cleans plugins with xEdit, anything in it
    that is not set up; Install waits until it is. **Nexus API key** is
    where to paste yours (from Nexus's API keys page), kept in that
-   `tools.toml`. **Other folders to look in** are folders
+   `tools.toml`. **Other folders to search for archives** are folders
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download

@@ -23,7 +23,7 @@
   <div class="bar">
     <nav role="group" aria-label="Show" data-tour="guide-switch">
       <button class:on={tab === "guide"} onclick={() => (tab = "guide")}>Guide · {document.mod_count} mods</button>
-      <button class:on={tab === "load"} onclick={() => (tab = "load")}>Load order · {document.load_order.length}</button>
+      <button class:on={tab === "load"} onclick={() => (tab = "load")}>Load order · {active}/{document.load_order.length}</button>
     </nav>
     {#if tab === "guide"}
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
@@ -32,9 +32,6 @@
 
   {#if tab === "guide"}
     <div class="content">
-      {#if !words && document.inputs.length}
-        <p class="dim small">This list asks {document.inputs.length} question(s); answer them on the right before installing.</p>
-      {/if}
       {#each shown as entry (entry.kind + ("anchor" in entry ? entry.anchor : ""))}
         <EntryView {entry} {words} {matches} />
       {/each}
@@ -42,7 +39,6 @@
     </div>
   {:else}
     <div class="content">
-      <p class="dim small">{active} active of {document.load_order.length}, in the order the game loads them. Read only here; author mode will let you drag them.</p>
       <ol class="load">
         {#each document.load_order as plugin, i}
           <li class:inactive={!plugin.active}>
@@ -102,9 +98,6 @@
   .content {
     padding: 16px 20px 40px;
     max-width: 980px;
-  }
-  .small {
-    font-size: 12px;
   }
   ol.load {
     list-style: none;
