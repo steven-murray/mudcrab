@@ -92,6 +92,21 @@ fn quote(text: impl AsRef<str>) -> String {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_plan_fingerprints_the_same_whatever_its_maps_order() {
+        let a: serde_json::Value =
+            serde_json::from_str(r#"{"b": 1, "a": {"y": [1, {"q": 2, "p": 3}], "x": "s"}}"#)
+                .unwrap();
+        let b: serde_json::Value =
+            serde_json::from_str(r#"{"a": {"x": "s", "y": [1, {"p": 3, "q": 2}]}, "b": 1}"#)
+                .unwrap();
+        assert_eq!(super::canonical(&a), super::canonical(&b));
+        assert_eq!(
+            super::canonical(&a),
+            r#"{"a":{"x":"s","y":[1,{"p":3,"q":2}]},"b":1}"#
+        );
+    }
     #[test]
     fn a_quoted_value_is_taken_literally_by_a_shell() {
         use super::quote;
@@ -542,12 +557,21 @@ fn step_plan(
     answers: BTreeMap<String, String>,
 ) -> Result<Done, String> {
     let list = state.list()?;
+    // A new run: a stop asked of the last one is not this one's.
+    mudcrab::util::cancel::reset();
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         settings.list_mut(&list).set_answers(answers.clone());
         let _ = settings.save();
     }
     plan_with(&state, answers)
+}
+
+/// Stop the run in progress at its next archive or mod
+/// (`mudcrab::util::cancel`).
+#[tauri::command]
+fn cancel_run() {
+    mudcrab::util::cancel::request();
 }
 
 /// `compile` and `query` with these answers, keeping the plan for the steps
@@ -765,6 +789,8 @@ fn open_page(url: String) -> Result<(), String> {
 #[derive(Serialize)]
 struct Checked {
     done: Done,
+    /// Not run: this plan, with these downloads, passed check before.
+    skipped: bool,
     problems: usize,
     warnings: usize,
     findings: Vec<config::check::Finding>,
@@ -800,7 +826,11 @@ fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
 
 /// Everything that can be known before installing (`check`).
 #[tauri::command]
-async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
+async fn step_check(
+    state: tauri::State<'_, State>,
+    again: Option<bool>,
+) -> Result<Checked, String> {
+    let again = again.unwrap_or(false);
     let plan = author::current_plan(&state)?;
     let downloads = locate(&state)?.downloads;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
@@ -809,6 +839,41 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         quote(plan_path(&state)?.display().to_string()),
         quote(downloads.display().to_string())
     );
+    // Checking again what passed is minutes for nothing: the same plan, the
+    // same downloads folder and the same mudcrab are skipped, unless asked.
+    let fingerprint = {
+        use sha2::{Digest, Sha256};
+        let mut hash = Sha256::new();
+        // With its maps' keys in order: the plan's answers are a HashMap,
+        // whose order differs from one run to the next.
+        let plan = serde_json::to_value(&plan).map_err(|err| err.to_string())?;
+        hash.update(canonical(&plan).as_bytes());
+        hash.update(downloads.to_string_lossy().as_bytes());
+        hash.update(env!("CARGO_PKG_VERSION").as_bytes());
+        format!("{:x}", hash.finalize())
+    };
+    let list = state.list()?;
+    let passed = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&list)
+        .checked;
+    if !again && passed.as_deref() == Some(fingerprint.as_str()) {
+        return Ok(Checked {
+            done: Done {
+                summary: "skipped: this plan passed check already, with the same downloads folder"
+                    .to_string(),
+                writes: Vec::new(),
+                command,
+            },
+            skipped: true,
+            problems: 0,
+            warnings: 0,
+            groups: Vec::new(),
+            findings: Vec::new(),
+        });
+    }
     let settings = config::check::CheckSettings {
         cache_dir: downloads,
         filter: Default::default(),
@@ -822,7 +887,13 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         .lock()
         .map_err(|_| "a command panicked")?
         .masters = Some(report.plugins);
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        settings.list_mut(&list).checked = (report.problems == 0).then_some(fingerprint);
+        let _ = settings.save();
+    }
     Ok(Checked {
+        skipped: false,
         done: Done {
             summary: format!(
                 "{} archive(s) in {} mod(s): {} problem(s), {} warning(s)",
@@ -836,6 +907,35 @@ async fn step_check(state: tauri::State<'_, State>) -> Result<Checked, String> {
         groups: grouped(&report.findings),
         findings: report.findings,
     })
+}
+
+/// `value` as JSON text with every object's keys sorted, so equal values
+/// give equal text whatever order their maps were built in.
+fn canonical(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Object(map) => {
+            let mut keys: Vec<&String> = map.keys().collect();
+            keys.sort();
+            let fields: Vec<String> = keys
+                .into_iter()
+                .map(|key| {
+                    format!(
+                        "{}:{}",
+                        serde_json::Value::from(key.as_str()),
+                        canonical(&map[key])
+                    )
+                })
+                .collect();
+            format!("{{{}}}", fields.join(","))
+        }
+        serde_json::Value::Array(items) => {
+            format!(
+                "[{}]",
+                items.iter().map(canonical).collect::<Vec<_>>().join(",")
+            )
+        }
+        other => other.to_string(),
+    }
 }
 
 /// Install settings for the open list, as `install --mo2-instance-dir` makes
@@ -1028,6 +1128,7 @@ pub fn app<R: Runtime>(
             open_page,
             step_check,
             step_install,
+            cancel_run,
             manual_steps,
             author::load_order,
             author::mod_view,

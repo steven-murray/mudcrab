@@ -112,7 +112,14 @@ pub async fn download_report(
         )
     })?;
 
-    let client = Client::new();
+    // A server that accepts a connection and then sends nothing would hold a
+    // download (and a cancel waiting on it) for ever: give up on one that
+    // has not connected in 30 seconds, or sent nothing for two minutes.
+    let client = Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .read_timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|err| anyhow::anyhow!("failed to set up HTTP: {err}"))?;
     let mut downloaded = 0usize;
     let mut skipped = 0usize;
     // Accumulated rather than propagated, exactly as `check` does. A section of
@@ -172,15 +179,19 @@ pub async fn download_report(
             let client = &client;
             let bar = bar.clone();
             async move {
-                let result = download_with_retry(
-                    client,
-                    job.path,
-                    job.file_name,
-                    job.content,
-                    job.handler,
-                    settings,
-                )
-                .await;
+                let result = if crate::util::cancel::requested() {
+                    Err(anyhow::Error::new(crate::util::cancel::Cancelled))
+                } else {
+                    or_cancelled(download_with_retry(
+                        client,
+                        job.path,
+                        job.file_name,
+                        job.content,
+                        job.handler,
+                        settings,
+                    ))
+                    .await
+                };
                 bar.inc(1);
                 bar.set_message(job.mod_id);
                 (job, result)
@@ -191,6 +202,8 @@ pub async fn download_report(
         .await;
 
     bar.finish();
+    // What did arrive is in the downloads folder; the rest is for next time.
+    crate::util::cancel::check()?;
     let mut fetched = 0usize;
     for (job, result) in results {
         match result {
@@ -264,6 +277,25 @@ struct Job<'a> {
 /// search paths, then the network. The first two never touch the network,
 /// which is the whole point -- a large modlist is mostly archives the machine
 /// already has.
+/// `work`, or `Cancelled` as soon as a stop is asked for: a download under
+/// way is dropped rather than waited for, as one can take an hour. What it
+/// had written is a partial file, which the next run replaces.
+async fn or_cancelled<T>(
+    work: impl std::future::Future<Output = anyhow::Result<T>>,
+) -> anyhow::Result<T> {
+    tokio::pin!(work);
+    loop {
+        tokio::select! {
+            done = &mut work => return done,
+            _ = tokio::time::sleep(std::time::Duration::from_millis(250)) => {
+                if crate::util::cancel::requested() {
+                    return Err(crate::util::cancel::Cancelled.into());
+                }
+            }
+        }
+    }
+}
+
 async fn download_with_retry(
     client: &Client,
     path: &str,

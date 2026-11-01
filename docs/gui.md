@@ -41,9 +41,13 @@ The GUI's install mode reads a list and installs it from one window:
    each mod with its notes and plugins, and the load order -- read-only.
    **About this list** shows what its author wrote for whoever installs it
    (its `about`), or, for a list without one, its guide's introduction.
-2. **Answer its questions**, if it asks any. The list's defaults are chosen;
-   your answers are remembered for next time.
-3. **Say where things go**, in **Folders** (by **About this list**), which
+2. **Set up its profile**, in **Profile**: a name, which is the MO2 profile
+   it installs into (an existing one, or a new one typed in), and the
+   answers to the list's questions. The list's defaults are chosen, and each
+   profile's answers are remembered, so one MO2 instance can hold the list
+   several times with different choices; see
+   [Several profiles](usage.md#several-profiles-in-one-instance).
+3. **Say where things go**, in **Settings** (by **About this list**), which
    opens by itself for a list with no MO2 instance chosen yet and stays
    until one is -- installing a list and writing one both need it, and the
    choices are shared by both modes. First the MO2 instance to install into
@@ -62,10 +66,7 @@ The GUI's install mode reads a list and installs it from one window:
    that may already hold some of the list's archives -- another instance's
    downloads, a backup -- looked in before anything is downloaded; an archive
    found there is linked into the downloads folder (`download
-   --archive-search-path`). **MO2 profile** is the profile to install into:
-   one the instance has, or a new one by name. The answers to the list's
-   questions are kept per profile, so one instance can hold the list twice
-   with different choices; see [Several profiles](usage.md#several-profiles-in-one-instance).
+   --archive-search-path`).
 4. **Install.** The steps run one after another -- plan, download, check,
    install -- each showing what it is doing, what it writes, and the command
    that does the same from a terminal (with a button to copy it).
@@ -77,7 +78,13 @@ The GUI's install mode reads a list and installs it from one window:
    carries on once all have arrived.
 
    If `check` finds a problem, the run stops there, with the findings listed,
-   as the command would.
+   as the command would. A plan that passed check before -- the same answers,
+   list and downloads folder -- is not checked again, unless **Check again**
+   is ticked.
+
+   **Cancel** stops a run at its next archive or mod: nothing is left half
+   unpacked, and what was installed is kept, so installing again carries on
+   from where it stopped.
 5. **Still to do by hand**: the list's steps that no tool can take, such as
    building the Bashed Patch in Wrye Bash. Each ticks itself when it is done
    (when the plugin it makes appears); the rest you tick yourself.
@@ -92,7 +99,7 @@ installed -- in `gui.toml` beside `tools.toml`, never in the list.
 
 To start a list of your own, **Create a new list…** on the opening page asks
 its name and where to keep it (`mudcrab new`), then the MO2 instance to try
-it in (**Folders**, as above), and opens it here, empty, ready for its first
+it in (**Settings**, as above), and opens it here, empty, ready for its first
 mod from the downloads folder.
 
 **Author** in the top right switches to working on the list as its author.
@@ -122,7 +129,7 @@ history there, rather than be undone by it.
   `.meta` does not say where it came from is looked up on Nexus by its
   checksum, as `mudcrab identify` does, so it goes in as a Nexus file that
   players' installs download for them. That needs a Nexus API key, which
-  **Folders** keeps in `tools.toml` (where the command line reads it too).
+  **Settings** keeps in `tools.toml` (where the command line reads it too).
   Failing that, a file whose name is plainly a Nexus download links its
   mod's page; the dialog says which happened, and the source can be changed
   by hand.

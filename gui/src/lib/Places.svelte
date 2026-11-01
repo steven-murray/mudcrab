@@ -62,19 +62,6 @@
     }
   }
 
-  // The profile to install into: one the instance has, or a new one, which
-  // the install makes.
-  let newProfile = $state("");
-  async function chooseProfile(name: string) {
-    try {
-      locations = await api.setLocation("profile", name);
-      newProfile = "";
-      placeError = null;
-    } catch (err) {
-      placeError = String(err);
-    }
-  }
-
   async function addSearch() {
     const path = await open({ directory: true, multiple: false });
     if (typeof path === "string") locations = await api.addSearchFolder(path);
@@ -171,37 +158,6 @@
         <button type="submit" disabled={disabled || !key.trim()}>Save in tools.toml</button>
       </form>
     {/if}
-    <div class="place sub">
-      <div class="ptitle">MO2 profile</div>
-      <div class="pfrom dim">
-        One instance can hold the list several times, a profile each, with different answers. A mod two profiles
-        install alike is shared; one they install differently gets a folder each.
-      </div>
-    </div>
-    <div class="profile">
-      <select
-        value={locations.profiles.includes(locations.profile) ? locations.profile : ""}
-        onchange={(e) => {
-          const value = (e.target as HTMLSelectElement).value;
-          if (value) chooseProfile(value);
-        }}
-        {disabled}
-      >
-        {#if !locations.profiles.includes(locations.profile)}
-          <option value="">{locations.profile} (new)</option>
-        {/if}
-        {#each locations.profiles as name}<option value={name}>{name}</option>{/each}
-      </select>
-      <form
-        onsubmit={(e) => {
-          e.preventDefault();
-          if (newProfile.trim()) chooseProfile(newProfile.trim());
-        }}
-      >
-        <input type="text" bind:value={newProfile} placeholder="a new profile" {disabled} />
-        <button type="submit" disabled={disabled || !newProfile.trim()}>Use</button>
-      </form>
-    </div>
   {/if}
 
 <style>
@@ -271,17 +227,6 @@
   }
   .key button {
     font-size: 12px;
-  }
-  .profile {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-    margin: 2px 0 8px 12px;
-    font-size: 12px;
-  }
-  .profile form {
-    display: flex;
-    gap: 6px;
   }
   .search {
     display: flex;

@@ -272,6 +272,9 @@ fn check_in(
                     let Some(mod_entry) = in_scope.get(index) else {
                         break;
                     };
+                    if crate::util::cancel::requested() {
+                        break;
+                    }
                     bar.set_message(&mod_entry.id);
                     let own = scratch.join(format!("mod-{index}"));
                     let mut found = Findings::default();
@@ -295,6 +298,8 @@ fn check_in(
         }
     });
     bar.finish();
+    // Some mods unchecked: a report on the rest would say the list is fine.
+    crate::util::cancel::check()?;
     let results = results
         .into_inner()
         .map_err(|_| anyhow::anyhow!("a check thread panicked"))?;
