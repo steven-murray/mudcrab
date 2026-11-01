@@ -332,6 +332,25 @@ pub(super) fn move_plugin(
     apply(&state, command, planned)
 }
 
+/// Tick a plugin in the load order, or leave it unticked (`plugins activate`,
+/// `plugins deactivate`).
+#[tauri::command]
+pub(super) fn set_plugin_active(
+    state: tauri::State<'_, State>,
+    plugin: String,
+    active: bool,
+) -> Result<Edited, String> {
+    let list = state.list()?;
+    let planned = edit::plan_plugin_active(&list, &plugin, active).map_err(shown)?;
+    let command = format!(
+        "mudcrab plugins {} {} {}",
+        if active { "activate" } else { "deactivate" },
+        list_arg(&list),
+        quote(&plugin)
+    );
+    apply(&state, command, planned)
+}
+
 /// Move a mod to a section, before another mod or at the section's end
 /// (`move`).
 #[tauri::command]

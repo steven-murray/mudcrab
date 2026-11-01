@@ -353,6 +353,15 @@ pub fn plan_plugin_move(
     plan_in(list, &file, |text, _| doc::move_plugin(text, plugin, to))
 }
 
+/// Plan leaving `plugin` unticked (`active` false) or ticking it again, in
+/// the file that places it.
+pub fn plan_plugin_active(list: &Path, plugin: &str, active: bool) -> anyhow::Result<Edit> {
+    let file = file_of_plugin(list, plugin)?;
+    plan_in(list, &file, |text, _| {
+        doc::set_plugin_active(text, plugin, active)
+    })
+}
+
 fn read(path: &Path) -> anyhow::Result<String> {
     std::fs::read_to_string(path)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))

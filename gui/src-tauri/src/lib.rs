@@ -880,6 +880,7 @@ async fn step_check(
     let settings = config::check::CheckSettings {
         cache_dir: downloads,
         filter: Default::default(),
+        masters_only: false,
     };
     let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
         .await
@@ -910,6 +911,31 @@ async fn step_check(
         groups: grouped(&report.findings),
         findings: report.findings,
     })
+}
+
+/// Each plugin's masters, for the load order (`check --masters-only`): read
+/// from the archives once, then kept, so it is quick after the first time.
+#[tauri::command]
+async fn read_masters(state: tauri::State<'_, State>) -> Result<(), String> {
+    let plan = author::current_plan(&state)?;
+    let downloads = locate(&state)?
+        .downloads
+        .ok_or("say where the downloads folder is first")?;
+    let settings = config::check::CheckSettings {
+        cache_dir: downloads,
+        filter: Default::default(),
+        masters_only: true,
+    };
+    let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(shown)?;
+    state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .masters = Some(report.plugins);
+    Ok(())
 }
 
 /// Install settings for the open list, as `install --mo2-instance-dir` makes
@@ -1103,6 +1129,7 @@ pub fn app<R: Runtime>(
             look_for_downloads,
             open_page,
             step_check,
+            read_masters,
             step_install,
             cancel_run,
             manual_steps,
@@ -1116,6 +1143,7 @@ pub fn app<R: Runtime>(
             edits::redo,
             edits::changes,
             edits::move_plugin,
+            edits::set_plugin_active,
             edits::move_mod,
             edits::edit_filter,
             edits::set_fields,

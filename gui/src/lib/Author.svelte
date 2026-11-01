@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import {
     api,
@@ -57,6 +58,11 @@
   let checked = $state<Checked | null>(null);
   let checking = $state(false);
   let busy = $state(false);
+  // The masters, read for the load order (`check --masters-only`).
+  let readingMasters = $state(false);
+  let mastersError = $state<string | null>(null);
+  // The mods of the plugin chosen in the load order, marked in the list.
+  const marked = new SvelteSet<string>();
 
   // The last edit, and whether there is one to undo or redo.
   let last = $state<Change | null>(null);
@@ -176,7 +182,10 @@
     tab = next;
     error = null;
     try {
-      if (next === "load" && !order) order = await api.loadOrder();
+      if (next === "load") {
+        if (!order) order = await api.loadOrder();
+        if (!order.masters_read) readMasters();
+      }
       if (next === "changes") changes = await api.changes();
       if (next === "conflicts" && !found) {
         busy = true;
@@ -189,6 +198,35 @@
     } finally {
       busy = false;
     }
+  }
+
+  async function readMasters() {
+    if (readingMasters) return;
+    readingMasters = true;
+    mastersError = null;
+    try {
+      await api.readMasters();
+      order = await api.loadOrder();
+    } catch (err) {
+      mastersError = String(err);
+    } finally {
+      readingMasters = false;
+    }
+  }
+
+  // Mark a plugin's mods in the list, their sections opened, the first
+  // scrolled to.
+  async function mark(ids: string[]) {
+    marked.clear();
+    for (const id of ids) {
+      marked.add(id);
+      for (const anchor of mods.get(id)?.path ?? []) opened.add(anchor);
+    }
+    if (!ids.length) return;
+    await tick();
+    scroller
+      ?.querySelector(`[data-drop="mod:${CSS.escape(ids[0])}"]`)
+      ?.scrollIntoView({ block: "nearest" });
   }
 
   async function runCheck() {
@@ -208,7 +246,11 @@
   // changed outside. What has to be asked for again (conflicts) is dropped.
   async function refresh() {
     list = await api.reloadList();
-    if (order) order = await api.loadOrder();
+    if (order) {
+      order = await api.loadOrder();
+      // A mod added brings plugins whose masters are not read yet.
+      if (tab === "load") readMasters();
+    }
     if (tab === "changes") changes = await api.changes();
     if (selected && mods.has(selected)) {
       view = await api.modView(selected);
@@ -439,6 +481,7 @@
             <div
               class="mod"
               class:on={selected === e.id}
+              class:marked={marked.has(e.id)}
               class:off={e.enabled === false}
               style="--depth: {depth}"
               data-drop={"mod:" + e.id}
@@ -583,7 +626,15 @@
         {/if}
       {:else if tab === "load"}
         {#if order}
-          <LoadOrder {order} {select} {runCheck} {checking} move={(plugin, before) => run(() => api.movePlugin(plugin, before))} />
+          <LoadOrder
+            {order}
+            {select}
+            {mark}
+            reading={readingMasters}
+            readError={mastersError}
+            move={(plugin, before) => run(() => api.movePlugin(plugin, before))}
+            setActive={(plugin, active) => run(() => api.setPluginActive(plugin, active))}
+          />
         {:else}<p class="dim">Reading…</p>{/if}
       {:else if tab === "conflicts"}
         {#if busy}
@@ -752,6 +803,10 @@
   .mod.on {
     background: var(--accent-soft);
     color: var(--accent);
+  }
+  .mod.marked {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
   .twisty {
     width: 12px;

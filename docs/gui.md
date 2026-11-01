@@ -187,11 +187,15 @@ history there, rather than be undone by it.
   box to add one. Greyed out is what the layout does not choose; ○ is what a
   filter leaves out. This needs the downloads folder, as `mudcrab files`
   does.
-- **Load order**: every plugin, the mods that ship it, and once a check has
-  read them, its masters. A plugin placed above one of its masters, or
-  needing one that is not in the list, is inactive, or is merged away, is
-  flagged, with why -- and the flags follow as you drag a plugin by its
-  handle to a new place (`plugins move`).
+- **Load order**: every plugin, the mods that ship it, and its masters,
+  read when the tab opens (`check --masters-only`: slow the first time for a
+  large solid archive, then moments). Untick a plugin to leave it inactive
+  in MO2 (`plugins deactivate`), tick it to make it active (`plugins
+  activate`). Click a plugin to see its masters: it is shaded, its masters
+  shaded in another colour, and its mods marked in the list on the left. A
+  plugin placed above one of its masters, or needing one that is not in the
+  list, is inactive, or is merged away, is flagged, with why -- and the flags
+  follow as you drag a plugin by its handle to a new place (`plugins move`).
 - **Conflicts**: which installed mods provide the same files, who wins (a
   later mod in MO2's order), and, a click on a pair, the files both provide
   -- `mudcrab conflicts`. **Hide these in** a mod adds a `file_hide` with

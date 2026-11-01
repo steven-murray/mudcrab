@@ -115,6 +115,7 @@ fn check_as_a_library_returns_its_findings_and_reports_them_as_events() {
         &mudcrab::config::check::CheckSettings {
             cache_dir: downloads,
             filter: Default::default(),
+            masters_only: false,
         },
     )
     .unwrap();
@@ -457,4 +458,78 @@ inner_archive = "inner.7z"
     assert!(output.status.success(), "{said}");
     assert!(said.contains("made by an older mudcrab"), "{said}");
     assert!(!said.contains("no mod installs it"), "{said}");
+}
+
+#[test]
+fn masters_only_reports_masters_and_rereads_an_archive_that_changed() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let (list, downloads) = masters_fixture(root);
+    let compiled = root.join("compiled.json");
+    let plan = root.join("plan.json");
+    let run = |args: &[&str]| {
+        let output = mudcrab(root)
+            .env("XDG_CACHE_HOME", root.join("cache"))
+            .args(args)
+            .output()
+            .unwrap();
+        format!(
+            "{}{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+    };
+    run(&[
+        "compile",
+        list.to_str().unwrap(),
+        "--output",
+        compiled.to_str().unwrap(),
+    ]);
+    run(&[
+        "query",
+        compiled.to_str().unwrap(),
+        "--headless",
+        "--output",
+        plan.to_str().unwrap(),
+    ]);
+    let check = || {
+        run(&[
+            "check",
+            plan.to_str().unwrap(),
+            "--masters-only",
+            "--downloads",
+            downloads.to_str().unwrap(),
+        ])
+    };
+
+    let said = check();
+    assert!(
+        said.contains("needs Base.esm, which loads after it"),
+        "{said}"
+    );
+    assert!(
+        said.contains("needs Elsewhere.esm, which is not in the list"),
+        "{said}"
+    );
+    // Read again from what the first check kept.
+    let said = check();
+    assert!(
+        said.contains("needs Elsewhere.esm, which is not in the list"),
+        "{said}"
+    );
+
+    // A new download of Patch, no longer needing Elsewhere, is read anew.
+    make_zip(
+        &downloads.join("Patch-2-1-0.zip"),
+        &[(
+            "Patch.esp",
+            &plugin(&["Oblivion.esm", "Base.esm", "Base2.esm", "Base3.esm"]),
+        )],
+    );
+    let said = check();
+    assert!(!said.contains("Elsewhere.esm"), "{said}");
+    assert!(
+        said.contains("needs Base2.esm, which is not in the list"),
+        "{said}"
+    );
 }

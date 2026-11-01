@@ -585,6 +585,11 @@ pub struct CheckArgs {
     /// MO2 install) the instance's own `downloads/`.
     #[arg(long = "downloads", alias = "cache", value_name = "DIR")]
     pub downloads: Option<PathBuf>,
+    /// Only read each plugin's masters and report what they need: no MD5s,
+    /// no actions rehearsed, nothing else checked. Much quicker; what an
+    /// author reordering plugins wants.
+    #[arg(long)]
+    pub masters_only: bool,
     #[command(flatten)]
     pub filter: FilterArgs,
 }
@@ -1176,6 +1181,22 @@ pub enum PluginsCommand {
     /// Move a plugin within the load order. Comment lines in the array stay
     /// where they are: a heading above the plugin stays with what follows it.
     Move(PluginsMoveArgs),
+    /// Tick a plugin again: take it out of `inactive-plugins`.
+    Activate(PluginsActiveArgs),
+    /// Leave a plugin unticked in MO2's load order, still in its place: put
+    /// it in `inactive-plugins`.
+    Deactivate(PluginsActiveArgs),
+}
+
+#[derive(Debug, Args)]
+pub struct PluginsActiveArgs {
+    /// The modlist to edit in place.
+    pub input: PathBuf,
+    /// The plugin.
+    pub plugin: String,
+    /// Print the change as a diff, and write nothing.
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]

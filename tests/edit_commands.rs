@@ -208,6 +208,41 @@ fn plugins_list_and_move() {
 }
 
 #[test]
+fn plugins_deactivate_and_activate() {
+    let (dir, list) = setup();
+    let run = |what: &str, plugin: &str| {
+        mudcrab(dir.path())
+            .args(["plugins", what, list.to_str().unwrap(), plugin])
+            .assert()
+            .success();
+    };
+    run("deactivate", "Extra.esp");
+    run("deactivate", "Core.esp");
+    assert!(
+        read(&list).contains(r#"inactive-plugins = ["Core.esp", "Extra.esp"]"#),
+        "{}",
+        read(&list)
+    );
+    mudcrab(dir.path())
+        .args(["plugins", "list", list.to_str().unwrap()])
+        .assert()
+        .success()
+        .stdout("Oblivion.esm\t(the game)\nCore.esp\tCore\tinactive\nExtra.esp\tExtra\tinactive\n");
+    run("activate", "Core.esp");
+    run("activate", "Extra.esp");
+    assert_eq!(read(&list), LIST);
+    mudcrab(dir.path())
+        .args([
+            "plugins",
+            "deactivate",
+            list.to_str().unwrap(),
+            "Nowhere.esp",
+        ])
+        .assert()
+        .failure();
+}
+
+#[test]
 fn actions_add_list_and_remove() {
     let (dir, list) = setup();
     mudcrab(dir.path())

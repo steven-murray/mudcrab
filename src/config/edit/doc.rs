@@ -393,6 +393,58 @@ pub fn move_plugin(text: &str, plugin: &str, to: &PluginPosition) -> anyhow::Res
     Ok(doc.to_string())
 }
 
+/// Leave `plugin` unticked in the load order (in `inactive-plugins`), or tick
+/// it again. `inactive-plugins` keeps the load order's order.
+pub fn set_plugin_active(text: &str, plugin: &str, active: bool) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let order: Vec<String> = doc
+        .get("plugins")
+        .and_then(Item::as_array)
+        .map(|array| {
+            array
+                .iter()
+                .filter_map(|value| value.as_str().map(str::to_ascii_lowercase))
+                .collect()
+        })
+        .unwrap_or_default();
+    let place = |name: &str| order.iter().position(|p| *p == name.to_ascii_lowercase());
+    let Some(at_in_order) = place(plugin) else {
+        anyhow::bail!("{plugin} is not in the load order");
+    };
+    if doc.get("inactive-plugins").is_none() {
+        if active {
+            return Ok(doc.to_string());
+        }
+        doc.insert("inactive-plugins", Item::Value(Value::Array(Array::new())));
+    }
+    let array = doc
+        .get_mut("inactive-plugins")
+        .and_then(Item::as_array_mut)
+        .ok_or_else(|| anyhow::anyhow!("`inactive-plugins` is not a list"))?;
+    match (position(array, plugin), active) {
+        (Some(at), true) => {
+            remove_item(array, at);
+            if array.is_empty() {
+                doc.remove("inactive-plugins");
+            }
+        }
+        (None, false) => {
+            let at = array
+                .iter()
+                .position(|value| {
+                    value
+                        .as_str()
+                        .and_then(place)
+                        .is_some_and(|other| other > at_in_order)
+                })
+                .unwrap_or(array.len());
+            insert_item(array, at, Value::from(plugin), false);
+        }
+        _ => {}
+    }
+    Ok(doc.to_string())
+}
+
 /// Take plugins out of the load order and `inactive-plugins`, wherever they
 /// are listed.
 pub fn drop_plugins(text: &str, plugins: &[String]) -> anyhow::Result<String> {

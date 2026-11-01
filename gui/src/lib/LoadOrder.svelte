@@ -4,19 +4,27 @@
 
   // The load order with each plugin's masters, and a flag on any placed
   // above one (check's rule, worked out here from the order, so it follows a
-  // drag). Drag a plugin by its handle to move it (`plugins move`).
+  // drag). Drag a plugin by its handle to move it (`plugins move`); tick or
+  // untick it to make it active or not. The chosen plugin is shaded, its
+  // masters shaded differently, and its mods marked in the list.
   let {
     order,
     select,
-    runCheck,
-    checking,
+    reading,
+    readError,
     move,
+    setActive,
+    mark,
   }: {
     order: LoadOrder;
     select: (mod: string) => void;
-    runCheck: () => void;
-    checking: boolean;
+    /** Whether the masters are being read (`check --masters-only`). */
+    reading: boolean;
+    readError: string | null;
     move: (plugin: string, before: string | null) => void;
+    setActive: (plugin: string, active: boolean) => void;
+    /** The chosen plugin's mods, to mark in the list on the left. */
+    mark: (mods: string[]) => void;
   } = $props();
 
   let scroller = $state<HTMLElement | null>(null);
@@ -32,6 +40,16 @@
   let filter = $state("");
   let onlyFlagged = $state(false);
   let opened = $state<string | null>(null);
+  function choose(plugin: PluginRow) {
+    opened = opened === plugin.name ? null : plugin.name;
+    mark(opened ? plugin.mods : []);
+  }
+  // The chosen plugin's masters, lowercased.
+  const mastersOfOpened = $derived(
+    new Set(
+      (order.plugins.find((p) => p.name === opened)?.masters ?? []).map((m) => m.toLowerCase()),
+    ),
+  );
 
   const at = $derived(new Map(order.plugins.map((p, i) => [p.name.toLowerCase(), i])));
   const game = $derived(new Set(order.game));
@@ -76,16 +94,21 @@
   {/if}
 </div>
 
-{#if !order.masters_read}
-  <p class="note">
-    Masters are read from the archives by a check.
-    <button onclick={runCheck} disabled={checking}>{checking ? "Checking…" : "Run check"}</button>
-  </p>
+{#if readError}
+  <p class="note bad">Masters not read: {readError}</p>
+{:else if reading}
+  <p class="note">Reading each plugin's masters from the archives… (quick after the first time)</p>
 {/if}
 
 <ol bind:this={scroller}>
   {#each shown as { plugin, index, problems } (plugin.name)}
-    <li class:inactive={plugin.inactive} class:flagged={problems.length > 0} data-drop={plugin.name}>
+    <li
+      class:inactive={plugin.inactive}
+      class:flagged={problems.length > 0}
+      class:chosen={opened === plugin.name}
+      class:master={mastersOfOpened.has(plugin.name.toLowerCase())}
+      data-drop={plugin.name}
+    >
       <div class="row">
         <span
           class="grip"
@@ -98,15 +121,20 @@
               onDrop: (key, place) => dropped(plugin.name, key, place),
             })}>⠿</span
         >
+        <input
+          type="checkbox"
+          checked={!plugin.inactive}
+          title={plugin.inactive ? "Inactive: unticked in MO2. Tick to make it active" : "Active. Untick to leave it unticked in MO2"}
+          onchange={(e) => setActive(plugin.name, e.currentTarget.checked)}
+        />
         <span class="n">{index + 1}</span>
-        <button class="plugin" onclick={() => (opened = opened === plugin.name ? null : plugin.name)}>
+        <button class="plugin" onclick={() => choose(plugin)}>
           {plugin.name}
         </button>
         <span class="mods">
           {#each plugin.mods as mod}<button class="link" onclick={() => select(mod)}>{mod}</button>{/each}
         </span>
         <span class="tags">
-          {#if plugin.inactive}<span class="badge">inactive</span>{/if}
           {#if plugin.masters}<span class="badge" title={plugin.masters.join("\n")}>{plugin.masters.length} master(s)</span>{/if}
           {#if problems.length}<span class="badge bad">{problems.length} misplaced</span>{/if}
         </span>
@@ -155,6 +183,21 @@
     font-size: 13px;
     color: var(--dim);
   }
+  .note.bad {
+    color: var(--problem);
+  }
+  .row input[type="checkbox"] {
+    margin: 0;
+    align-self: center;
+  }
+  li.chosen {
+    background: var(--accent-soft);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  li.master {
+    background: color-mix(in srgb, var(--note) 14%, transparent);
+    box-shadow: inset 3px 0 0 var(--note);
+  }
   ol {
     list-style: none;
     padding: 0;
@@ -167,7 +210,7 @@
   }
   .row {
     display: grid;
-    grid-template-columns: 14px 36px minmax(0, 1.2fr) minmax(0, 1fr) auto;
+    grid-template-columns: 14px 16px 30px minmax(0, 1.2fr) minmax(0, 1fr) auto;
     gap: 8px;
     align-items: baseline;
   }
@@ -217,14 +260,14 @@
     border-color: var(--problem);
   }
   .why {
-    margin: 2px 0 2px 64px;
+    margin: 2px 0 2px 84px;
     padding: 0;
     list-style: none;
     font-size: 12px;
     color: var(--problem);
   }
   .masters {
-    margin: 4px 0 4px 64px;
+    margin: 4px 0 4px 84px;
     font-size: 12px;
     display: flex;
     flex-wrap: wrap;

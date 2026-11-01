@@ -399,6 +399,7 @@ export const api = {
   lookForDownloads: () => invoke<ByHand[]>("look_for_downloads"),
   openPage: (url: string) => invoke<void>("open_page", { url }),
   check: (again = false) => invoke<Checked>("step_check", { again }),
+  readMasters: () => invoke<void>("read_masters"),
   /** Stop the run in progress at its next archive or mod. */
   cancelRun: () => invoke<void>("cancel_run"),
   install: () => invoke<Done>("step_install"),
@@ -413,6 +414,7 @@ export const api = {
   undo: () => invoke<Edited>("undo"),
   redo: () => invoke<Edited>("redo"),
   changes: () => invoke<Changes>("changes"),
+  setPluginActive: (plugin: string, active: boolean) => invoke<Edited>("set_plugin_active", { plugin, active }),
   movePlugin: (plugin: string, before: string | null) =>
     invoke<Edited>("move_plugin", { plugin, before }),
   moveMod: (id: string, section: string[], beforeMod: string | null) =>
