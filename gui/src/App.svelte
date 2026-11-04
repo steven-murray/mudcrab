@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { open, save } from "@tauri-apps/plugin-dialog";
+  import { dirname, join } from "@tauri-apps/api/path";
   import { api, type ListView, type Locations } from "./lib/api";
   import Places from "./lib/Places.svelte";
   import ToolSettings from "./lib/ToolSettings.svelte";
@@ -121,8 +122,9 @@
     const name = cloneName.trim();
     if (!name || !list) return;
     const file = name.replace(/[^A-Za-z0-9 _-]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "modlist";
+    // Beside the list it copies.
     const path = await save({
-      defaultPath: `${file}.toml`,
+      defaultPath: await join(await dirname(list.path), `${file}.toml`),
       filters: [{ name: "Modlist", extensions: ["toml"] }],
     });
     if (!path) return;
