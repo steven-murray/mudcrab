@@ -408,6 +408,8 @@ export const api = {
   tourShown: (part: string) => invoke<void>("tour_shown", { part }),
   openList: (path: string) => invoke<ListView>("open_list", { path }),
   newList: (path: string, name: string) => invoke<string>("new_list", { path, name }),
+  /** Copy the open list to a new file; resolves to its path. */
+  cloneList: (path: string, name: string) => invoke<string>("clone_list", { path, name }),
   locations: () => invoke<Locations>("locations"),
   setLocation: (kind: string, path: string | null) =>
     invoke<Locations>("set_location", { kind, path }),
