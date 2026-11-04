@@ -221,6 +221,8 @@ history there, rather than be undone by it.
 - **Check**: `mudcrab check`, on demand, its findings under the same
   headings; a finding about a mod opens that mod.
 - **Questions**: the list's inputs, each with the mods whose `if` asks it.
+  A *multi* question (any of its answers) is ticked in Install's Profile
+  panel, one box per answer.
   Change one's wording, answers or default (`input set`), add one (`input
   add`), or remove one no mod asks any more (`input remove`).
 - **Changes**: every change made in this session, as the commands that make

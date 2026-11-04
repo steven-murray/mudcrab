@@ -1354,15 +1354,16 @@ pub struct InputAddArgs {
     /// The question's name, as conditions use it.
     pub name: String,
     /// What kind of answer it takes.
-    #[arg(long = "type", value_name = "TYPE", value_parser = ["bool", "choice", "text"])]
+    #[arg(long = "type", value_name = "TYPE", value_parser = ["bool", "choice", "text", "multi"])]
     pub input_type: String,
     /// The question as the player sees it.
     #[arg(long)]
     pub query: String,
-    /// One of the answers to a `choice`; repeat for each.
+    /// One of the answers to a `choice` or `multi`; repeat for each.
     #[arg(long = "choice", value_name = "CHOICE")]
     pub choices: Vec<String>,
-    /// The answer when nobody is asked (`query --headless`).
+    /// The answer when nobody is asked (`query --headless`); for a `multi`,
+    /// its choices with commas between them.
     #[arg(long)]
     pub default: Option<String>,
     /// Print the change as a diff, and write nothing.

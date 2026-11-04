@@ -14,7 +14,69 @@ pub fn input(spec: &InputSpec) -> anyhow::Result<InputValue> {
             prompt_choice(&spec.query, &spec.choices, text_default(spec)).map(InputValue::Text)
         }
         InputType::Text => prompt_text(&spec.query, text_default(spec)).map(InputValue::Text),
+        InputType::Multi => {
+            let default: Vec<String> = match &spec.default {
+                Some(InputValue::List(picked)) => picked.clone(),
+                _ => Vec::new(),
+            };
+            let picked = prompt_multi(&spec.query, &spec.choices, &default)?;
+            crate::config::query::multi_answer(spec, picked.iter().map(String::as_str))
+        }
     }
+}
+
+fn prompt_multi(
+    query: &str,
+    choices: &[String],
+    default: &[String],
+) -> anyhow::Result<Vec<String>> {
+    println!("{}", crate::ui::question(query));
+    for (idx, choice) in choices.iter().enumerate() {
+        println!(
+            "{}",
+            crate::ui::option(idx + 1, choice, default.contains(choice))
+        );
+    }
+    loop {
+        print!(
+            "  {} ",
+            crate::ui::dim(
+                "Numbers to install, with spaces or commas (Enter for the defaults, 0 for none):"
+            )
+        );
+        io::stdout().flush()?;
+        let mut buf = String::new();
+        io::stdin().read_line(&mut buf)?;
+        if let Some(picked) = pick_many(buf.trim(), choices, default) {
+            return Ok(picked);
+        }
+        crate::ui::status(
+            crate::ui::Tone::Warning,
+            format!(
+                "Please enter numbers from 1 to {}, or 0 for none.",
+                choices.len()
+            ),
+        );
+    }
+}
+
+/// An answer to a multi prompt: numbers, `0` for none, nothing for the
+/// defaults.
+fn pick_many(answer: &str, choices: &[String], default: &[String]) -> Option<Vec<String>> {
+    if answer.is_empty() {
+        return Some(default.to_vec());
+    }
+    if answer == "0" {
+        return Some(Vec::new());
+    }
+    answer
+        .split(|c: char| c == ',' || c.is_whitespace())
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let idx = part.parse::<usize>().ok()?;
+            choices.get(idx.checked_sub(1)?).cloned()
+        })
+        .collect()
 }
 
 fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
@@ -131,5 +193,18 @@ mod tests {
         assert_eq!(pick_choice("", &choices, None), None);
         assert_eq!(pick_choice("0", &choices, None), None);
         assert_eq!(pick_choice("3", &choices, None), None);
+    }
+
+    #[test]
+    fn a_multi_answer_is_numbers_none_or_the_defaults() {
+        let choices = vec!["a".to_string(), "b".to_string(), "c".to_string()];
+        let default = vec!["b".to_string()];
+        assert_eq!(pick_many("", &choices, &default), Some(default.clone()));
+        assert_eq!(pick_many("0", &choices, &default), Some(vec![]));
+        assert_eq!(
+            pick_many("3, 1", &choices, &default),
+            Some(vec!["c".to_string(), "a".to_string()])
+        );
+        assert_eq!(pick_many("4", &choices, &default), None);
     }
 }

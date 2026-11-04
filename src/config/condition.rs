@@ -6,6 +6,8 @@
 //!
 //! - `flag` -- a bool input is true, or a text input is non-empty;
 //! - `key == value`, `key != value` -- an input's answer, value optionally quoted;
+//! - `value in key` -- a `multi` input's answer includes `value` (quoted when
+//!   it is more than one word);
 //! - `mod:id` -- the mod `id` is in the resolved list (`mod:"Some Name"` when
 //!   the id has spaces or operators in it).
 //!
@@ -36,6 +38,8 @@ pub enum InputTest {
     Truthy,
     Equals(String),
     NotEquals(String),
+    /// A `multi` input's answer includes this choice: `"x" in key`.
+    Has(String),
 }
 
 impl Condition {
@@ -49,6 +53,17 @@ impl Condition {
         self.walk(&mut |c| {
             if let Condition::Input { key, .. } = c {
                 out.push(key.as_str());
+            }
+        });
+        out
+    }
+
+    /// Every input this condition reads, with what it asks of it.
+    pub fn input_tests(&self) -> Vec<(&str, &InputTest)> {
+        let mut out = Vec::new();
+        self.walk(&mut |c| {
+            if let Condition::Input { key, test } = c {
+                out.push((key.as_str(), test));
             }
         });
         out
@@ -109,8 +124,12 @@ impl Condition {
                     InputTest::Truthy => match answer {
                         Some(InputValue::Bool(v)) => *v,
                         Some(InputValue::Text(v)) => !v.trim().is_empty(),
+                        Some(InputValue::List(v)) => !v.is_empty(),
                         None => false,
                     },
+                    InputTest::Has(want) => {
+                        matches!(answer, Some(InputValue::List(v)) if v.contains(want))
+                    }
                     InputTest::Equals(want) => answer.is_some_and(|a| answer_text(a) == *want),
                     InputTest::NotEquals(want) => answer.is_some_and(|a| answer_text(a) != *want),
                 }
@@ -228,6 +247,7 @@ fn term_text(term: &Condition) -> String {
             InputTest::Truthy => key.clone(),
             InputTest::Equals(want) => format!("{key} == {}", value(want)),
             InputTest::NotEquals(want) => format!("{key} != {}", value(want)),
+            InputTest::Has(want) => format!("{} in {key}", quoted(want)),
         },
         _ => unreachable!("only terms are left once multiplied out"),
     }
@@ -251,6 +271,20 @@ fn answer_text(answer: &InputValue) -> String {
     match answer {
         InputValue::Bool(v) => v.to_string(),
         InputValue::Text(v) => v.clone(),
+        InputValue::List(v) => v.join(","),
+    }
+}
+
+/// A choice in an `in` term: quoted unless it is one plain word.
+fn quoted(value: &str) -> String {
+    if !value.is_empty()
+        && value
+            .chars()
+            .all(|c| c.is_alphanumeric() || "_-.".contains(c))
+    {
+        value.to_string()
+    } else {
+        format!("\"{value}\"")
     }
 }
 
@@ -312,6 +346,15 @@ fn parse_term(term: &str) -> anyhow::Result<Condition> {
         anyhow::ensure!(!id.is_empty(), "`mod:` needs a mod id");
         return Ok(Condition::Mod(id));
     }
+    // `"choice" in key`, the word `in` outside quotes.
+    let parts = split_outside_quotes(term, " in ");
+    if parts.len() == 2 {
+        return Ok(Condition::Input {
+            key: input_key(parts[1])?,
+            test: InputTest::Has(unquote(parts[0].trim())?),
+        });
+    }
+    anyhow::ensure!(parts.len() < 3, "`{term}` uses `in` twice");
     for (op, make) in [
         ("==", InputTest::Equals as fn(String) -> InputTest),
         ("!=", InputTest::NotEquals),

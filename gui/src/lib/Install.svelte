@@ -55,7 +55,16 @@
       }
     });
   });
-  const unanswered = $derived(list.document.inputs.filter((i) => answers[i.id] === ""));
+  // A multi question is answered by ticking none, too.
+  const unanswered = $derived(list.document.inputs.filter((i) => i.type !== "multi" && answers[i.id] === ""));
+  // A multi answer, as `--set` takes it: the choices ticked, with commas.
+  const pickedFor = (id: string) => answers[id].split(",").filter(Boolean);
+  function tick(id: string, choices: string[], choice: string, on: boolean) {
+    const now = new Set(pickedFor(id));
+    if (on) now.add(choice);
+    else now.delete(choice);
+    answers[id] = choices.filter((c) => now.has(c)).join(",");
+  }
 
   // --- The run ----------------------------------------------------------------
   type State = "idle" | "running" | "waiting" | "done" | "failed";
@@ -313,6 +322,20 @@
               <label><input type="radio" name={input.id} {value} bind:group={answers[input.id]} disabled={running} /> {value === "true" ? "Yes" : "No"}</label>
             {/each}
           </div>
+        {:else if input.type === "multi"}
+          <div class="choices multi">
+            {#each input.choices ?? [] as choice}
+              <label
+                ><input
+                  type="checkbox"
+                  checked={pickedFor(input.id).includes(choice)}
+                  onchange={(e) => tick(input.id, input.choices ?? [], choice, e.currentTarget.checked)}
+                  disabled={running}
+                />
+                {choice}</label
+              >
+            {/each}
+          </div>
         {:else if input.type === "choice"}
           <select bind:value={answers[input.id]} disabled={running}>
             {#if answers[input.id] === ""}<option value="">Choose…</option>{/if}
@@ -491,6 +514,10 @@
   .choices {
     display: flex;
     gap: 16px;
+  }
+  .choices.multi {
+    flex-direction: column;
+    gap: 3px;
   }
   .question select,
   .question input[type="text"] {

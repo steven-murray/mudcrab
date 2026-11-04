@@ -18,6 +18,7 @@ pub async fn run(args: QueryArgs) -> anyhow::Result<()> {
         .map(|(key, value)| match value {
             config::schema::InputValue::Bool(b) => format!("{key}={b}"),
             config::schema::InputValue::Text(t) => format!("{key}={t}"),
+            config::schema::InputValue::List(l) => format!("{key}={}", l.join(",")),
         })
         .collect();
     answers.sort();

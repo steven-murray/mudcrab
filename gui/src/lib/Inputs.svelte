@@ -42,6 +42,10 @@
   // there is a default is kept apart from its text, which may be empty.
   let draft = $state({ query: "", choices: "", hasDefault: false, fallback: "" });
   const lines = (text: string) => text.split("\n").map((c) => c.trim()).filter(Boolean);
+  const listed = (kind: string) => kind === "choice" || kind === "multi";
+  // A default as the form edits it: a multi's choices with commas between.
+  const shownDefault = (value: unknown) => (Array.isArray(value) ? value.join(", ") : String(value));
+  const picked = (text: string) => text.split(",").map((c) => c.trim()).filter(Boolean);
 
   function start(input: InputDoc) {
     editing = input.id;
@@ -49,7 +53,7 @@
       query: input.query,
       choices: (input.choices ?? []).join("\n"),
       hasDefault: input.default !== undefined,
-      fallback: input.default === undefined ? (input.type === "bool" ? "false" : "") : String(input.default),
+      fallback: input.default === undefined ? (input.type === "bool" ? "false" : "") : shownDefault(input.default),
     };
   }
 
@@ -57,7 +61,7 @@
     const sets: string[] = [];
     const unsets: string[] = [];
     if (draft.query !== input.query) sets.push(`query=${tomlString(draft.query)}`);
-    if (input.type === "choice") {
+    if (listed(input.type)) {
       const choices = lines(draft.choices);
       if (JSON.stringify(choices) !== JSON.stringify(input.choices ?? []))
         sets.push(`choices=[${choices.map(tomlString).join(", ")}]`);
@@ -65,8 +69,9 @@
     const had = input.default !== undefined;
     if (!draft.hasDefault) {
       if (had) unsets.push("default");
-    } else if (!had || draft.fallback !== String(input.default)) {
+    } else if (!had || draft.fallback !== shownDefault(input.default)) {
       if (input.type === "bool") sets.push(`default=${draft.fallback === "true"}`);
+      else if (input.type === "multi") sets.push(`default=[${picked(draft.fallback).map(tomlString).join(", ")}]`);
       else sets.push(`default=${tomlString(draft.fallback)}`);
     }
     if (!sets.length && !unsets.length) {
@@ -88,7 +93,7 @@
         fresh.name.trim(),
         fresh.kind,
         fresh.query,
-        fresh.kind === "choice" ? choices : [],
+        listed(fresh.kind) ? choices : [],
         fresh.hasDefault ? (fresh.kind === "bool" ? (fresh.fallback === "true" ? "true" : "false") : fresh.fallback) : null,
       ),
     );
@@ -127,7 +132,7 @@
         }}
       >
         <label>Question <input type="text" bind:value={draft.query} /></label>
-        {#if input.type === "choice"}
+        {#if listed(input.type)}
           <label>Answers <textarea rows="3" bind:value={draft.choices} placeholder="one per line"></textarea></label>
         {/if}
         <label
@@ -137,7 +142,12 @@
             {#if input.type === "bool"}
               <select bind:value={draft.fallback} disabled={!draft.hasDefault}><option>true</option><option>false</option></select>
             {:else}
-              <input type="text" bind:value={draft.fallback} disabled={!draft.hasDefault} placeholder={draft.hasDefault ? "(empty)" : "none"} />
+              <input
+                type="text"
+                bind:value={draft.fallback}
+                disabled={!draft.hasDefault}
+                placeholder={!draft.hasDefault ? "none" : input.type === "multi" ? "none picked; or answers, with commas" : "(empty)"}
+              />
             {/if}
           </span>
         </label>
@@ -151,7 +161,11 @@
       <div class="dim small">
         {#if input.choices?.length}answers: {input.choices.map((c) => `“${c}”`).join(" ")} · {/if}default: {input.default === undefined
           ? "none"
-          : `“${input.default}”`}
+          : Array.isArray(input.default)
+            ? input.default.length
+              ? input.default.map((c) => `“${c}”`).join(" ")
+              : "none picked"
+            : `“${input.default}”`}
       </div>
     {/if}
     {#if mods.length}
@@ -172,10 +186,14 @@
     <label>Name <input type="text" bind:value={fresh.name} placeholder="as conditions use it, e.g. big_textures" /></label>
     <label
       >Kind
-      <select bind:value={fresh.kind}><option>bool</option><option>choice</option><option>text</option></select>
+      <select bind:value={fresh.kind}
+        ><option value="bool">bool (yes or no)</option><option value="choice">choice (one of its answers)</option><option value="multi"
+          >multi (any of its answers)</option
+        ><option value="text">text</option></select
+      >
     </label>
     <label>Question <input type="text" bind:value={fresh.query} /></label>
-    {#if fresh.kind === "choice"}
+    {#if listed(fresh.kind)}
       <label>Answers <textarea rows="3" bind:value={fresh.choices} placeholder="one per line"></textarea></label>
     {/if}
     <label

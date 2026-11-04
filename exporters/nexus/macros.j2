@@ -11,7 +11,7 @@
 {% endmacro %}
 
 {#- A yes/no or a choice, as a reader would write it. -#}
-{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% else %}{{ value }}{% endif %}{% endmacro %}
+{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% elif value is sequence and value is not string %}{{ value | join(", ") if value else "none" }}{% else %}{{ value }}{% endif %}{% endmacro %}
 
 {#- ¹²³ for telling a mod's archives apart. -#}
 {% macro superscript(n) %}{{ n | string | replace("0","⁰") | replace("1","¹") | replace("2","²") | replace("3","³") | replace("4","⁴") | replace("5","⁵") | replace("6","⁶") | replace("7","⁷") | replace("8","⁸") | replace("9","⁹") }}{% endmacro %}

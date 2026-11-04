@@ -34,6 +34,12 @@ pub fn condition(cond: &Condition, inputs: &IndexMap<String, InputSpec>) -> Stri
             } => {
                 format!("you choose “{value}” for “{}”", query(key, inputs))
             }
+            Condition::Input {
+                key,
+                test: InputTest::Has(value),
+            } => {
+                format!("you do not pick “{value}” for “{}”", query(key, inputs))
+            }
             Condition::Mod(id) => format!("{id} is not installed"),
             other => format!("not ({})", condition(other, inputs)),
         },
@@ -45,6 +51,7 @@ pub fn condition(cond: &Condition, inputs: &IndexMap<String, InputSpec>) -> Stri
             InputTest::NotEquals(value) => {
                 format!("you do not choose “{value}” for “{}”", query(key, inputs))
             }
+            InputTest::Has(value) => format!("you pick “{value}” for “{}”", query(key, inputs)),
         },
         Condition::Mod(id) => format!("{id} is installed"),
     }
