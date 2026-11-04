@@ -30,11 +30,11 @@ fn prompt_multi(
     choices: &[String],
     default: &[String],
 ) -> anyhow::Result<Vec<String>> {
-    println!("{}", crate::ui::question(query));
+    println!("{}", crate::ui::question(printable(query)));
     for (idx, choice) in choices.iter().enumerate() {
         println!(
             "{}",
-            crate::ui::option(idx + 1, choice, default.contains(choice))
+            crate::ui::option(idx + 1, printable(choice), default.contains(choice))
         );
     }
     loop {
@@ -79,10 +79,22 @@ fn pick_many(answer: &str, choices: &[String], default: &[String]) -> Option<Vec
         .collect()
 }
 
+/// A list's text as the terminal shows it: control characters (an escape
+/// sequence a list could use to rewrite the prompt) shown as `?`.
+fn printable(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { '?' } else { c })
+        .collect()
+}
+
 fn prompt_bool(query: &str, default: bool) -> anyhow::Result<bool> {
     let hint = if default { "[Y/n]" } else { "[y/N]" };
     loop {
-        print!("{} {}: ", crate::ui::question(query), crate::ui::dim(hint));
+        print!(
+            "{} {}: ",
+            crate::ui::question(printable(query)),
+            crate::ui::dim(hint)
+        );
         io::stdout().flush()?;
 
         let mut buf = String::new();
@@ -116,11 +128,11 @@ fn prompt_choice(query: &str, choices: &[String], default: Option<&str>) -> anyh
         anyhow::bail!("choice input is missing available choices");
     }
 
-    println!("{}", crate::ui::question(query));
+    println!("{}", crate::ui::question(printable(query)));
     for (idx, choice) in choices.iter().enumerate() {
         println!(
             "{}",
-            crate::ui::option(idx + 1, choice, Some(choice.as_str()) == default)
+            crate::ui::option(idx + 1, printable(choice), Some(choice.as_str()) == default)
         );
     }
 
@@ -159,10 +171,10 @@ fn prompt_text(query: &str, default: Option<&str>) -> anyhow::Result<String> {
     match default {
         Some(default) => print!(
             "{} {}: ",
-            crate::ui::question(query),
-            crate::ui::dim(format!("[{default}]"))
+            crate::ui::question(printable(query)),
+            crate::ui::dim(format!("[{}]", printable(default)))
         ),
-        None => print!("{}: ", crate::ui::question(query)),
+        None => print!("{}: ", crate::ui::question(printable(query))),
     }
     io::stdout().flush()?;
 

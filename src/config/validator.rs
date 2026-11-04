@@ -59,15 +59,33 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         if spec.input_type == InputType::Choice && spec.choices.is_empty() {
             anyhow::bail!("input {id} is choice type and must include choices");
         }
+        // A choice is written in conditions, quoted where it must be; and
+        // each must be told apart.
+        if let Some(choice) = spec.choices.iter().find(|c| c.contains('"')) {
+            anyhow::bail!("input {id}: a choice cannot hold a double quote ({choice:?})");
+        }
+        if let Some((_, choice)) = spec
+            .choices
+            .iter()
+            .enumerate()
+            .find(|(at, c)| spec.choices[..*at].contains(c))
+        {
+            anyhow::bail!("input {id}: {choice:?} is one of its choices twice");
+        }
         if spec.input_type == InputType::Multi {
             anyhow::ensure!(
                 !spec.choices.is_empty(),
                 "input {id} is multi type and must include choices"
             );
-            // `--set id=a,b` splits on commas.
-            if let Some(choice) = spec.choices.iter().find(|c| c.contains(',')) {
+            // `--set id=a,b` splits on commas, and trims each.
+            if let Some(choice) = spec
+                .choices
+                .iter()
+                .find(|c| c.contains(',') || c.is_empty() || c.trim() != c.as_str())
+            {
                 anyhow::bail!(
-                    "input {id}: a multi input's choice cannot hold a comma ({choice:?})"
+                    "input {id}: a multi input's choice cannot hold a comma, be empty, or start or \
+                     end with spaces ({choice:?})"
                 );
             }
         }

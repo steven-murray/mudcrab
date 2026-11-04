@@ -19,6 +19,12 @@ pub fn condition(cond: &Condition, inputs: &IndexMap<String, InputSpec>) -> Stri
             Condition::Input {
                 key,
                 test: InputTest::Truthy,
+            } if is_multi(key, inputs) => {
+                format!("you pick nothing for “{}”", query(key, inputs))
+            }
+            Condition::Input {
+                key,
+                test: InputTest::Truthy,
             } => {
                 format!("you answer no to “{}”", query(key, inputs))
             }
@@ -44,6 +50,9 @@ pub fn condition(cond: &Condition, inputs: &IndexMap<String, InputSpec>) -> Stri
             other => format!("not ({})", condition(other, inputs)),
         },
         Condition::Input { key, test } => match test {
+            InputTest::Truthy if is_multi(key, inputs) => {
+                format!("you pick anything for “{}”", query(key, inputs))
+            }
             InputTest::Truthy => format!("you answer yes to “{}”", query(key, inputs)),
             InputTest::Equals(value) => {
                 format!("you choose “{value}” for “{}”", query(key, inputs))
@@ -63,6 +72,12 @@ fn join(terms: &[Condition], inputs: &IndexMap<String, InputSpec>, sep: &str) ->
         .map(|term| condition(term, inputs))
         .collect::<Vec<_>>()
         .join(sep)
+}
+
+fn is_multi(key: &str, inputs: &IndexMap<String, InputSpec>) -> bool {
+    inputs
+        .get(key)
+        .is_some_and(|spec| spec.input_type == crate::config::schema::InputType::Multi)
 }
 
 fn query<'a>(key: &'a str, inputs: &'a IndexMap<String, InputSpec>) -> &'a str {
