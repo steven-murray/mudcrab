@@ -72,6 +72,9 @@
       {#each pagesOf(entry) as page}
         <a class="page" href={page.url} title={page.title}>{page.label} ↗</a>
       {/each}
+      {#if entry.optional}<span class="cond" title={entry.optional.query}
+          >optional{entry.optional.group ? ` (${entry.optional.group})` : ""}</span
+        >{/if}
       {#if entry.condition}<span class="cond" title={entry.condition.expr}>{entry.condition.text}</span>{/if}
       {#if entry.mod_type}<span class="kind">{entry.mod_type}</span>{/if}
       {#if entry.enabled === false}

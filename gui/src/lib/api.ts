@@ -19,6 +19,9 @@ export interface InputDoc {
   id: string;
   /** A `multi` question takes any number of its choices; its default is a list. */
   type: "bool" | "choice" | "text" | "multi";
+  /** A group of optional mods' question, its choices the mods in the group:
+   *  true when the list words it itself, false when made for the group. */
+  optional_group?: boolean;
   query: string;
   choices?: string[];
   default?: InputValue;
@@ -56,6 +59,8 @@ export interface ModDoc {
   enabled?: boolean;
   pages: { mod_url: string }[];
   condition?: ConditionDoc;
+  /** The group of optional mods it is in: one question, a tick per mod. */
+  optional?: { input: string; group?: string; query: string; default: boolean };
   docs: Docs;
   archives: ArchiveDoc[];
   plugins: string[];

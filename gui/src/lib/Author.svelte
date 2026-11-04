@@ -519,6 +519,7 @@
               >
               <button class="pick" onclick={() => select(e.id)}>
                 <span class="title">{e.title}</span>
+                {#if e.optional}<span class="tag cond" title={e.optional.query}>optional</span>{/if}
                 {#if e.condition}<span class="tag cond" title={e.condition.text}>if</span>{/if}
                 {#if e.enabled === false}<span class="tag">off</span>{/if}
                 {#if e.mod_type}<span class="tag">{e.mod_type}</span>{/if}
@@ -582,7 +583,7 @@
           <ModFields
             mod={chosen}
             inputs={list.document.inputs}
-            mods={[...mods.values()].map((m) => ({ id: m.mod.id, title: m.mod.title }))}
+            mods={[...mods.values()].map((m) => ({ id: m.mod.id, title: m.mod.title, optional: m.mod.optional }))}
             {run}
           />
           {#if actions.length}
