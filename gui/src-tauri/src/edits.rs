@@ -527,6 +527,15 @@ pub(super) fn add_input(
                     .parse::<bool>()
                     .map_err(|_| "a yes-or-no default is true or false".to_string())?,
             )
+        } else if kind == "multi" {
+            // The choices picked, with commas between them.
+            toml_edit::Value::Array(
+                default
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|choice| !choice.is_empty())
+                    .collect(),
+            )
         } else {
             toml_edit::Value::from(default.as_str())
         };

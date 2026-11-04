@@ -185,6 +185,9 @@ pub enum InputType {
     Bool,
     Choice,
     Text,
+    /// Any number of its `choices`, answered as a list: `"x" in key` asks
+    /// whether `x` was picked.
+    Multi,
 }
 
 /// A per-mod action to execute during installation.
@@ -1169,6 +1172,9 @@ pub struct CompiledArchive {
 pub enum InputValue {
     Bool(bool),
     Text(String),
+    /// A `multi` input's answer: the choices picked, in the order of its
+    /// `choices`.
+    List(Vec<String>),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

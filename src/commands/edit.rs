@@ -528,10 +528,12 @@ fn input_list(args: InputListArgs) -> anyhow::Result<()> {
             InputType::Bool => "bool".to_string(),
             InputType::Choice => format!("choice [{}]", spec.choices.join(", ")),
             InputType::Text => "text".to_string(),
+            InputType::Multi => format!("multi [{}]", spec.choices.join(", ")),
         };
         let text = |value: &InputValue| match value {
             InputValue::Bool(b) => b.to_string(),
             InputValue::Text(t) => t.clone(),
+            InputValue::List(l) => format!("[{}]", l.join(", ")),
         };
         let default = match (&spec.fixed, &spec.default) {
             (Some(fixed), _) => format!("{} (set by the list)", text(fixed)),
@@ -566,6 +568,14 @@ fn input_add(args: InputAddArgs) -> anyhow::Result<()> {
                 .parse()
                 .map_err(|_| anyhow::anyhow!("--default {default}: a bool is true or false"))?;
             toml_edit::Value::from(flag)
+        } else if args.input_type == "multi" {
+            toml_edit::Value::Array(
+                default
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|choice| !choice.is_empty())
+                    .collect(),
+            )
         } else {
             toml_edit::Value::from(default.as_str())
         };

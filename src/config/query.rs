@@ -244,7 +244,31 @@ fn parse_answer(id: &str, spec: &InputSpec, raw: &str) -> anyhow::Result<InputVa
             }
         }
         InputType::Text => Ok(InputValue::Text(raw.to_string())),
+        InputType::Multi => multi_answer(spec, raw.split(',').map(str::trim))
+            .map_err(|err| anyhow::anyhow!("--set {id}={raw}: {err}")),
     }
+}
+
+/// A `multi` answer from the choices picked, each one of the input's own:
+/// kept in the order of its `choices`, each once.
+pub fn multi_answer<'a>(
+    spec: &InputSpec,
+    picked: impl IntoIterator<Item = &'a str>,
+) -> anyhow::Result<InputValue> {
+    let picked: Vec<&str> = picked.into_iter().filter(|p| !p.is_empty()).collect();
+    if let Some(stray) = picked
+        .iter()
+        .find(|p| !spec.choices.iter().any(|c| c == *p))
+    {
+        anyhow::bail!("{stray} is not one of {:?}", spec.choices);
+    }
+    Ok(InputValue::List(
+        spec.choices
+            .iter()
+            .filter(|choice| picked.contains(&choice.as_str()))
+            .cloned()
+            .collect(),
+    ))
 }
 
 /// The archives, FOMOD selections and BAIN subpackages that apply, with their

@@ -677,6 +677,17 @@ fn answer(
         (InputType::Choice, _) => {
             anyhow::bail!("set {key} = {value}: not one of {:?}", spec.choices)
         }
+        (InputType::Multi, toml::Value::Array(items)) => {
+            let picked = items
+                .iter()
+                .map(|item| {
+                    item.as_str()
+                        .ok_or_else(|| anyhow::anyhow!("set {key} = {value}: a list of choices"))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            crate::config::query::multi_answer(spec, picked)
+                .map_err(|err| anyhow::anyhow!("set {key} = {value}: {err}"))
+        }
         (input_type, _) => anyhow::bail!("set {key} = {value}: {key} is {input_type:?}"),
     }
 }
