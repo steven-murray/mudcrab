@@ -13,7 +13,8 @@ export interface Docs {
   footer?: Markdown;
 }
 
-export type InputValue = boolean | string;
+/** A multi question's answer or default is the list of choices picked. */
+export type InputValue = boolean | string | string[];
 
 export interface InputDoc {
   id: string;

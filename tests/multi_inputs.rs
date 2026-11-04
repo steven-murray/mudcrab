@@ -72,9 +72,35 @@ fn a_condition_must_fit_the_question() {
     }
     let list = LIST.replace("default = [\"Birds\"]", "default = [\"Cats\"]");
     assert!(selected(dir.path(), &list, &[]).is_err());
-    let list = LIST.replace("\"Rats\"]", "\"Rats, big\"]");
-    let err = selected(dir.path(), &list, &[]).unwrap_err();
-    assert!(format!("{err:#}").contains("comma"), "{err:#}");
+    for (choices, said) in [
+        ("\"Rats, big\"]", "comma"),
+        ("\" Rats\"]", "spaces"),
+        ("\"\"]", "empty"),
+        ("\"Birds\"]", "twice"),
+        ("\"Big \\\"Rats\\\"\"]", "double quote"),
+    ] {
+        let list = LIST.replace("\"Rats\"]", choices);
+        let err = selected(dir.path(), &list, &[]).unwrap_err();
+        assert!(format!("{err:#}").contains(said), "{choices}: {err:#}");
+    }
+}
+
+#[test]
+fn a_default_is_taken_once_each_in_the_order_of_the_choices() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("list.toml");
+    let list = LIST.replace(
+        "default = [\"Birds\"]",
+        "default = [\"Rats\", \"Birds\", \"Rats\"]",
+    );
+    std::fs::write(&path, list).unwrap();
+    let compiled = compile(&path, false).unwrap();
+    let plan = build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    assert!(
+        matches!(&plan.responses["extras"], mudcrab::config::schema::InputValue::List(l) if l == &["Birds", "Rats"]),
+        "{:?}",
+        plan.responses["extras"]
+    );
 }
 
 #[test]

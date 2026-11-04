@@ -237,7 +237,8 @@ paths = ["textures/menus/big.dds"]
 A `multi` input takes any number of its choices -- several optional mods
 asked about at once -- and its answer is a list. Its default is a list (empty
 for none picked), `--set name=a,b` answers it (commas between the choices, so
-a choice cannot hold one; `--set name=` for none), and a condition asks
+a choice cannot hold one, nor be empty or start or end with spaces; `--set
+name=` for none), and a condition asks
 whether a choice was picked with `in`:
 
 ```toml
@@ -262,7 +263,7 @@ no parentheses). Each term may be negated with `!` and is one of:
 
 | Term | True when |
 |---|---|
-| `flag` | the bool input is true, or the text input is non-empty |
+| `flag` | the bool input is true, the text input is non-empty, or the multi input has anything picked |
 | `key == value`, `key != value` | the input's answer is (not) `value`; quotes optional |
 | `value in key` | the `multi` input's answer includes `value`; quotes when it is more than one word |
 | `mod:id` | mod `id` is in the resolved list; `mod:"Some Mod"` when the id has spaces |
