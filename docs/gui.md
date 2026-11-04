@@ -225,7 +225,10 @@ history there, rather than be undone by it.
   headings; a finding about a mod opens that mod.
 - **Questions**: the list's inputs, each with the mods whose `if` asks it.
   A *multi* question (any of its answers) is ticked in Install's Profile
-  panel, one box per answer.
+  panel, one box per answer. **Asked only if** gives a question an `if` on
+  the questions above it: in the Profile panel it shows only when that
+  holds, and a default that follows an earlier answer (`default_when`)
+  changes with it until it is answered.
   Change one's wording, answers or default (`input set`), add one (`input
   add`), or remove one no mod asks any more (`input remove`).
 - **Changes**: every change made in this session, as the commands that make

@@ -282,6 +282,37 @@ id = "Better Water"
 if = '"Better Water" in extras'
 ```
 
+Questions are asked in the order they are declared, and one can depend on
+those before it. With an `if`, a question is asked only when its condition
+holds on the earlier answers; otherwise it is not asked and takes its default
+(no, none picked or empty when it has none -- a `choice` with an `if` must
+have one), whatever `--set` says. `default_when` gives defaults that follow
+earlier answers: the first whose `if` holds is the default, else `default`.
+
+```toml
+[inputs.enb]
+type = "bool"
+query = "Use an ENB?"
+default = true
+
+[inputs.potato]
+type = "bool"
+query = "A slow computer?"
+default = false
+
+[inputs.preset]
+type = "choice"
+query = "Which ENB preset?"
+choices = ["low", "high", "ultra"]
+if = "enb"                                          # asked only with an ENB
+default = "high"
+default_when = [{ if = "potato", value = "low" }]   # low for a slow computer
+```
+
+A question's `if` and `default_when` ask only about questions declared above
+it, never about mods (`validate` refuses either); in an included file they
+ask about that file's own questions, renamed with it.
+
 Since TOML puts every table after the top-level keys, an input declared with a
 `[inputs.*]` header lands below `plugins`. Dotted keys
 (`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top

@@ -116,6 +116,71 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         }
     }
 
+    // A question asked only on the answers before it: its `if` and its
+    // defaults ask about questions declared above it, never mods (whose
+    // own conditions ask the questions), and as each question can be asked.
+    let declared: Vec<&String> = modlist.inputs.keys().collect();
+    for (at, (id, spec)) in modlist.inputs.iter().enumerate() {
+        let cases = spec.condition.iter().map(|expr| (expr, "its `if`")).chain(
+            spec.default_when
+                .iter()
+                .map(|case| (&case.condition, "a default_when")),
+        );
+        for (expr, site) in cases {
+            let condition = Condition::parse(expr)
+                .map_err(|err| anyhow::anyhow!("input {id}: {site}: {err:#}"))?;
+            if let Some(other) = condition.mods().first() {
+                anyhow::bail!(
+                    "input {id}: {site} asks about mod '{other}'; a question asks only about the \
+                     questions before it"
+                );
+            }
+            for (key, test) in condition.input_tests() {
+                match declared.iter().position(|k| k.as_str() == key) {
+                    Some(before) if before < at => {
+                        check_test(key, &modlist.inputs[key], test)
+                            .map_err(|err| anyhow::anyhow!("input {id}: {site}: {err}"))?;
+                    }
+                    Some(_) => anyhow::bail!(
+                        "input {id}: {site} asks about '{key}', which is not declared before it; \
+                         questions are asked in the order they are declared"
+                    ),
+                    None if modlist.component => {}
+                    None => anyhow::bail!(
+                        "input {id}: {site} asks about input '{key}', which [inputs] does not declare"
+                    ),
+                }
+            }
+        }
+        for case in &spec.default_when {
+            let fits = matches!(
+                (&case.value, spec.input_type),
+                (InputValue::Bool(_), InputType::Bool)
+                    | (InputValue::Text(_), InputType::Text)
+                    | (InputValue::List(_), InputType::Multi)
+            ) || matches!((&case.value, spec.input_type), (InputValue::Text(v), InputType::Choice) if spec.choices.contains(v));
+            anyhow::ensure!(
+                fits,
+                "input {id}: a default_when's value {:?} does not fit the question",
+                case.value
+            );
+            if let InputValue::List(values) = &case.value
+                && let Some(value) = values.iter().find(|v| !spec.choices.contains(v))
+            {
+                anyhow::bail!(
+                    "input {id}: a default_when picks {value:?}, which is not one of its choices"
+                );
+            }
+        }
+        // Not asked, it takes its default; a choice has no answer of its own.
+        anyhow::ensure!(
+            spec.condition.is_none()
+                || spec.input_type != InputType::Choice
+                || spec.default.is_some(),
+            "input {id} is asked only when its `if` holds, so it needs a default for when it does not"
+        );
+    }
+
     // `key = value`, or `[ini.<Section>]` holding them.
     let scalar = |value: &toml::Value| {
         matches!(

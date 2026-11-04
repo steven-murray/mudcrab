@@ -20,6 +20,10 @@ export interface InputDoc {
   id: string;
   /** A `multi` question takes any number of its choices; its default is a list. */
   type: "bool" | "choice" | "text" | "multi";
+  /** Asked only when this holds on the answers before it. */
+  condition?: ConditionDoc;
+  /** Defaults following earlier answers: the first that holds is taken. */
+  default_when?: { condition: ConditionDoc; value: InputValue }[];
   /** A group of optional mods' question, its choices the mods in the group:
    *  true when the list words it itself, false when made for the group. */
   optional_group?: boolean;
@@ -430,6 +434,9 @@ export const api = {
   openPage: (url: string) => invoke<void>("open_page", { url }),
   check: (again = false) => invoke<Checked>("step_check", { again }),
   readMasters: () => invoke<void>("read_masters"),
+  /** Which questions these answers leave asked, and each one's default. */
+  questionStates: (answers: Record<string, string>) =>
+    invoke<{ id: string; asked: boolean; default?: InputValue }[]>("question_states", { answers }),
   /** Stop the run in progress at its next archive or mod. */
   cancelRun: () => invoke<void>("cancel_run"),
   install: () => invoke<Done>("step_install"),

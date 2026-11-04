@@ -3,6 +3,7 @@ use crate::config::schema::{
     BainSubpackage, CompiledArchive, CompiledModlist, FomodSelection, InputSpec, InputType,
     InputValue, PersonalizedMod, PersonalizedPlan,
 };
+use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 
 /// Answers given on the command line, as `key=value`, before any prompting.
@@ -184,10 +185,13 @@ pub fn build_plan(
     })
 }
 
-/// Every input's answer: from `--set` if given, else by asking, else (headless)
-/// the declared default.
+/// Every input's answer, in the order the list declares them: from `--set`
+/// if given, else by asking, else (headless) its default. A question whose
+/// `if` does not hold on the answers before it is not asked: it takes its
+/// default, whatever `--set` says (a front end sends every answer, even a
+/// hidden question's).
 fn resolve_responses(
-    inputs: &HashMap<String, InputSpec>,
+    inputs: &IndexMap<String, InputSpec>,
     overrides: &Overrides,
     mut ask: Option<Ask<'_>>,
 ) -> anyhow::Result<HashMap<String, InputValue>> {
@@ -197,12 +201,8 @@ fn resolve_responses(
         anyhow::bail!("--set {unknown}: no such input (the modlist declares {known:?})");
     }
 
-    let mut sorted_ids: Vec<&String> = inputs.keys().collect();
-    sorted_ids.sort();
-
     let mut out = HashMap::new();
-    for id in sorted_ids {
-        let spec = &inputs[id];
+    for (id, spec) in inputs {
         // Answered by the list that includes the file asking it.
         if let Some(fixed) = &spec.fixed {
             anyhow::ensure!(
@@ -212,23 +212,120 @@ fn resolve_responses(
             out.insert(id.clone(), fixed.clone());
             continue;
         }
-        let value = if let Some(raw) = overrides.get(id) {
+        let default = default_for(id, spec, &out)?;
+        let value = if !asked(id, spec, &out)? {
+            match default {
+                Some(value) => value,
+                None => unasked(id, spec)?,
+            }
+        } else if let Some(raw) = overrides.get(id) {
             parse_answer(id, spec, raw)?
         } else if let Some(ask) = ask.as_mut() {
-            ask(spec)?
-        } else if let (InputType::Multi, Some(InputValue::List(picked))) =
-            (spec.input_type, &spec.default)
-        {
-            // Once each, in the order of the choices.
-            multi_answer(spec, picked.iter().map(String::as_str))?
+            ask(&InputSpec {
+                default,
+                ..spec.clone()
+            })?
         } else {
-            spec.default.clone().ok_or_else(|| {
+            default.ok_or_else(|| {
                 anyhow::anyhow!(
                     "input {id} has no default, so a headless run must be given it with --set {id}=..."
                 )
             })?
         };
         out.insert(id.clone(), value);
+    }
+    Ok(out)
+}
+
+/// Whether `spec` is asked, on the answers before it.
+fn asked(id: &str, spec: &InputSpec, before: &HashMap<String, InputValue>) -> anyhow::Result<bool> {
+    match &spec.condition {
+        Some(expr) => Condition::parse(expr)?
+            .eval_inputs(before)
+            .map_err(|err| anyhow::anyhow!("input {id}: its `if`: {err:#}")),
+        None => Ok(true),
+    }
+}
+
+/// `spec`'s default, on the answers before it: the first `default_when`
+/// that holds, else `default`; a multi's once each, in its choices' order.
+fn default_for(
+    id: &str,
+    spec: &InputSpec,
+    before: &HashMap<String, InputValue>,
+) -> anyhow::Result<Option<InputValue>> {
+    let mut default = spec.default.clone();
+    for case in &spec.default_when {
+        if Condition::parse(&case.condition)?
+            .eval_inputs(before)
+            .map_err(|err| anyhow::anyhow!("input {id}: a default_when: {err:#}"))?
+        {
+            default = Some(case.value.clone());
+            break;
+        }
+    }
+    Ok(match default {
+        Some(InputValue::List(picked)) if spec.input_type == InputType::Multi => {
+            Some(multi_answer(spec, picked.iter().map(String::as_str))?)
+        }
+        other => other,
+    })
+}
+
+/// The answer to a question not asked and with no default: no for a bool,
+/// none picked, nothing written. A choice must say which.
+fn unasked(id: &str, spec: &InputSpec) -> anyhow::Result<InputValue> {
+    Ok(match spec.input_type {
+        InputType::Bool => InputValue::Bool(false),
+        InputType::Multi => InputValue::List(Vec::new()),
+        InputType::Text => InputValue::Text(String::new()),
+        InputType::Choice => anyhow::bail!(
+            "input {id} is not asked (its `if` does not hold) and has no default to take"
+        ),
+    })
+}
+
+/// A question as the answers so far leave it: whether it is asked, and its
+/// default -- for a front end showing the questions as they are answered.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct QuestionState {
+    pub id: String,
+    pub asked: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<InputValue>,
+}
+
+/// Each question, in order, as `answers` (as `--set` gives them) leave it.
+/// An answer that does not fit its question is taken as not given.
+pub fn question_states(
+    inputs: &IndexMap<String, InputSpec>,
+    answers: &Overrides,
+) -> anyhow::Result<Vec<QuestionState>> {
+    let mut before = HashMap::new();
+    let mut out = Vec::new();
+    for (id, spec) in inputs {
+        if let Some(fixed) = &spec.fixed {
+            before.insert(id.clone(), fixed.clone());
+            continue;
+        }
+        let asked = asked(id, spec, &before)?;
+        let default = default_for(id, spec, &before)?;
+        let value = if asked {
+            answers
+                .get(id)
+                .and_then(|raw| parse_answer(id, spec, raw).ok())
+                .or_else(|| default.clone())
+        } else {
+            default.clone().or_else(|| unasked(id, spec).ok())
+        };
+        if let Some(value) = value {
+            before.insert(id.clone(), value);
+        }
+        out.push(QuestionState {
+            id: id.clone(),
+            asked,
+            default,
+        });
     }
     Ok(out)
 }
@@ -406,8 +503,8 @@ fn resolve_included<'a>(
 mod tests {
     use super::*;
 
-    fn bool_input(default: Option<bool>) -> HashMap<String, InputSpec> {
-        HashMap::from([(
+    fn bool_input(default: Option<bool>) -> IndexMap<String, InputSpec> {
+        IndexMap::from([(
             "flag".to_string(),
             InputSpec {
                 input_type: InputType::Bool,
@@ -415,6 +512,8 @@ mod tests {
                 choices: Vec::new(),
                 default: default.map(InputValue::Bool),
                 fixed: None,
+                condition: None,
+                default_when: Vec::new(),
             },
         )])
     }

@@ -930,6 +930,19 @@ fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
         .collect()
 }
 
+/// Which of the list's questions are asked, and each one's default, as
+/// these answers leave them: a question whose `if` does not hold is hidden,
+/// and a default may follow an earlier answer.
+#[tauri::command]
+fn question_states(
+    state: tauri::State<'_, State>,
+    answers: std::collections::HashMap<String, String>,
+) -> Result<Vec<config::query::QuestionState>, String> {
+    let list = state.list()?;
+    let modlist = config::loader::load_modlist(&list).map_err(shown)?;
+    config::query::question_states(&modlist.inputs, &answers).map_err(shown)
+}
+
 /// Everything that can be known before installing (`check`).
 #[tauri::command]
 async fn step_check(
@@ -1231,6 +1244,7 @@ pub fn app<R: Runtime>(
             look_for_downloads,
             open_page,
             step_check,
+            question_states,
             read_masters,
             step_install,
             cancel_run,

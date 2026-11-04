@@ -77,6 +77,18 @@ pub struct InputDoc {
     /// when it was made for the group.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional_group: Option<bool>,
+    /// Asked only when this holds on the answers before it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<ConditionDoc>,
+    /// Defaults that depend on earlier answers, the first that holds taken.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub default_when: Vec<DefaultWhenDoc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DefaultWhenDoc {
+    pub condition: ConditionDoc,
+    pub value: InputValue,
 }
 
 #[derive(Debug, Serialize)]
@@ -418,6 +430,20 @@ pub fn build_document(
                 default: spec.default.clone(),
                 answer: plan.and_then(|plan| plan.responses.get(id).cloned()),
                 optional_group: modlist.optional_groups.get(id).copied(),
+                condition: spec
+                    .condition
+                    .as_deref()
+                    .and_then(|expr| condition_doc(expr, modlist).ok()),
+                default_when: spec
+                    .default_when
+                    .iter()
+                    .filter_map(|case| {
+                        Some(DefaultWhenDoc {
+                            condition: condition_doc(&case.condition, modlist).ok()?,
+                            value: case.value.clone(),
+                        })
+                    })
+                    .collect(),
             })
             .collect(),
         plan: plan.map(|plan| PlanDoc {

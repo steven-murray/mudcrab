@@ -18,7 +18,7 @@
 [size=4][b]Choices[/b][/size]
 [list]
 {% for input in doc.inputs %}
-[*]{{ input.query }}{{ " [i](" ~ m.answer(input.answer) ~ ")[/i]" if input.answer is defined else " [i](default: " ~ m.answer(input.default) ~ ")[/i]" if input.default is defined }}
+[*]{{ input.query }}{{ " [i](" ~ m.answer(input.answer) ~ ")[/i]" if input.answer is defined else " [i](default: " ~ m.answer(input.default) ~ ")[/i]" if input.default is defined }}{{ " [i](asked only if " ~ input.condition.text ~ ")[/i]" if input.condition and input.answer is not defined }}
 {% endfor %}
 [/list]
 

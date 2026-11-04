@@ -182,6 +182,23 @@ pub struct InputSpec {
     /// the include. Nobody is asked, and `--set` cannot change it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<InputValue>,
+    /// Asked only when this holds, on the answers to the questions before
+    /// it; otherwise it takes its default, unasked.
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    /// Defaults that depend on earlier answers: the first whose `if` holds
+    /// is the default, else `default`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_when: Vec<DefaultWhen>,
+}
+
+/// A default that applies when its condition does: `{ if = "...", value = ... }`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DefaultWhen {
+    #[serde(rename = "if")]
+    pub condition: String,
+    pub value: InputValue,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -1100,7 +1117,9 @@ pub struct CompiledModlist {
     pub input_count: usize,
     pub mod_count: usize,
     pub plugin_count: usize,
-    pub inputs: HashMap<String, InputSpec>,
+    /// In declaration order: the order they are asked in, each able to
+    /// depend on those before it.
+    pub inputs: IndexMap<String, InputSpec>,
     /// Install-wide actions, currently only those desugared from the top-level
     /// `[ini]` table. Same type as per-mod actions so there is one dispatcher.
     #[serde(default)]
