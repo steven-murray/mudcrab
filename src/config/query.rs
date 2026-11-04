@@ -216,6 +216,11 @@ fn resolve_responses(
             parse_answer(id, spec, raw)?
         } else if let Some(ask) = ask.as_mut() {
             ask(spec)?
+        } else if let (InputType::Multi, Some(InputValue::List(picked))) =
+            (spec.input_type, &spec.default)
+        {
+            // Once each, in the order of the choices.
+            multi_answer(spec, picked.iter().map(String::as_str))?
         } else {
             spec.default.clone().ok_or_else(|| {
                 anyhow::anyhow!(
