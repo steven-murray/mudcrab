@@ -357,6 +357,27 @@ fn a_list_installs_from_the_commands_the_page_calls() {
     // The answers are remembered for next time.
     let again = call(&webview, "open_list", json!({ "path": list })).unwrap();
     assert_eq!(again["answers"]["extra"], "true");
+    // A clone is a list of its own, named anew, with this one's settings.
+    let copy = root.join("copies/copy.toml");
+    let made = call(
+        &webview,
+        "clone_list",
+        json!({ "path": copy, "name": "The copy" }),
+    )
+    .unwrap();
+    let cloned = call(&webview, "open_list", json!({ "path": made })).unwrap();
+    assert_eq!(cloned["document"]["name"], "The copy");
+    assert_eq!(cloned["answers"]["extra"], "true", "{cloned}");
+    let locations = call(&webview, "locations", json!({})).unwrap();
+    assert_eq!(locations["instance"]["from"], "chosen", "{locations}");
+    assert!(
+        call(
+            &webview,
+            "clone_list",
+            json!({ "path": list, "name": "Again" })
+        )
+        .is_err()
+    );
     // Opening a page is only ever a web page.
     assert!(
         call(

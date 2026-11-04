@@ -113,6 +113,29 @@
     }
   }
 
+  // A copy of the open list, to a new file, opened in its place.
+  let cloning = $state(false);
+  let cloneName = $state("");
+  async function cloneTo(event: SubmitEvent) {
+    event.preventDefault();
+    const name = cloneName.trim();
+    if (!name || !list) return;
+    const file = name.replace(/[^A-Za-z0-9 _-]+/g, "").trim().replace(/\s+/g, "-").toLowerCase() || "modlist";
+    const path = await save({
+      defaultPath: `${file}.toml`,
+      filters: [{ name: "Modlist", extensions: ["toml"] }],
+    });
+    if (!path) return;
+    error = null;
+    try {
+      const made = await api.cloneList(path.endsWith(".toml") ? path : `${path}.toml`, name);
+      cloning = false;
+      await openPath(made);
+    } catch (err) {
+      error = String(err);
+    }
+  }
+
   async function choose() {
     const path = await open({
       multiple: false,
@@ -163,6 +186,16 @@
           /></svg
         >Settings</button
       >
+    {#if list}
+      <button
+        onclick={() => {
+          cloneName = `${list!.document.name} (copy)`;
+          cloning = true;
+        }}
+        disabled={opening || installing}
+        title="Copy this list to a new file, with its docs, and open the copy">Clone…</button
+      >
+    {/if}
     <button onclick={choose} disabled={opening}>{list ? "Open another list…" : "Open a list…"}</button>
     {#if list}
       <div class="modes" role="group" aria-label="Mode" data-tour="modes">
@@ -230,6 +263,32 @@
           <p class="dim small">mudcrab's own, for every list. A list's MO2 instance and folders are set once it is open.</p>
           <ToolSettings changed={() => {}} />
         </div>
+      </div>
+    </div>
+  {/if}
+
+  {#if list && cloning}
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="veil" onclick={() => (cloning = false)}>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="dialog" role="dialog" tabindex="-1" aria-label="Clone this list" onclick={(e) => e.stopPropagation()}>
+        <div class="dhead">
+          <strong>Clone {list.document.name}</strong>
+          <button class="link" onclick={() => (cloning = false)}>Cancel</button>
+        </div>
+        <form class="dbody create" onsubmit={cloneTo}>
+          <label for="clone-name">The copy's name, as players will see it</label>
+          <div>
+            <!-- svelte-ignore a11y_autofocus -->
+            <input id="clone-name" type="text" bind:value={cloneName} autofocus />
+            <button type="submit" class="primary" disabled={!cloneName.trim()}>Choose where to save it…</button>
+          </div>
+          <p class="dim small">
+            A new file with every mod, question and note of this one, and its docs file copied beside it. Files it
+            includes are shared, not copied. The copy opens here, with this list's MO2 instance and answers.
+          </p>
+          {#if error}<p class="error small">{error}</p>{/if}
+        </form>
       </div>
     </div>
   {/if}
