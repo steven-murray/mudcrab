@@ -133,3 +133,18 @@ fn the_guide_says_which_group() {
         "{text}"
     );
 }
+
+#[test]
+fn a_group_is_asked_as_its_name_in_lower_case() {
+    use mudcrab::config::schema::OptionalMod;
+    assert_eq!(
+        OptionalMod::input_name(Some("Better textures")),
+        "better_textures"
+    );
+    assert_eq!(
+        OptionalMod::input_name(Some("Ébène Ölmalerei")),
+        "ébène_ölmalerei"
+    );
+    assert_eq!(OptionalMod::input_name(None), "optional");
+    assert_eq!(OptionalMod::input_name(Some(" -- ")), "optional");
+}
