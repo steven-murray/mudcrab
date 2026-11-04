@@ -690,11 +690,11 @@ impl OptionalMod {
         let name: String = group
             .trim()
             .chars()
-            .map(|c| {
+            .flat_map(|c| {
                 if c.is_alphanumeric() {
-                    c.to_ascii_lowercase()
+                    c.to_lowercase().collect::<Vec<_>>()
                 } else {
-                    '_'
+                    vec!['_']
                 }
             })
             .collect();
