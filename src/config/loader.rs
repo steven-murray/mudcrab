@@ -78,7 +78,65 @@ pub fn load_locked(
         lock,
         stack: Vec::new(),
     };
-    resolve(&normalize(path), &mut context)
+    let mut list = resolve(&normalize(path), &mut context)?;
+    gather_optional(&mut list)?;
+    Ok(list)
+}
+
+/// Mods marked `optional`, each group gathered into one `multi` question of
+/// its mods (by id, in list order): asked as written where the list
+/// declares the question itself (`[inputs.<group>]`, `type = "multi"`),
+/// else in a question made for it. After the includes, so a group gathers
+/// mods from every file.
+fn gather_optional(list: &mut SourceModlist) -> anyhow::Result<()> {
+    use crate::config::schema::{InputSpec, InputType, InputValue, OptionalMod};
+    for m in &mut list.mods {
+        let Some((group, ticked)) = m.optional.as_ref().and_then(OptionalMod::group) else {
+            continue;
+        };
+        let key = OptionalMod::input_name(group);
+        if !list.optional_groups.contains_key(&key) {
+            list.optional_groups
+                .insert(key.clone(), list.inputs.contains_key(&key));
+        }
+        let spec = list.inputs.entry(key.clone()).or_insert_with(|| InputSpec {
+            input_type: InputType::Multi,
+            query: match group {
+                Some(group) => format!("{group}: which of these optional mods would you like?"),
+                None => "Which of these optional mods would you like?".to_string(),
+            },
+            choices: Vec::new(),
+            default: Some(InputValue::List(Vec::new())),
+            fixed: None,
+        });
+        anyhow::ensure!(
+            spec.input_type == InputType::Multi,
+            "mod '{}' is optional in '{key}', which the list declares as a {:?} question; an \
+             optional group's question is a multi",
+            m.id,
+            spec.input_type
+        );
+        if !spec.choices.contains(&m.id) {
+            spec.choices.push(m.id.clone());
+        }
+        // Nothing ticked, unless a mod or the list says: never a question
+        // a headless run cannot answer.
+        if spec.default.is_none() {
+            spec.default = Some(InputValue::List(Vec::new()));
+        }
+        if ticked {
+            match &mut spec.default {
+                Some(InputValue::List(picked)) => {
+                    if !picked.contains(&m.id) {
+                        picked.push(m.id.clone());
+                    }
+                }
+                other => *other = Some(InputValue::List(vec![m.id.clone()])),
+            }
+        }
+        m.optional_in = Some(key);
+    }
+    Ok(())
 }
 
 /// What resolving a list's includes carries along.
