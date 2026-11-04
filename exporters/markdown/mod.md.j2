@@ -1,9 +1,11 @@
 {% import "macros.md.j2" as m %}
 {% import "symbols.j2" as sym %}
 {% set many = mod.archives | length > 1 %}
-{{ m.hashes((depth or 0) + heading_base + 1) }} {{ number ~ ". " if number }}{{ mod.title }}{{ " " ~ sym.symbols.optional if mod.condition }}{{ " " ~ sym.symbols.merge if mod.merge }}{% if options.files %}{% for page in mod.pages %} [{{ sym.symbols.page }}]({{ page.mod_url }} "Nexus mod page"){% endfor %}{% for link in mod.docs.links %} [{{ sym.symbols.page }}]({{ link.url }} {{ link.label | tojson }}){% endfor %}{% for archive in mod.archives %} {{ m.download(archive, loop.index if many, sym.symbols) }}{% endfor %}{% endif %}
+{{ m.hashes((depth or 0) + heading_base + 1) }} {{ number ~ ". " if number }}{{ mod.title }}{{ " " ~ sym.symbols.optional if mod.condition or mod.optional }}{{ " " ~ sym.symbols.merge if mod.merge }}{% if options.files %}{% for page in mod.pages %} [{{ sym.symbols.page }}]({{ page.mod_url }} "Nexus mod page"){% endfor %}{% for link in mod.docs.links %} [{{ sym.symbols.page }}]({{ link.url }} {{ link.label | tojson }}){% endfor %}{% for archive in mod.archives %} {{ m.download(archive, loop.index if many, sym.symbols) }}{% endfor %}{% endif %}
 
-{% if mod.condition %}
+{% if mod.optional %}
+*{{ sym.symbols.optional }} Optional{{ " (" ~ mod.optional.group ~ ")" if mod.optional.group }}{{ ", suggested" if mod.optional.default }}: install it if you want it{{ ", and only if " ~ mod.condition.text if mod.condition }}*
+{% elif mod.condition %}
 *{{ sym.symbols.optional }} {{ "Optional: " ~ mod.condition.question if mod.condition.question else "Only if " ~ mod.condition.text }}*
 
 {% endif %}

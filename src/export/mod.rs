@@ -72,6 +72,11 @@ pub struct InputDoc {
     /// The plan's answer, when exporting a plan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<InputValue>,
+    /// A group of optional mods' question, its choices the mods marked
+    /// optional in it: `true` when the list declares it itself, `false`
+    /// when it was made for the group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional_group: Option<bool>,
 }
 
 #[derive(Debug, Serialize)]
@@ -131,14 +136,31 @@ pub struct ModDoc {
     /// The Nexus pages its archives come from, each once, in archive order.
     /// Usually one; a mod built from several pages' files has several.
     pub pages: Vec<NexusDoc>,
+    /// Its own `if`; an optional mod's group is in `optional`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub condition: Option<ConditionDoc>,
+    /// The group of optional mods it is in, when it is one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub optional: Option<OptionalDoc>,
     pub docs: Docs,
     pub archives: Vec<ArchiveDoc>,
     pub plugins: Vec<String>,
     pub steps: Vec<StepDoc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeDoc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct OptionalDoc {
+    /// The question it is a choice of.
+    pub input: String,
+    /// The group as the list names it; `None` for the list's own.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// The question as it is asked.
+    pub query: String,
+    /// Ticked unless the player unticks it.
+    pub default: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -395,6 +417,7 @@ pub fn build_document(
                 choices: spec.choices.clone(),
                 default: spec.default.clone(),
                 answer: plan.and_then(|plan| plan.responses.get(id).cloned()),
+                optional_group: modlist.optional_groups.get(id).copied(),
             })
             .collect(),
         plan: plan.map(|plan| PlanDoc {
@@ -610,6 +633,26 @@ fn mod_doc(
                 .map(|c| condition_doc(c, modlist))
                 .transpose()
                 .map_err(context)?,
+        },
+        optional: match planned {
+            Some(_) => None,
+            None => entry.optional_in.as_ref().map(|input| {
+                let (group, default) = entry
+                    .optional
+                    .as_ref()
+                    .and_then(crate::config::schema::OptionalMod::group)
+                    .unwrap_or((None, false));
+                OptionalDoc {
+                    input: input.clone(),
+                    group: group.map(str::to_string),
+                    query: modlist
+                        .inputs
+                        .get(input)
+                        .map(|spec| spec.query.clone())
+                        .unwrap_or_default(),
+                    default,
+                }
+            }),
         },
         docs: entry.docs.clone(),
         archives: archive_docs,

@@ -29,7 +29,17 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                     .iter()
                     .map(|archive| compile_archive(id, archive))
                     .collect::<anyhow::Result<Vec<_>>>()?,
-                condition: spec.condition.clone(),
+                // An optional mod is in when it is picked, and its own `if`.
+                condition: match &spec.optional_in {
+                    Some(key) => {
+                        let picked = crate::config::condition::has_term(id, key);
+                        Some(match &spec.condition {
+                            Some(own) => crate::config::condition::and(own, &picked)?,
+                            None => picked,
+                        })
+                    }
+                    None => spec.condition.clone(),
+                },
                 files: spec.files.clone(),
                 actions: spec.actions.clone(),
             })

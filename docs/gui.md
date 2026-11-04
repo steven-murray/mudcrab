@@ -169,10 +169,13 @@ history there, rather than be undone by it.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
   file (`mudcrab docs`). Then its settings:
-  - **Optional**: **Make this mod optional…** chooses the answers that bring
-    it in -- one of the list's questions and which answers, a new question
-    (added to the list with it: `input add`), or an `if` written out -- and
-    writes the mod's `if`. **Always install it** takes the `if` out.
+  - **Optional**: **Make this mod optional…** puts it among the list's
+    optional mods (`optional`): in the list's own group or another, ticked
+    or not to start -- each group is one question in Install's Profile
+    panel, a tick per mod. Or it chooses the answers that bring it in -- one
+    of the list's questions and which answers, a new question (added to the
+    list with it: `input add`), or an `if` written out -- and writes the
+    mod's `if`. **Always install it** takes both out.
   - **Inactive**: ticked, the mod is installed but left unticked in MO2,
     its plugins inactive (`disable`; unticked again, `enable`).
   - **Needs**: **Choose…** ticks the mods it needs from every mod in the

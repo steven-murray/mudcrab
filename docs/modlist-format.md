@@ -234,6 +234,35 @@ action = "file_prune"
 paths = ["textures/menus/big.dds"]
 ```
 
+The simplest optional mod needs no question of its own: mark it `optional`,
+and it becomes a tick in a question that gathers the list's optional mods.
+
+```toml
+[[mods]]
+id = "Birds"
+optional = true                                   # in the list's optional mods
+
+[[mods]]
+id = "Sharp Rocks"
+optional = "Better textures"                      # in a group of its own name
+
+[[mods]]
+id = "Huge Trees"
+optional = { group = "Better textures", default = true }   # ticked to start
+if = "big"                                        # and its own `if` still applies
+```
+
+Each group is one `multi` question whose choices are its mods' ids, in list
+order, gathered from every file of the list (an included file's optional
+mods join the same groups). `optional = true` is asked as `optional`; a
+group as its name in lower case with `_` for anything but letters and digits
+(`better_textures`), so `--set better_textures="Sharp Rocks,Huge Trees"`
+answers it. Nothing starts ticked unless a mod says `default = true`. To word
+a group's question yourself, declare it -- `[inputs.better_textures]` with
+`type = "multi"` and your `query`; its choices are the mods (and any you
+list). An optional mod is installed when it is ticked and its `if`, if it has
+one, holds; `mod:id` in other conditions follows it as usual.
+
 A `multi` input takes any number of its choices -- several optional mods
 asked about at once -- and its answer is a list. Its default is a list (empty
 for none picked), `--set name=a,b` answers it (commas between the choices, so
