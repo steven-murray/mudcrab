@@ -154,6 +154,9 @@ pub struct ModDoc {
     /// The group of optional mods it is in, when it is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional: Option<OptionalDoc>,
+    /// The mods it needs, by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
     pub docs: Docs,
     pub archives: Vec<ArchiveDoc>,
     pub plugins: Vec<String>,
@@ -192,6 +195,9 @@ pub struct ConditionDoc {
     /// question": a manual guide can then say "Optional: <question>".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub question: Option<String>,
+    /// The mods it asks about (`mod:id`), by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mods: Vec<String>,
 }
 
 /// Where to find the archives, so the document can name the files a pattern
@@ -538,6 +544,7 @@ fn condition_doc(expr: &str, modlist: &SourceModlist) -> anyhow::Result<Conditio
         expr: expr.to_string(),
         text: describe::condition(&condition, &modlist.inputs),
         question,
+        mods: condition.mods().into_iter().map(str::to_string).collect(),
     })
 }
 
@@ -680,6 +687,7 @@ fn mod_doc(
                 }
             }),
         },
+        dependencies: entry.dependencies.clone(),
         docs: entry.docs.clone(),
         archives: archive_docs,
         plugins: entry.plugins.clone(),

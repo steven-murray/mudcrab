@@ -36,6 +36,8 @@ export interface ConditionDoc {
   expr: string;
   text: string;
   question?: string;
+  /** The mods it asks about (`mod:id`). */
+  mods?: string[];
 }
 
 export interface StepDoc {
@@ -66,6 +68,8 @@ export interface ModDoc {
   condition?: ConditionDoc;
   /** The group of optional mods it is in: one question, a tick per mod. */
   optional?: { input: string; group?: string; query: string; default: boolean };
+  /** The mods it needs, by id. */
+  dependencies?: string[];
   docs: Docs;
   archives: ArchiveDoc[];
   plugins: string[];

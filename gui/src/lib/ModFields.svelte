@@ -14,8 +14,9 @@
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
-    /** Every mod in the list: its id, title, and group of optional mods. */
-    mods: { id: string; title: string; optional?: ModDoc["optional"] }[];
+    /** Every mod in the list: its id, title, group of optional mods, what it
+     *  needs, and the mods its `if` asks about. */
+    mods: { id: string; title: string; optional?: ModDoc["optional"]; dependencies: string[]; follows: string[] }[];
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
@@ -39,6 +40,17 @@
   let optional = $state(false);
   let choosing = $state(false);
   const title = (id: string) => mods.find((m) => m.id === id)?.title ?? id;
+
+  // The player may untick an optional mod, so a mod that is not optional may
+  // not need one -- unless its `if` names it, and it comes and goes with it.
+  // `validate` refuses the edit; these say so before it is tried.
+  const isOptional = (id: string) => !!mods.find((m) => m.id === id)?.optional;
+  /** The mods that are not optional and need this one, without following it. */
+  const dependents = $derived(
+    mods.filter((m) => m.id !== mod.id && !m.optional && m.dependencies.includes(mod.id) && !m.follows.includes(mod.id)),
+  );
+  /** The optional mods this one needs: out of the optional mods, it has to follow them. */
+  const optionalNeeds = $derived(needs.filter(isOptional));
 
   // Optional by a question: out of its group of optional mods, if it was in one.
   async function setCondition(condition: string, fresh: Fresh | null): Promise<boolean> {
@@ -77,12 +89,12 @@
         One of <strong>{mod.optional.group ?? "the list's optional mods"}</strong>, {mod.optional.default ? "ticked" : "unticked"} to
         start{#if mod.condition}, and only if <strong>{mod.condition.text}</strong>{/if}
         <button class="link" onclick={() => (optional = true)}>Change…</button>
-        · <button class="link" onclick={always}>Always install it</button>
+        · {@render alwaysButton()}
       {:else if mod.condition}
         Installed only if <strong>{mod.condition.text}</strong>
         <code class="dim">{mod.condition.expr}</code>
         <button class="link" onclick={() => (optional = true)}>Change…</button>
-        · <button class="link" onclick={always}>Always install it</button>
+        · {@render alwaysButton()}
       {:else}
         <button onclick={() => (optional = true)}>Make this mod optional…</button>
       {/if}
@@ -109,6 +121,16 @@
   </div>
 </div>
 
+{#snippet alwaysButton()}
+  <button
+    class="link"
+    onclick={always}
+    disabled={!!optionalNeeds.length}
+    title={optionalNeeds.length ? `It needs ${optionalNeeds.map(title).join(", ")}, which the player may untick` : undefined}
+    >Always install it</button
+  >
+{/snippet}
+
 {#if optional}
   <OptionalDialog
     id={mod.id}
@@ -116,6 +138,8 @@
     current={mod.condition?.expr ?? null}
     save={setCondition}
     {groups}
+    dependents={dependents.map((m) => m.title)}
+    optionalNeeds={optionalNeeds.map((id) => ({ id, title: title(id) }))}
     group={mod.optional ? { name: mod.optional.group ?? null, default: mod.optional.default } : null}
     saveGroup={setGroup}
     close={() => (optional = false)}
@@ -126,6 +150,13 @@
     id={mod.id}
     mods={mods.filter((m) => m.id !== mod.id)}
     current={needs}
+    blocked={mod.optional
+      ? new Map()
+      : new Map(
+          mods
+            .filter((m) => m.optional && !(mod.condition?.mods ?? []).includes(m.id))
+            .map((m) => [m.id, `${m.title} is optional and ${mod.title} is not: make ${mod.title} optional too, or have its if follow ${m.title}`]),
+        )}
     save={setNeeds}
     close={() => (choosing = false)}
   />

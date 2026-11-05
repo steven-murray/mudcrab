@@ -583,7 +583,13 @@
           <ModFields
             mod={chosen}
             inputs={list.document.inputs}
-            mods={[...mods.values()].map((m) => ({ id: m.mod.id, title: m.mod.title, optional: m.mod.optional }))}
+            mods={[...mods.values()].map((m) => ({
+              id: m.mod.id,
+              title: m.mod.title,
+              optional: m.mod.optional,
+              dependencies: m.mod.dependencies ?? [],
+              follows: m.mod.condition?.mods ?? [],
+            }))}
             {run}
           />
           {#if actions.length}
