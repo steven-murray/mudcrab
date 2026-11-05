@@ -323,8 +323,27 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
 
     for (mod_id, spec) in &flattened_mods {
         for dep in &spec.dependencies {
-            if !flattened_mods.contains_key(dep) {
+            let Some(needed) = flattened_mods.get(dep) else {
                 anyhow::bail!("mod {mod_id} has unknown dependency {dep}");
+            };
+            // The player may untick an optional mod, and a mod that is not
+            // optional has to work without it. One whose `if` names it
+            // follows it, so comes and goes with it.
+            if let (None, Some(question)) = (&spec.optional_in, &needed.optional_in) {
+                let follows = match &spec.condition {
+                    Some(expr) => Condition::parse(expr)
+                        .map_err(|err| anyhow::anyhow!("mod {mod_id}: its `if`: {err:#}"))?
+                        .mods()
+                        .contains(&dep.as_str()),
+                    None => false,
+                };
+                anyhow::ensure!(
+                    follows,
+                    "mod {mod_id} depends on {dep}, which is optional (a choice of {question}) \
+                     while {mod_id} is not; make {mod_id} optional too, or give it `if = '{}'` \
+                     so it comes and goes with {dep}",
+                    crate::config::condition::mod_term(dep)
+                );
             }
         }
 

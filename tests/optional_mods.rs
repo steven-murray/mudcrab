@@ -148,3 +148,34 @@ fn a_group_is_asked_as_its_name_in_lower_case() {
     assert_eq!(OptionalMod::input_name(None), "optional");
     assert_eq!(OptionalMod::input_name(Some(" -- ")), "optional");
 }
+
+#[test]
+fn a_mod_that_is_not_optional_may_not_need_one_that_is() {
+    let dir = tempdir().unwrap();
+    write(dir.path(), "extra.toml", EXTRA);
+    let needing = |extra: &str| {
+        LIST.replace(
+            "id = \"Core\"\n",
+            &format!("id = \"Core\"\ndependencies = [\"Birds\"]\n{extra}"),
+        )
+    };
+
+    let list = write(dir.path(), "list.toml", &needing(""));
+    let err = compile(&list, false).err().expect("refused");
+    let text = format!("{err:#}");
+    assert!(
+        text.contains("Core depends on Birds, which is optional"),
+        "{text}"
+    );
+
+    // Following it, or optional too, it may.
+    let list = write(dir.path(), "list.toml", &needing("if = 'mod:\"Birds\"'\n"));
+    compile(&list, false).unwrap();
+    assert_eq!(
+        plan(&list, &["optional=Birds"]).unwrap(),
+        ["Core", "Birds", "Sharp Rocks"]
+    );
+    assert_eq!(plan(&list, &[]).unwrap(), ["Sharp Rocks"]);
+    let list = write(dir.path(), "list.toml", &needing("optional = true\n"));
+    compile(&list, false).unwrap();
+}

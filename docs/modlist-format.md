@@ -262,6 +262,9 @@ a group's question yourself, declare it -- `[inputs.better_textures]` with
 `type = "multi"` and your `query`; its choices are the mods (and any you
 list). An optional mod is installed when it is ticked and its `if`, if it has
 one, holds; `mod:id` in other conditions follows it as usual.
+A mod that is not optional may not list an optional one in its
+`dependencies`, as the player can untick it: `validate` asks for the mod to be
+optional too, or to follow it with `if = 'mod:"id"'`.
 
 A `multi` input takes any number of its choices -- several optional mods
 asked about at once -- and its answer is a list. Its default is a list (empty
