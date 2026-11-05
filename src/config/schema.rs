@@ -22,6 +22,11 @@ pub struct SourceModlist {
     /// In declaration order, which is the order `export` presents them in.
     #[serde(default)]
     pub inputs: IndexMap<String, InputSpec>,
+    /// The questions groups of optional mods are asked as, each with whether
+    /// the list declares it itself (else the loader made it). Set by the
+    /// loader.
+    #[serde(skip)]
+    pub optional_groups: IndexMap<String, bool>,
     #[serde(default)]
     pub ini: toml::Table,
     #[serde(default)]
@@ -647,6 +652,61 @@ pub enum PluginSlot {
     Include { include: String },
 }
 
+/// A mod's `optional`: which group of optional mods it is in.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum OptionalMod {
+    /// `true`: the list's one group of optional mods; `false`: not optional.
+    Flag(bool),
+    /// A group of its own name.
+    Group(String),
+    /// A group (the list's own, without one), and whether it starts ticked.
+    Spec {
+        #[serde(default)]
+        group: Option<String>,
+        #[serde(default)]
+        default: bool,
+    },
+}
+
+impl OptionalMod {
+    /// Its group's name (`None` for the list's own), and whether it starts
+    /// ticked; `None` for `false`.
+    pub fn group(&self) -> Option<(Option<&str>, bool)> {
+        match self {
+            OptionalMod::Flag(false) => None,
+            OptionalMod::Flag(true) => Some((None, false)),
+            OptionalMod::Group(name) => Some((Some(name.as_str()), false)),
+            OptionalMod::Spec { group, default } => Some((group.as_deref(), *default)),
+        }
+    }
+
+    /// The input a group asks as: `optional` for the list's own, else its
+    /// name in lower case with `_` for anything but letters and digits.
+    pub fn input_name(group: Option<&str>) -> String {
+        let Some(group) = group else {
+            return "optional".to_string();
+        };
+        let name: String = group
+            .trim()
+            .chars()
+            .flat_map(|c| {
+                if c.is_alphanumeric() {
+                    c.to_lowercase().collect::<Vec<_>>()
+                } else {
+                    vec!['_']
+                }
+            })
+            .collect();
+        let name = name.trim_matches('_').to_string();
+        if name.is_empty() {
+            "optional".to_string()
+        } else {
+            name
+        }
+    }
+}
+
 /// One mod in the flat `[[mods]]` list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -715,6 +775,16 @@ pub struct ModEntry {
     pub dependencies: Vec<String>,
     #[serde(rename = "if")]
     pub condition: Option<String>,
+    /// Left to the player: `true` for the list's optional mods, a group's
+    /// name, or `{ group = "...", default = true }` for one ticked unless
+    /// unticked. Each group is one `multi` question, of its mods; see
+    /// [`OptionalMod`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optional: Option<OptionalMod>,
+    /// The question this mod is a choice of, for `optional`. Set by the
+    /// loader.
+    #[serde(skip)]
+    pub optional_in: Option<String>,
     #[serde(default)]
     pub archives: Vec<ArchiveSpec>,
     #[serde(rename = "type")]

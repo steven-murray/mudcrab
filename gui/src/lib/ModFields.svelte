@@ -14,8 +14,8 @@
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
-    /** Every mod in the list: its id and title. */
-    mods: { id: string; title: string }[];
+    /** Every mod in the list: its id, title, and group of optional mods. */
+    mods: { id: string; title: string; optional?: ModDoc["optional"] }[];
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
@@ -40,10 +40,23 @@
   let choosing = $state(false);
   const title = (id: string) => mods.find((m) => m.id === id)?.title ?? id;
 
+  // Optional by a question: out of its group of optional mods, if it was in one.
   async function setCondition(condition: string, fresh: Fresh | null): Promise<boolean> {
     if (fresh && !(await run(() => api.addInput(fresh.name, fresh.kind, fresh.query, fresh.choices, fresh.fallback)))) return false;
-    return run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], []));
+    return run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], mod.optional ? ["optional"] : []));
   }
+  // The list's groups of optional mods, by name ("" for its own).
+  const groups = $derived([...new Set(mods.filter((m) => m.optional).map((m) => m.optional!.group ?? ""))]);
+  const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
+  const always = () =>
+    run(() =>
+      api.setFields(
+        mod.id,
+        null,
+        [],
+        [...(mod.condition ? ["if"] : []), ...(mod.optional ? ["optional"] : [])],
+      ),
+    );
   async function setNeeds(next: string[]): Promise<boolean> {
     const done = await run(() =>
       next.length
@@ -60,11 +73,16 @@
   <div class="row">
     <span class="name">Optional</span>
     <span>
-      {#if mod.condition}
+      {#if mod.optional}
+        One of <strong>{mod.optional.group ?? "the list's optional mods"}</strong>, {mod.optional.default ? "ticked" : "unticked"} to
+        start{#if mod.condition}, and only if <strong>{mod.condition.text}</strong>{/if}
+        <button class="link" onclick={() => (optional = true)}>Change…</button>
+        · <button class="link" onclick={always}>Always install it</button>
+      {:else if mod.condition}
         Installed only if <strong>{mod.condition.text}</strong>
         <code class="dim">{mod.condition.expr}</code>
         <button class="link" onclick={() => (optional = true)}>Change…</button>
-        · <button class="link" onclick={() => run(() => api.setFields(mod.id, null, [], ["if"]))}>Always install it</button>
+        · <button class="link" onclick={always}>Always install it</button>
       {:else}
         <button onclick={() => (optional = true)}>Make this mod optional…</button>
       {/if}
@@ -92,7 +110,16 @@
 </div>
 
 {#if optional}
-  <OptionalDialog id={mod.id} {inputs} current={mod.condition?.expr ?? null} save={setCondition} close={() => (optional = false)} />
+  <OptionalDialog
+    id={mod.id}
+    {inputs}
+    current={mod.condition?.expr ?? null}
+    save={setCondition}
+    {groups}
+    group={mod.optional ? { name: mod.optional.group ?? null, default: mod.optional.default } : null}
+    saveGroup={setGroup}
+    close={() => (optional = false)}
+  />
 {/if}
 {#if choosing}
   <NeedsDialog

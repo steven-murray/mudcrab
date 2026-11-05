@@ -58,6 +58,20 @@
   }
 
   async function save(input: InputDoc) {
+    // A group of optional mods: only its wording is the list's to change;
+    // its answers are its mods, and which start ticked is said on each.
+    if (input.optional_group !== undefined) {
+      if (draft.query === input.query) editing = null;
+      else if (
+        await run(() =>
+          input.optional_group
+            ? api.setInput(input.id, [`query=${tomlString(draft.query)}`], [])
+            : api.addInput(input.id, "multi", draft.query, [], null),
+        )
+      )
+        editing = null;
+      return;
+    }
     const sets: string[] = [];
     const unsets: string[] = [];
     if (draft.query !== input.query) sets.push(`query=${tomlString(draft.query)}`);
@@ -114,14 +128,14 @@
   <article>
     <div class="top">
       <code class="name">{input.id}</code>
-      <span class="kind">{input.type}</span>
+      <span class="kind">{input.optional_group === undefined ? input.type : "optional mods"}</span>
       {#if editing !== input.id}
         <button class="link" onclick={() => start(input)}>Change</button>
-        <button
+        {#if input.optional_group === undefined}<button
           class="link danger"
           onclick={() => run(() => api.removeInput(input.id))}
           title="Refused while a mod's condition still asks it">Remove</button
-        >
+        >{/if}
       {/if}
     </div>
     {#if editing === input.id}
@@ -132,6 +146,9 @@
         }}
       >
         <label>Question <input type="text" bind:value={draft.query} /></label>
+        {#if input.optional_group !== undefined}
+          <p class="dim small">Its answers are the mods marked optional in it; which start ticked is said on each mod.</p>
+        {:else}
         {#if listed(input.type)}
           <label>Answers <textarea rows="3" bind:value={draft.choices} placeholder="one per line"></textarea></label>
         {/if}
@@ -151,6 +168,7 @@
             {/if}
           </span>
         </label>
+        {/if}
         <div class="buttons">
           <button type="submit" class="primary">Save</button>
           <button type="button" onclick={() => (editing = null)}>Cancel</button>

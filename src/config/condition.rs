@@ -247,7 +247,7 @@ fn term_text(term: &Condition) -> String {
             InputTest::Truthy => key.clone(),
             InputTest::Equals(want) => format!("{key} == {}", value(want)),
             InputTest::NotEquals(want) => format!("{key} != {}", value(want)),
-            InputTest::Has(want) => format!("{} in {key}", quoted(want)),
+            InputTest::Has(want) => has_term(want, key),
         },
         _ => unreachable!("only terms are left once multiplied out"),
     }
@@ -273,6 +273,11 @@ fn answer_text(answer: &InputValue) -> String {
         InputValue::Text(v) => v.clone(),
         InputValue::List(v) => v.join(","),
     }
+}
+
+/// The term asking whether `value` was picked in the multi input `key`.
+pub fn has_term(value: &str, key: &str) -> String {
+    format!("{} in {key}", quoted(value))
 }
 
 /// A choice in an `in` term: quoted unless it is one plain word.
