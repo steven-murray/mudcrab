@@ -159,6 +159,27 @@ fn new_list(path: String, name: String) -> Result<String, String> {
     Ok(path.display().to_string())
 }
 
+/// Copy the open list to a new file, named `name` (`edit::clone_list`),
+/// with this list's settings here -- its MO2 instance, folders and answers
+/// -- so the copy opens ready to install.
+#[tauri::command]
+fn clone_list(
+    state: tauri::State<'_, State>,
+    path: String,
+    name: String,
+) -> Result<String, String> {
+    let from = state.list()?;
+    let to = PathBuf::from(path);
+    let written = config::edit::clone_list(&from, &to, &name).map_err(shown)?;
+    let to = written.first().cloned().unwrap_or(to);
+    let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+    let mut copied = settings.list(&from);
+    copied.checked = None;
+    *settings.list_mut(&to) = copied;
+    let _ = settings.save();
+    Ok(to.display().to_string())
+}
+
 #[tauri::command]
 fn open_list<R: Runtime>(
     app: tauri::AppHandle<R>,
@@ -1231,6 +1252,7 @@ pub fn app<R: Runtime>(
             tour_shown,
             open_list,
             new_list,
+            clone_list,
             locations,
             set_location,
             set_tools_config,

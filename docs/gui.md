@@ -110,6 +110,14 @@ its name and where to keep it (`mudcrab new`), then the MO2 instance to try
 it in (**Settings**, as above), and opens it here, empty, ready for its first
 mod from the downloads folder.
 
+**Clone…** copies the open list to a new file, under a new name: every
+mod, question and note, its docs file copied beside it (as
+`<name>.docs.toml`), and its lock file. Files it includes, and the shims
+its entries `use`, are shared rather than copied, named from wherever the
+copy is. The copy opens in the list's place, with its MO2 instance,
+folders and answers, ready to change -- a variant of a list, say, without
+touching the original.
+
 **Author** in the top right switches to working on the list as its author.
 It reads the list as planned with the answers given in Install, and plans it
 again after each change.

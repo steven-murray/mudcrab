@@ -692,6 +692,130 @@ pub fn create_list(path: &Path, name: &str) -> anyhow::Result<()> {
         .map_err(|err| anyhow::anyhow!("failed to write {}: {err}", path.display()))
 }
 
+/// Copy the list at `from` to `to`, a new file, named `name`: with its docs
+/// file (as `<to's stem>.docs.toml`) and its lock file, so the copy is a
+/// list of its own that installs the same. Paths in it relative to the list
+/// -- its docs file, and the files its entries `include` and `use` -- are
+/// written relative to where the copy is, so they name the same files (a
+/// docs file's image paths are not). Returns the files written.
+pub fn clone_list(from: &Path, to: &Path, name: &str) -> anyhow::Result<Vec<PathBuf>> {
+    anyhow::ensure!(!name.trim().is_empty(), "a list needs a name");
+    anyhow::ensure!(
+        !to.exists(),
+        "{} already exists; a copy is never written over another file",
+        to.display()
+    );
+    let absolute = |path: &Path| {
+        normalize(&if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir().unwrap_or_default().join(path)
+        })
+    };
+    let (from, to) = (absolute(from), absolute(to));
+    let (from_dir, to_dir) = (
+        from.parent().unwrap_or(Path::new("")).to_path_buf(),
+        to.parent().unwrap_or(Path::new("")).to_path_buf(),
+    );
+    let moved = |rel: &str| -> String {
+        if from_dir == to_dir || Path::new(rel).is_absolute() {
+            return rel.to_string();
+        }
+        relative(&to_dir, &normalize(&from_dir.join(rel)))
+    };
+    let text = read(&from)?;
+    let mut doc = text
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|err| anyhow::anyhow!("{} is not valid TOML: {err}", from.display()))?;
+    doc.insert("name", toml_edit::value(name.trim()));
+    // Its docs file, copied beside it under its own name.
+    let mut written = Vec::new();
+    let mut docs_copy = None;
+    if let Some(docs) = doc
+        .get("docs_file")
+        .and_then(|v| v.as_str())
+        .map(str::to_string)
+    {
+        let source = normalize(&from_dir.join(&docs));
+        let stem = to.file_stem().unwrap_or_default().to_string_lossy();
+        let copy = to_dir.join(format!("{stem}.docs.toml"));
+        anyhow::ensure!(
+            !copy.exists(),
+            "{} already exists; a copy is never written over another file",
+            copy.display()
+        );
+        doc.insert(
+            "docs_file",
+            toml_edit::value(
+                copy.file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .as_ref(),
+            ),
+        );
+        docs_copy = Some((source, copy));
+    }
+    if let Some(mods) = doc.get_mut("mods").and_then(|m| m.as_array_of_tables_mut()) {
+        for entry in mods.iter_mut() {
+            for key in ["include", "use"] {
+                if let Some(rel) = entry.get(key).and_then(|v| v.as_str())
+                    && crate::config::git::parse(rel).is_none()
+                {
+                    let rel = moved(rel);
+                    entry.insert(key, toml_edit::value(rel));
+                }
+            }
+        }
+    }
+    let after = doc.to_string();
+    std::fs::create_dir_all(&to_dir)
+        .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", to_dir.display()))?;
+    if let Some((source, copy)) = &docs_copy {
+        std::fs::copy(source, copy).map_err(|err| {
+            anyhow::anyhow!(
+                "failed to copy {} to {}: {err}",
+                source.display(),
+                copy.display()
+            )
+        })?;
+        written.push(copy.clone());
+    }
+    let lock = crate::config::git::lock_path(&from);
+    if lock.is_file() {
+        let copy = crate::config::git::lock_path(&to);
+        if !copy.exists() {
+            std::fs::copy(&lock, &copy)
+                .map_err(|err| anyhow::anyhow!("failed to copy {}: {err}", lock.display()))?;
+            written.push(copy);
+        }
+    }
+    // Checked as it will be, once beside its docs and lock; taken back if not.
+    if let Err(err) = check(&to, &after) {
+        for file in &written {
+            let _ = std::fs::remove_file(file);
+        }
+        return Err(err.context(format!("the copy of {} would not load", from.display())));
+    }
+    write_atomic(&to, &after)?;
+    written.insert(0, to);
+    Ok(written)
+}
+
+/// `target` as a path relative to the folder `base`, both absolute and
+/// normalized, with `/` between its parts.
+fn relative(base: &Path, target: &Path) -> String {
+    let base: Vec<_> = base.components().collect();
+    let target: Vec<_> = target.components().collect();
+    let shared = base.iter().zip(&target).take_while(|(a, b)| a == b).count();
+    let mut parts: Vec<String> = vec!["..".to_string(); base.len() - shared];
+    parts.extend(
+        target[shared..]
+            .iter()
+            .map(|c| c.as_os_str().to_string_lossy().into_owned()),
+    );
+    parts.join("/")
+}
+
 /// `text` loads and validates as the modlist at `path`.
 pub fn check(path: &Path, text: &str) -> anyhow::Result<()> {
     check_in(path, path, text)
