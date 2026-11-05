@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { api, tomlString, type InputDoc, type ModDoc } from "./api";
+  import { api, tomlString, type InputDoc, type LoadOrder, type ModDoc } from "./api";
   import NeedsDialog from "./NeedsDialog.svelte";
   import OptionalDialog, { type Fresh } from "./OptionalDialog.svelte";
-  import { neededBy, optionalGroups } from "./optional";
+  import { masterNeeds, neededBy, optionalGroups } from "./optional";
 
   // A mod's own settings: whether it is optional (its `if`), whether it is
   // installed inactive (`disable`), and what it needs (`dependencies`). Each
@@ -11,12 +11,20 @@
     mod,
     inputs,
     mods,
+    order,
+    readingMasters,
+    readMasters,
     run,
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
     /** Every mod in the list. */
     mods: ModDoc[];
+    /** The load order, with each plugin's masters once read. */
+    order: LoadOrder | null;
+    readingMasters: boolean;
+    /** Read every plugin's masters (`check --masters-only`). */
+    readMasters: () => void;
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
@@ -53,6 +61,19 @@
     return run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], mod.optional ? ["optional"] : []));
   }
   const groups = $derived(optionalGroups(mods));
+
+  // The mods its plugins' masters come from, that `dependencies` does not
+  // list yet. One it may not need (optional, while it is not and does not
+  // follow it) is shown, not offered.
+  const fromMasters = $derived(masterNeeds(mod.id, order).filter((n) => !needs.includes(n.id)));
+  const mayNotNeed = (id: string) => !mod.optional && isOptional(id) && !(mod.condition?.mods ?? []).includes(id);
+  const offered = $derived(fromMasters.filter((n) => !mayNotNeed(n.id)));
+  const refused = $derived(fromMasters.filter((n) => mayNotNeed(n.id)));
+  const why = (n: { plugin: string; master: string }) => `Its ${n.plugin} has ${n.master} as a master`;
+  const addFromMasters = () => {
+    const next = new Set([...needs, ...offered.map((n) => n.id)]);
+    return setNeeds(mods.map((m) => m.id).filter((id) => next.has(id)));
+  };
   const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
   const always = () =>
     run(() =>
@@ -111,8 +132,38 @@
       {#each needs as need}<span class="chip">{title(need)}</span>{/each}
       {#if !needs.length}<span class="dim">nothing</span>{/if}
       <button class="link" onclick={() => (choosing = true)}>Choose…</button>
+      {#if !order?.masters_read}
+        ·
+        <button
+          class="link"
+          onclick={readMasters}
+          disabled={readingMasters}
+          title="Read its plugins' masters from the archives (check --masters-only), to see which mods they come from"
+          >{readingMasters ? "Reading masters…" : "Find from its masters"}</button
+        >
+      {/if}
     </span>
   </div>
+  {#if fromMasters.length}
+    <div class="row">
+      <span></span>
+      <span class="masters">
+        {#if offered.length}
+          Its plugins' masters also need
+          {#each offered as n, i}{i ? ", " : ""}<strong title={why(n)}>{title(n.id)}</strong>{/each}
+          · <button class="link" onclick={addFromMasters}>Add {offered.length === 1 ? "it" : "them"}</button>
+        {/if}
+        {#if refused.length}
+          <span class="bad">
+            {#each refused as n, i}{i ? ", " : ""}<strong title={why(n)}>{title(n.id)}</strong>{/each}
+            {refused.length === 1 ? "has" : "have"} a master its plugins need, but
+            {refused.length === 1 ? "is" : "are"} optional: make this mod optional too, or have its <code>if</code> follow
+            {refused.length === 1 ? "it" : "them"}.
+          </span>
+        {/if}
+      </span>
+    </div>
+  {/if}
 </div>
 
 {#snippet alwaysButton()}
@@ -144,6 +195,7 @@
     id={mod.id}
     mods={mods.filter((m) => m.id !== mod.id)}
     current={needs}
+    suggested={new Map(offered.map((n) => [n.id, why(n)]))}
     blocked={mod.optional
       ? new Map()
       : new Map(
@@ -181,6 +233,15 @@
     flex-wrap: wrap;
     gap: 4px;
     align-items: baseline;
+  }
+  .masters {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bad {
+    color: var(--problem);
   }
   .chip {
     border: 1px solid var(--line);

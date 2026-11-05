@@ -977,6 +977,12 @@ Then, across the finished folders:
   of the load order, are checked as the merge needs them: each master must
   be another source of the same merge, or in the load order ahead of its
   output.
+- **dependencies**: a master from another mod makes that mod one this mod
+  needs. When its `dependencies` do not list it, that is a warning: list it,
+  and `validate` and the GUI know of it too. When it is an optional mod and
+  this one is not optional and its `if` does not follow it, that is an error,
+  whatever this plan's answers are: the player can untick the optional mod
+  and leave the plugin without its master.
 - **load order**: a plugin in `plugins` that no mod installs is an error (a
   merge's output and Wrye Bash's `Bashed Patch, 0.esp` are made later), as is
   a plugin a mod declares but does not install. A plugin a mod installs that
@@ -1001,7 +1007,7 @@ solid 7z, unpacking one file means unpacking everything before it, which for
 a large archive takes a while.
 
 `--masters-only` checks only the masters: no MD5s, no filters, no actions
-rehearsed, nothing about the load order or BSAs. Once the masters are kept,
+rehearsed, nothing about the load order or BSAs (dependencies are). Once the masters are kept,
 it takes moments, which is what the GUI's load order runs. A mod whose
 actions change its files is read as its archives lay it out.
 

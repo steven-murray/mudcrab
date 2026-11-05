@@ -533,3 +533,59 @@ fn masters_only_reports_masters_and_rereads_an_archive_that_changed() {
         "{said}"
     );
 }
+
+#[test]
+fn a_master_from_another_mod_is_a_dependency() {
+    use mudcrab::config::check::Kind;
+    let dir = tempdir().unwrap();
+    let (list, downloads) = masters_fixture(dir.path());
+    let original = std::fs::read_to_string(&list).unwrap();
+    let findings = |base: &str, patch: &str| -> Vec<(Kind, String)> {
+        let text = original
+            .replace("id = \"Base\"\n", &format!("id = \"Base\"\n{base}"))
+            .replace("id = \"Patch\"\n", &format!("id = \"Patch\"\n{patch}"));
+        std::fs::write(&list, text).unwrap();
+        let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+        let plan = mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None)
+            .unwrap();
+        let report = mudcrab::config::check::check_all(
+            &plan,
+            &mudcrab::config::check::CheckSettings {
+                cache_dir: downloads.clone(),
+                filter: Default::default(),
+                masters_only: true,
+            },
+        )
+        .unwrap();
+        report
+            .findings
+            .into_iter()
+            .filter(|f| matches!(f.kind, Kind::Undeclared | Kind::OptionalMasters))
+            .map(|f| (f.kind, f.item.text.to_plain()))
+            .collect()
+    };
+
+    // Patch.esp's master Base.esm is Base's, which Patch does not list.
+    let found = findings("", "");
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, Kind::Undeclared);
+    assert!(
+        found[0].1.contains("Base.esm as a master, from Base"),
+        "{found:?}"
+    );
+    assert!(findings("", "dependencies = [\"Base\"]\n").is_empty());
+
+    // Base optional, and ticked in this plan: Patch still breaks when the
+    // player unticks it.
+    let optional = "optional = { default = true }\n";
+    let found = findings(optional, "");
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, Kind::OptionalMasters);
+    assert!(found[0].1.contains("make Patch optional too"), "{found:?}");
+    // Following it, it does not; it still does not list it.
+    let found = findings(optional, "if = 'mod:\"Base\"'\n");
+    assert_eq!(found.len(), 1, "{found:?}");
+    assert_eq!(found[0].0, Kind::Undeclared);
+    // Optional too, and listing it: nothing to say.
+    assert!(findings(optional, &format!("{optional}dependencies = [\"Base\"]\n")).is_empty());
+}

@@ -88,10 +88,12 @@ pub enum Kind {
     DamagedArchive,
     WouldFail,
     Masters,
+    OptionalMasters,
     LoadOrder,
     Bsa,
     Overwritten,
     Unordered,
+    Undeclared,
     Filters,
     NotChecked,
 }
@@ -103,12 +105,19 @@ impl Kind {
             Kind::DamagedArchive => "Archives that are not what the list expects",
             Kind::WouldFail => "Would fail at install",
             Kind::Masters => "Plugins whose masters will not be loaded before them",
+            Kind::OptionalMasters => {
+                "Plugins whose masters come from a mod the player may untick, in a mod that \
+                 stays"
+            }
             Kind::LoadOrder => "Load order and installed plugins disagree",
             Kind::Bsa => "BSAs the game will not load",
             Kind::Overwritten => "Plugins installed by more than one mod (winner > overwritten)",
             Kind::Unordered => {
                 "Installed but not in the load order (MO2 shows them unticked: exclude them, or \
                  add them to `plugins`)"
+            }
+            Kind::Undeclared => {
+                "Mods whose plugins need another mod, which their `dependencies` do not list"
             }
             Kind::Filters => "Filters that do nothing",
             Kind::NotChecked => "Not checked",
@@ -117,7 +126,7 @@ impl Kind {
 
     pub fn tone(self) -> Tone {
         match self {
-            Kind::Overwritten | Kind::Unordered | Kind::Filters => Tone::Warning,
+            Kind::Overwritten | Kind::Unordered | Kind::Undeclared | Kind::Filters => Tone::Warning,
             Kind::NotChecked => Tone::Note,
             _ => Tone::Problem,
         }
@@ -336,6 +345,7 @@ fn check_in(
             item: Item::new(error).about(mod_id),
         });
     }
+    dependency_problems(plan, &folders, &mut findings);
     let whole_plan = settings.filter.is_empty();
     if !settings.masters_only {
         load_order_problems(plan, &folders, whole_plan, &mut findings);
@@ -886,6 +896,82 @@ fn check_single_archive(
     }
     known.save();
     Ok(Some(contents))
+}
+
+/// What each mod's plugins need of other mods, by their masters, against what
+/// it says it needs. A master from a mod its `dependencies` do not list is a
+/// dependency left unsaid: listed, `validate` and the GUI know of it too. One
+/// from an optional mod, in a mod that is not optional and does not follow
+/// it, goes missing whenever the player unticks that mod -- whatever this
+/// plan's answers are.
+fn dependency_problems(
+    plan: &PersonalizedPlan,
+    folders: &BTreeMap<String, ModFolder>,
+    findings: &mut Findings,
+) {
+    let by_id: HashMap<&str, &PersonalizedMod> =
+        plan.mods.iter().map(|m| (m.id.as_str(), m)).collect();
+    // The mod installing each plugin: as read, else as a mod declares it.
+    let mut provider: HashMap<String, &str> = HashMap::new();
+    for mod_entry in &plan.mods {
+        for plugin in &mod_entry.plugins {
+            provider
+                .entry(plugin.to_ascii_lowercase())
+                .or_insert(&mod_entry.id);
+        }
+    }
+    for (id, folder) in folders {
+        for key in folder.plugins.keys() {
+            provider.insert(key.clone(), id);
+        }
+    }
+    for needing in &plan.mods {
+        let Some(folder) = folders.get(&needing.id) else {
+            continue;
+        };
+        // Each mod it needs, with the first of its plugins and master to say so.
+        let mut needs: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+        for (plugin, masters) in folder.plugins.values() {
+            for master in masters {
+                if let Some(&from) = provider.get(&master.to_ascii_lowercase())
+                    && from != needing.id
+                {
+                    needs.entry(from).or_insert((plugin, master));
+                }
+            }
+        }
+        for (from, (plugin, master)) in needs {
+            if needing.dependencies.iter().any(|dep| dep == from) {
+                continue;
+            }
+            let shown = Text::new()
+                .plain("its ")
+                .name(plugin)
+                .plain(" has ")
+                .name(master)
+                .plain(format!(" as a master, from {from}, "));
+            let unticked = by_id.get(from).is_some_and(|m| m.optional_in.is_some())
+                && needing.optional_in.is_none()
+                && !needing.follows.iter().any(|f| f == from);
+            if unticked {
+                findings.about(
+                    Kind::OptionalMasters,
+                    &needing.id,
+                    shown.plain(format!(
+                        "which is optional; make {} optional too, or give it `if = '{}'`",
+                        needing.id,
+                        crate::config::condition::mod_term(from)
+                    )),
+                );
+            } else {
+                findings.about(
+                    Kind::Undeclared,
+                    &needing.id,
+                    shown.plain("which its `dependencies` do not list"),
+                );
+            }
+        }
+    }
 }
 
 /// The load order against what the mods install: a plugin ordered that

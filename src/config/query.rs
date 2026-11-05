@@ -98,6 +98,16 @@ pub fn build_plan(
             enabled: entry.enabled,
             merge: entry.merge.clone(),
             plugins: entry.plugins.clone(),
+            dependencies: entry.dependencies.clone(),
+            optional_in: entry.optional_in.clone(),
+            follows: match &entry.condition {
+                Some(expr) => Condition::parse(expr)?
+                    .mods()
+                    .into_iter()
+                    .map(str::to_string)
+                    .collect(),
+                None => Vec::new(),
+            },
             archives,
             files: entry.files.clone(),
             actions,

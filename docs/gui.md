@@ -182,7 +182,11 @@ history there, rather than be undone by it.
   - **Inactive**: ticked, the mod is installed but left unticked in MO2,
     its plugins inactive (`disable`; unticked again, `enable`).
   - **Needs**: **Choose…** ticks the mods it needs from every mod in the
-    list, found by name (`dependencies`).
+    list, found by name (`dependencies`). Once the masters are read
+    (**Find from its masters**, or the load order), the mods its plugins'
+    masters come from are offered too -- **Add them**, or ticked to start in
+    **Choose…** -- and an optional one it may not need is named, with what
+    to do.
 
   Its actions follow (each can be removed: `action remove`), then each of
   its archives: its installer's choices, its filters and its fields (`set`),

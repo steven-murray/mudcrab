@@ -1084,6 +1084,9 @@ mod tests {
             mod_type: None,
             merge: None,
             plugins: Vec::new(),
+            dependencies: Vec::new(),
+            optional_in: None,
+            follows: Vec::new(),
             archives: vec![CompiledArchive {
                 size: None,
                 md5: None,

@@ -1,4 +1,4 @@
-import type { ModDoc } from "./api";
+import type { LoadOrder, ModDoc } from "./api";
 
 // Making a mod optional, wherever it is done from: its fields, its dialog,
 // or its right-click menu.
@@ -33,6 +33,23 @@ export function optionalToml(group: string, ticked: boolean): string {
   const name = group.trim();
   if (ticked) return name ? `{ group = ${JSON.stringify(name)}, default = true }` : "{ default = true }";
   return name ? JSON.stringify(name) : "true";
+}
+
+/** The mods `id`'s plugins need by their masters, as the load order has
+ *  them once their masters are read: each with the first of its plugins and
+ *  master to say so. */
+export function masterNeeds(id: string, order: LoadOrder | null): { id: string; plugin: string; master: string }[] {
+  if (!order?.masters_read) return [];
+  const byName = new Map(order.plugins.map((p) => [p.name.toLowerCase(), p]));
+  const out = new Map<string, { id: string; plugin: string; master: string }>();
+  for (const plugin of order.plugins.filter((p) => p.mods.includes(id))) {
+    for (const master of plugin.masters ?? []) {
+      for (const from of byName.get(master.toLowerCase())?.mods ?? []) {
+        if (from !== id && !out.has(from)) out.set(from, { id: from, plugin: plugin.name, master });
+      }
+    }
+  }
+  return [...out.values()];
 }
 
 /** The mods a condition asks about, as `mod:id` or `mod:"id"`. */

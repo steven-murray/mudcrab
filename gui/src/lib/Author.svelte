@@ -685,6 +685,12 @@
             mod={chosen}
             inputs={list.document.inputs}
             mods={allMods}
+            {order}
+            {readingMasters}
+            readMasters={async () => {
+              if (!order) order = await api.loadOrder();
+              await readMasters();
+            }}
             {run}
           />
           {#if actions.length}
