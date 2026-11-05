@@ -217,7 +217,7 @@ beats both.
 
 ```toml
 [inputs.use_hd_textures]
-type = "bool"        # or "choice" (with `choices`) / "text"
+type = "bool"        # or "choice" / "multi" (with `choices`) / "text"
 query = "Install HD textures?"
 default = false      # must match the type; a choice's must be one of its choices
 
@@ -234,6 +234,25 @@ action = "file_prune"
 paths = ["textures/menus/big.dds"]
 ```
 
+A `multi` input takes any number of its choices -- several optional mods
+asked about at once -- and its answer is a list. Its default is a list (empty
+for none picked), `--set name=a,b` answers it (commas between the choices, so
+a choice cannot hold one, nor be empty or start or end with spaces; `--set
+name=` for none), and a condition asks
+whether a choice was picked with `in`:
+
+```toml
+[inputs.extras]
+type = "multi"
+query = "Which extras would you like?"
+choices = ["Birds", "Better Water", "Rats"]
+default = ["Birds"]
+
+[[mods]]
+id = "Better Water"
+if = '"Better Water" in extras'
+```
+
 Since TOML puts every table after the top-level keys, an input declared with a
 `[inputs.*]` header lands below `plugins`. Dotted keys
 (`inputs.use_hd_textures.type = "bool"`) are plain keys and can sit at the top
@@ -244,8 +263,9 @@ no parentheses). Each term may be negated with `!` and is one of:
 
 | Term | True when |
 |---|---|
-| `flag` | the bool input is true, or the text input is non-empty |
+| `flag` | the bool input is true, the text input is non-empty, or the multi input has anything picked |
 | `key == value`, `key != value` | the input's answer is (not) `value`; quotes optional |
+| `value in key` | the `multi` input's answer includes `value`; quotes when it is more than one word |
 | `mod:id` | mod `id` is in the resolved list; `mod:"Some Mod"` when the id has spaces |
 
 ```toml

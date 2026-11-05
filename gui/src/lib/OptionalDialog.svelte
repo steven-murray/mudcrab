@@ -1,6 +1,6 @@
 <script lang="ts" module>
   /** A question to add with the `if`. */
-  export type Fresh = { name: string; kind: "bool" | "choice"; query: string; choices: string[]; fallback: string };
+  export type Fresh = { name: string; kind: "bool" | "choice" | "multi"; query: string; choices: string[]; fallback: string };
 </script>
 
 <script lang="ts">
@@ -43,6 +43,9 @@
     const terms = t.split("||").map((term) => /^\s*([A-Za-z0-9_.-]+)\s*==\s*("[^"]*"|\S+)\s*$/.exec(term));
     if (terms.every(Boolean) && new Set(terms.map((m) => m![1])).size === 1 && inputs.some((i) => i.id === terms[0]![1]))
       return { mode: "existing" as const, question: terms[0]![1], yes: true, picked: terms.map((m) => unquoted(m![2])) };
+    const has = t.split("||").map((term) => /^\s*("[^"]*"|[A-Za-z0-9_.-]+)\s+in\s+([A-Za-z0-9_.-]+)\s*$/.exec(term));
+    if (has.every(Boolean) && new Set(has.map((m) => m![2])).size === 1 && inputs.some((i) => i.id === has[0]![2]))
+      return { mode: "existing" as const, question: has[0]![2], yes: true, picked: has.map((m) => unquoted(m![1])) };
     return { mode: "text" as const, question: inputs[0]?.id ?? "", yes: true, picked: [] };
   }
   // The form starts at what the mod has when the dialog opens.
@@ -68,6 +71,7 @@
   function forAnswers(name: string, kind: string): string {
     if (kind === "bool") return yes ? name : `!${name}`;
     if (kind === "choice") return [...picked].map((v) => `${name} == ${quoted(v)}`).join(" || ");
+    if (kind === "multi") return [...picked].map((v) => `${quoted(v)} in ${name}`).join(" || ");
     return name;
   }
   const condition = $derived(
@@ -87,7 +91,7 @@
         (/^[A-Za-z0-9_.-]+$/.test(fresh.name.trim()) &&
           !inputs.some((i) => i.id === fresh.name.trim()) &&
           !!fresh.query.trim() &&
-          (fresh.kind === "bool" || freshChoices.length >= 2))),
+          (fresh.kind === "bool" || freshChoices.length >= (fresh.kind === "multi" ? 1 : 2)))),
   );
 
   // A different question's answers start empty.
@@ -105,8 +109,16 @@
           ? {
               ...fresh,
               name: fresh.name.trim(),
-              choices: fresh.kind === "choice" ? freshChoices : [],
-              fallback: fresh.kind === "choice" ? (freshChoices.includes(fresh.fallback) ? fresh.fallback : freshChoices[0]) : fresh.fallback,
+              choices: fresh.kind === "bool" ? [] : freshChoices,
+              // A multi starts with none picked.
+              fallback:
+                fresh.kind === "choice"
+                  ? freshChoices.includes(fresh.fallback)
+                    ? fresh.fallback
+                    : freshChoices[0]
+                  : fresh.kind === "multi"
+                    ? ""
+                    : fresh.fallback,
             }
           : null;
       if (await save(condition, made)) close();
@@ -150,14 +162,15 @@
       <span class="radios">
         <label><input type="radio" bind:group={fresh.kind} value="bool" /> yes or no</label>
         <label><input type="radio" bind:group={fresh.kind} value="choice" /> one of several answers</label>
+        <label><input type="radio" bind:group={fresh.kind} value="multi" /> any of several answers (ticked)</label>
       </span>
     </div>
-    {#if fresh.kind === "choice"}
+    {#if fresh.kind !== "bool"}
       <label class="field">
         <span>Answers</span>
         <textarea rows="3" bind:value={choicesText} placeholder="one per line"></textarea>
       </label>
-      {#if freshChoices.length}
+      {#if freshChoices.length && fresh.kind === "choice"}
         <label class="field">
           <span>Unless chosen</span>
           <select bind:value={fresh.fallback}>{#each freshChoices as c}<option>{c}</option>{/each}</select>
@@ -197,7 +210,7 @@
         <label><input type="radio" bind:group={yes} value={true} /> the answer is yes</label>
         <label><input type="radio" bind:group={yes} value={false} /> the answer is no</label>
       </span>
-    {:else if kind === "choice"}
+    {:else if kind === "choice" || kind === "multi"}
       <span class="radios">
         {#each choices as choice}
           <label

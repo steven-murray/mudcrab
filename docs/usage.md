@@ -290,13 +290,14 @@ action's fields.
 
 ```bash
 mudcrab input list <modlist.toml>
-mudcrab input add <modlist.toml> <name> --type bool|choice|text --query "<question>" [--choice <c>]... [--default <answer>] [--dry-run]
+mudcrab input add <modlist.toml> <name> --type bool|choice|text|multi --query "<question>" [--choice <c>]... [--default <answer>] [--dry-run]
 mudcrab input set <modlist.toml> <name> [key=value]... [--unset <key>]... [--dry-run]
 mudcrab input remove <modlist.toml> <name> [--dry-run]
 ```
 
 The list's questions. `add` writes them the way the list already does (dotted
-`inputs.<name>.<key>` lines at the top, if it has none yet). `remove` is
+`inputs.<name>.<key>` lines at the top, if it has none yet). A `multi`
+question's `--default` is its choices with commas between them. `remove` is
 refused while a condition still uses the question.
 
 ## includes, update

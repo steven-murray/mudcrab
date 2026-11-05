@@ -13,11 +13,13 @@ export interface Docs {
   footer?: Markdown;
 }
 
-export type InputValue = boolean | string;
+/** A multi question's answer or default is the list of choices picked. */
+export type InputValue = boolean | string | string[];
 
 export interface InputDoc {
   id: string;
-  type: "bool" | "choice" | "text";
+  /** A `multi` question takes any number of its choices; its default is a list. */
+  type: "bool" | "choice" | "text" | "multi";
   query: string;
   choices?: string[];
   default?: InputValue;

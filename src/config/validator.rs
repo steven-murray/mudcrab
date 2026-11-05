@@ -59,11 +59,49 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         if spec.input_type == InputType::Choice && spec.choices.is_empty() {
             anyhow::bail!("input {id} is choice type and must include choices");
         }
+        // A choice is written in conditions, quoted where it must be; and
+        // each must be told apart.
+        if let Some(choice) = spec.choices.iter().find(|c| c.contains('"')) {
+            anyhow::bail!("input {id}: a choice cannot hold a double quote ({choice:?})");
+        }
+        if let Some((_, choice)) = spec
+            .choices
+            .iter()
+            .enumerate()
+            .find(|(at, c)| spec.choices[..*at].contains(c))
+        {
+            anyhow::bail!("input {id}: {choice:?} is one of its choices twice");
+        }
+        if spec.input_type == InputType::Multi {
+            anyhow::ensure!(
+                !spec.choices.is_empty(),
+                "input {id} is multi type and must include choices"
+            );
+            // `--set id=a,b` splits on commas, and trims each.
+            if let Some(choice) = spec
+                .choices
+                .iter()
+                .find(|c| c.contains(',') || c.is_empty() || c.trim() != c.as_str())
+            {
+                anyhow::bail!(
+                    "input {id}: a multi input's choice cannot hold a comma, be empty, or start or \
+                     end with spaces ({choice:?})"
+                );
+            }
+        }
 
         match (&spec.default, spec.input_type) {
             (None, _)
             | (Some(InputValue::Bool(_)), InputType::Bool)
             | (Some(InputValue::Text(_)), InputType::Text) => {}
+            (Some(InputValue::List(values)), InputType::Multi) => {
+                if let Some(value) = values.iter().find(|v| !spec.choices.contains(v)) {
+                    anyhow::bail!(
+                        "input {id}: default {value:?} is not one of its choices {:?}",
+                        spec.choices
+                    );
+                }
+            }
             (Some(InputValue::Text(value)), InputType::Choice) => {
                 if !spec.choices.contains(value) {
                     anyhow::bail!(
@@ -174,6 +212,12 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
                 anyhow::bail!(
                     "mod {mod_id}: {site} asks about input '{input}', which [inputs] does not declare"
                 );
+            }
+            for (key, test) in condition.input_tests() {
+                if let Some(spec) = modlist.inputs.get(key) {
+                    check_test(key, spec, test)
+                        .map_err(|err| anyhow::anyhow!("mod {mod_id}: {site}: {err}"))?;
+                }
             }
             for other in condition.mods() {
                 if !flattened_mods.contains_key(other) {
@@ -609,6 +653,31 @@ fn validate_docs(modlist: &SourceModlist, mods: &IndexMap<String, ModEntry>) -> 
                 );
             }
         }
+    }
+    Ok(())
+}
+
+/// A condition's test fits the input it reads: `in` only a `multi` input's
+/// own choices, `==` and `!=` never a `multi`.
+fn check_test(
+    key: &str,
+    spec: &crate::config::schema::InputSpec,
+    test: &crate::config::condition::InputTest,
+) -> anyhow::Result<()> {
+    use crate::config::condition::InputTest;
+    match (test, spec.input_type) {
+        (InputTest::Has(choice), InputType::Multi) => anyhow::ensure!(
+            spec.choices.contains(choice),
+            "asks whether {choice:?} is in {key}, which is not one of its choices {:?}",
+            spec.choices
+        ),
+        (InputTest::Has(choice), _) => {
+            anyhow::bail!("asks whether {choice:?} is in {key}, which is not a multi input")
+        }
+        (InputTest::Equals(_) | InputTest::NotEquals(_), InputType::Multi) => anyhow::bail!(
+            "compares {key} with == or !=; it is a multi input, so ask `\"<choice>\" in {key}`"
+        ),
+        _ => {}
     }
     Ok(())
 }

@@ -11,7 +11,7 @@
 {% endfor %}
 {% endmacro %}
 
-{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% else %}{{ value }}{% endif %}{% endmacro %}
+{% macro answer(value) %}{% if value == true %}yes{% elif value == false %}no{% elif value is sequence and value is not string %}{{ value | join(", ") if value else "none" }}{% else %}{{ value }}{% endif %}{% endmacro %}
 
 {% macro choices(inputs) %}
 {% for input in inputs %}
