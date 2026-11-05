@@ -186,7 +186,10 @@ history there, rather than be undone by it.
     (**Find from its masters**, or the load order), the mods its plugins'
     masters come from are offered too -- **Add them**, or ticked to start in
     **Choose…** -- and an optional one it may not need is named, with what
-    to do.
+    to do. For every mod at once, **Check** has **Add plugin masters as
+    dependencies to all mods** (one edit, undone at once), and a mod's
+    right-click menu has the same for that mod alone. Both cover the mods
+    the current answers install.
 
   Its actions follow (each can be removed: `action remove`), then each of
   its archives: its installer's choices, its filters and its fields (`set`),

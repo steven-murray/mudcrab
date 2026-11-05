@@ -320,6 +320,18 @@ export interface Edited {
   can_redo: boolean;
 }
 
+/** What adding plugins' masters as dependencies did. */
+export interface MasterDependencies {
+  /** The edit, when there was anything to add. */
+  edited: Edited | null;
+  /** How many mods were given dependencies. */
+  mods: number;
+  /** Not added: optional mods that mods which stay would need. */
+  refused: { mod_id: string; needs: string; plugin: string; master: string }[];
+  /** Mods left as they were, and why. */
+  skipped: string[];
+}
+
 export interface Changes {
   edits: Change[];
   diff: string;
@@ -440,6 +452,9 @@ export const api = {
   openPage: (url: string) => invoke<void>("open_page", { url }),
   check: (again = false) => invoke<Checked>("step_check", { again }),
   readMasters: () => invoke<void>("read_masters"),
+  /** Each mod's plugins' masters' mods into its `dependencies`: every mod in the plan, or `id`'s. */
+  addMasterDependencies: (id: string | null) =>
+    invoke<MasterDependencies>("add_master_dependencies", { id }),
   /** Which questions these answers leave asked, and each one's default. */
   questionStates: (answers: Record<string, string>) =>
     invoke<{ id: string; asked: boolean; default?: InputValue }[]>("question_states", { answers }),

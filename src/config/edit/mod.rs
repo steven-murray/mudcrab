@@ -816,6 +816,86 @@ fn relative(base: &Path, target: &Path) -> String {
     parts.join("/")
 }
 
+/// Add to mods' `dependencies`: each mod id with the mods to add, as the list
+/// names them. Written in the file each mod is in, one edit per file, each
+/// list kept as it was with the new ones after it. A mod is left as it is,
+/// and said why, when it is in an included file and a mod it would need is
+/// not in that same file, or its include's `override` sets its
+/// `dependencies`. Returns the edits, what is added (as `add` has it, less
+/// what is left out), and what is left out, and why.
+#[allow(clippy::type_complexity)]
+pub fn plan_dependencies(
+    list: &Path,
+    add: &[(String, Vec<String>)],
+) -> anyhow::Result<(Vec<Edit>, Vec<(String, Vec<String>)>, Vec<String>)> {
+    let source = load_modlist(list)?;
+    let mods = source.flatten_mods()?;
+    let mut skipped = Vec::new();
+    let mut added = Vec::new();
+    // By file: each mod, as that file writes it, with what to add, likewise.
+    let mut by_file: indexmap::IndexMap<PathBuf, Vec<(String, Vec<String>)>> =
+        indexmap::IndexMap::new();
+    for (id, needs) in add {
+        let entry = mods
+            .get(id)
+            .ok_or_else(|| anyhow::anyhow!("no mod {id} in {}", list.display()))?;
+        if entry.overridden.iter().any(|key| key == "dependencies") {
+            skipped.push(format!(
+                "{id}: its include's `override` sets its `dependencies`"
+            ));
+            continue;
+        }
+        let written = |entry: &crate::config::schema::ModEntry, id: &str| {
+            entry.written_id.clone().unwrap_or_else(|| id.to_string())
+        };
+        let mut wanted = Vec::new();
+        let mut kept = Vec::new();
+        for need in needs {
+            match mods.get(need) {
+                Some(other) if other.origin == entry.origin => {
+                    wanted.push(written(other, need));
+                    kept.push(need.clone());
+                }
+                Some(_) => skipped.push(format!(
+                    "{id}: needs {need}, which is in another file than it"
+                )),
+                None => anyhow::bail!("no mod {need} in {}", list.display()),
+            }
+        }
+        if !wanted.is_empty() {
+            added.push((id.clone(), kept));
+            let file = entry.origin.clone().unwrap_or_else(|| list.to_path_buf());
+            by_file
+                .entry(file)
+                .or_default()
+                .push((written(entry, id), wanted));
+        }
+    }
+    let mut edits = Vec::new();
+    for (file, changes) in by_file {
+        edits.push(plan_in(list, &file, |text, own| {
+            let own = own.flatten_mods()?;
+            let mut text = text.to_string();
+            for (id, wanted) in &changes {
+                let mut deps = own
+                    .get(id)
+                    .map(|entry| entry.dependencies.clone())
+                    .unwrap_or_default();
+                for need in wanted {
+                    if !deps.contains(need) {
+                        deps.push(need.clone());
+                    }
+                }
+                let value = toml_edit::Array::from_iter(deps.iter().map(String::as_str));
+                let pairs = doc::parse_pairs(&[format!("dependencies={value}")])?;
+                text = doc::set_fields(&text, id, None, &pairs, &[])?;
+            }
+            Ok(text)
+        })?);
+    }
+    Ok((edits, added, skipped))
+}
+
 /// `text` loads and validates as the modlist at `path`.
 pub fn check(path: &Path, text: &str) -> anyhow::Result<()> {
     check_in(path, path, text)

@@ -9,6 +9,7 @@
     type Checked,
     type Conflicts as Found,
     type Edited,
+    type MasterDependencies,
     type Entry,
     type ListView,
     type LoadOrder as Order,
@@ -327,6 +328,35 @@
     }
   }
 
+  // Each mod's plugins' masters into its `dependencies` (every mod's, or
+  // one's), reading the masters first if they are not yet; what it did is
+  // shown until the next.
+  let masterDeps = $state<MasterDependencies | null>(null);
+  let addingDeps = $state(false);
+  async function addMasterDeps(id: string | null) {
+    modMenu = null;
+    if (editing) return;
+    editing = true;
+    addingDeps = true;
+    error = null;
+    try {
+      const done = await api.addMasterDependencies(id);
+      masterDeps = done;
+      if (done.edited) {
+        last = done.edited.change;
+        canUndo = done.edited.can_undo;
+        canRedo = done.edited.can_redo;
+      }
+      if (!order) order = await api.loadOrder();
+      await refresh();
+    } catch (err) {
+      error = String(err);
+    } finally {
+      editing = false;
+      addingDeps = false;
+    }
+  }
+
   const undo = () => canUndo && run(api.undo);
   const redo = () => canRedo && run(api.redo);
 
@@ -433,10 +463,48 @@
       {#if doc}
         {@render optionalMenu(doc)}
       {/if}
+      <button
+        role="menuitem"
+        onclick={() => addMasterDeps(modMenu!.id)}
+        title="List the mods its plugins' masters come from in its dependencies (reading the masters from the archives first, if need be)"
+        >Add its plugins' masters as dependencies</button
+      >
       <button role="menuitem" class="danger" onclick={() => (confirmRemove = true)} title="mudcrab remove">Remove from the list…</button>
     {/if}
   </div>
 {/if}
+
+{#snippet masterDepsDone(done: MasterDependencies)}
+  <div class="depsdone">
+    <button class="link close" onclick={() => (masterDeps = null)} title="Hide this">×</button>
+    {#if done.mods}
+      Added dependencies to {done.mods} mod{done.mods === 1 ? "" : "s"}, from their plugins' masters{#if checked}; check again
+        to see the list as it is now{/if}.
+    {:else}
+      No dependencies to add: every mod already lists the mods its plugins' masters come from.
+    {/if}
+    {#if done.refused.length}
+      <div class="bad">
+        Not added, as the player may untick them -- make each mod optional too, or have its <code>if</code> follow what it
+        needs:
+        <ul>
+          {#each done.refused as r}
+            <li>
+              <button class="link" onclick={() => select(r.mod_id)}>{r.mod_id}</button> needs {r.needs}
+              <span class="dim">({r.plugin} has {r.master} as a master)</span>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
+    {#if done.skipped.length}
+      <div class="dim">
+        Left as they were:
+        <ul>{#each done.skipped as s}<li>{s}</li>{/each}</ul>
+      </div>
+    {/if}
+  </div>
+{/snippet}
 
 {#snippet optionalMenu(doc: ModDoc)}
   {@const blockers = neededBy(doc.id, allMods)}
@@ -657,6 +725,11 @@
 
     <div class="content">
       {#if error}<pre class="error">{error}</pre>{/if}
+      {#if addingDeps}
+        <p class="dim">Reading plugins' masters, and adding them as dependencies…</p>
+      {:else if masterDeps}
+        {@render masterDepsDone(masterDeps)}
+      {/if}
 
       {#if tab === "mod"}
         {#if !chosen}
@@ -750,6 +823,12 @@
         <div class="checkbar">
           <button class="primary" onclick={runCheck} disabled={checking}>{checking ? "Checking…" : checked ? "Check again" : "Run check"}</button>
           {#if checked}<span>{checked.done.summary}</span>{/if}
+          <button
+            onclick={() => addMasterDeps(null)}
+            disabled={editing}
+            title="For every mod in the plan: list the mods its plugins' masters come from in its dependencies. One edit, undone at once."
+            >Add plugin masters as dependencies to all mods</button
+          >
         </div>
         {#if checked}
           {#each checked.groups as group}
@@ -1036,6 +1115,27 @@
   }
   .ask .bad {
     color: var(--problem);
+  }
+  .depsdone {
+    position: relative;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px 28px 8px 12px;
+    margin: 0 0 10px;
+  }
+  .depsdone .close {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+  }
+  .depsdone ul {
+    margin: 4px 0 0;
+    padding-left: 18px;
+  }
+  .depsdone .bad {
+    color: var(--problem);
+    margin-top: 6px;
   }
   .menu .danger {
     color: var(--problem);

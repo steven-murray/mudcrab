@@ -589,3 +589,46 @@ fn a_master_from_another_mod_is_a_dependency() {
     // Optional too, and listing it: nothing to say.
     assert!(findings(optional, &format!("{optional}dependencies = [\"Base\"]\n")).is_empty());
 }
+
+#[test]
+fn masters_are_written_as_dependencies() {
+    let dir = tempdir().unwrap();
+    let (list, downloads) = masters_fixture(dir.path());
+    let text = std::fs::read_to_string(&list).unwrap().replace(
+        "id = \"Patch\"\n",
+        "id = \"Patch\"\ndependencies = [\"Absent\"]\n",
+    );
+    std::fs::write(&list, text).unwrap();
+    let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+    let plan =
+        mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    let report = mudcrab::config::check::check_all(
+        &plan,
+        &mudcrab::config::check::CheckSettings {
+            cache_dir: downloads,
+            filter: Default::default(),
+            masters_only: true,
+        },
+    )
+    .unwrap();
+    let needs = mudcrab::config::check::unlisted_needs(&plan, &report.plugins);
+    assert_eq!(needs.len(), 1, "{needs:?}");
+    assert_eq!(
+        (needs[0].mod_id.as_str(), needs[0].needs.as_str()),
+        ("Patch", "Base")
+    );
+    assert!(!needs[0].optional);
+
+    let add = vec![("Patch".to_string(), vec!["Base".to_string()])];
+    let (edits, added, skipped) = mudcrab::config::edit::plan_dependencies(&list, &add).unwrap();
+    assert_eq!(added, add);
+    assert!(skipped.is_empty());
+    for edit in &edits {
+        edit.write().unwrap();
+    }
+    let written = std::fs::read_to_string(&list).unwrap();
+    assert!(
+        written.contains("dependencies = [\"Absent\", \"Base\"]"),
+        "{written}"
+    );
+}
