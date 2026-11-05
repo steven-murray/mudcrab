@@ -164,7 +164,10 @@ history there, rather than be undone by it.
   onto another mod to put it before or after that one, or onto a section to
   put it at the end of it (`move`). Right-click a mod to untick it in MO2 (its
   plugins leave the load order: `disable`), tick it again (`enable`), or
-  remove it from the list, with its plugins and notes (`remove`). **+** by
+  remove it from the list, with its plugins and notes (`remove`). Its
+  **Make optional** submenu puts it in one of the list's groups of optional
+  mods, or a new group, in one click each; **Custom condition…** writes its
+  `if` instead. **+** by
   the search box adds a mod, from an archive or a Nexus link.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs

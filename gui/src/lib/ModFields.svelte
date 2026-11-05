@@ -2,6 +2,7 @@
   import { api, tomlString, type InputDoc, type ModDoc } from "./api";
   import NeedsDialog from "./NeedsDialog.svelte";
   import OptionalDialog, { type Fresh } from "./OptionalDialog.svelte";
+  import { neededBy, optionalGroups } from "./optional";
 
   // A mod's own settings: whether it is optional (its `if`), whether it is
   // installed inactive (`disable`), and what it needs (`dependencies`). Each
@@ -14,9 +15,8 @@
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
-    /** Every mod in the list: its id, title, group of optional mods, what it
-     *  needs, and the mods its `if` asks about. */
-    mods: { id: string; title: string; optional?: ModDoc["optional"]; dependencies: string[]; follows: string[] }[];
+    /** Every mod in the list. */
+    mods: ModDoc[];
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
@@ -41,15 +41,10 @@
   let choosing = $state(false);
   const title = (id: string) => mods.find((m) => m.id === id)?.title ?? id;
 
-  // The player may untick an optional mod, so a mod that is not optional may
-  // not need one -- unless its `if` names it, and it comes and goes with it.
-  // `validate` refuses the edit; these say so before it is tried.
+  // What would leave a mod that is not optional needing one; see ./optional.
   const isOptional = (id: string) => !!mods.find((m) => m.id === id)?.optional;
-  /** The mods that are not optional and need this one, without following it. */
-  const dependents = $derived(
-    mods.filter((m) => m.id !== mod.id && !m.optional && m.dependencies.includes(mod.id) && !m.follows.includes(mod.id)),
-  );
-  /** The optional mods this one needs: out of the optional mods, it has to follow them. */
+  const dependents = $derived(neededBy(mod.id, mods));
+  /** The optional mods this one needs (as read just now). */
   const optionalNeeds = $derived(needs.filter(isOptional));
 
   // Optional by a question: out of its group of optional mods, if it was in one.
@@ -57,8 +52,7 @@
     if (fresh && !(await run(() => api.addInput(fresh.name, fresh.kind, fresh.query, fresh.choices, fresh.fallback)))) return false;
     return run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], mod.optional ? ["optional"] : []));
   }
-  // The list's groups of optional mods, by name ("" for its own).
-  const groups = $derived([...new Set(mods.filter((m) => m.optional).map((m) => m.optional!.group ?? ""))]);
+  const groups = $derived(optionalGroups(mods));
   const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
   const always = () =>
     run(() =>

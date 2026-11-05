@@ -3,6 +3,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import {
     api,
+    tomlString,
     type Change,
     type Changes,
     type Checked,
@@ -22,6 +23,7 @@
   import { startDrag, type Place } from "./drag";
   import EntryView from "./EntryView.svelte";
   import ModFields from "./ModFields.svelte";
+  import { namedMods, neededBy, optionalGroups, optionalNeeds, optionalToml } from "./optional";
   import ModFiles, { type Archive as ModArchive } from "./ModFiles.svelte";
   import Inputs from "./Inputs.svelte";
   import LoadOrder from "./LoadOrder.svelte";
@@ -80,6 +82,27 @@
   // A mod's right-click menu, and whether its removal is being confirmed.
   let modMenu = $state<{ x: number; y: number; id: string; title: string; enabled: boolean } | null>(null);
   let confirmRemove = $state(false);
+  // In its "Make optional" submenu: a new group's name, or an `if`, being typed.
+  let menuAsk = $state<"group" | "if" | null>(null);
+  let menuText = $state("");
+
+  // From the menu, many mods can be made optional quickly: each pick is
+  // written at once, as in the mod's Optional dialog. A group keeps the mod's
+  // `if`, and whether it starts ticked when it stays in the same group; an
+  // `if` of its own takes it out of its group.
+  function setOptional(mod: ModDoc, group: string) {
+    const ticked = !!mod.optional && (mod.optional.group ?? "") === group.trim() && mod.optional.default;
+    modMenu = null;
+    run(() => api.setFields(mod.id, null, [`optional=${optionalToml(group, ticked)}`], []));
+  }
+  function setIf(mod: ModDoc, condition: string) {
+    modMenu = null;
+    run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], mod.optional ? ["optional"] : []));
+  }
+  function alwaysInstall(mod: ModDoc) {
+    modMenu = null;
+    run(() => api.setFields(mod.id, null, [], [...(mod.condition ? ["if"] : []), ...(mod.optional ? ["optional"] : [])]));
+  }
   // The "+" menu by the search box.
   let addMenu = $state(false);
 
@@ -109,6 +132,8 @@
     walk(list.document.entries, [], []);
     return out;
   });
+  const allMods = $derived([...mods.values()].map((m) => m.mod));
+  const groups = $derived(optionalGroups(allMods));
   const sections = $derived.by(() => {
     const out = new Map<string, string[]>();
     const walk = (entries: Entry[]) => {
@@ -404,10 +429,85 @@
           : "Ticked in MO2 again; its plugins go back in the load order (mudcrab enable)"}
         >{modMenu.enabled ? "Untick it in MO2" : "Tick it in MO2"}</button
       >
+      {@const doc = mods.get(modMenu.id)?.mod}
+      {#if doc}
+        {@render optionalMenu(doc)}
+      {/if}
       <button role="menuitem" class="danger" onclick={() => (confirmRemove = true)} title="mudcrab remove">Remove from the list…</button>
     {/if}
   </div>
 {/if}
+
+{#snippet optionalMenu(doc: ModDoc)}
+  {@const blockers = neededBy(doc.id, allMods)}
+  {@const needed = optionalNeeds(doc, allMods)}
+  {@const unfollowed = menuAsk === "if" ? needed.filter((n) => !namedMods(menuText).includes(n.id)) : []}
+  {@const blocked = blockers.length
+    ? `${blockers.map((m) => m.title).join(", ")} ${blockers.length === 1 ? "needs it and is" : "need it and are"} not optional`
+    : undefined}
+  <div class="sub" class:flip={modMenu!.x > window.innerWidth - 470} class:asking={menuAsk}>
+    <button role="menuitem" aria-haspopup="menu" class="opens"
+      >{doc.optional || doc.condition ? "Optional" : "Make optional"}<span class="dim">▸</span></button
+    >
+    <div class="menu subm" role="menu">
+      {#each groups as group}
+        {@const here = !!doc.optional && (doc.optional.group ?? "") === group}
+        <button role="menuitem" class:here disabled={!!blocked || here} title={blocked} onclick={() => setOptional(doc, group)}
+          >{group || "The list's optional mods"}</button
+        >
+      {/each}
+      {#if menuAsk === "group"}
+        <form
+          class="ask"
+          onsubmit={(e) => {
+            e.preventDefault();
+            if (menuText.trim()) setOptional(doc, menuText);
+          }}
+        >
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="text" bind:value={menuText} placeholder="The new group's name" autofocus
+            onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), (menuAsk = null))} />
+        </form>
+      {:else}
+        <button role="menuitem" disabled={!!blocked} title={blocked} onclick={() => ((menuAsk = "group"), (menuText = ""))}
+          >Add new group…</button
+        >
+      {/if}
+      <hr />
+      {#if menuAsk === "if"}
+        <form
+          class="ask"
+          onsubmit={(e) => {
+            e.preventDefault();
+            if (menuText.trim() && !unfollowed.length) setIf(doc, menuText.trim());
+          }}
+        >
+          <!-- svelte-ignore a11y_autofocus -->
+          <input type="text" class="code" bind:value={menuText} placeholder="e.g. big_textures && !mod:Other" autofocus
+            onkeydown={(e) => e.key === "Escape" && (e.stopPropagation(), (menuAsk = null))} />
+          {#if unfollowed.length}
+            <div class="bad">
+              It needs {unfollowed.map((n) => n.title).join(", ")}, so its <code>if</code> has to name
+              {#each unfollowed as n, i}{i ? ", " : ""}<code>mod:{JSON.stringify(n.id)}</code>{/each}.
+            </div>
+          {:else}
+            <div class="dim">Enter to write it as its <code>if</code>{doc.optional ? ", out of its group" : ""}.</div>
+          {/if}
+        </form>
+      {:else}
+        <button role="menuitem" onclick={() => ((menuAsk = "if"), (menuText = doc.condition?.expr ?? ""))}>Custom condition…</button>
+      {/if}
+      {#if doc.optional || doc.condition}
+        <button
+          role="menuitem"
+          disabled={!!needed.length}
+          title={needed.length ? `It needs ${needed.map((m) => m.title).join(", ")}, which the player may untick` : undefined}
+          onclick={() => alwaysInstall(doc)}>Always install it</button
+        >
+      {/if}
+    </div>
+  </div>
+{/snippet}
 
 {#if choosing}
   <ChooseDialog
@@ -502,6 +602,7 @@
                 ev.preventDefault();
                 ev.stopPropagation();
                 confirmRemove = false;
+                menuAsk = null;
                 modMenu = { x: ev.clientX, y: ev.clientY, id: e.id, title: e.title, enabled: e.enabled !== false };
               }}
             >
@@ -583,13 +684,7 @@
           <ModFields
             mod={chosen}
             inputs={list.document.inputs}
-            mods={[...mods.values()].map((m) => ({
-              id: m.mod.id,
-              title: m.mod.title,
-              optional: m.mod.optional,
-              dependencies: m.mod.dependencies ?? [],
-              follows: m.mod.condition?.mods ?? [],
-            }))}
+            mods={allMods}
             {run}
           />
           {#if actions.length}
@@ -885,6 +980,56 @@
   }
   .menu button:hover {
     background: var(--accent-soft);
+  }
+  .menu button:disabled {
+    color: var(--dim);
+    background: none;
+  }
+  .sub {
+    position: relative;
+  }
+  .opens {
+    display: flex !important;
+    justify-content: space-between;
+  }
+  .subm {
+    display: none;
+    position: absolute;
+    left: calc(100% + 2px);
+    top: -4px;
+    max-width: 280px;
+  }
+  .sub.flip .subm {
+    left: auto;
+    right: calc(100% + 2px);
+  }
+  .sub:hover > .subm,
+  .sub:focus-within > .subm,
+  .sub.asking > .subm {
+    display: block;
+  }
+  .subm .here::before {
+    content: "✓ ";
+  }
+  .subm hr {
+    border: none;
+    border-top: 1px solid var(--line);
+    margin: 4px 0;
+  }
+  .ask {
+    padding: 2px 8px 4px;
+    font-size: 12px;
+  }
+  .ask input {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 3px;
+  }
+  .ask input.code {
+    font-family: var(--mono);
+  }
+  .ask .bad {
+    color: var(--problem);
   }
   .menu .danger {
     color: var(--problem);

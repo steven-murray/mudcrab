@@ -8,6 +8,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import type { InputDoc } from "./api";
   import Dialog from "./Dialog.svelte";
+  import { namedMods, optionalToml as toml } from "./optional";
 
   // Which answers bring a mod in: a group of optional mods (for a mod),
   // one of the list's questions and its answers, a new question, or (for
@@ -54,11 +55,7 @@
   let groupName = $state(untrack(() => startGroup?.name ?? (groups?.includes("") || !groups?.length ? "" : groups[0])));
   let newGroup = $state(false);
   let ticked = $state(untrack(() => startGroup?.default ?? false));
-  const optionalToml = $derived.by(() => {
-    const name = groupName.trim();
-    if (ticked) return name ? `{ group = ${JSON.stringify(name)}, default = true }` : "{ default = true }";
-    return name ? JSON.stringify(name) : "true";
-  });
+  const optionalToml = $derived(toml(groupName, ticked));
 
   const quoted = (value: string) => (/^[A-Za-z0-9_.-]+$/.test(value) ? value : JSON.stringify(value));
   const unquoted = (value: string) => value.replace(/^"(.*)"$/, "$1");
@@ -118,12 +115,7 @@
           ? forAnswers(fresh.name.trim(), fresh.kind)
           : "",
   );
-  // The mods `condition` asks about, as `mod:id` or `mod:"id"`.
-  const named = $derived(
-    [...condition.matchAll(/mod:\s*("(?:[^"\\]|\\.)*"|[A-Za-z0-9_.-]+)/g)].map((m) =>
-      m[1].startsWith('"') ? JSON.parse(m[1]) : m[1],
-    ),
-  );
+  const named = $derived(namedMods(condition));
   // What `validate` would refuse.
   const unfollowed = $derived(optionalNeeds.filter((n) => !named.includes(n.id)));
   const refused = $derived(mode === "group" ? dependents.length > 0 : unfollowed.length > 0);
