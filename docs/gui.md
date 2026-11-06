@@ -164,7 +164,10 @@ history there, rather than be undone by it.
   onto another mod to put it before or after that one, or onto a section to
   put it at the end of it (`move`). Right-click a mod to untick it in MO2 (its
   plugins leave the load order: `disable`), tick it again (`enable`), or
-  remove it from the list, with its plugins and notes (`remove`). **+** by
+  remove it from the list, with its plugins and notes (`remove`). Its
+  **Make optional** submenu puts it in one of the list's groups of optional
+  mods, or a new group, in one click each; **Custom condition…** writes its
+  `if` instead. **+** by
   the search box adds a mod, from an archive or a Nexus link.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
@@ -179,7 +182,14 @@ history there, rather than be undone by it.
   - **Inactive**: ticked, the mod is installed but left unticked in MO2,
     its plugins inactive (`disable`; unticked again, `enable`).
   - **Needs**: **Choose…** ticks the mods it needs from every mod in the
-    list, found by name (`dependencies`).
+    list, found by name (`dependencies`). Once the masters are read
+    (**Find from its masters**, or the load order), the mods its plugins'
+    masters come from are offered too -- **Add them**, or ticked to start in
+    **Choose…** -- and an optional one it may not need is named, with what
+    to do. For every mod at once, **Check** has **Add plugin masters as
+    dependencies to all mods** (one edit, undone at once), and a mod's
+    right-click menu has the same for that mod alone. Both cover the mods
+    the current answers install.
 
   Its actions follow (each can be removed: `action remove`), then each of
   its archives: its installer's choices, its filters and its fields (`set`),
@@ -233,7 +243,10 @@ history there, rather than be undone by it.
   headings; a finding about a mod opens that mod.
 - **Questions**: the list's inputs, each with the mods whose `if` asks it.
   A *multi* question (any of its answers) is ticked in Install's Profile
-  panel, one box per answer.
+  panel, one box per answer. **Asked only if** gives a question an `if` on
+  the questions above it: in the Profile panel it shows only when that
+  holds, and a default that follows an earlier answer (`default_when`)
+  changes with it until it is answered.
   Change one's wording, answers or default (`input set`), add one (`input
   add`), or remove one no mod asks any more (`input remove`).
 - **Changes**: every change made in this session, as the commands that make

@@ -40,7 +40,7 @@
   let editing = $state<string | null>(null);
   // Answers are edited one per line, so an answer may hold a comma; whether
   // there is a default is kept apart from its text, which may be empty.
-  let draft = $state({ query: "", choices: "", hasDefault: false, fallback: "" });
+  let draft = $state({ query: "", choices: "", hasDefault: false, fallback: "", condition: "" });
   const lines = (text: string) => text.split("\n").map((c) => c.trim()).filter(Boolean);
   const listed = (kind: string) => kind === "choice" || kind === "multi";
   // A default as the form edits it: a multi's choices with commas between.
@@ -54,6 +54,7 @@
       choices: (input.choices ?? []).join("\n"),
       hasDefault: input.default !== undefined,
       fallback: input.default === undefined ? (input.type === "bool" ? "false" : "") : shownDefault(input.default),
+      condition: input.condition?.expr ?? "",
     };
   }
 
@@ -75,6 +76,10 @@
     const sets: string[] = [];
     const unsets: string[] = [];
     if (draft.query !== input.query) sets.push(`query=${tomlString(draft.query)}`);
+    if (draft.condition.trim() !== (input.condition?.expr ?? "")) {
+      if (draft.condition.trim()) sets.push(`if=${tomlString(draft.condition.trim())}`);
+      else unsets.push("if");
+    }
     if (listed(input.type)) {
       const choices = lines(draft.choices);
       if (JSON.stringify(choices) !== JSON.stringify(input.choices ?? []))
@@ -146,6 +151,12 @@
         }}
       >
         <label>Question <input type="text" bind:value={draft.query} /></label>
+        {#if input.optional_group === undefined}
+          <label
+            >Asked only if
+            <input type="text" bind:value={draft.condition} placeholder="always asked; or a condition on the questions above, e.g. enb" />
+          </label>
+        {/if}
         {#if input.optional_group !== undefined}
           <p class="dim small">Its answers are the mods marked optional in it; which start ticked is said on each mod.</p>
         {:else}
@@ -176,6 +187,10 @@
       </form>
     {:else}
       <p class="query">{input.query}</p>
+      {#if input.condition}<div class="dim small">Asked only if {input.condition.text}</div>{/if}
+      {#each input.default_when ?? [] as when}
+        <div class="dim small">Default {Array.isArray(when.value) ? when.value.join(", ") || "none" : `“${when.value}”`} if {when.condition.text}</div>
+      {/each}
       <div class="dim small">
         {#if input.choices?.length}answers: {input.choices.map((c) => `“${c}”`).join(" ")} · {/if}default: {input.default === undefined
           ? "none"

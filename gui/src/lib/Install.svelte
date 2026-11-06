@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount, untrack } from "svelte";
+  import { SvelteSet } from "svelte/reactivity";
   import { listen, type UnlistenFn } from "@tauri-apps/api/event";
   import {
     api,
@@ -40,6 +41,9 @@
     return out;
   });
   let answers = $state<Record<string, string>>(initial);
+  // Answers given (here, or saved from before): a default that follows an
+  // earlier answer changes only those not given.
+  const given = new SvelteSet<string>(untrack(() => Object.keys(list.answers)));
   // Each profile has its own answers: choosing another brings its
   // answers back (or the last given anywhere, for a new one).
   let shownProfile = untrack(() => locations?.profile);
@@ -50,13 +54,37 @@
     notes = {};
     const saved = locations.answers;
     untrack(() => {
+      given.clear();
+      for (const id of Object.keys(saved)) given.add(id);
       for (const input of list.document.inputs) {
         answers[input.id] = saved[input.id] ?? (input.default === undefined ? "" : String(input.default));
       }
     });
   });
+  // Which questions are asked, as the answers so far leave them: one whose
+  // `if` does not hold is hidden. Its default may follow an earlier answer.
+  let asked = $state<Record<string, boolean>>({});
+  const asText = (value: unknown) => (Array.isArray(value) ? value.join(",") : value === undefined ? "" : String(value));
+  let reading = 0;
+  $effect(() => {
+    const now = JSON.stringify(answers);
+    const mine = ++reading;
+    api
+      .questionStates(JSON.parse(now))
+      .then((states) => {
+        if (mine !== reading) return;
+        asked = Object.fromEntries(states.map((q) => [q.id, q.asked]));
+        untrack(() => {
+          for (const q of states)
+            if (!given.has(q.id) && q.default !== undefined && answers[q.id] !== asText(q.default)) answers[q.id] = asText(q.default);
+        });
+      })
+      .catch(() => {});
+  });
   // A multi question is answered by ticking none, too.
-  const unanswered = $derived(list.document.inputs.filter((i) => i.type !== "multi" && answers[i.id] === ""));
+  const unanswered = $derived(
+    list.document.inputs.filter((i) => i.type !== "multi" && asked[i.id] !== false && answers[i.id] === ""),
+  );
   // A multi answer, as `--set` takes it: the choices ticked, with commas.
   const pickedFor = (id: string) => answers[id].split(",").filter(Boolean);
   function tick(id: string, choices: string[], choice: string, on: boolean) {
@@ -313,8 +341,8 @@
         {#if profileError}<div class="small err">{profileError}</div>{/if}
       {/if}
     </div>
-    {#each list.document.inputs as input}
-      <div class="question">
+    {#each list.document.inputs.filter((i) => asked[i.id] !== false) as input (input.id)}
+      <div class="question" onchange={() => given.add(input.id)} oninput={() => given.add(input.id)}>
         <div class="query">{input.query}</div>
         {#if input.type === "bool"}
           <div class="choices">

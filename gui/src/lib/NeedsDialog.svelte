@@ -9,6 +9,8 @@
     id,
     mods,
     current,
+    blocked = new Map(),
+    suggested = new Map(),
     save,
     close,
   }: {
@@ -16,12 +18,16 @@
     /** Every other mod: its id and title. */
     mods: { id: string; title: string }[];
     current: string[];
+    /** The mods it may not need, each with why. */
+    blocked?: Map<string, string>;
+    /** The mods its plugins' masters come from, each with which: ticked to start. */
+    suggested?: Map<string, string>;
     save: (needs: string[]) => Promise<boolean>;
     close: () => void;
   } = $props();
 
   // Starting at what the mod needs when the dialog opens.
-  const ticked = new SvelteSet<string>(untrack(() => current));
+  const ticked = new SvelteSet<string>(untrack(() => [...current, ...suggested.keys()]));
   let filter = $state("");
   let busy = $state(false);
   const words = $derived(filter.trim().toLowerCase());
@@ -49,14 +55,18 @@
   <input type="text" class="find" placeholder="Find a mod" bind:value={filter} autofocus />
   <ul>
     {#each shown as mod (mod.id)}
+      {@const why = ticked.has(mod.id) ? undefined : blocked.get(mod.id)}
       <li>
-        <label>
+        <label class:blocked={why} title={why}>
           <input
             type="checkbox"
+            disabled={!!why}
             checked={ticked.has(mod.id)}
             onchange={(e) => (e.currentTarget.checked ? ticked.add(mod.id) : ticked.delete(mod.id))}
           />
           {mod.title}{#if mod.title !== mod.id}<span class="dim"> · {mod.id}</span>{/if}
+          {#if why}<span class="dim"> · optional</span>{/if}
+          {#if suggested.has(mod.id)}<span class="dim" title={suggested.get(mod.id)}> · a master</span>{/if}
         </label>
       </li>
     {/each}
@@ -89,6 +99,9 @@
     display: flex;
     gap: 6px;
     align-items: baseline;
+  }
+  label.blocked {
+    color: var(--dim);
   }
   .count {
     margin-right: auto;

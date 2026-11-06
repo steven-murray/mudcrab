@@ -631,6 +631,8 @@ mod tests {
                 choices: Vec::new(),
                 default: Some(InputValue::Bool(true)),
                 fixed: None,
+                condition: None,
+                default_when: Vec::new(),
             },
         )]);
         let say = |expr: &str| condition(&Condition::parse(expr).unwrap(), &inputs);

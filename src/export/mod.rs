@@ -77,6 +77,18 @@ pub struct InputDoc {
     /// when it was made for the group.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional_group: Option<bool>,
+    /// Asked only when this holds on the answers before it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub condition: Option<ConditionDoc>,
+    /// Defaults that depend on earlier answers, the first that holds taken.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub default_when: Vec<DefaultWhenDoc>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct DefaultWhenDoc {
+    pub condition: ConditionDoc,
+    pub value: InputValue,
 }
 
 #[derive(Debug, Serialize)]
@@ -142,6 +154,9 @@ pub struct ModDoc {
     /// The group of optional mods it is in, when it is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional: Option<OptionalDoc>,
+    /// The mods it needs, by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
     pub docs: Docs,
     pub archives: Vec<ArchiveDoc>,
     pub plugins: Vec<String>,
@@ -180,6 +195,9 @@ pub struct ConditionDoc {
     /// question": a manual guide can then say "Optional: <question>".
     #[serde(skip_serializing_if = "Option::is_none")]
     pub question: Option<String>,
+    /// The mods it asks about (`mod:id`), by id.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub mods: Vec<String>,
 }
 
 /// Where to find the archives, so the document can name the files a pattern
@@ -418,6 +436,20 @@ pub fn build_document(
                 default: spec.default.clone(),
                 answer: plan.and_then(|plan| plan.responses.get(id).cloned()),
                 optional_group: modlist.optional_groups.get(id).copied(),
+                condition: spec
+                    .condition
+                    .as_deref()
+                    .and_then(|expr| condition_doc(expr, modlist).ok()),
+                default_when: spec
+                    .default_when
+                    .iter()
+                    .filter_map(|case| {
+                        Some(DefaultWhenDoc {
+                            condition: condition_doc(&case.condition, modlist).ok()?,
+                            value: case.value.clone(),
+                        })
+                    })
+                    .collect(),
             })
             .collect(),
         plan: plan.map(|plan| PlanDoc {
@@ -512,6 +544,7 @@ fn condition_doc(expr: &str, modlist: &SourceModlist) -> anyhow::Result<Conditio
         expr: expr.to_string(),
         text: describe::condition(&condition, &modlist.inputs),
         question,
+        mods: condition.mods().into_iter().map(str::to_string).collect(),
     })
 }
 
@@ -654,6 +687,7 @@ fn mod_doc(
                 }
             }),
         },
+        dependencies: entry.dependencies.clone(),
         docs: entry.docs.clone(),
         archives: archive_docs,
         plugins: entry.plugins.clone(),

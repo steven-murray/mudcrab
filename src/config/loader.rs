@@ -108,6 +108,8 @@ fn gather_optional(list: &mut SourceModlist) -> anyhow::Result<()> {
             choices: Vec::new(),
             default: Some(InputValue::List(Vec::new())),
             fixed: None,
+            condition: None,
+            default_when: Vec::new(),
         });
         anyhow::ensure!(
             spec.input_type == InputType::Multi,
@@ -706,6 +708,22 @@ fn namespace_inputs(entry: &ModEntry, child: &mut SourceModlist) -> anyhow::Resu
     let rename = |key: &str| own.contains(key).then(|| format!("{space}.{key}"));
     for m in &mut child.mods {
         rename_inputs_in(m, &rename)?;
+    }
+    // A question's own `if` and defaults ask about the same file's questions.
+    let renamed = |text: &mut String| -> anyhow::Result<()> {
+        let mut parsed = crate::config::condition::Condition::parse(text)?;
+        parsed.rename_inputs(&rename);
+        *text = parsed.to_text();
+        Ok(())
+    };
+    for (key, spec) in &mut child.inputs {
+        let at = |err: anyhow::Error| anyhow::anyhow!("input '{key}': {err:#}");
+        if let Some(text) = &mut spec.condition {
+            renamed(text).map_err(at)?;
+        }
+        for case in &mut spec.default_when {
+            renamed(&mut case.condition).map_err(at)?;
+        }
     }
     child.inputs = std::mem::take(&mut child.inputs)
         .into_iter()

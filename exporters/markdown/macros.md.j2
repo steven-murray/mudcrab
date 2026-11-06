@@ -15,7 +15,7 @@
 
 {% macro choices(inputs) %}
 {% for input in inputs %}
-- {{ input.query }}{{ " *(" ~ answer(input.answer) ~ ")*" if input.answer is defined else " *(default: " ~ answer(input.default) ~ ")*" if input.default is defined }}
+- {{ input.query }}{{ " *(" ~ answer(input.answer) ~ ")*" if input.answer is defined else " *(default: " ~ answer(input.default) ~ ")*" if input.default is defined }}{{ " *(asked only if " ~ input.condition.text ~ ")*" if input.condition and input.answer is not defined }}
 {% endfor %}
 {% endmacro %}
 

@@ -182,6 +182,23 @@ pub struct InputSpec {
     /// the include. Nobody is asked, and `--set` cannot change it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fixed: Option<InputValue>,
+    /// Asked only when this holds, on the answers to the questions before
+    /// it; otherwise it takes its default, unasked.
+    #[serde(default, rename = "if", skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    /// Defaults that depend on earlier answers: the first whose `if` holds
+    /// is the default, else `default`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub default_when: Vec<DefaultWhen>,
+}
+
+/// A default that applies when its condition does: `{ if = "...", value = ... }`.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct DefaultWhen {
+    #[serde(rename = "if")]
+    pub condition: String,
+    pub value: InputValue,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
@@ -1100,7 +1117,9 @@ pub struct CompiledModlist {
     pub input_count: usize,
     pub mod_count: usize,
     pub plugin_count: usize,
-    pub inputs: HashMap<String, InputSpec>,
+    /// In declaration order: the order they are asked in, each able to
+    /// depend on those before it.
+    pub inputs: IndexMap<String, InputSpec>,
     /// Install-wide actions, currently only those desugared from the top-level
     /// `[ini]` table. Same type as per-mod actions so there is one dispatcher.
     #[serde(default)]
@@ -1184,6 +1203,10 @@ pub struct CompiledMod {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
+    /// The question it is a choice of, when it is one of the optional mods;
+    /// see `ModEntry::optional_in`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optional_in: Option<String>,
     /// Plugins this mod ships, from the source entry, so `query` can take a
     /// left-out mod's plugins out of the load order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -1310,6 +1333,15 @@ pub struct PersonalizedMod {
     /// archives hold. Not part of what is installed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub plugins: Vec<String>,
+    /// For `check`, to compare with the masters of its plugins: the mods it
+    /// needs, the question it is a choice of when it is optional, and the
+    /// mods its `if` asks about (so comes and goes with).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub optional_in: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub follows: Vec<String>,
     pub archives: Vec<CompiledArchive>,
     #[serde(default)]
     pub files: Vec<String>,

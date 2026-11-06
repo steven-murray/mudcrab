@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { api, tomlString, type InputDoc, type ModDoc } from "./api";
+  import { api, tomlString, type InputDoc, type LoadOrder, type ModDoc } from "./api";
   import NeedsDialog from "./NeedsDialog.svelte";
   import OptionalDialog, { type Fresh } from "./OptionalDialog.svelte";
+  import { masterNeeds, neededBy, optionalGroups } from "./optional";
 
   // A mod's own settings: whether it is optional (its `if`), whether it is
   // installed inactive (`disable`), and what it needs (`dependencies`). Each
@@ -10,12 +11,20 @@
     mod,
     inputs,
     mods,
+    order,
+    readingMasters,
+    readMasters,
     run,
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
-    /** Every mod in the list: its id, title, and group of optional mods. */
-    mods: { id: string; title: string; optional?: ModDoc["optional"] }[];
+    /** Every mod in the list. */
+    mods: ModDoc[];
+    /** The load order, with each plugin's masters once read. */
+    order: LoadOrder | null;
+    readingMasters: boolean;
+    /** Read every plugin's masters (`check --masters-only`). */
+    readMasters: () => void;
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
@@ -40,13 +49,31 @@
   let choosing = $state(false);
   const title = (id: string) => mods.find((m) => m.id === id)?.title ?? id;
 
+  // What would leave a mod that is not optional needing one; see ./optional.
+  const isOptional = (id: string) => !!mods.find((m) => m.id === id)?.optional;
+  const dependents = $derived(neededBy(mod.id, mods));
+  /** The optional mods this one needs (as read just now). */
+  const optionalNeeds = $derived(needs.filter(isOptional));
+
   // Optional by a question: out of its group of optional mods, if it was in one.
   async function setCondition(condition: string, fresh: Fresh | null): Promise<boolean> {
     if (fresh && !(await run(() => api.addInput(fresh.name, fresh.kind, fresh.query, fresh.choices, fresh.fallback)))) return false;
     return run(() => api.setFields(mod.id, null, [`if=${tomlString(condition)}`], mod.optional ? ["optional"] : []));
   }
-  // The list's groups of optional mods, by name ("" for its own).
-  const groups = $derived([...new Set(mods.filter((m) => m.optional).map((m) => m.optional!.group ?? ""))]);
+  const groups = $derived(optionalGroups(mods));
+
+  // The mods its plugins' masters come from, that `dependencies` does not
+  // list yet. One it may not need (optional, while it is not and does not
+  // follow it) is shown, not offered.
+  const fromMasters = $derived(masterNeeds(mod.id, order).filter((n) => !needs.includes(n.id)));
+  const mayNotNeed = (id: string) => !mod.optional && isOptional(id) && !(mod.condition?.mods ?? []).includes(id);
+  const offered = $derived(fromMasters.filter((n) => !mayNotNeed(n.id)));
+  const refused = $derived(fromMasters.filter((n) => mayNotNeed(n.id)));
+  const why = (n: { plugin: string; master: string }) => `Its ${n.plugin} has ${n.master} as a master`;
+  const addFromMasters = () => {
+    const next = new Set([...needs, ...offered.map((n) => n.id)]);
+    return setNeeds(mods.map((m) => m.id).filter((id) => next.has(id)));
+  };
   const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
   const always = () =>
     run(() =>
@@ -77,12 +104,12 @@
         One of <strong>{mod.optional.group ?? "the list's optional mods"}</strong>, {mod.optional.default ? "ticked" : "unticked"} to
         start{#if mod.condition}, and only if <strong>{mod.condition.text}</strong>{/if}
         <button class="link" onclick={() => (optional = true)}>Change…</button>
-        · <button class="link" onclick={always}>Always install it</button>
+        · {@render alwaysButton()}
       {:else if mod.condition}
         Installed only if <strong>{mod.condition.text}</strong>
         <code class="dim">{mod.condition.expr}</code>
         <button class="link" onclick={() => (optional = true)}>Change…</button>
-        · <button class="link" onclick={always}>Always install it</button>
+        · {@render alwaysButton()}
       {:else}
         <button onclick={() => (optional = true)}>Make this mod optional…</button>
       {/if}
@@ -105,9 +132,49 @@
       {#each needs as need}<span class="chip">{title(need)}</span>{/each}
       {#if !needs.length}<span class="dim">nothing</span>{/if}
       <button class="link" onclick={() => (choosing = true)}>Choose…</button>
+      {#if !order?.masters_read}
+        ·
+        <button
+          class="link"
+          onclick={readMasters}
+          disabled={readingMasters}
+          title="Read its plugins' masters from the archives (check --masters-only), to see which mods they come from"
+          >{readingMasters ? "Reading masters…" : "Find from its masters"}</button
+        >
+      {/if}
     </span>
   </div>
+  {#if fromMasters.length}
+    <div class="row">
+      <span></span>
+      <span class="masters">
+        {#if offered.length}
+          Its plugins' masters also need
+          {#each offered as n, i}{i ? ", " : ""}<strong title={why(n)}>{title(n.id)}</strong>{/each}
+          · <button class="link" onclick={addFromMasters}>Add {offered.length === 1 ? "it" : "them"}</button>
+        {/if}
+        {#if refused.length}
+          <span class="bad">
+            {#each refused as n, i}{i ? ", " : ""}<strong title={why(n)}>{title(n.id)}</strong>{/each}
+            {refused.length === 1 ? "has" : "have"} a master its plugins need, but
+            {refused.length === 1 ? "is" : "are"} optional: make this mod optional too, or have its <code>if</code> follow
+            {refused.length === 1 ? "it" : "them"}.
+          </span>
+        {/if}
+      </span>
+    </div>
+  {/if}
 </div>
+
+{#snippet alwaysButton()}
+  <button
+    class="link"
+    onclick={always}
+    disabled={!!optionalNeeds.length}
+    title={optionalNeeds.length ? `It needs ${optionalNeeds.map(title).join(", ")}, which the player may untick` : undefined}
+    >Always install it</button
+  >
+{/snippet}
 
 {#if optional}
   <OptionalDialog
@@ -116,6 +183,8 @@
     current={mod.condition?.expr ?? null}
     save={setCondition}
     {groups}
+    dependents={dependents.map((m) => m.title)}
+    optionalNeeds={optionalNeeds.map((id) => ({ id, title: title(id) }))}
     group={mod.optional ? { name: mod.optional.group ?? null, default: mod.optional.default } : null}
     saveGroup={setGroup}
     close={() => (optional = false)}
@@ -126,6 +195,14 @@
     id={mod.id}
     mods={mods.filter((m) => m.id !== mod.id)}
     current={needs}
+    suggested={new Map(offered.map((n) => [n.id, why(n)]))}
+    blocked={mod.optional
+      ? new Map()
+      : new Map(
+          mods
+            .filter((m) => m.optional && !(mod.condition?.mods ?? []).includes(m.id))
+            .map((m) => [m.id, `${m.title} is optional and ${mod.title} is not: make ${mod.title} optional too, or have its if follow ${m.title}`]),
+        )}
     save={setNeeds}
     close={() => (choosing = false)}
   />
@@ -156,6 +233,15 @@
     flex-wrap: wrap;
     gap: 4px;
     align-items: baseline;
+  }
+  .masters {
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .bad {
+    color: var(--problem);
   }
   .chip {
     border: 1px solid var(--line);

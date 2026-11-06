@@ -8,6 +8,7 @@
   import { SvelteSet } from "svelte/reactivity";
   import type { InputDoc } from "./api";
   import Dialog from "./Dialog.svelte";
+  import { namedMods, optionalToml as toml } from "./optional";
 
   // Which answers bring a mod in: a group of optional mods (for a mod),
   // one of the list's questions and its answers, a new question, or (for
@@ -21,6 +22,8 @@
     groups = null,
     group = null,
     saveGroup,
+    dependents = [],
+    optionalNeeds = [],
     close,
   }: {
     id: string;
@@ -37,6 +40,12 @@
     group?: { name: string | null; default: boolean } | null;
     /** Write the mod's `optional`, as TOML. */
     saveGroup?: (optional: string) => Promise<boolean>;
+    /** The mods that need it and are not optional, nor follow it: while
+     *  they do, it cannot be one of the optional mods. */
+    dependents?: string[];
+    /** The optional mods it needs: out of the optional mods, its `if` has to
+     *  follow them. */
+    optionalNeeds?: { id: string; title: string }[];
     close: () => void;
   } = $props();
 
@@ -46,11 +55,7 @@
   let groupName = $state(untrack(() => startGroup?.name ?? (groups?.includes("") || !groups?.length ? "" : groups[0])));
   let newGroup = $state(false);
   let ticked = $state(untrack(() => startGroup?.default ?? false));
-  const optionalToml = $derived.by(() => {
-    const name = groupName.trim();
-    if (ticked) return name ? `{ group = ${JSON.stringify(name)}, default = true }` : "{ default = true }";
-    return name ? JSON.stringify(name) : "true";
-  });
+  const optionalToml = $derived(toml(groupName, ticked));
 
   const quoted = (value: string) => (/^[A-Za-z0-9_.-]+$/.test(value) ? value : JSON.stringify(value));
   const unquoted = (value: string) => value.replace(/^"(.*)"$/, "$1");
@@ -110,13 +115,18 @@
           ? forAnswers(fresh.name.trim(), fresh.kind)
           : "",
   );
+  const named = $derived(namedMods(condition));
+  // What `validate` would refuse.
+  const unfollowed = $derived(optionalNeeds.filter((n) => !named.includes(n.id)));
+  const refused = $derived(mode === "group" ? dependents.length > 0 : unfollowed.length > 0);
   const ready = $derived(
-    mode === "group" ? !(newGroup && !groupName.trim()) : !!condition &&
+    !refused &&
+    (mode === "group" ? !(newGroup && !groupName.trim()) : !!condition &&
       (mode !== "new" ||
         (/^[A-Za-z0-9_.-]+$/.test(fresh.name.trim()) &&
           !inputs.some((i) => i.id === fresh.name.trim()) &&
           !!fresh.query.trim() &&
-          (fresh.kind === "bool" || freshChoices.length >= (fresh.kind === "multi" ? 1 : 2)))),
+          (fresh.kind === "bool" || freshChoices.length >= (fresh.kind === "multi" ? 1 : 2))))),
   );
 
   // A different question's answers start empty.
@@ -249,6 +259,21 @@
     <p class="dim">
       Questions by name, <code>name == answer</code>, <code>mod:id</code> for another mod, joined with
       <code>&&</code> and <code>||</code>, each negated with <code>!</code>.
+    </p>
+  {/if}
+
+  {#if mode === "group" && dependents.length}
+    <p class="bad">
+      {dependents.join(", ")}
+      {dependents.length === 1 ? "needs it and is" : "need it and are"} not optional, so the player could not untick it:
+      make {dependents.length === 1 ? "that" : "those"} optional too, or have {dependents.length === 1 ? "its" : "their"}
+      <code>if</code> follow {id} (<code>mod:{quoted(id)}</code>).
+    </p>
+  {:else if mode !== "group" && unfollowed.length}
+    <p class="bad">
+      It needs {unfollowed.map((n) => n.title).join(", ")}, which the player may untick: out of the optional mods, its
+      <code>if</code> has to follow {unfollowed.length === 1 ? "it" : "them"} --
+      {#each unfollowed as n, i}{i ? ", " : ""}<code>mod:{quoted(n.id)}</code>{/each}.
     </p>
   {/if}
 

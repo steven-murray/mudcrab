@@ -951,6 +951,19 @@ fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
         .collect()
 }
 
+/// Which of the list's questions are asked, and each one's default, as
+/// these answers leave them: a question whose `if` does not hold is hidden,
+/// and a default may follow an earlier answer.
+#[tauri::command]
+fn question_states(
+    state: tauri::State<'_, State>,
+    answers: std::collections::HashMap<String, String>,
+) -> Result<Vec<config::query::QuestionState>, String> {
+    let list = state.list()?;
+    let modlist = config::loader::load_modlist(&list).map_err(shown)?;
+    config::query::question_states(&modlist.inputs, &answers).map_err(shown)
+}
+
 /// Everything that can be known before installing (`check`).
 #[tauri::command]
 async fn step_check(
@@ -1039,7 +1052,15 @@ async fn step_check(
 #[tauri::command]
 async fn read_masters(state: tauri::State<'_, State>) -> Result<(), String> {
     let plan = author::current_plan(&state)?;
-    let downloads = locate(&state)?
+    masters_of(&state, plan).await.map(|_| ())
+}
+
+/// Each plugin's masters in `plan`, read (`check --masters-only`) and kept.
+async fn masters_of(
+    state: &State,
+    plan: config::schema::PersonalizedPlan,
+) -> Result<Vec<config::check::PluginMasters>, String> {
+    let downloads = locate(state)?
         .downloads
         .ok_or("say where the downloads folder is first")?;
     let settings = config::check::CheckSettings {
@@ -1055,8 +1076,95 @@ async fn read_masters(state: tauri::State<'_, State>) -> Result<(), String> {
         .session
         .lock()
         .map_err(|_| "a command panicked")?
-        .masters = Some(report.plugins);
-    Ok(())
+        .masters = Some(report.plugins.clone());
+    Ok(report.plugins)
+}
+
+/// What adding plugins' masters as dependencies did.
+#[derive(Serialize)]
+struct MasterDependencies {
+    /// The edit, when there was anything to add.
+    edited: Option<edits::Edited>,
+    /// How many mods were given dependencies.
+    mods: usize,
+    /// Those not added: optional mods that mods which stay would need.
+    refused: Vec<config::check::UnlistedNeed>,
+    /// Mods left as they were, and why.
+    skipped: Vec<String>,
+}
+
+/// Add to each mod's `dependencies` the mods its plugins' masters come from,
+/// as the masters read (or read now) have them: every mod in the plan, or
+/// only `id`'s. One edit, undone at once. A master from an optional mod in
+/// a mod that stays is not added -- `validate` would refuse it -- but said.
+#[tauri::command]
+async fn add_master_dependencies(
+    state: tauri::State<'_, State>,
+    id: Option<String>,
+) -> Result<MasterDependencies, String> {
+    let plan = author::current_plan(&state)?;
+    let known = state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .masters
+        .clone();
+    let masters = match known {
+        Some(masters) => masters,
+        None => masters_of(&state, plan.clone()).await?,
+    };
+    let (refused, wanted): (Vec<_>, Vec<_>) = config::check::unlisted_needs(&plan, &masters)
+        .into_iter()
+        .filter(|need| id.as_ref().is_none_or(|id| &need.mod_id == id))
+        .partition(|need| need.optional);
+    let mut add: Vec<(String, Vec<String>)> = Vec::new();
+    for need in wanted {
+        match add.last_mut() {
+            Some((mod_id, needs)) if *mod_id == need.mod_id => needs.push(need.needs),
+            _ => add.push((need.mod_id, vec![need.needs])),
+        }
+    }
+    let list = state.list()?;
+    let (planned, added, skipped) = config::edit::plan_dependencies(&list, &add).map_err(shown)?;
+    let planned: Vec<_> = planned.into_iter().filter(|e| e.changes()).collect();
+    let edited = if planned.is_empty() {
+        None
+    } else {
+        // As `set` writes it: the whole list, the new after what was there.
+        let command = added
+            .iter()
+            .map(|(mod_id, needs)| {
+                let had = plan
+                    .mods
+                    .iter()
+                    .find(|m| &m.id == mod_id)
+                    .map(|m| m.dependencies.clone())
+                    .unwrap_or_default();
+                let needs: Vec<_> = had.iter().chain(needs).collect();
+                format!(
+                    "mudcrab set {} --mod {} {}",
+                    quote(list.display().to_string()),
+                    quote(mod_id),
+                    quote(format!(
+                        "dependencies=[{}]",
+                        needs
+                            .iter()
+                            .map(|n| format!("{n:?}"))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ))
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        Some(edits::apply_all(&state, command, planned)?)
+    };
+    Ok(MasterDependencies {
+        edited,
+        mods: added.len(),
+        refused,
+        skipped,
+    })
 }
 
 /// Install settings for the open list, as `install --mo2-instance-dir` makes
@@ -1253,7 +1361,9 @@ pub fn app<R: Runtime>(
             look_for_downloads,
             open_page,
             step_check,
+            question_states,
             read_masters,
+            add_master_dependencies,
             step_install,
             cancel_run,
             manual_steps,
