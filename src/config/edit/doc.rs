@@ -784,13 +784,15 @@ pub fn field_values(
 /// table keeps its comments); BAIN packages as `bain_subpackages`; a
 /// wizard's packages likewise, with the plugins it left out added to
 /// `exclude`. Choices that depend on the list's questions (an `if` on a
-/// selection or package) are the author's to change in the file, so an
+/// selection or package) are kept by a walk that showed them (`rows`: the
+/// GUI's, which writes FOMOD selections with their `if`); otherwise an
 /// archive with any is refused rather than have them dropped.
 pub fn set_installer(
     text: &str,
     id: &str,
     archive: usize,
     chosen: &crate::config::inspect::Chosen,
+    rows: bool,
 ) -> anyhow::Result<String> {
     use crate::config::inspect::Chosen;
     let mut doc = parse(text)?;
@@ -809,7 +811,7 @@ pub fn set_installer(
     match chosen {
         Chosen::Fomod(selections) => {
             anyhow::ensure!(
-                !conditional(table.get("fomod_selections")),
+                rows || !conditional(table.get("fomod_selections")),
                 "some of '{id}'s FOMOD selections depend on the list's questions (an `if`); \
                  change them in the list's file"
             );
@@ -825,8 +827,12 @@ pub fn set_installer(
                 if let Some(was) = old.iter().find(|t| {
                     t.get("step").and_then(Item::as_str) == Some(selection.step.as_str())
                         && t.get("group").and_then(Item::as_str) == Some(selection.group.as_str())
+                        && t.get("if").and_then(Item::as_str) == selection.condition.as_deref()
                 }) {
                     *new.decor_mut() = was.decor().clone();
+                }
+                if let Some(condition) = &selection.condition {
+                    new.insert("if", toml_edit::value(condition.as_str()));
                 }
                 new.insert("step", toml_edit::value(selection.step.as_str()));
                 new.insert("group", toml_edit::value(selection.group.as_str()));
@@ -1131,7 +1137,7 @@ id = "B"
                 options: vec![],
             },
         ]);
-        let out = super::set_installer(text, "A", 1, &chosen).unwrap();
+        let out = super::set_installer(text, "A", 1, &chosen, false).unwrap();
         assert!(
             out.contains("# Lite, for low-end machines.\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Full\"]"),
             "{out}"
@@ -1148,6 +1154,7 @@ id = "B"
                 subpackages: vec!["00 Core".to_string(), "10 Extra".to_string()],
                 exclude: vec!["Extra.esp".to_string()],
             },
+            false,
         )
         .unwrap();
         assert!(
@@ -1160,6 +1167,33 @@ id = "B"
         );
 
         let conditional = bain.replace("[\"00 Core\"]", "[{ name = \"00 Core\", if = \"x\" }]");
-        assert!(super::set_installer(&conditional, "A", 1, &Chosen::Bain(vec![])).is_err());
+        assert!(super::set_installer(&conditional, "A", 1, &Chosen::Bain(vec![]), false).is_err());
+    }
+    #[test]
+    fn fomod_rows_that_depend_on_the_questions_are_written_with_their_if() {
+        use crate::config::inspect::Chosen;
+        use crate::config::schema::FomodSelection;
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\n\n# Small for a slow machine.\n[[mods.archives.fomod_selections]]\nif = \"potato\"\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Lite\"]\n";
+        let row = |condition: Option<&str>, option: &str| FomodSelection {
+            condition: condition.map(str::to_string),
+            step: "S".to_string(),
+            group: "G".to_string(),
+            options: vec![option.to_string()],
+        };
+        let chosen = Chosen::Fomod(vec![
+            row(Some("potato"), "Lite"),
+            row(Some("!potato"), "Full"),
+        ]);
+        // A walk that did not show the rows would drop them: refused.
+        assert!(super::set_installer(text, "A", 1, &chosen, false).is_err());
+        let out = super::set_installer(text, "A", 1, &chosen, true).unwrap();
+        assert!(
+            out.contains("# Small for a slow machine.\n[[mods.archives.fomod_selections]]\nif = \"potato\"\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Lite\"]"),
+            "{out}"
+        );
+        assert!(
+            out.contains("[[mods.archives.fomod_selections]]\nif = \"!potato\"\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Full\"]"),
+            "{out}"
+        );
     }
 }
