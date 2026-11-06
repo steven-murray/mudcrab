@@ -135,6 +135,21 @@ pub struct Section {
     pub entries: Vec<Entry>,
 }
 
+/// A mod's dependencies `check` found: see `Dependencies`.
+#[derive(Debug, Default, Serialize)]
+pub struct FoundDoc {
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub masters: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<String>,
+}
+
+impl FoundDoc {
+    fn is_empty(&self) -> bool {
+        self.masters.is_empty() && self.resources.is_empty()
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct ModDoc {
     pub id: String,
@@ -154,9 +169,13 @@ pub struct ModDoc {
     /// The group of optional mods it is in, when it is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub optional: Option<OptionalDoc>,
-    /// The mods it needs, by id.
+    /// The mods it needs, by id: every group's.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
+    /// Of those, the ones `check` found, by why: so they can be told from
+    /// the author's own.
+    #[serde(skip_serializing_if = "FoundDoc::is_empty")]
+    pub found: FoundDoc,
     pub docs: Docs,
     pub archives: Vec<ArchiveDoc>,
     pub plugins: Vec<String>,
@@ -687,7 +706,11 @@ fn mod_doc(
                 }
             }),
         },
-        dependencies: entry.dependencies.clone(),
+        dependencies: entry.dependencies.all(),
+        found: FoundDoc {
+            masters: entry.dependencies.masters.clone(),
+            resources: entry.dependencies.resources.clone(),
+        },
         docs: entry.docs.clone(),
         archives: archive_docs,
         plugins: entry.plugins.clone(),

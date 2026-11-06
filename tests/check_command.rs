@@ -116,6 +116,7 @@ fn check_as_a_library_returns_its_findings_and_reports_them_as_events() {
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: false,
+            resources: None,
         },
     )
     .unwrap();
@@ -138,13 +139,15 @@ fn check_as_a_library_returns_its_findings_and_reports_them_as_events() {
         Event::Section { tone: Tone::Problem, heading, items }
             if heading.starts_with("Plugins whose masters") && items.len() == 2
     )));
-    assert!(matches!(
-        events.last(),
-        Some(Event::Status {
+    // The sink is the process's, and other tests check side by side: so
+    // any status, not the last event, is this one's.
+    assert!(events.iter().any(|event| matches!(
+        event,
+        Event::Status {
             tone: Tone::Problem,
             ..
-        })
-    ));
+        }
+    )));
 }
 
 #[test]
@@ -554,6 +557,7 @@ fn a_master_from_another_mod_is_a_dependency() {
                 cache_dir: downloads.clone(),
                 filter: Default::default(),
                 masters_only: true,
+                resources: None,
             },
         )
         .unwrap();
@@ -608,10 +612,14 @@ fn masters_are_written_as_dependencies() {
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: true,
+            resources: None,
         },
     )
     .unwrap();
-    let needs = mudcrab::config::check::unlisted_needs(&plan, &report.plugins);
+    let needs: Vec<_> = mudcrab::config::check::master_needs(&plan, &report.plugins)
+        .into_iter()
+        .filter(|need| !need.listed)
+        .collect();
     assert_eq!(needs.len(), 1, "{needs:?}");
     assert_eq!(
         (needs[0].mod_id.as_str(), needs[0].needs.as_str()),
@@ -619,16 +627,178 @@ fn masters_are_written_as_dependencies() {
     );
     assert!(!needs[0].optional);
 
-    let add = vec![("Patch".to_string(), vec!["Base".to_string()])];
-    let (edits, added, skipped) = mudcrab::config::edit::plan_dependencies(&list, &add).unwrap();
-    assert_eq!(added, add);
-    assert!(skipped.is_empty());
-    for edit in &edits {
+    // Written as `masters`, apart from the author's own; a plain list stays
+    // the author's.
+    let found = vec![("Patch".to_string(), vec!["Base".to_string()])];
+    let planned = mudcrab::config::edit::plan_found_dependencies(&list, "masters", &found).unwrap();
+    assert!(planned.skipped.is_empty(), "{:?}", planned.skipped);
+    for edit in &planned.edits {
         edit.write().unwrap();
     }
     let written = std::fs::read_to_string(&list).unwrap();
     assert!(
-        written.contains("dependencies = [\"Absent\", \"Base\"]"),
+        written.contains("dependencies = { masters = [\"Base\"], custom = [\"Absent\"] }"),
         "{written}"
     );
+    mudcrab::config::pipeline::compile(&list, false).unwrap();
+
+    // Found again with nothing: the group goes, the author's own stays.
+    let found = vec![("Patch".to_string(), Vec::new())];
+    let planned = mudcrab::config::edit::plan_found_dependencies(&list, "masters", &found).unwrap();
+    for edit in &planned.edits {
+        edit.write().unwrap();
+    }
+    let written = std::fs::read_to_string(&list).unwrap();
+    assert!(written.contains("dependencies = [\"Absent\"]"), "{written}");
+}
+
+#[test]
+fn the_authors_own_are_left_alone_and_loops_are_left_out() {
+    let dir = tempdir().unwrap();
+    let (list, _) = masters_fixture(dir.path());
+    let text = std::fs::read_to_string(&list).unwrap().replace(
+        "id = \"Patch\"\n",
+        "id = \"Patch\"\ndependencies = [\"Base\"]\n",
+    );
+    std::fs::write(&list, text).unwrap();
+    let found = vec![
+        ("Patch".to_string(), vec!["Base".to_string()]),
+        ("Base".to_string(), vec!["Patch".to_string()]),
+    ];
+    let planned =
+        mudcrab::config::edit::plan_found_dependencies(&list, "resources", &found).unwrap();
+    assert_eq!(planned.skipped.len(), 1, "{:?}", planned.skipped);
+    assert!(planned.skipped[0].contains("loop"), "{:?}", planned.skipped);
+    for edit in &planned.edits {
+        edit.write().unwrap();
+    }
+    // Base, which Patch already lists itself, is not listed again; Base's
+    // need of Patch would make a loop. Nothing to write.
+    let written = std::fs::read_to_string(&list).unwrap();
+    assert!(written.contains("dependencies = [\"Base\"]"), "{written}");
+}
+
+/// A plugin naming `models`, one static each, after a header naming
+/// `masters`.
+fn plugin_naming(masters: &[&str], models: &[&str]) -> Vec<u8> {
+    let field = |kind: &[u8; 4], data: &[u8]| {
+        let mut out = kind.to_vec();
+        out.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        out.extend_from_slice(data);
+        out
+    };
+    let mut records = Vec::new();
+    for (i, model) in models.iter().enumerate() {
+        let mut fields = field(b"EDID", format!("Thing{i}\0").as_bytes());
+        fields.extend(field(b"MODL", format!("{model}\0").as_bytes()));
+        records.extend_from_slice(b"STAT");
+        records.extend_from_slice(&(fields.len() as u32).to_le_bytes());
+        records.extend_from_slice(&0u32.to_le_bytes());
+        records.extend_from_slice(&(0x0100_0800 + i as u32).to_le_bytes());
+        records.extend_from_slice(&0u32.to_le_bytes());
+        records.extend(fields);
+    }
+    let mut out = plugin(masters);
+    out.extend_from_slice(b"GRUP");
+    out.extend_from_slice(&(20 + records.len() as u32).to_le_bytes());
+    out.extend_from_slice(b"STAT");
+    out.extend_from_slice(&0i32.to_le_bytes());
+    out.extend_from_slice(&0u32.to_le_bytes());
+    out.extend(records);
+    out
+}
+
+#[test]
+fn a_file_only_one_other_mod_provides_is_a_resource_dependency() {
+    use mudcrab::config::check::Kind;
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    let game = root.join("game");
+    std::fs::create_dir_all(game.join("Data/meshes")).unwrap();
+    std::fs::write(game.join("Data/meshes/vanilla.nif"), b"nif").unwrap();
+    make_zip(
+        &downloads.join("Rocks-1-1-0.zip"),
+        &[
+            ("meshes/rocks/big.nif", b"nif"),
+            ("meshes/shared.nif", b"nif"),
+            ("meshes/vanilla.nif", b"nif"),
+        ],
+    );
+    make_zip(
+        &downloads.join("Other-2-1-0.zip"),
+        &[("meshes/shared.nif", b"nif")],
+    );
+    make_zip(
+        &downloads.join("Quarry-3-1-0.zip"),
+        &[
+            (
+                "Quarry.esp",
+                &plugin_naming(
+                    &["Oblivion.esm"],
+                    &[
+                        // Only Rocks has it: Quarry needs Rocks.
+                        "Rocks\\Big.nif",
+                        // Rocks and Other: either would do.
+                        "shared.nif",
+                        // The game's own, which Rocks replaces.
+                        "vanilla.nif",
+                        // Its own.
+                        "quarry/pit.nif",
+                        // Nobody's: `assets`'s business.
+                        "lost.nif",
+                    ],
+                ),
+            ),
+            ("meshes/quarry/pit.nif", b"nif"),
+        ],
+    );
+    let list = root.join("list.toml");
+    let entry = |id: &str, file: &str, n: u32| {
+        format!(
+            "[[mods]]\nid = \"{id}\"\n[[mods.archives]]\npath = \"nexus:oblivion/{n}/{n}0\"\nfile_name = \"{file}\"\n\n"
+        )
+    };
+    std::fs::write(
+        &list,
+        format!(
+            "name = \"L\"\nplugins = [\"Quarry.esp\"]\n\n{}{}{}",
+            entry("Rocks", "Rocks-1-1-0.zip", 1),
+            entry("Other", "Other-2-1-0.zip", 2),
+            entry("Quarry", "Quarry-3-1-0.zip", 3).replace(
+                "id = \"Quarry\"\n",
+                "id = \"Quarry\"\nplugins = [\"Quarry.esp\"]\n"
+            ),
+        ),
+    )
+    .unwrap();
+    let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+    let plan =
+        mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    let report = mudcrab::config::check::check_all(
+        &plan,
+        &mudcrab::config::check::CheckSettings {
+            cache_dir: downloads,
+            filter: Default::default(),
+            masters_only: true,
+            resources: Some(game),
+        },
+    )
+    .unwrap();
+    let needs = report.resources.expect("resources were asked for");
+    assert_eq!(needs.len(), 1, "{needs:?}");
+    assert_eq!(
+        (needs[0].mod_id.as_str(), needs[0].needs.as_str()),
+        ("Quarry", "Rocks")
+    );
+    assert_eq!(needs[0].named, "meshes/rocks/big.nif");
+    let said: Vec<_> = report
+        .findings
+        .iter()
+        .filter(|f| f.kind == Kind::UndeclaredResources)
+        .map(|f| f.item.text.to_plain())
+        .collect();
+    assert_eq!(said.len(), 1, "{said:?}");
+    assert!(said[0].contains("which only Rocks provides"), "{said:?}");
+    assert!(report.read.contains(&"Quarry".to_string()));
 }

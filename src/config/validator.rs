@@ -322,7 +322,7 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
         .collect();
 
     for (mod_id, spec) in &flattened_mods {
-        for dep in &spec.dependencies {
+        for dep in &spec.dependencies.all() {
             let Some(needed) = flattened_mods.get(dep) else {
                 anyhow::bail!("mod {mod_id} has unknown dependency {dep}");
             };
@@ -646,7 +646,7 @@ fn visit(
     }
 
     if let Some(spec) = mods.get(mod_id) {
-        for dep in &spec.dependencies {
+        for dep in &spec.dependencies.all() {
             visit(mods, dep, visiting, visited)?;
         }
     }
