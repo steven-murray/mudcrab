@@ -653,7 +653,7 @@ fn masters_are_written_as_dependencies() {
 }
 
 #[test]
-fn a_found_dependency_moves_out_of_the_authors_own_and_loops_are_left_out() {
+fn the_authors_own_are_left_alone_and_loops_are_left_out() {
     let dir = tempdir().unwrap();
     let (list, _) = masters_fixture(dir.path());
     let text = std::fs::read_to_string(&list).unwrap().replace(
@@ -672,11 +672,10 @@ fn a_found_dependency_moves_out_of_the_authors_own_and_loops_are_left_out() {
     for edit in &planned.edits {
         edit.write().unwrap();
     }
+    // Base, which Patch already lists itself, is not listed again; Base's
+    // need of Patch would make a loop. Nothing to write.
     let written = std::fs::read_to_string(&list).unwrap();
-    assert!(
-        written.contains("dependencies = { resources = [\"Base\"] }"),
-        "{written}"
-    );
+    assert!(written.contains("dependencies = [\"Base\"]"), "{written}");
 }
 
 /// A plugin naming `models`, one static each, after a header naming

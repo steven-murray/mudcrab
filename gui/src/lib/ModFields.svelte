@@ -90,13 +90,10 @@
   const offered = $derived(fromMasters.filter((n) => !mayNotNeed(n.id)));
   const refused = $derived(fromMasters.filter((n) => mayNotNeed(n.id)));
   const why = (n: { plugin: string; master: string }) => `Its ${n.plugin} has ${n.master} as a master`;
+  // Into `masters`; `custom` is the author's, and left as it is.
   const addFromMasters = () => {
     const masters = new Set([...deps.masters, ...offered.map((n) => n.id)]);
-    return writeGroups({
-      ...deps,
-      masters: mods.map((m) => m.id).filter((id) => masters.has(id)),
-      custom: deps.custom.filter((id) => !masters.has(id)),
-    });
+    return writeGroups({ ...deps, masters: mods.map((m) => m.id).filter((id) => masters.has(id)) });
   };
   const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
   const always = () =>

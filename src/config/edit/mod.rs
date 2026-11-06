@@ -829,9 +829,11 @@ pub struct FoundDependencies {
 
 /// Set one group of found dependencies (`masters` or `resources`) of mods:
 /// each mod id with every mod that group should list, as the list names
-/// them. The group is replaced whole, so what no longer holds goes; a mod
-/// it now lists is taken out of `custom`, where an earlier, ungrouped list
-/// had it. Written in the file each mod is in, one edit per file.
+/// them. The group is replaced whole, so what no longer holds goes. `custom`
+/// is the author's, and never touched: one it already lists is not listed
+/// again here, and stays when it is no longer found -- the author may have
+/// listed it for a reason of their own. Written in the file each mod is in,
+/// one edit per file.
 ///
 /// Left out, and said why: a mod in an included file that would need one in
 /// another file (which that file cannot name), a mod whose include's
@@ -930,8 +932,11 @@ pub fn plan_found_dependencies(
                     .map(|entry| entry.dependencies.clone())
                     .unwrap_or_default();
                 let mut deps = had.clone();
-                deps.custom.retain(|dep| !kept.contains(dep));
-                *deps.group_mut(group).expect("checked above") = kept.clone();
+                *deps.group_mut(group).expect("checked above") = kept
+                    .iter()
+                    .filter(|dep| !had.custom.contains(dep))
+                    .cloned()
+                    .collect();
                 if deps == had {
                     continue;
                 }
