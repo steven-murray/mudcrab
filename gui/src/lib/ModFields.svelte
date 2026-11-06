@@ -29,16 +29,36 @@
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
   } = $props();
 
-  let needs = $state<string[]>([]);
+  // `dependencies` as its file writes it: a list (the author's own), or a
+  // table of them by group, `masters` and `resources` being what `check`
+  // found.
+  type DepGroups = { masters: string[]; resources: string[]; custom: string[] };
+  let deps = $state<DepGroups>({ masters: [], resources: [], custom: [] });
+  /** Every mod it needs, whatever the reason. */
+  const needs = $derived([...new Set([...deps.custom, ...deps.masters, ...deps.resources])]);
+  const foundAs = (id: string) =>
+    deps.masters.includes(id) ? "a master" : deps.resources.includes(id) ? "its files" : null;
   let error = $state<string | null>(null);
   async function readNeeds() {
     try {
       const value = new Map(await api.fields(mod.id, null)).get("dependencies");
-      needs = Array.isArray(value) ? value.map(String) : [];
+      const ids = (v: unknown) => (Array.isArray(v) ? v.map(String) : []);
+      if (Array.isArray(value)) deps = { masters: [], resources: [], custom: ids(value) };
+      else if (value && typeof value === "object") {
+        const table = value as Record<string, unknown>;
+        deps = { masters: ids(table.masters), resources: ids(table.resources), custom: ids(table.custom) };
+      } else deps = { masters: [], resources: [], custom: [] };
       error = null;
     } catch (err) {
       error = String(err);
     }
+  }
+  /** As TOML: a plain list while only the author's own are there. */
+  function dependenciesToml(g: DepGroups): string {
+    const list = (ids: string[]) => `[${ids.map(tomlString).join(", ")}]`;
+    if (!g.masters.length && !g.resources.length) return list(g.custom);
+    const parts = (["masters", "resources", "custom"] as const).filter((k) => g[k].length).map((k) => `${k} = ${list(g[k])}`);
+    return `{ ${parts.join(", ")} }`;
   }
   $effect(() => {
     void mod;
@@ -71,8 +91,12 @@
   const refused = $derived(fromMasters.filter((n) => mayNotNeed(n.id)));
   const why = (n: { plugin: string; master: string }) => `Its ${n.plugin} has ${n.master} as a master`;
   const addFromMasters = () => {
-    const next = new Set([...needs, ...offered.map((n) => n.id)]);
-    return setNeeds(mods.map((m) => m.id).filter((id) => next.has(id)));
+    const masters = new Set([...deps.masters, ...offered.map((n) => n.id)]);
+    return writeGroups({
+      ...deps,
+      masters: mods.map((m) => m.id).filter((id) => masters.has(id)),
+      custom: deps.custom.filter((id) => !masters.has(id)),
+    });
   };
   const setGroup = (optional: string) => run(() => api.setFields(mod.id, null, [`optional=${optional}`], []));
   const always = () =>
@@ -84,11 +108,20 @@
         [...(mod.condition ? ["if"] : []), ...(mod.optional ? ["optional"] : [])],
       ),
     );
-  async function setNeeds(next: string[]): Promise<boolean> {
+  // Chosen by hand: one taken off goes from whichever group had it; one
+  // added is the author's own.
+  function setNeeds(next: string[]): Promise<boolean> {
+    const masters = deps.masters.filter((id) => next.includes(id));
+    const resources = deps.resources.filter((id) => next.includes(id));
+    const custom = next.filter((id) => !masters.includes(id) && !resources.includes(id));
+    return writeGroups({ masters, resources, custom });
+  }
+  async function writeGroups(next: DepGroups): Promise<boolean> {
+    const empty = !next.masters.length && !next.resources.length && !next.custom.length;
     const done = await run(() =>
-      next.length
-        ? api.setFields(mod.id, null, [`dependencies=[${next.map(tomlString).join(", ")}]`], [])
-        : api.setFields(mod.id, null, [], ["dependencies"]),
+      empty
+        ? api.setFields(mod.id, null, [], ["dependencies"])
+        : api.setFields(mod.id, null, [`dependencies=${dependenciesToml(next)}`], []),
     );
     if (done) await readNeeds();
     return done;
@@ -129,7 +162,12 @@
   <div class="row">
     <span class="name">Needs</span>
     <span class="needs">
-      {#each needs as need}<span class="chip">{title(need)}</span>{/each}
+      {#each needs as need}
+        {@const why = foundAs(need)}
+        <span class="chip" title={why ? `Found by check: ${why === "a master" ? "its plugins' masters" : "its plugins use its files"}` : "Listed by hand"}
+          >{title(need)}{#if why}<span class="dim"> · {why}</span>{/if}</span
+        >
+      {/each}
       {#if !needs.length}<span class="dim">nothing</span>{/if}
       <button class="link" onclick={() => (choosing = true)}>Choose…</button>
       {#if !order?.masters_read}

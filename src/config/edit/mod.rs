@@ -13,6 +13,7 @@ pub mod doc;
 
 use crate::config::loader::{Texts, load_modlist, load_with, normalize, parse_file};
 use crate::config::schema::SourceModlist;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 /// A planned change to one modlist file. Nothing is written until
@@ -816,26 +817,73 @@ fn relative(base: &Path, target: &Path) -> String {
     parts.join("/")
 }
 
-/// Add to mods' `dependencies`: each mod id with the mods to add, as the list
-/// names them. Written in the file each mod is in, one edit per file, each
-/// list kept as it was with the new ones after it. A mod is left as it is,
-/// and said why, when it is in an included file and a mod it would need is
-/// not in that same file, or its include's `override` sets its
-/// `dependencies`. Returns the edits, what is added (as `add` has it, less
-/// what is left out), and what is left out, and why.
-#[allow(clippy::type_complexity)]
-pub fn plan_dependencies(
+/// What setting a group of found dependencies would write.
+pub struct FoundDependencies {
+    pub edits: Vec<Edit>,
+    /// Each mod whose `dependencies` change, with its new value as TOML, as
+    /// its own file writes it.
+    pub changed: Vec<(String, String)>,
+    /// Dependencies left out, or mods left as they are, and why.
+    pub skipped: Vec<String>,
+}
+
+/// Set one group of found dependencies (`masters` or `resources`) of mods:
+/// each mod id with every mod that group should list, as the list names
+/// them. The group is replaced whole, so what no longer holds goes; a mod
+/// it now lists is taken out of `custom`, where an earlier, ungrouped list
+/// had it. Written in the file each mod is in, one edit per file.
+///
+/// Left out, and said why: a mod in an included file that would need one in
+/// another file (which that file cannot name), a mod whose include's
+/// `override` sets its `dependencies`, and a dependency that would close a
+/// loop -- two mods whose plugins each use the other's files, say -- which
+/// `validate` refuses.
+pub fn plan_found_dependencies(
     list: &Path,
-    add: &[(String, Vec<String>)],
-) -> anyhow::Result<(Vec<Edit>, Vec<(String, Vec<String>)>, Vec<String>)> {
+    group: &str,
+    found: &[(String, Vec<String>)],
+) -> anyhow::Result<FoundDependencies> {
+    anyhow::ensure!(
+        matches!(group, "masters" | "resources"),
+        "{group}: not a group of found dependencies"
+    );
     let source = load_modlist(list)?;
     let mods = source.flatten_mods()?;
     let mut skipped = Vec::new();
-    let mut added = Vec::new();
-    // By file: each mod, as that file writes it, with what to add, likewise.
+    // What each mod needs once these are set, to keep loops out: everything
+    // as it is, less the group being replaced.
+    let mut needs: HashMap<String, Vec<String>> = mods
+        .iter()
+        .map(|(id, entry)| {
+            let mut deps = entry.dependencies.clone();
+            if found.iter().any(|(mod_id, _)| mod_id == id)
+                && !entry.overridden.iter().any(|key| key == "dependencies")
+            {
+                deps.group_mut(group).expect("checked above").clear();
+            }
+            (id.clone(), deps.all())
+        })
+        .collect();
+    let reaches = |needs: &HashMap<String, Vec<String>>, from: &str, to: &str| {
+        let mut seen = HashSet::new();
+        let mut stack = vec![from.to_string()];
+        while let Some(id) = stack.pop() {
+            if id == to {
+                return true;
+            }
+            if seen.insert(id.clone()) {
+                stack.extend(needs.get(&id).into_iter().flatten().cloned());
+            }
+        }
+        false
+    };
+    let written = |entry: &crate::config::schema::ModEntry, id: &str| {
+        entry.written_id.clone().unwrap_or_else(|| id.to_string())
+    };
+    // By file: each mod, as that file writes it, with its group, likewise.
     let mut by_file: indexmap::IndexMap<PathBuf, Vec<(String, Vec<String>)>> =
         indexmap::IndexMap::new();
-    for (id, needs) in add {
+    for (id, wanted) in found {
         let entry = mods
             .get(id)
             .ok_or_else(|| anyhow::anyhow!("no mod {id} in {}", list.display()))?;
@@ -845,55 +893,66 @@ pub fn plan_dependencies(
             ));
             continue;
         }
-        let written = |entry: &crate::config::schema::ModEntry, id: &str| {
-            entry.written_id.clone().unwrap_or_else(|| id.to_string())
-        };
-        let mut wanted = Vec::new();
         let mut kept = Vec::new();
-        for need in needs {
-            match mods.get(need) {
-                Some(other) if other.origin == entry.origin => {
-                    wanted.push(written(other, need));
-                    kept.push(need.clone());
-                }
-                Some(_) => skipped.push(format!(
+        for need in wanted {
+            let other = mods
+                .get(need)
+                .ok_or_else(|| anyhow::anyhow!("no mod {need} in {}", list.display()))?;
+            if other.origin != entry.origin {
+                skipped.push(format!(
                     "{id}: needs {need}, which is in another file than it"
-                )),
-                None => anyhow::bail!("no mod {need} in {}", list.display()),
+                ));
+            } else if need == id || reaches(&needs, need, id) {
+                skipped.push(format!(
+                    "{id}: needs {need}, which already needs {id}, and a loop is refused"
+                ));
+            } else {
+                needs.entry(id.clone()).or_default().push(need.clone());
+                kept.push(written(other, need));
             }
         }
-        if !wanted.is_empty() {
-            added.push((id.clone(), kept));
-            let file = entry.origin.clone().unwrap_or_else(|| list.to_path_buf());
-            by_file
-                .entry(file)
-                .or_default()
-                .push((written(entry, id), wanted));
-        }
+        let file = entry.origin.clone().unwrap_or_else(|| list.to_path_buf());
+        by_file
+            .entry(file)
+            .or_default()
+            .push((written(entry, id), kept));
     }
     let mut edits = Vec::new();
+    let mut changed = Vec::new();
     for (file, changes) in by_file {
-        edits.push(plan_in(list, &file, |text, own| {
+        let mut values = Vec::new();
+        let edit = plan_in(list, &file, |text, own| {
             let own = own.flatten_mods()?;
             let mut text = text.to_string();
-            for (id, wanted) in &changes {
-                let mut deps = own
+            for (id, kept) in &changes {
+                let had = own
                     .get(id)
                     .map(|entry| entry.dependencies.clone())
                     .unwrap_or_default();
-                for need in wanted {
-                    if !deps.contains(need) {
-                        deps.push(need.clone());
-                    }
+                let mut deps = had.clone();
+                deps.custom.retain(|dep| !kept.contains(dep));
+                *deps.group_mut(group).expect("checked above") = kept.clone();
+                if deps == had {
+                    continue;
                 }
-                let value = toml_edit::Array::from_iter(deps.iter().map(String::as_str));
-                let pairs = doc::parse_pairs(&[format!("dependencies={value}")])?;
-                text = doc::set_fields(&text, id, None, &pairs, &[])?;
+                text = if deps.is_empty() {
+                    doc::set_fields(&text, id, None, &[], &["dependencies".to_string()])?
+                } else {
+                    let pairs = doc::parse_pairs(&[format!("dependencies={}", deps.to_toml())])?;
+                    doc::set_fields(&text, id, None, &pairs, &[])?
+                };
+                values.push((id.clone(), deps.to_toml()));
             }
             Ok(text)
-        })?);
+        })?;
+        changed.extend(values);
+        edits.push(edit);
     }
-    Ok((edits, added, skipped))
+    Ok(FoundDependencies {
+        edits,
+        changed,
+        skipped,
+    })
 }
 
 /// `text` loads and validates as the modlist at `path`.

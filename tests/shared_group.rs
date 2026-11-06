@@ -72,7 +72,7 @@ fn two_lists_take_what_they_want_from_one_group() {
     assert_eq!(planned(&full), ["Script Extender", "Menu Fix", "HUD"]);
     assert_eq!(planned(&lean), ["Core: Script Extender", "Core: Menu Fix"]);
     let lean = load_modlist(&lean).unwrap();
-    assert_eq!(lean.mods[1].dependencies, ["Core: Script Extender"]);
+    assert_eq!(lean.mods[1].dependencies.all(), ["Core: Script Extender"]);
     assert_eq!(lean.mods[1].oracle_name.as_deref(), Some("MenuFix"));
     assert!(lean.inputs["Core.hud"].fixed.is_some());
 }

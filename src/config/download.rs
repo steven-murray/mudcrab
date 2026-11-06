@@ -1088,6 +1088,7 @@ mod tests {
                 merge: None,
                 plugins: Vec::new(),
                 dependencies: Vec::new(),
+                found: Default::default(),
                 optional_in: None,
                 follows: Vec::new(),
                 archives: vec![CompiledArchive {
@@ -1185,6 +1186,7 @@ mod tests {
                 merge: None,
                 plugins: Vec::new(),
                 dependencies: Vec::new(),
+                found: Default::default(),
                 optional_in: None,
                 follows: Vec::new(),
                 archives: vec![CompiledArchive {

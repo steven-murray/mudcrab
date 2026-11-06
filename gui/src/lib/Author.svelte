@@ -9,7 +9,10 @@
     type Checked,
     type Conflicts as Found,
     type Edited,
-    type MasterDependencies,
+    type FoundDependencies,
+    type FoundGroup,
+    type FindingGroup,
+    type ResourceScan,
     type Entry,
     type ListView,
     type LoadOrder as Order,
@@ -328,20 +331,20 @@
     }
   }
 
-  // Each mod's plugins' masters into its `dependencies` (every mod's, or
-  // one's), reading the masters first if they are not yet; what it did is
-  // shown until the next.
-  let masterDeps = $state<MasterDependencies | null>(null);
-  let addingDeps = $state(false);
-  async function addMasterDeps(id: string | null) {
+  // One group of each mod's found `dependencies` (every mod's, or one's) set
+  // as last found: `masters` read first if they are not yet, `resources`
+  // once looked for. What it did is shown until the next.
+  let foundDeps = $state<{ group: FoundGroup; done: FoundDependencies } | null>(null);
+  let addingDeps = $state<FoundGroup | null>(null);
+  async function addFound(group: FoundGroup, id: string | null) {
     modMenu = null;
     if (editing) return;
     editing = true;
-    addingDeps = true;
+    addingDeps = group;
     error = null;
     try {
-      const done = await api.addMasterDependencies(id);
-      masterDeps = done;
+      const done = await api.addFoundDependencies(group, id);
+      foundDeps = { group, done };
       if (done.edited) {
         last = done.edited.change;
         canUndo = done.edited.can_undo;
@@ -353,9 +356,27 @@
       error = String(err);
     } finally {
       editing = false;
-      addingDeps = false;
+      addingDeps = null;
     }
   }
+
+  // What each mod's plugins need of other mods for the files they name
+  // (`check --resources`): kept for adding them, until looked for again.
+  let resources = $state<ResourceScan | null>(null);
+  let scanning = $state(false);
+  async function findResources() {
+    scanning = true;
+    error = null;
+    try {
+      resources = await api.findResourceDependencies();
+    } catch (err) {
+      error = String(err);
+    } finally {
+      scanning = false;
+    }
+  }
+  /** Resource dependencies found that can be added: not listed, not refused. */
+  const resourcesToAdd = $derived(resources?.needs.filter((n) => !n.listed && !n.optional).length ?? 0);
 
   const undo = () => canUndo && run(api.undo);
   const redo = () => canRedo && run(api.redo);
@@ -465,23 +486,32 @@
       {/if}
       <button
         role="menuitem"
-        onclick={() => addMasterDeps(modMenu!.id)}
-        title="List the mods its plugins' masters come from in its dependencies (reading the masters from the archives first, if need be)"
+        onclick={() => addFound("masters", modMenu!.id)}
+        title="List the mods its plugins' masters come from in its dependencies.masters (reading the masters from the archives first, if need be)"
         >Add its plugins' masters as dependencies</button
       >
+      {#if resources}
+        <button
+          role="menuitem"
+          onclick={() => addFound("resources", modMenu!.id)}
+          title="List the mods that alone provide files its plugins name in its dependencies.resources, as last looked for in Check"
+          >Add its resource dependencies</button
+        >
+      {/if}
       <button role="menuitem" class="danger" onclick={() => (confirmRemove = true)} title="mudcrab remove">Remove from the list…</button>
     {/if}
   </div>
 {/if}
 
-{#snippet masterDepsDone(done: MasterDependencies)}
+{#snippet foundDepsDone(group: FoundGroup, done: FoundDependencies)}
+  {@const why = group === "masters" ? "their plugins' masters" : "the files their plugins use"}
   <div class="depsdone">
-    <button class="link close" onclick={() => (masterDeps = null)} title="Hide this">×</button>
+    <button class="link close" onclick={() => (foundDeps = null)} title="Hide this">×</button>
     {#if done.mods}
-      Added dependencies to {done.mods} mod{done.mods === 1 ? "" : "s"}, from their plugins' masters{#if checked}; check again
-        to see the list as it is now{/if}.
+      Updated <code>dependencies.{group}</code> of {done.mods} mod{done.mods === 1 ? "" : "s"}, from {why}{#if checked}; check
+        again to see the list as it is now{/if}.
     {:else}
-      No dependencies to add: every mod already lists the mods its plugins' masters come from.
+      Nothing to change: every mod's <code>dependencies.{group}</code> already lists the mods {why} need.
     {/if}
     {#if done.refused.length}
       <div class="bad">
@@ -491,7 +521,7 @@
           {#each done.refused as r}
             <li>
               <button class="link" onclick={() => select(r.mod_id)}>{r.mod_id}</button> needs {r.needs}
-              <span class="dim">({r.plugin} has {r.master} as a master)</span>
+              <span class="dim">({r.plugin} {group === "masters" ? "has" : "uses"} {r.named}{group === "masters" ? " as a master" : ""})</span>
             </li>
           {/each}
         </ul>
@@ -499,11 +529,30 @@
     {/if}
     {#if done.skipped.length}
       <div class="dim">
-        Left as they were:
+        Left out:
         <ul>{#each done.skipped as s}<li>{s}</li>{/each}</ul>
       </div>
     {/if}
   </div>
+{/snippet}
+
+{#snippet findingGroups(groups: FindingGroup[])}
+  {#each groups as group}
+    <section class="group {group.tone}">
+      <h3>{group.heading} <span class="dim">({group.items.length})</span></h3>
+      <ul>
+        {#each group.items as item}
+          <li>
+            {#if item.mod_id}
+              <button class="link" onclick={() => select(item.mod_id!)} title="Show this mod"><Text spans={item.text} /></button>
+            {:else}
+              <Text spans={item.text} />
+            {/if}
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/each}
 {/snippet}
 
 {#snippet optionalMenu(doc: ModDoc)}
@@ -726,9 +775,11 @@
     <div class="content">
       {#if error}<pre class="error">{error}</pre>{/if}
       {#if addingDeps}
-        <p class="dim">Reading plugins' masters, and adding them as dependencies…</p>
-      {:else if masterDeps}
-        {@render masterDepsDone(masterDeps)}
+        <p class="dim">
+          {addingDeps === "masters" ? "Reading plugins' masters, and adding them" : "Adding resource dependencies"}…
+        </p>
+      {:else if foundDeps}
+        {@render foundDepsDone(foundDeps.group, foundDeps.done)}
       {/if}
 
       {#if tab === "mod"}
@@ -824,29 +875,40 @@
           <button class="primary" onclick={runCheck} disabled={checking}>{checking ? "Checking…" : checked ? "Check again" : "Run check"}</button>
           {#if checked}<span>{checked.done.summary}</span>{/if}
           <button
-            onclick={() => addMasterDeps(null)}
+            onclick={() => addFound("masters", null)}
             disabled={editing}
-            title="For every mod in the plan: list the mods its plugins' masters come from in its dependencies. One edit, undone at once."
+            title="For every mod in the plan: set dependencies.masters to the mods its plugins' masters come from, taking out those it no longer needs. One edit, undone at once."
             >Add plugin masters as dependencies to all mods</button
           >
         </div>
+        <div class="checkbar">
+          <button
+            onclick={findResources}
+            disabled={scanning}
+            title="Read every plugin whole for the meshes and sounds it names, and every BSA for its files (check --masters-only --resources). Slow the first time; what is read is kept."
+            >{scanning ? "Reading plugins and BSAs…" : resources ? "Find resource dependencies again" : "Find resource dependencies"}</button
+          >
+          {#if resources}
+            <span>{resources.needs.length} found, {resourcesToAdd} not yet listed</span>
+            <button
+              onclick={() => addFound("resources", null)}
+              disabled={editing}
+              title="For every mod in the plan: set dependencies.resources to the mods that alone provide files its plugins name, taking out those it no longer needs. One edit, undone at once."
+              >Add resource dependencies to all mods</button
+            >
+          {/if}
+        </div>
+        {#if resources}
+          {@render findingGroups(resources.groups)}
+          {#if !resources.groups.length}<p class="dim">Every mod lists the mods it needs for its files.</p>{/if}
+        {:else}
+          <p class="dim small">
+            A file a mod's plugins name -- a mesh, a sound -- that only one other mod provides makes that mod a dependency.
+            One the game has, or several mods have, does not: any would do, and the order only decides whose wins.
+          </p>
+        {/if}
         {#if checked}
-          {#each checked.groups as group}
-            <section class="group {group.tone}">
-              <h3>{group.heading} <span class="dim">({group.items.length})</span></h3>
-              <ul>
-                {#each group.items as item}
-                  <li>
-                    {#if item.mod_id}
-                      <button class="link" onclick={() => select(item.mod_id!)} title="Show this mod"><Text spans={item.text} /></button>
-                    {:else}
-                      <Text spans={item.text} />
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-            </section>
-          {/each}
+          {@render findingGroups(checked.groups)}
           <p class="dim small">Same from a terminal: <code>{checked.done.command}</code></p>
         {:else}
           <p class="dim">Checks every archive, layout, action, master, the load order and BSAs, as <code>mudcrab check</code> does. It reads every archive, so it takes a minute on a large list.</p>
