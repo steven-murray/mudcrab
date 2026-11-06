@@ -582,6 +582,8 @@
     id={choosing.id}
     number={choosing.number}
     label={choosing.label}
+    inputs={list.document.inputs}
+    current={list.answers}
     write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers))}
     close={() => (choosing = null)}
   />

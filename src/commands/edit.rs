@@ -137,8 +137,13 @@ pub fn choose(args: crate::cli::ChooseArgs) -> anyhow::Result<()> {
             ),
         );
     }
-    let edit =
-        crate::config::installer::plan_choice(&args.input, &args.mod_id, args.archive, &installed)?;
+    let edit = crate::config::installer::plan_choice(
+        &args.input,
+        &args.mod_id,
+        args.archive,
+        &installed,
+        false,
+    )?;
     finish(
         edit,
         args.dry_run,

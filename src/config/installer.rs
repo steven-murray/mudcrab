@@ -30,6 +30,18 @@ pub enum Answer {
     Pick(Vec<usize>),
     /// Yes or no, to a wizard asking whether a file is installed.
     Yes(bool),
+    /// A FOMOD group whose options depend on the list's questions: a row
+    /// for each condition, written with its `if`; the walk goes on with
+    /// `now`, what the answers given now choose.
+    Depends { now: Vec<usize>, rows: Vec<Row> },
+}
+
+/// A FOMOD group's options chosen when `condition` holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Row {
+    #[serde(rename = "if")]
+    pub condition: String,
+    pub pick: Vec<usize>,
 }
 
 /// What the walk needs to know next.
@@ -38,12 +50,14 @@ pub enum Answer {
 pub enum Asked {
     Choose {
         question: Question,
+        /// For a FOMOD group, whose options can depend on the list's
+        /// questions: the entry's rows that do, to start from.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        rows: Option<Vec<Row>>,
     },
     /// A wizard asks whether a file is already installed, by a mod earlier
     /// in the list: something only the list's author knows.
-    YesNo {
-        path: String,
-    },
+    YesNo { path: String },
 }
 
 /// The installer walked: what the entry records, the actions those choices
@@ -87,7 +101,10 @@ impl ListPlugins {
 /// installer's own choice is the default.
 #[derive(Debug, Clone, Default)]
 pub struct Prior {
+    /// The selections that apply, on the list's answers now.
     pub fomod: Vec<crate::config::schema::FomodSelection>,
+    /// The entry's own selections, with their conditions.
+    pub rows: Vec<crate::config::schema::FomodSelection>,
     pub packages: Vec<String>,
     /// Walk the installer even on defaults, so each choice is written out
     /// (`choose`). Adding leaves an installer nobody walked to its defaults.
@@ -116,22 +133,67 @@ struct Answers<'a> {
 
 impl Answers<'_> {
     fn pick(&mut self, question: Question) -> anyhow::Result<Vec<usize>> {
+        let (now, rows) = self.pick_rows(question, None)?;
+        anyhow::ensure!(
+            rows.is_empty(),
+            "only a FOMOD group's options can depend on the list's questions"
+        );
+        Ok(now)
+    }
+
+    /// The options chosen now, and the rows for each condition when they
+    /// depend on the list's questions (`prior` the entry's, to start from;
+    /// none where they cannot).
+    fn pick_rows(
+        &mut self,
+        question: Question,
+        prior: Option<Vec<Row>>,
+    ) -> anyhow::Result<(Vec<usize>, Vec<Row>)> {
         if let Some(settled) = question.settled() {
-            return Ok(settled);
+            return Ok((settled, Vec::new()));
         }
         if self.defaults {
-            return Ok(question.default.clone());
+            return Ok((question.default.clone(), prior.unwrap_or_default()));
         }
-        match self.given.next() {
-            Some(Answer::Pick(picked)) => question
+        let accept = |picked: &[usize]| {
+            question
                 .accept(picked)
-                .map_err(|problem| anyhow::anyhow!("{}: {problem}", question.title)),
+                .map_err(|problem| anyhow::anyhow!("{}: {problem}", question.title))
+        };
+        match self.given.next() {
+            Some(Answer::Pick(picked)) => Ok((accept(picked)?, Vec::new())),
+            Some(Answer::Depends { now, rows }) => {
+                anyhow::ensure!(
+                    prior.is_some(),
+                    "only a FOMOD group's options can depend on the list's questions"
+                );
+                let rows = rows
+                    .iter()
+                    .map(|row| {
+                        let condition = row.condition.trim();
+                        anyhow::ensure!(
+                            !condition.is_empty(),
+                            "{}: each row needs a condition",
+                            question.title
+                        );
+                        Ok(Row {
+                            condition: condition.to_string(),
+                            pick: accept(&row.pick)?,
+                        })
+                    })
+                    .collect::<anyhow::Result<Vec<_>>>()?;
+                Ok((accept(now)?, rows))
+            }
             Some(Answer::Yes(_)) => anyhow::bail!(
                 "the answers given do not match the installer's questions (a yes or no for \
                  {:?}); start again",
                 question.title
             ),
-            None => Err(NeedAnswer(Asked::Choose { question }).into()),
+            None => Err(NeedAnswer(Asked::Choose {
+                question,
+                rows: prior,
+            })
+            .into()),
         }
     }
 
@@ -141,7 +203,7 @@ impl Answers<'_> {
         }
         match self.given.next() {
             Some(Answer::Yes(yes)) => Ok(Some(*yes)),
-            Some(Answer::Pick(_)) => anyhow::bail!(
+            Some(Answer::Pick(_) | Answer::Depends { .. }) => anyhow::bail!(
                 "the answers given do not match the installer's questions (a choice for \
                  whether {path} is installed); start again"
             ),
@@ -200,6 +262,9 @@ fn walk_with(
             // A step can depend on which plugins are active; install answers
             // that from the list's load order, so the walk here does too.
             let active: HashSet<String> = list.active.iter().cloned().collect();
+            // Groups answered once per condition: their selections, each
+            // with its `if`.
+            let mut depends: Vec<crate::config::schema::FomodSelection> = Vec::new();
             let selections = choose_fomod(&xml, config_path, &active, &mut |group| {
                 // What the entry chooses already, where it names this group.
                 let default = prior
@@ -212,29 +277,73 @@ fn walk_with(
                             .collect()
                     })
                     .unwrap_or_else(|| group.default.clone());
-                answers.pick(Question {
-                    title: format!("{}: {}", group.step, group.group),
-                    rule: Rule::from_fomod(group.group_type),
-                    choices: group
-                        .options
-                        .iter()
-                        .map(|option| Choice {
-                            name: option.name.clone(),
-                            description: option.description.clone(),
-                            availability: match option.kind {
-                                FomodOptionType::Required => Availability::Required,
-                                FomodOptionType::Recommended => Availability::Recommended,
-                                FomodOptionType::NotUsable => Availability::Unavailable,
-                                FomodOptionType::Optional | FomodOptionType::CouldBeUsable => {
-                                    Availability::Free
-                                }
-                            },
+                let rows = prior
+                    .rows
+                    .iter()
+                    .filter(|s| s.step == group.step && s.group == group.group)
+                    .filter_map(|s| {
+                        Some(Row {
+                            condition: s.condition.clone()?,
+                            pick: (0..group.options.len())
+                                .filter(|&i| s.options.contains(&group.options[i].name))
+                                .collect(),
                         })
-                        .collect(),
-                    default,
-                })
+                    })
+                    .collect();
+                let (now, rows) = answers.pick_rows(
+                    Question {
+                        title: format!("{}: {}", group.step, group.group),
+                        rule: Rule::from_fomod(group.group_type),
+                        choices: group
+                            .options
+                            .iter()
+                            .map(|option| Choice {
+                                name: option.name.clone(),
+                                description: option.description.clone(),
+                                availability: match option.kind {
+                                    FomodOptionType::Required => Availability::Required,
+                                    FomodOptionType::Recommended => Availability::Recommended,
+                                    FomodOptionType::NotUsable => Availability::Unavailable,
+                                    FomodOptionType::Optional | FomodOptionType::CouldBeUsable => {
+                                        Availability::Free
+                                    }
+                                },
+                            })
+                            .collect(),
+                        default,
+                    },
+                    Some(rows),
+                )?;
+                depends.extend(rows.into_iter().map(|row| {
+                    crate::config::schema::FomodSelection {
+                        condition: Some(row.condition),
+                        step: group.step.to_string(),
+                        group: group.group.to_string(),
+                        options: row
+                            .pick
+                            .iter()
+                            .map(|&i| group.options[i].name.clone())
+                            .collect(),
+                    }
+                }));
+                Ok(now)
             })?;
-            installed.chosen = Some(Chosen::Fomod(selections));
+            // A group answered once per condition is written as its rows,
+            // in its place.
+            let mut written = Vec::new();
+            for selection in selections {
+                let rows: Vec<_> = depends
+                    .iter()
+                    .filter(|s| s.step == selection.step && s.group == selection.group)
+                    .cloned()
+                    .collect();
+                if rows.is_empty() {
+                    written.push(selection);
+                } else {
+                    written.extend(rows);
+                }
+            }
+            installed.chosen = Some(Chosen::Fomod(written));
         }
         LayoutGuess::Bain { subpackages, .. } if subpackages.len() > 1 => {
             // A wizard asks its own questions, in words, and decides what
@@ -595,7 +704,8 @@ pub fn existing(
     let report = inspect_archive(&archive, false)?;
     Ok(Existing {
         prior: Prior {
-            fomod: spec.fomod_selections.clone(),
+            fomod: planned.archive.fomod_selections.clone(),
+            rows: spec.fomod_selections.clone(),
             packages: spec
                 .bain_subpackages
                 .iter()
@@ -610,19 +720,21 @@ pub fn existing(
 }
 
 /// Plan writing what the walk chose into mod `id`'s `number`th archive, in
-/// the list at `path`.
+/// the list at `path`: with `rows`, its FOMOD selections that depend on the
+/// list's questions replace the entry's (the walk showed them).
 pub fn plan_choice(
     path: &Path,
     id: &str,
     number: usize,
     installed: &Installed,
+    rows: bool,
 ) -> anyhow::Result<crate::config::edit::Edit> {
     let chosen = installed
         .chosen
         .as_ref()
         .ok_or_else(|| anyhow::anyhow!("this archive's installer has nothing to choose"))?;
     crate::config::edit::plan_mod(path, id, |text, _, id| {
-        crate::config::edit::doc::set_installer(text, id, number, chosen)
+        crate::config::edit::doc::set_installer(text, id, number, chosen, rows)
     })
 }
 
@@ -686,10 +798,82 @@ mod tests {
     fn asked(walked: Walk) -> Question {
         match walked {
             Walk::Ask {
-                asked: Asked::Choose { question },
+                asked: Asked::Choose { question, .. },
             } => question,
             other => panic!("expected a question, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn a_fomod_group_can_depend_on_the_lists_questions() {
+        let dir = tempfile::tempdir().unwrap();
+        let archive = archive(dir.path());
+        let report = inspect_archive(&archive, false).unwrap();
+        let list = ListPlugins::default();
+        let row = |condition: &str, pick: Vec<usize>| Row {
+            condition: condition.to_string(),
+            pick,
+        };
+
+        let answers = [
+            Answer::Depends {
+                now: vec![0],
+                rows: vec![row("potato", vec![1]), row("!potato", vec![0])],
+            },
+            Answer::Pick(vec![]),
+        ];
+        let Walk::Done { installed } =
+            walk(&archive, &report, &list, &Prior::default(), &answers, false).unwrap()
+        else {
+            panic!("the walk should be done");
+        };
+        let Some(Chosen::Fomod(selections)) = &installed.chosen else {
+            panic!("expected FOMOD selections");
+        };
+        let written: Vec<(Option<&str>, &str, &[String])> = selections
+            .iter()
+            .map(|s| {
+                (
+                    s.condition.as_deref(),
+                    s.group.as_str(),
+                    s.options.as_slice(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            written,
+            [
+                (Some("potato"), "Core", &["Lite".to_string()][..]),
+                (Some("!potato"), "Core", &["Full".to_string()][..]),
+                (None, "Always", &["Base".to_string()][..]),
+                (None, "Patches", &[][..]),
+            ]
+        );
+
+        // Walked again, the entry's rows are offered to start from.
+        let prior = Prior {
+            fomod: vec![selections[1].clone()],
+            rows: selections.clone(),
+            ..Prior::default()
+        };
+        let Walk::Ask {
+            asked: Asked::Choose { question, rows },
+        } = walk(&archive, &report, &list, &prior, &[], false).unwrap()
+        else {
+            panic!("expected a question");
+        };
+        assert_eq!(question.default, [0]);
+        assert_eq!(
+            rows,
+            Some(vec![row("potato", vec![1]), row("!potato", vec![0])])
+        );
+
+        // Only a FOMOD group can depend on them, and each row needs its `if`.
+        let blank = [Answer::Depends {
+            now: vec![0],
+            rows: vec![row(" ", vec![1])],
+        }];
+        assert!(walk(&archive, &report, &list, &Prior::default(), &blank, false).is_err());
     }
 
     #[test]

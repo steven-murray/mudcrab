@@ -1,21 +1,27 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Answer, type Walk } from "./api";
+  import { api, type Answer, type InputDoc, type Walk } from "./api";
   import InstallerQuestions from "./InstallerQuestions.svelte";
 
   // An archive's installer walked again (`mudcrab choose`): each question
   // starts at what the list chooses now, and the new choices are written as
-  // the archive's `fomod_selections` or `bain_subpackages`.
+  // the archive's `fomod_selections` or `bain_subpackages`. A FOMOD group's
+  // options can depend on the list's questions, written as a row per `if`.
   let {
     id,
     number,
     label,
+    inputs,
+    current,
     write,
     close,
   }: {
     id: string;
     number: number;
     label: string;
+    /** The list's questions, and the answers now. */
+    inputs: InputDoc[];
+    current: Record<string, string>;
     /** Write the choices; resolves true when written. */
     write: (answers: Answer[]) => Promise<boolean>;
     close: () => void;
@@ -52,7 +58,15 @@
     try {
       let next = await api.chooseWalk(id, number, answers);
       while (next.kind === "ask") {
-        answers = [...answers, next.asked.kind === "choose" ? { pick: next.asked.question.default } : { yes: false }];
+        const asked = next.asked;
+        // A group's rows that depend on the questions are kept as they are.
+        const given: Answer =
+          asked.kind !== "choose"
+            ? { yes: false }
+            : asked.rows?.length
+              ? { depends: { now: asked.question.default, rows: asked.rows } }
+              : { pick: asked.question.default };
+        answers = [...answers, given];
         next = await api.chooseWalk(id, number, answers);
       }
       walk = next;
@@ -83,7 +97,7 @@
     <div class="dbody">
       <p class="dim small">Each question starts at what the list chooses now.</p>
       {#if error}<pre class="error">{error}</pre>{/if}
-      <InstallerQuestions {walk} answered={answers.length} {busy} {answer} {back} {defaults} />
+      <InstallerQuestions {walk} answered={answers.length} {busy} {answer} {back} {defaults} {inputs} {current} />
     </div>
     <div class="dfoot">
       <button onclick={close}>Cancel</button>

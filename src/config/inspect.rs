@@ -337,7 +337,11 @@ fn guess_layout(tree: &ArchiveTree, paths: &[String], fomod_config: Option<&str>
 /// One text file out of an archive -- a FOMOD config -- pulled out into the
 /// user's cache and decoded. Never the whole archive, never `/tmp`.
 pub(crate) fn extract_single_entry(source: &Path, entry_path: &str) -> anyhow::Result<String> {
-    let scratch = crate::util::fs::cache_scratch_dir("inspect");
+    // A folder of its own per call: threads share the process's, and each
+    // removes its folder when done.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let call = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let scratch = crate::util::fs::cache_scratch_dir(&format!("inspect-{call}"));
     let bytes = crate::archive::read_entry(source, entry_path, &scratch)?;
     crate::config::install::layout::fomod::decode_xml(&bytes, entry_path)
 }
