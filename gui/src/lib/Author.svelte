@@ -110,16 +110,26 @@
   // The "+" menu by the search box.
   let addMenu = $state(false);
 
+  // Removing is refused while another mod names it; the menu stays open to
+  // say why.
+  let removeError = $state<string | null>(null);
   async function removeMod(id: string) {
-    modMenu = null;
-    if (await run(() => api.removeMod(id))) {
-      if (selected === id) {
-        selected = null;
-        view = null;
-        files = [];
-      }
-      await archivesPane?.refresh();
+    removeError = null;
+    // Not selected while the list is read again: it would be looked up gone.
+    const was = selected;
+    if (selected === id) selected = null;
+    if (!(await run(() => api.removeMod(id)))) {
+      selected = was;
+      removeError = error;
+      error = null;
+      return;
     }
+    modMenu = null;
+    if (was === id) {
+      view = null;
+      files = [];
+    }
+    await archivesPane?.refresh();
   }
   let archivesPane = $state<Archives | null>(null);
 
@@ -460,12 +470,24 @@
   <div class="menu" style="left: {modMenu.x}px; top: {modMenu.y}px" role="menu" tabindex="-1" onclick={(e) => e.stopPropagation()}>
     <div class="mtitle">{modMenu.title}</div>
     {#if confirmRemove}
+      {@const naming = allMods.filter(
+        (m) => m.id !== modMenu!.id && ((m.dependencies ?? []).includes(modMenu!.id) || (m.condition?.mods ?? []).includes(modMenu!.id)),
+      )}
       <div class="confirm">
-        Remove it from the list, with its plugins and notes?
-        <div>
-          <button class="danger" onclick={() => removeMod(modMenu!.id)}>Remove</button>
-          <button onclick={() => (confirmRemove = false)}>Keep it</button>
-        </div>
+        {#if naming.length}
+          It can't be removed while other mods name it, in their <code>dependencies</code> or <code>if</code>:
+          <ul>
+            {#each naming as m (m.id)}<li>{m.title}</li>{/each}
+          </ul>
+          <div><button onclick={() => (confirmRemove = false)}>Back</button></div>
+        {:else}
+          Remove it from the list, with its plugins and notes?
+          {#if removeError}<p class="error">{removeError}</p>{/if}
+          <div>
+            <button class="danger" disabled={editing} onclick={() => removeMod(modMenu!.id)}>Remove</button>
+            <button onclick={() => (confirmRemove = false)}>Keep it</button>
+          </div>
+        {/if}
       </div>
     {:else}
       <button
@@ -719,6 +741,7 @@
                 ev.preventDefault();
                 ev.stopPropagation();
                 confirmRemove = false;
+                removeError = null;
                 menuAsk = null;
                 modMenu = { x: ev.clientX, y: ev.clientY, id: e.id, title: e.title, enabled: e.enabled !== false };
               }}
@@ -1210,6 +1233,16 @@
   .confirm {
     padding: 4px 12px;
     max-width: 260px;
+  }
+  .confirm ul {
+    margin: 4px 0;
+    padding-left: 18px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .confirm .error {
+    margin: 6px 0 0;
+    white-space: pre-wrap;
   }
   .confirm div {
     display: flex;
