@@ -12,7 +12,10 @@
   import { tours } from "./lib/tours";
   import { inline, markdown } from "./lib/markdown";
 
-  let list = $state<ListView | null>(null);
+  // Raw: the list is only ever replaced whole (each edit reads it again),
+  // and a deep proxy of a big list made every edit re-track its every field
+  // -- about 400 ms for a 700-mod list, with nothing on screen changing.
+  let list = $state.raw<ListView | null>(null);
   let recent = $state<string[]>([]);
   let error = $state<string | null>(null);
   let opening = $state(false);
