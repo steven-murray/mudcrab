@@ -3,8 +3,9 @@
 //! files, and `check`'s findings -- the views an author edits from, once
 //! phase 6 turns editing on. See docs/design/gui.md.
 //!
-//! Everything reads the list as planned with the answers last given for it
-//! (install mode's), planned again whenever the file has changed on disk.
+//! Everything reads the list as planned with Author mode's own profile's
+//! answers (`author_answers`, apart from Install mode's), planned again
+//! whenever the file or those answers change.
 
 use super::{State, locate, quote, shown};
 use mudcrab::config;

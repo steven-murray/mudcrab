@@ -49,7 +49,7 @@
   let {
     list = $bindable(),
     active,
-    locations,
+    locations = $bindable(),
   }: { list: ListView; active: boolean; locations: import("./api").Locations | null } = $props();
 
   type Tab = "mod" | "load" | "conflicts" | "check" | "inputs" | "changes";
@@ -109,6 +109,12 @@
   // A profile chosen or its answers changed: what is shown follows them.
   async function profileChanged(next: AuthorProfile) {
     profile = next;
+    // Profiles are shared: Install mode's list of them, and its answers when
+    // it has the same one, follow.
+    api
+      .locations()
+      .then((read) => (locations = read))
+      .catch(() => {});
     order = null;
     checked = null;
     await refresh();

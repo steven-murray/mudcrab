@@ -330,7 +330,7 @@
         <section class="left" data-tour="guide"><Guide document={list.document} /></section>
         <aside class="right"><Install {list} bind:locations openFolders={() => (folders = true)} bind:running={installing} /></aside>
       </main>
-      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} {locations} /></div>
+      <div class="authoring" class:hidden={mode !== "author"}><Author bind:list active={mode === "author"} bind:locations /></div>
     {/key}
   {:else}
     <div class="welcome">
