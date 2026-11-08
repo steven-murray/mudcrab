@@ -573,6 +573,22 @@ fn choice_edit(
     apply(state, command, planned)
 }
 
+/// Mod `id`'s `number`th archive taken out, its choices with it.
+#[tauri::command(async)]
+pub(super) fn remove_archive(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+) -> Result<Edited, String> {
+    choice_edit(
+        &state,
+        &id,
+        number,
+        "remove the archive",
+        |text, written| doc::remove_archive(text, written, number),
+    )
+}
+
 /// BAIN packages chosen for one of an archive's sets of choices: its own, a
 /// set's, or a new set's.
 #[tauri::command(async)]

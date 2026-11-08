@@ -22,6 +22,7 @@
 <script lang="ts">
   import { tick as rendered } from "svelte";
   import ChoiceSets from "./ChoiceSets.svelte";
+  import { api } from "./api";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { startDrag } from "./drag";
   import type { InputDoc } from "./api";
@@ -65,6 +66,8 @@
   } = $props();
 
   const lower = (list: string[]) => list.map((v) => v.toLowerCase());
+  // The archive whose removal is being confirmed.
+  let removing = $state<number | null>(null);
   // As globset escapes a path: each metacharacter in brackets.
   const escape = (path: string) => path.replace(/[*?[\]{}]/g, (c) => `[${c}]`);
 
@@ -349,6 +352,16 @@
       <strong>{several ? `${archive.number}. ` : ""}{archive.label}</strong>
       {#if archive.condition}<IfTag condition={archive.condition} applies={archive.applies} />{/if}
       {#if archive.tree}<span class="tag" title="Its layout">{archive.tree.layout ?? "automatic"}</span>{/if}
+      <span class="grow"></span>
+      {#if removing === archive.number}
+        <span class="small">Remove this archive, and its choices?</span>
+        <button class="small danger" onclick={() => run(() => api.removeArchive(id, archive.number)).then(() => (removing = null))}
+          >Remove</button
+        >
+        <button class="small" onclick={() => (removing = null)}>Keep it</button>
+      {:else}
+        <button class="link small danger" onclick={() => (removing = archive.number)} title="Take this archive out of the mod">Remove</button>
+      {/if}
     </div>
     {#if archive.error}
       <pre class="error">{archive.error}</pre>
@@ -503,6 +516,9 @@
     padding: 6px 10px;
     margin: 6px 0;
     font-size: 13px;
+  }
+  .ahead .grow {
+    flex: 1;
   }
   .ahead {
     display: flex;

@@ -259,7 +259,8 @@ history there, rather than be undone by it.
   there -- from the downloads folders, or a file fetched from a Nexus
   link -- has its source and installer answered, and goes after the mod's
   own archives. Plugins it has that the mod does not declare are named, to
-  add to its plugins and the load order.
+  add to its plugins and the load order. Each archive has **Remove**, which takes it
+  out, its choices with it, once confirmed.
 
   **Add an action…** adds one of the other actions (`action add`) -- `qac`,
   `delete_records`, `write_file`, `pack_bsa`, `create_dummy_plugin`,

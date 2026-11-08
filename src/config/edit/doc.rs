@@ -221,6 +221,28 @@ pub fn add_action(
     Ok(doc.to_string())
 }
 
+/// Take mod `id`'s `number`th archive (from 1) out, its choices with it.
+pub fn remove_archive(text: &str, id: &str, number: usize) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    let archives = table
+        .get_mut("archives")
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or_else(|| {
+            anyhow::anyhow!("mod '{id}' has no archives written as [[mods.archives]]")
+        })?;
+    anyhow::ensure!(
+        (1..=archives.len()).contains(&number),
+        "mod '{id}' has {} archive(s), so there is no archive {number}",
+        archives.len()
+    );
+    archives.remove(number - 1);
+    if archives.is_empty() {
+        table.remove("archives");
+    }
+    Ok(doc.to_string())
+}
+
 /// Add an archive to the end of a mod's archives: `block` is an
 /// `[[mods.archives]]` entry, its FOMOD selections and all, as
 /// [`crate::config::installer::archive_block`] writes one.
@@ -1781,5 +1803,19 @@ id = "B"
         assert_eq!(a.archives[1].fomod_selections[0].options, ["X"]);
         assert_eq!(a.actions.len(), 1);
         assert!(list.mods[1].archives.is_empty(), "{out}");
+    }
+
+    #[test]
+    fn an_archive_is_removed_with_its_choices() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/2\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/3\"\n\n[[mods.archives.choices]]\nif = \"x\"\nbain_subpackages = [\"00\"]\n\n[[mods.actions]]\naction = \"file_hide\"\npaths = [\"a\"]\n";
+        let out = super::remove_archive(text, "A", 2).unwrap();
+        let list: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+        assert_eq!(list.mods[0].archives.len(), 1);
+        assert_eq!(
+            list.mods[0].archives[0].path.as_deref(),
+            Some("nexus:oblivion/1/2")
+        );
+        assert_eq!(list.mods[0].actions.len(), 1);
+        assert!(super::remove_archive(text, "A", 3).is_err());
     }
 }

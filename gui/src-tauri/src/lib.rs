@@ -1639,6 +1639,7 @@ pub fn app<R: Runtime>(
             edits::add_action,
             edits::set_ini,
             edits::write_bain_set,
+            edits::remove_archive,
             edits::set_choice_condition,
             edits::remove_choice_set,
             edits::move_choice_set,

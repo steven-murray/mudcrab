@@ -670,6 +670,7 @@ export const api = {
    *  the mod does not declare yet. */
   addArchive: (id: string, request: { path: string; source: string | null; answers: Answer[] }) =>
     invoke<Edited & { new_plugins: string[] }>("add_archive", { id, request }),
+  removeArchive: (id: string, number: number) => invoke<Edited>("remove_archive", { id, number }),
   writeBainSet: (id: string, number: number, to: ChoiceTarget, packages: string[]) =>
     invoke<Edited>("write_bain_set", { id, number, to, packages }),
   setChoiceCondition: (id: string, number: number, index: number, condition: string | null) =>
