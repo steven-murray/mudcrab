@@ -415,20 +415,33 @@ fn replace_set_to_value(line: &str, key: &str, value: &str) -> Option<String> {
     }
     let after_to = &rest[2..];
 
-    // The value runs to the next whitespace; anything past it -- padding, a
+    // The value runs to a `;` comment; anything past it -- padding, a
     // `;Default 90` comment, trailing spaces -- belongs to the author.
-    let value_gap = after_to.len() - after_to.trim_start().len();
-    let old_value = after_to[value_gap..]
-        .split_whitespace()
-        .next()
-        .unwrap_or_default();
+    let (start, end) = set_to_value_span(after_to);
+    let head_len = line.len() - after_to.len() + start;
+    Some(format!("{}{value}{}", &line[..head_len], &after_to[end..]))
+}
 
-    let head_len = line.len() - after_to.len() + value_gap;
-    Some(format!(
-        "{}{value}{}",
-        &line[..head_len],
-        &after_to[value_gap + old_value.len()..]
-    ))
+/// Where the value is in what follows a `set <key> to`: from its first
+/// non-blank to a `;` comment (one outside quotes) or the end, its trailing
+/// blanks left out. A value can have spaces -- `sv_Construct "Silver
+/// Weapons"`, `(GetFormFromMod "Mod.esp" 00A0B4)` -- so it is not one word.
+pub(crate) fn set_to_value_span(after_to: &str) -> (usize, usize) {
+    let start = after_to.len() - after_to.trim_start().len();
+    let mut quoted = false;
+    let mut end = after_to.len();
+    for (at, c) in after_to[start..].char_indices() {
+        match c {
+            '"' => quoted = !quoted,
+            ';' if !quoted => {
+                end = start + at;
+                break;
+            }
+            _ => {}
+        }
+    }
+    let end = start + after_to[start..end].trim_end().len();
+    (start, end)
 }
 
 /// Whether the file pads its keys out to a column before the `=`.
@@ -539,6 +552,29 @@ pub(super) fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bo
 #[cfg(test)]
 mod set_to_tests {
     use super::replace_set_to_value;
+
+    #[test]
+    fn a_value_with_spaces_is_replaced_whole() {
+        // Migck's Miscellanea: values with quotes and spaces, and comments.
+        assert_eq!(
+            replace_set_to_value(
+                "set MigMasterQ.sListType to sv_Construct \"Werecreature\"",
+                "MigMasterQ.sListType",
+                "sv_Construct \"Silver Weapons\""
+            )
+            .as_deref(),
+            Some("set MigMasterQ.sListType to sv_Construct \"Silver Weapons\"")
+        );
+        assert_eq!(
+            replace_set_to_value(
+                "set Q.rListAdd to (GetFormFromMod \"A; B.esp\" 07169A) ;a token",
+                "Q.rListAdd",
+                "0"
+            )
+            .as_deref(),
+            Some("set Q.rListAdd to 0 ;a token")
+        );
+    }
 
     #[test]
     fn only_the_value_changes() {

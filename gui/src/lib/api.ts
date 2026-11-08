@@ -270,7 +270,18 @@ export type IniFormat = "standard" | "set-to";
 /** A line of an INI: a section header, a setting, or anything else. */
 export type IniLine =
   | { kind: "section"; name: string }
-  | { kind: "setting"; section: string | null; key: string; value: string; format: IniFormat; text: string }
+  | {
+      kind: "setting";
+      section: string | null;
+      key: string;
+      value: string;
+      format: IniFormat;
+      /** A comment after it on the line. */
+      comment?: string;
+      /** How many lines set this key in its section: more than one is a script building a list. */
+      times: number;
+      text: string;
+    }
   | { kind: "text"; text: string };
 
 export type IniAction =

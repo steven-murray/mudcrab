@@ -23,6 +23,13 @@ pub enum IniLine {
         key: String,
         value: String,
         format: IniSetFormat,
+        /// A comment after it on the line, `;` and all.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        comment: Option<String>,
+        /// How many lines set this key in its section: more than one is a
+        /// script building a list, which `ini_set` cannot change one line
+        /// of.
+        times: usize,
         text: String,
     },
     /// A comment, a blank line, or anything else, as written.
@@ -32,7 +39,8 @@ pub enum IniLine {
 /// `text`'s lines, each read as `ini_set` reads it.
 pub fn read_lines(text: &str) -> Vec<IniLine> {
     let mut section: Option<String> = None;
-    text.lines()
+    let lines = text
+        .lines()
         .map(|line| {
             let trimmed = line.trim();
             if let Some(name) = trimmed
@@ -45,11 +53,13 @@ pub fn read_lines(text: &str) -> Vec<IniLine> {
                 };
             }
             match setting(trimmed) {
-                Some((key, value, format)) => IniLine::Setting {
+                Some((key, value, format, comment)) => IniLine::Setting {
                     section: section.clone(),
                     key,
                     value,
                     format,
+                    comment,
+                    times: 1,
                     text: line.to_string(),
                 },
                 None => IniLine::Text {
@@ -57,21 +67,58 @@ pub fn read_lines(text: &str) -> Vec<IniLine> {
                 },
             }
         })
-        .collect()
+        .collect();
+    count_times(lines)
 }
 
-/// A setting's key, value and form, where `line` is one.
-fn setting(line: &str) -> Option<(String, String, IniSetFormat)> {
+/// Each setting with how many lines in its section set its key.
+fn count_times(mut lines: Vec<IniLine>) -> Vec<IniLine> {
+    let mut times: std::collections::HashMap<(Option<String>, String), usize> =
+        std::collections::HashMap::new();
+    for line in &lines {
+        if let IniLine::Setting { section, key, .. } = line {
+            *times
+                .entry((section.as_ref().map(|s| s.to_lowercase()), key.clone()))
+                .or_default() += 1;
+        }
+    }
+    for line in &mut lines {
+        if let IniLine::Setting {
+            section,
+            key,
+            times: n,
+            ..
+        } = line
+        {
+            *n = times[&(section.as_ref().map(|s| s.to_lowercase()), key.clone())];
+        }
+    }
+    lines
+}
+
+/// A setting's key, value, form and trailing comment, where `line` is one.
+fn setting(line: &str) -> Option<(String, String, IniSetFormat, Option<String>)> {
     if line.starts_with(';') || line.starts_with('#') {
         return None;
     }
     let mut words = line.split_whitespace();
-    if let (Some(command), Some(key), Some(to), Some(value)) =
-        (words.next(), words.next(), words.next(), words.next())
+    if let (Some(command), Some(key), Some(to)) = (words.next(), words.next(), words.next())
         && command.eq_ignore_ascii_case("set")
         && to.eq_ignore_ascii_case("to")
     {
-        return Some((key.to_string(), value.to_string(), IniSetFormat::SetTo));
+        // As `ini_set` reads it: the value runs to a `;` comment.
+        let after_key = line[3..].trim_start().strip_prefix(key)?;
+        let after_to = &after_key.trim_start()[2..];
+        let (start, end) = crate::config::actions::ini_set::set_to_value_span(after_to);
+        let comment = Some(after_to[end..].trim())
+            .filter(|c| !c.is_empty())
+            .map(str::to_string);
+        return Some((
+            key.to_string(),
+            after_to[start..end].to_string(),
+            IniSetFormat::SetTo,
+            comment,
+        ));
     }
     let (key, value) = line.split_once('=')?;
     let key = key.trim();
@@ -80,6 +127,7 @@ fn setting(line: &str) -> Option<(String, String, IniSetFormat)> {
             key.to_string(),
             value.trim().to_string(),
             IniSetFormat::Standard,
+            None,
         )
     })
 }
@@ -228,6 +276,8 @@ mod tests {
                 key: "iShadowMapResolution".to_string(),
                 value: "1024".to_string(),
                 format: IniSetFormat::Standard,
+                comment: None,
+                times: 1,
                 text: "iShadowMapResolution=1024".to_string(),
             }
         );
@@ -239,6 +289,22 @@ mod tests {
         ));
         assert!(matches!(&lines[0], IniLine::Text { .. }));
         assert!(matches!(&lines[1], IniLine::Section { name } if name == "Display"));
+    }
+
+    #[test]
+    fn a_script_ini_is_read_whole_values_and_repeats_counted() {
+        let text = "set Q.sListType to sv_Construct \"Silver Weapons\"\nset Q.rListAdd to (GetFormFromMod \"A.esp\" 07169A) ;a token\nSetStage Q 5\nset Q.rListAdd to (GetFormFromMod \"B.esp\" 00A0B4)\n";
+        let lines = read_lines(text);
+        assert!(matches!(
+            &lines[0],
+            IniLine::Setting { value, times: 1, comment: None, .. } if value == "sv_Construct \"Silver Weapons\""
+        ));
+        assert!(matches!(
+            &lines[1],
+            IniLine::Setting { value, times: 2, comment: Some(c), .. }
+                if value == "(GetFormFromMod \"A.esp\" 07169A)" && c == ";a token"
+        ));
+        assert!(matches!(&lines[2], IniLine::Text { .. }));
     }
 
     #[test]
