@@ -226,7 +226,12 @@ history there, rather than be undone by it.
   (`ini_append_block`). **Applies** chooses the condition the changes are
   for -- always, one already used, or another, typed or made from a yes/no
   or choice question and an answer -- and what other conditions set is
-  shown beside each setting (`512 if potato`). **Save** writes that
+  shown beside each setting (`512 if potato`). Choosing one with nothing
+  changed shows what it sets; with changes made, they stay, to be saved
+  under it -- which moves the block they were read from, and replaces one
+  the condition already has, each said before saving. An INI action in the
+  mod's list has **Edit**, which opens the editor on its file and
+  condition. **Save** writes that
   condition's `ini_set`, `ini_comment` and `ini_append_block` actions on the
   file in place of the ones there were, as one step to undo -- the settings
   as one `ini_set`, its `values` by section; one kept keeps its place and

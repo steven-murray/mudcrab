@@ -325,6 +325,8 @@ export interface IniLayer {
   sets: { section: string | null; key: string; value: string; format: IniFormat }[];
   comments: { key: string; format: IniFormat }[];
   block: string | null;
+  /** The condition these were read from, when it was another: that block moves. */
+  moved_from?: { if: string | null };
 }
 
 export interface Partner {

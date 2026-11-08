@@ -9,14 +9,19 @@
   // setting. What is changed is written as the mod's `ini_set`,
   // `ini_comment` and `ini_append_block` actions on that file, for one
   // condition at a time; the values other conditions give are shown beside.
+  // The condition can be changed at any time: what is shown is then saved
+  // under it, moving the block it was read from.
   let {
     id,
     archives,
     inputs,
     run,
     close,
+    start = null,
   }: {
     id: string;
+    /** Open on this file and condition: an action's, to edit it. */
+    start?: { file: string; scope: "mod" | "game"; condition: string | null } | null;
     /** The mod's archives and what each installs, for its INIs. */
     archives: Archive[];
     inputs: InputDoc[];
@@ -40,7 +45,23 @@
     return out;
   });
   let chosen = $state("");
+  const samePath = (a: string, b: string) => {
+    const norm = (p: string) => p.replace(/\\/g, "/").replace(/^\.\//, "").toLowerCase();
+    return norm(a) === norm(b);
+  };
+  // The file asked for, once the mod's files are known.
+  // Where it opens: read once.
+  const opening = untrack(() => start);
+  let started = $state(!opening);
   $effect(() => {
+    if (!started && opening) {
+      const asked = inis.find((i) => (opening.scope === "game" ? i.scope === "game" : i.scope === "mod" && samePath(i.file, opening.file)));
+      if (asked) {
+        chosen = asked.key;
+        started = true;
+        return;
+      }
+    }
     if (!inis.some((i) => i.key === chosen)) chosen = inis[0]?.key ?? "";
   });
   const ini = $derived(inis.find((i) => i.key === chosen) ?? null);
@@ -67,7 +88,10 @@
 
   // The condition being edited, and its settings: changed values by
   // section and key, those commented out, and lines appended.
-  let condition = $state<string | null>(null);
+  let condition = $state<string | null>(opening?.condition ?? null);
+  // The condition what is shown was read from: saved under another, its
+  // block moves there.
+  let readFrom = $state<string | null>(opening?.condition ?? null);
   const known = $derived((view?.groups ?? []).map((g) => g.if).filter((c): c is string => !!c));
   const values = new SvelteMap<string, Setting>();
   const commented = new SvelteSet<string>();
@@ -92,6 +116,7 @@
     values.clear();
     commented.clear();
     block = "";
+    readFrom = condition;
     const group = view?.groups.find((g) => g.if === condition);
     for (const action of group?.actions ?? []) {
       if (action.kind === "set") {
@@ -103,11 +128,23 @@
     }
     dirty = false;
   }
+  // A file read, or another condition chosen with nothing changed, shows
+  // what that condition sets; with changes made, they stay, to be saved
+  // under it.
   $effect(() => {
     void view;
-    void condition;
     untrack(loadLayer);
   });
+  $effect(() => {
+    void condition;
+    if (!untrack(() => dirty)) untrack(loadLayer);
+  });
+  const target = $derived(condition?.trim() || null);
+  const readGroup = $derived(view?.groups.find((g) => g.if === readFrom) ?? null);
+  const targetGroup = $derived(view?.groups.find((g) => g.if === target) ?? null);
+  const moving = $derived(dirty && target !== readFrom && !!readGroup);
+  const replacing = $derived(dirty && target !== readFrom && !!targetGroup);
+  const when = (c: string | null) => (c ? `if ${c}` : "always");
 
   function setValue(s: { section: string | null; key: string; value: string; format: IniFormat }, to: string, file?: string) {
     const k = sk(s.section, s.key);
@@ -195,6 +232,7 @@
         sets: [...values.values()],
         comments: ini.scope === "mod" ? [...commented].map((key) => ({ key, format: formatOf(key) })) : [],
         block: ini.scope === "mod" && block.trim() ? block : null,
+        ...(target !== readFrom && readGroup ? { moved_from: { if: readFrom } } : {}),
       }),
     );
     saving = false;
@@ -213,7 +251,8 @@
       <strong>{id}: INI editor</strong>
       <button class="link" onclick={close}>Close</button>
     </div>
-    <div class="top" class:held={dirty}>
+    <!-- Held while a save is written: an edit made meanwhile would be lost. -->
+    <div class="top" inert={saving}>
       <div class="line">
         <select bind:value={chosen} disabled={dirty}>
           {#each inis as i (i.key)}<option value={i.key}>{i.label}</option>{/each}
@@ -221,12 +260,21 @@
         <input class="search" bind:value={search} placeholder="Find a setting" />
         <label class="small"><input type="checkbox" bind:checked={changedOnly} /> Changed only</label>
       </div>
-      <div class="picker" inert={dirty}>
+      <div class="picker">
         <ConditionPicker bind:value={condition} {known} {inputs} />
       </div>
-      {#if dirty}<p class="small dim">Save or discard these changes to choose another file or condition.</p>{/if}
+      {#if moving || replacing}
+        <p class="small warn">
+          {#if moving}Saving moves these settings from <b>{when(readFrom)}</b> to <b>{when(target)}</b>.{/if}
+          {#if replacing}
+            Saving replaces the {targetGroup?.actions.length} setting(s) already made <b>{when(target)}</b> on this file.
+          {/if}
+        </p>
+      {:else if dirty}
+        <p class="small dim">Save or discard these changes to choose another file.</p>
+      {/if}
     </div>
-    <div class="dbody">
+    <div class="dbody" inert={saving}>
       {#if error}<pre class="error">{error}</pre>{/if}
       {#if loading && !view}
         <p class="dim">Reading the INI…</p>
@@ -381,8 +429,9 @@
     flex: 1;
     min-width: 140px;
   }
-  .held .picker {
-    opacity: 0.5;
+  .warn {
+    color: var(--warning);
+    margin: 0;
   }
   .dbody {
     padding: 10px 16px 16px;

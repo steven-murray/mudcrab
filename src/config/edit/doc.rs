@@ -280,6 +280,25 @@ pub fn set_ini_layer(
 ) -> anyhow::Result<String> {
     use crate::config::ini_edit::same_file;
     use crate::config::schema::{IniScope, IniSetFormat};
+    // Moved from another condition: that one's actions on the file go first.
+    if let Some(from) = layer
+        .moved_from
+        .as_ref()
+        .filter(|from| from.condition != layer.condition)
+    {
+        let emptied = crate::config::ini_edit::IniLayer {
+            file: layer.file.clone(),
+            scope: layer.scope,
+            condition: from.condition.clone(),
+            ..Default::default()
+        };
+        let text = set_ini_layer(text, id, &emptied)?;
+        let rest = crate::config::ini_edit::IniLayer {
+            moved_from: None,
+            ..layer.clone()
+        };
+        return set_ini_layer(&text, id, &rest);
+    }
     let mut doc = parse(text)?;
     let table = mod_table(&mut doc, id)?;
     let actions = table
@@ -1461,5 +1480,32 @@ id = "B"
         let out = super::set_ini_layer(&out, "A", &empty).unwrap();
         assert!(!out.contains("potato"), "{out}");
         assert!(out.contains("key = \"Other\""), "{out}");
+    }
+
+    #[test]
+    fn an_ini_layer_moved_to_another_condition_leaves_the_old_one() {
+        use crate::config::ini_edit::{IniLayer, IniSetting, MovedFrom};
+        use crate::config::schema::IniSetFormat;
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.actions]]\naction = \"ini_set\"\nfile = \"a.ini\"\nkey = \"Shadows\"\nvalue = \"1024\"\n\n[[mods.actions]]\naction = \"ini_set\"\nif = \"res\"\nfile = \"a.ini\"\nkey = \"Other\"\nvalue = \"1\"\n";
+        let layer = IniLayer {
+            file: "a.ini".to_string(),
+            condition: Some("potato".to_string()),
+            sets: vec![IniSetting {
+                section: None,
+                key: "Shadows".to_string(),
+                value: "512".to_string(),
+                format: IniSetFormat::Standard,
+            }],
+            moved_from: Some(MovedFrom { condition: None }),
+            ..IniLayer::default()
+        };
+        let out = super::set_ini_layer(text, "A", &layer).unwrap();
+        assert!(!out.contains("1024"), "{out}");
+        assert!(out.contains("if = \"potato\""), "{out}");
+        assert!(out.contains("Shadows = \"512\""), "{out}");
+        assert!(
+            out.contains("key = \"Other\""),
+            "another condition is left: {out}"
+        );
     }
 }
