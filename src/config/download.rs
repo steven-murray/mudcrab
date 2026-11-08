@@ -99,6 +99,25 @@ pub async fn download_all(
     Ok(())
 }
 
+/// A plan of one archive from Nexus, to fetch it as `download` would: what
+/// adding a mod from a Nexus link downloads, before the mod is in the list.
+pub fn nexus_file_plan(
+    mod_id: u64,
+    file_id: u64,
+    file_name: Option<String>,
+) -> anyhow::Result<crate::config::schema::PersonalizedPlan> {
+    serde_json::from_value(serde_json::json!({
+        "schema_version": 1, "name": "fetch", "responses": {},
+        "mod_order": ["fetch"], "selected_mods": ["fetch"], "plugins": [],
+        "mods": [{"id": "fetch", "archives": [{
+            "path": format!("nexus:oblivion/{mod_id}/{file_id}"),
+            "download_handler": "nexus",
+            "file_name": file_name,
+        }]}]
+    }))
+    .map_err(|err| anyhow::anyhow!("a plan to fetch one file: {err}"))
+}
+
 /// Fetch every archive the plan needs, and return the ones that could not be,
 /// for a caller that has another way to get them (`download --browser`).
 pub async fn download_report(
@@ -794,6 +813,19 @@ fn parse_nexus_spec(source: &str) -> anyhow::Result<(&str, &str, &str)> {
     }
 
     Ok((game, mod_id, file_id))
+}
+
+#[cfg(test)]
+mod nexus_file_plan_tests {
+    #[test]
+    fn a_nexus_file_makes_a_plan_of_one_archive() {
+        let plan = super::nexus_file_plan(56782, 1000, Some("A-56782-1-0.7z".to_string())).unwrap();
+        let archive = &plan.mods[0].archives[0];
+        assert_eq!(archive.path.as_deref(), Some("nexus:oblivion/56782/1000"));
+        assert_eq!(archive.file_name.as_deref(), Some("A-56782-1-0.7z"));
+        assert!(archive.include.is_empty() && archive.exclude.is_empty());
+        assert!(super::nexus_file_plan(1, 2, None).is_ok());
+    }
 }
 
 #[cfg(test)]

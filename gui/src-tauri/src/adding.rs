@@ -733,16 +733,7 @@ pub(super) async fn nexus_fetch(
         .ok_or("say where the downloads folder is first (in Settings)")?;
     std::fs::create_dir_all(&downloads).map_err(|err| format!("{}: {err}", downloads.display()))?;
     // A plan of one archive, so the download is `download`'s own.
-    let plan: config::schema::PersonalizedPlan = serde_json::from_value(serde_json::json!({
-        "schema_version": 1, "name": "fetch", "responses": {},
-        "mod_order": ["fetch"], "selected_mods": ["fetch"], "plugins": [],
-        "mods": [{"id": "fetch", "archives": [{
-            "path": format!("nexus:oblivion/{mod_id}/{file_id}"),
-            "download_handler": "nexus",
-            "file_name": file_name,
-        }]}]
-    }))
-    .map_err(|err| err.to_string())?;
+    let plan = config::download::nexus_file_plan(mod_id, file_id, file_name).map_err(shown)?;
     let settings = config::download::DownloadSettings {
         cache_dir: downloads.clone(),
         retry: 3,
