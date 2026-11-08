@@ -95,7 +95,7 @@
   // An INI action's file, scope and condition, read from its line, to open
   // the INI editor on it.
   function iniActionOf(line: string): { file: string; scope: "mod" | "game"; condition: string | null } | null {
-    if (!/(?:^|, )action = "ini_(set|comment|append_block)"/.test(line)) return null;
+    if (!/(?:^|, )action = (["'])ini_(set|comment|append_block)\1/.test(line)) return null;
     const field = (name: string) => {
       const m = new RegExp(`(?:^|, )${name} = (?:"((?:[^"\\\\]|\\\\.)*)"|'([^']*)')`).exec(line);
       if (!m) return null;

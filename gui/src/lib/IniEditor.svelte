@@ -251,7 +251,8 @@
       <strong>{id}: INI editor</strong>
       <button class="link" onclick={close}>Close</button>
     </div>
-    <div class="top">
+    <!-- Held while a save is written: an edit made meanwhile would be lost. -->
+    <div class="top" inert={saving}>
       <div class="line">
         <select bind:value={chosen} disabled={dirty}>
           {#each inis as i (i.key)}<option value={i.key}>{i.label}</option>{/each}
@@ -273,7 +274,7 @@
         <p class="small dim">Save or discard these changes to choose another file.</p>
       {/if}
     </div>
-    <div class="dbody">
+    <div class="dbody" inert={saving}>
       {#if error}<pre class="error">{error}</pre>{/if}
       {#if loading && !view}
         <p class="dim">Reading the INI…</p>
