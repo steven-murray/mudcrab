@@ -246,7 +246,8 @@ history there, rather than be undone by it.
   under it -- which moves the block they were read from, and replaces one
   the condition already has, each said before saving. An INI action in the
   mod's list has **Edit**, which opens the editor on its file and
-  condition. **Save** writes that
+  condition: on that block, so choosing another condition is a change to
+  save, moving it there, and **Discard** goes back. **Save** writes that
   condition's `ini_set`, `ini_comment` and `ini_append_block` actions on the
   file in place of the ones there were, as one step to undo -- the settings
   as one `ini_set`, its `values` by section; one kept keeps its place and
