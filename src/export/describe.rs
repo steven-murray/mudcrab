@@ -498,11 +498,15 @@ pub fn action(action: &ModAction) -> Step {
             code(&tweak.key),
             value(&tweak.value.to_string())
         )),
-        ModAction::IniComment(comment) => plain(format!(
-            "In {}, comment out the {} line (put `;` at its start).",
-            code(&comment.file),
-            code(&comment.key)
-        )),
+        ModAction::IniComment(comment) => {
+            let keys = comment.keys();
+            plain(format!(
+                "In {}, comment out the {} line{} (put `;` at the start).",
+                code(&comment.file),
+                keys.iter().map(|k| code(k)).collect::<Vec<_>>().join(", "),
+                if keys.len() == 1 { "" } else { "s" }
+            ))
+        }
         ModAction::IniAppendBlock(block) => Step {
             kind,
             text: format!("Add this to the end of {}:", code(&block.file)),

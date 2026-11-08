@@ -27,29 +27,33 @@ pub(super) fn apply(action: &IniCommentAction, cx: &ActionCx<'_>) -> anyhow::Res
     })?;
 
     if cx.settings.dry_run {
-        tracing::info!(owner = cx.owner, ini = %path.display(), key = action.key, "install dry-run ini_comment action");
+        tracing::info!(owner = cx.owner, ini = %path.display(), keys = ?action.keys(), "install dry-run ini_comment action");
         return Ok(());
     }
 
     let original = std::fs::read_to_string(&path)
         .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
-    let (lines, changed) = comment_out(&original, &action.key, action.format);
-    // Nothing to comment out means the file is not the one the guide meant, or
-    // the setting moved: say so rather than report success.
-    anyhow::ensure!(
-        changed > 0,
-        "{}: {} has no active `{}` line to comment out",
-        cx.owner,
-        path.display(),
-        action.key
-    );
+    let mut text = original.clone();
+    for key in action.keys() {
+        let (lines, changed) = comment_out(&text, key, action.format);
+        // Nothing to comment out means the file is not the one the guide
+        // meant, or the setting moved: say so rather than report success.
+        anyhow::ensure!(
+            changed > 0,
+            "{}: {} has no active `{key}` line to comment out",
+            cx.owner,
+            path.display(),
+        );
+        tracing::info!(owner = cx.owner, ini = %path.display(), key, lines = changed, "commented out an ini setting");
+        text = lines.join("\n");
+    }
     let newline = if original.contains("\r\n") {
         "\r\n"
     } else {
         "\n"
     };
+    let lines: Vec<String> = text.lines().map(str::to_string).collect();
     write_ini_lines(&path, &lines, newline, original.ends_with('\n'))?;
-    tracing::info!(owner = cx.owner, ini = %path.display(), key = action.key, lines = changed, "commented out an ini setting");
     Ok(())
 }
 
@@ -72,6 +76,37 @@ fn comment_out(
         })
         .collect();
     (lines, changed)
+}
+
+#[cfg(test)]
+mod keys_tests {
+    use super::super::ActionCx;
+    use super::super::conflicts::tests::settings;
+
+    #[test]
+    fn every_key_is_commented_and_a_missing_one_refused() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("mod");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(target.join("a.ini"), "a=1\r\nb=2\r\nc=3\r\n").unwrap();
+        let settings = settings(dir.path().join("mods"));
+        let cx = ActionCx {
+            owner: "Example",
+            settings: &settings,
+            mod_target: Some(&target),
+            plan_mods: &[],
+            active_plugins: &Default::default(),
+        };
+        let spec = |keys: &str| -> crate::config::schema::IniCommentAction {
+            toml::from_str(&format!("file = \"a.ini\"\nkeys = {keys}")).unwrap()
+        };
+        super::apply(&spec(r#"["a", "c"]"#), &cx).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(target.join("a.ini")).unwrap(),
+            ";a=1\r\nb=2\r\n;c=3\r\n"
+        );
+        assert!(super::apply(&spec(r#"["b", "gone"]"#), &cx).is_err());
+    }
 }
 
 #[cfg(test)]

@@ -225,6 +225,25 @@ mod tests {
     }
 
     #[test]
+    fn ini_comment_takes_one_key_or_several() {
+        let ModAction::IniComment(one) =
+            parse("action=\"ini_comment\"\nfile=\"a.ini\"\nkey=\"k\"").unwrap()
+        else {
+            panic!("expected ini_comment");
+        };
+        assert_eq!(one.keys(), ["k"]);
+        let ModAction::IniComment(several) =
+            parse("action=\"ini_comment\"\nfile=\"a.ini\"\nkeys=[\"a\", \"b\"]").unwrap()
+        else {
+            panic!("expected ini_comment");
+        };
+        assert_eq!(several.keys(), ["a", "b"]);
+        let both = "action=\"ini_comment\"\nfile=\"a.ini\"\nkey=\"k\"\nkeys=[\"a\"]";
+        assert!(parse(both).unwrap_err().to_string().contains("not both"));
+        assert!(parse("action=\"ini_comment\"\nfile=\"a.ini\"").is_err());
+    }
+
+    #[test]
     fn ini_set_defaults_are_mod_scope_and_standard_format() {
         let ModAction::IniSet(spec) =
             parse("action=\"ini_set\"\nfile=\"a.ini\"\nkey=\"k\"\nvalue=\"v\"").unwrap()

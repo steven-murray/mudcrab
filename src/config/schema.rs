@@ -345,17 +345,66 @@ pub struct IniTweakAction {
     pub format: IniSetFormat,
 }
 
-/// Comment out a setting's line in an INI the mod ships, so the script falls
-/// back to its own default. Every active line setting `key` is commented; none
-/// is an error.
+/// Comment out settings' lines in an INI the mod ships, so the script falls
+/// back to its own defaults: one, as `key`, or several, as `keys`. Every
+/// active line setting each is commented; a key with none is an error.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawIniComment")]
 pub struct IniCommentAction {
     /// Relative to the mod's staged data folder.
     pub file: String,
-    pub key: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keys: Vec<String>,
     #[serde(default)]
     pub format: IniSetFormat,
+}
+
+/// An `ini_comment` as written, before it is checked to say one thing.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawIniComment {
+    file: String,
+    #[serde(default)]
+    key: Option<String>,
+    #[serde(default)]
+    keys: Vec<String>,
+    #[serde(default)]
+    format: IniSetFormat,
+}
+
+impl TryFrom<RawIniComment> for IniCommentAction {
+    type Error = String;
+
+    fn try_from(raw: RawIniComment) -> Result<Self, String> {
+        match (&raw.key, raw.keys.is_empty()) {
+            (Some(_), false) => Err(format!(
+                "ini_comment on {}: give `key` or `keys`, not both",
+                raw.file
+            )),
+            (None, true) => Err(format!(
+                "ini_comment on {}: give `key`, or `keys` for several",
+                raw.file
+            )),
+            _ => Ok(Self {
+                file: raw.file,
+                key: raw.key,
+                keys: raw.keys,
+                format: raw.format,
+            }),
+        }
+    }
+}
+
+impl IniCommentAction {
+    /// Every key it comments out, in order.
+    pub fn keys(&self) -> Vec<&str> {
+        match &self.key {
+            Some(key) => vec![key.as_str()],
+            None => self.keys.iter().map(String::as_str).collect(),
+        }
+    }
 }
 
 /// Decode DXT1 textures that use punch-through transparency to uncompressed
