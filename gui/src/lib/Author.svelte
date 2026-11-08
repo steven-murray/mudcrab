@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from "svelte";
+  import { tick, untrack } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
   import {
     api,
@@ -33,6 +33,8 @@
   import LoadOrder from "./LoadOrder.svelte";
   import Notes from "./Notes.svelte";
   import Text from "./Text.svelte";
+  import ListFilters from "./ListFilters.svelte";
+  import { passes, type Context, type ModScan, type Want } from "./listFilters";
 
   // Author mode: the list as a tree on the left; on the right, the chosen mod
   // and its files, the load order with masters, conflicts, check, the
@@ -161,21 +163,82 @@
     return out;
   });
 
+  // The list scanned (`scan_list`): what each mod installs, read from its
+  // archives when the list opens and again after each edit, so the badges
+  // and filters follow the list without a Check.
+  let scan = $state<Map<string, ModScan> | null>(null);
+  let listScanning = $state(false);
+  let scanError = $state<string | null>(null);
+  let scanTimer: ReturnType<typeof setTimeout> | undefined;
+  let scanRun = 0;
+  function rescan() {
+    clearTimeout(scanTimer);
+    scanTimer = setTimeout(async () => {
+      const mine = ++scanRun;
+      listScanning = true;
+      try {
+        const read = await api.scanList();
+        if (mine === scanRun) {
+          scan = new Map(read.mods.map((m) => [m.mod_id, m]));
+          scanError = null;
+        }
+      } catch (err) {
+        if (mine === scanRun) scanError = String(err);
+      } finally {
+        if (mine === scanRun) listScanning = false;
+      }
+    }, 400);
+  }
+  $effect(() => {
+    void list;
+    if (active) untrack(rescan);
+  });
+
+  // The filters, kept between sessions; each mod's non-optional dependents.
+  const wantsKey = "mudcrab.author.filters";
+  let wants = $state<Record<string, Want>>(
+    (() => {
+      try {
+        return JSON.parse(localStorage.getItem(wantsKey) ?? "{}");
+      } catch {
+        return {};
+      }
+    })(),
+  );
+  $effect(() => {
+    try {
+      localStorage.setItem(wantsKey, JSON.stringify(wants));
+    } catch {
+      // Not kept, then.
+    }
+  });
+  let filtersOpen = $state(false);
+  const filtering = $derived(Object.keys(wants).length > 0);
+  const needers = $derived(new Map(allMods.map((m) => [m.id, neededBy(m.id, allMods)])));
+  const cx = $derived<Context>({
+    scan,
+    neededBy: (id) => needers.get(id)?.length ?? 0,
+    mergeSources: new Set(allMods.flatMap((m) => m.merge?.sources.map((s) => s.mod) ?? [])),
+  });
+
   function matches(entry: Entry, words: string): boolean {
-    if (!words) return true;
+    if (!words && !filtering) return true;
     if (entry.kind === "section")
-      return entry.title.toLowerCase().includes(words) || entry.entries.some((e) => matches(e, words));
+      return (!filtering && entry.title.toLowerCase().includes(words)) || entry.entries.some((e) => matches(e, words));
     if (entry.kind === "mod")
       return (
-        entry.title.toLowerCase().includes(words) ||
-        entry.id.toLowerCase().includes(words) ||
-        entry.plugins.some((p) => p.toLowerCase().includes(words))
+        (!words ||
+          entry.title.toLowerCase().includes(words) ||
+          entry.id.toLowerCase().includes(words) ||
+          entry.plugins.some((p) => p.toLowerCase().includes(words))) &&
+        (!filtering || passes(entry, wants, cx))
       );
     return false;
   }
   const words = $derived(filter.trim().toLowerCase());
+  // Mods in a section: those shown, when filtered.
   function count(e: Entry): number {
-    if (e.kind === "mod") return 1;
+    if (e.kind === "mod") return !filtering || passes(e, wants, cx) ? 1 : 0;
     if (e.kind === "section") return e.entries.reduce((n, c) => n + count(c), 0);
     return 0;
   }
@@ -679,6 +742,13 @@
     </div>
     <div class="bar" class:hidden={pane !== "list"}>
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
+      <button
+        class="plus filt"
+        class:on={filtering}
+        onclick={() => (filtersOpen = !filtersOpen)}
+        title={filtering ? `${Object.keys(wants).length} filter(s) on` : "Filter the list"}
+        >⚲{#if filtering}<span class="n">{Object.keys(wants).length}</span>{/if}</button
+      >
       <div class="addwrap">
         <button
           class="plus"
@@ -712,10 +782,13 @@
       </div>
     </div>
     <div class="list" class:hidden={pane !== "list"}>
+      {#if filtersOpen}
+        <ListFilters bind:wants scanning={listScanning} error={scanError} scanned={scan?.size ?? null} {rescan} />
+      {/if}
       {#snippet entries(items: Entry[], depth: number)}
         {#each items.filter((e) => matches(e, words)) as e (e.kind + e.anchor)}
           {#if e.kind === "section"}
-            {@const open = opened.has(e.anchor) || !!words}
+            {@const open = opened.has(e.anchor) || !!words || filtering}
             <button
               class="section"
               style="--depth: {depth}"
@@ -764,6 +837,15 @@
                 {#if e.condition}<span class="tag cond" title={e.condition.text}>if</span>{/if}
                 {#if e.enabled === false}<span class="tag">off</span>{/if}
                 {#if e.mod_type}<span class="tag">{e.mod_type}</span>{/if}
+                {#if needers.get(e.id)?.length}
+                  {@const need = needers.get(e.id)!}
+                  <span class="tag need" title={`Needed by ${need.map((m) => m.title).join(", ")}: it can't be made optional while they aren't`}
+                    >needed ×{need.length}</span
+                  >
+                {/if}
+                {#if scan?.get(e.id)?.inis.length}
+                  <span class="tag ini" title={scan.get(e.id)!.inis.join("\n")}>INI</span>
+                {/if}
                 {#if e.plugins.length}<span class="dim count">{e.plugins.length}p</span>{/if}
               </button>
             </div>
@@ -1086,6 +1168,22 @@
     padding: 0 4px;
     color: var(--dim);
     flex: none;
+  }
+  .tag.need {
+    color: var(--warning);
+    border-color: var(--warning);
+  }
+  .tag.ini {
+    color: var(--good);
+    border-color: var(--good);
+  }
+  .filt.on {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .filt .n {
+    font-size: 10px;
+    margin-left: 2px;
   }
   .tag.cond {
     color: var(--note);

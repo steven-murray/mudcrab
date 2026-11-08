@@ -479,6 +479,7 @@ export const api = {
   openPage: (url: string) => invoke<void>("open_page", { url }),
   check: (again = false) => invoke<Checked>("step_check", { again }),
   readMasters: () => invoke<void>("read_masters"),
+  scanList: () => invoke<import("./listFilters").ListScan>("scan_list"),
   /** Set one group of each mod's found `dependencies` (every mod in the plan, or `id`'s), as last found. */
   addFoundDependencies: (group: FoundGroup, id: string | null) =>
     invoke<FoundDependencies>("add_found_dependencies", { group, id }),

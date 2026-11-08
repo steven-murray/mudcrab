@@ -1061,6 +1061,107 @@ async fn read_masters(state: tauri::State<'_, State>) -> Result<(), String> {
     masters_of(&state, plan).await.map(|_| ())
 }
 
+/// One mod in the list scan: what it installs, and what the scan found.
+#[derive(Serialize)]
+struct ModScan {
+    #[serde(flatten)]
+    facts: config::check::ModFacts,
+    /// Its archives' installers that the list makes choices for: `fomod`,
+    /// `bain`.
+    installers: Vec<&'static str>,
+    /// An archive is not in the downloads folder.
+    missing: bool,
+    problems: usize,
+    warnings: usize,
+}
+
+/// The list scanned (`check --masters-only`), for its view: each mod in the
+/// plan the answers make, in order.
+#[derive(Serialize)]
+struct ListScan {
+    mods: Vec<ModScan>,
+    problems: usize,
+    warnings: usize,
+}
+
+/// Scan the list as the current answers plan it: each archive's files, and
+/// its plugins' masters (kept, so quick after the first time), for what the
+/// list view shows and filters by.
+#[tauri::command]
+async fn scan_list(state: tauri::State<'_, State>) -> Result<ListScan, String> {
+    use config::check::Kind;
+    use config::schema::ArchiveLayout;
+    use mudcrab::events::Tone;
+    let plan = author::current_plan(&state)?;
+    let installers: HashMap<String, Vec<&'static str>> = plan
+        .mods
+        .iter()
+        .map(|m| {
+            let mut kinds = Vec::new();
+            for a in &m.archives {
+                let kind = match a.layout {
+                    Some(ArchiveLayout::Fomod) => Some("fomod"),
+                    Some(ArchiveLayout::Bain) => Some("bain"),
+                    _ if !a.fomod_selections.is_empty() => Some("fomod"),
+                    _ if !a.bain_subpackages.is_empty() => Some("bain"),
+                    _ => None,
+                };
+                if let Some(kind) = kind.filter(|k| !kinds.contains(k)) {
+                    kinds.push(kind);
+                }
+            }
+            (m.id.clone(), kinds)
+        })
+        .collect();
+    let downloads = locate(&state)?
+        .downloads
+        .ok_or("say where the downloads folder is first")?;
+    let settings = config::check::CheckSettings {
+        cache_dir: downloads,
+        filter: Default::default(),
+        masters_only: true,
+        resources: None,
+    };
+    let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(shown)?;
+    {
+        let mut session = state.session.lock().map_err(|_| "a command panicked")?;
+        session.masters = Some(report.plugins.clone());
+        session.read = report.read.clone();
+    }
+    let mut about: HashMap<&str, Vec<&config::check::Finding>> = HashMap::new();
+    for finding in &report.findings {
+        if let Some(id) = finding.item.mod_id.as_deref() {
+            about.entry(id).or_default().push(finding);
+        }
+    }
+    let mods = report
+        .facts
+        .iter()
+        .map(|facts| {
+            let found = about
+                .get(facts.mod_id.as_str())
+                .map(Vec::as_slice)
+                .unwrap_or_default();
+            let count = |tone: Tone| found.iter().filter(|f| f.kind.tone() == tone).count();
+            ModScan {
+                installers: installers.get(&facts.mod_id).cloned().unwrap_or_default(),
+                missing: found.iter().any(|f| f.kind == Kind::MissingArchive),
+                problems: count(Tone::Problem),
+                warnings: count(Tone::Warning),
+                facts: facts.clone(),
+            }
+        })
+        .collect();
+    Ok(ListScan {
+        mods,
+        problems: report.problems,
+        warnings: report.warnings,
+    })
+}
+
 /// Each plugin's masters in `plan`, read (`check --masters-only`) and kept.
 async fn masters_of(
     state: &State,
@@ -1446,6 +1547,7 @@ pub fn app<R: Runtime>(
             step_check,
             question_states,
             read_masters,
+            scan_list,
             add_found_dependencies,
             find_resource_dependencies,
             step_install,

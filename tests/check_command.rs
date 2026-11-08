@@ -802,3 +802,66 @@ fn a_file_only_one_other_mod_provides_is_a_resource_dependency() {
     assert!(said[0].contains("which only Rocks provides"), "{said:?}");
     assert!(report.read.contains(&"Quarry".to_string()));
 }
+
+#[test]
+fn each_mods_inis_bsas_and_shared_files_are_reported() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    make_zip(
+        &downloads.join("Rocks-1-1-0.zip"),
+        &[
+            ("meshes/shared.nif", b"nif"),
+            ("meshes/rocks.nif", b"nif"),
+            ("Rocks.bsa", b"BSA"),
+            ("readme.txt", b"hi"),
+        ],
+    );
+    make_zip(
+        &downloads.join("Other-2-1-0.zip"),
+        &[
+            ("meshes/shared.nif", b"nif"),
+            ("ini/Other.ini", b"[Main]\nx=1\n"),
+            ("readme.txt", b"hi"),
+        ],
+    );
+    let list = root.join("list.toml");
+    let entry = |id: &str, file: &str, n: u32| {
+        format!(
+            "[[mods]]\nid = \"{id}\"\n[[mods.archives]]\npath = \"nexus:oblivion/{n}/{n}0\"\nfile_name = \"{file}\"\n\n"
+        )
+    };
+    std::fs::write(
+        &list,
+        format!(
+            "name = \"L\"\n\n{}{}",
+            entry("Rocks", "Rocks-1-1-0.zip", 1),
+            entry("Other", "Other-2-1-0.zip", 2),
+        ),
+    )
+    .unwrap();
+    let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+    let plan =
+        mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    let report = mudcrab::config::check::check_all(
+        &plan,
+        &mudcrab::config::check::CheckSettings {
+            cache_dir: downloads,
+            filter: Default::default(),
+            masters_only: true,
+            resources: None,
+        },
+    )
+    .unwrap();
+    let [rocks, other] = &report.facts[..] else {
+        panic!("{:?}", report.facts);
+    };
+    assert_eq!(rocks.bsas, ["rocks.bsa"]);
+    assert!(rocks.inis.is_empty());
+    assert_eq!(other.inis, ["ini/other.ini"]);
+    // Other, later, replaces Rocks' one shared mesh; the readmes do not count.
+    assert_eq!(rocks.losses, [("Other".to_string(), 1)]);
+    assert!(rocks.wins.is_empty());
+    assert_eq!(other.wins, [("Rocks".to_string(), 1)]);
+    assert!(rocks.read && other.read);
+}

@@ -69,6 +69,27 @@ pub struct CheckReport {
     /// The mods whose archives were all read: what was found for them is
     /// all they need, so a found dependency they no longer have can go.
     pub read: Vec<String>,
+    /// What each mod installs, as a list view shows it: in plan order.
+    pub facts: Vec<ModFacts>,
+}
+
+/// What a mod installs, for showing and filtering a list by it: its INIs
+/// and BSAs, and the files it shares with other mods.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct ModFacts {
+    pub mod_id: String,
+    /// INIs and BSAs in its folder, lowercased.
+    pub inis: Vec<String>,
+    pub bsas: Vec<String>,
+    /// The mods earlier in the plan whose files its own replace, with how
+    /// many; and those later, whose replace its own.
+    pub wins: Vec<(String, usize)>,
+    pub losses: Vec<(String, usize)>,
+    /// Its files are as its actions leave them; else as its archives lay
+    /// them out, the actions not rehearsed.
+    pub finished: bool,
+    /// Every archive was read: else what it installs is partly unknown.
+    pub read: bool,
 }
 
 /// A plugin a mod installs, and the masters its header names.
@@ -264,6 +285,9 @@ struct ModFolder {
     /// BSAs. Kept apart from `files`, as it is filled in even when the
     /// folder is not complete -- what is known is still worth knowing.
     assets: BTreeSet<String>,
+    /// Every file the archives lay out, lowercased, before any action: what
+    /// is known of the folder when it is not complete.
+    laid_out: BTreeSet<String>,
 }
 
 pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::Result<CheckReport> {
@@ -477,7 +501,75 @@ fn check_in(
             .filter(|(_, folder)| folder.read)
             .map(|(id, _)| id.clone())
             .collect(),
+        facts: mod_facts(plan, &folders),
     })
+}
+
+/// A folder's files as finished, where its actions were rehearsed; else as
+/// its archives lay them out.
+fn facts_files(folder: &ModFolder) -> &BTreeSet<String> {
+    if folder.complete && !folder.files.is_empty() {
+        &folder.files
+    } else {
+        &folder.laid_out
+    }
+}
+
+/// Each checked mod's INIs, BSAs and shared files, in plan order: a later
+/// mod's file replaces an earlier one's, as MO2 lays them over each other.
+/// Files at the top of a folder other than plugins, BSAs and INIs (readmes)
+/// are left out of what is shared: every mod replacing them is noise.
+fn mod_facts(plan: &PersonalizedPlan, folders: &BTreeMap<String, ModFolder>) -> Vec<ModFacts> {
+    let checked: Vec<(&str, &ModFolder)> = plan
+        .mods
+        .iter()
+        .filter_map(|m| folders.get(&m.id).map(|f| (m.id.as_str(), f)))
+        .collect();
+    let ends = |path: &str, ext: &str| path.ends_with(ext);
+    let counts = |path: &str| {
+        path.contains('/')
+            || layout::plan::is_plugin_name(path)
+            || ends(path, ".bsa")
+            || ends(path, ".ini")
+    };
+    let mut owners: HashMap<&str, Vec<usize>> = HashMap::new();
+    for (index, (_, folder)) in checked.iter().enumerate() {
+        for path in facts_files(folder).iter().filter(|p| counts(p)) {
+            owners.entry(path.as_str()).or_default().push(index);
+        }
+    }
+    let mut wins: Vec<BTreeMap<usize, usize>> = vec![BTreeMap::new(); checked.len()];
+    let mut losses: Vec<BTreeMap<usize, usize>> = vec![BTreeMap::new(); checked.len()];
+    for indices in owners.values().filter(|o| o.len() > 1) {
+        for (n, &earlier) in indices.iter().enumerate() {
+            for &later in &indices[n + 1..] {
+                *wins[later].entry(earlier).or_default() += 1;
+                *losses[earlier].entry(later).or_default() += 1;
+            }
+        }
+    }
+    let named = |counts: &BTreeMap<usize, usize>| {
+        counts
+            .iter()
+            .map(|(&other, &n)| (checked[other].0.to_string(), n))
+            .collect()
+    };
+    checked
+        .iter()
+        .enumerate()
+        .map(|(index, (id, folder))| {
+            let all = facts_files(folder);
+            ModFacts {
+                mod_id: id.to_string(),
+                inis: all.iter().filter(|p| ends(p, ".ini")).cloned().collect(),
+                bsas: all.iter().filter(|p| ends(p, ".bsa")).cloned().collect(),
+                wins: named(&wins[index]),
+                losses: named(&losses[index]),
+                finished: folder.complete,
+                read: folder.read,
+            }
+        })
+        .collect()
 }
 
 /// One mod: each archive present, readable and installable; its actions
@@ -572,6 +664,10 @@ fn check_mod(
             }
         }
     }
+    folder.laid_out = planned
+        .iter()
+        .map(|(destination, _)| destination.replace('\\', "/").to_lowercase())
+        .collect();
     // Rehearsing the actions is the slow part; without it, the plugins are
     // those the archives lay out (an action's renames and dummies unknown).
     if settings.masters_only
