@@ -48,10 +48,7 @@ pub(crate) fn with_planned_archive(
     })?;
 
     let result = (|| -> anyhow::Result<usize> {
-        let reader = EntryReader {
-            source,
-            scratch: staging_dir.join(".mudcrab-entry"),
-        };
+        let reader = EntryReader::new(source, staging_dir.join(".mudcrab-entry"));
         let plan = plan_from(&paths, &reader)?;
         let _ = std::fs::remove_dir_all(&reader.scratch);
 
@@ -68,14 +65,50 @@ pub(crate) fn with_planned_archive(
 pub(crate) struct EntryReader<'a> {
     source: &'a Path,
     scratch: PathBuf,
+    /// Where entries read are kept between runs, when they are.
+    kept: Option<PathBuf>,
 }
 
 impl<'a> EntryReader<'a> {
     pub(crate) fn new(source: &'a Path, scratch: PathBuf) -> Self {
-        Self { source, scratch }
+        Self {
+            source,
+            scratch,
+            kept: None,
+        }
+    }
+
+    /// The same, keeping what it reads in `kept`: for checks, which read the
+    /// same archives over and over.
+    pub(crate) fn kept(source: &'a Path, scratch: PathBuf, kept: Option<PathBuf>) -> Self {
+        Self {
+            source,
+            scratch,
+            kept,
+        }
     }
 
     pub(crate) fn read(&self, entry: &str) -> anyhow::Result<Vec<u8>> {
+        use sha2::{Digest, Sha256};
+        let kept = self
+            .kept
+            .as_ref()
+            .map(|dir| dir.join(format!("{:x}", Sha256::digest(entry.as_bytes()))));
+        if let Some(bytes) = kept.as_ref().and_then(|file| std::fs::read(file).ok()) {
+            return Ok(bytes);
+        }
+        let bytes = self.extract(entry)?;
+        // Best effort: one not kept is read again next time.
+        if let Some(file) = &kept {
+            if let Some(dir) = file.parent() {
+                let _ = std::fs::create_dir_all(dir);
+            }
+            let _ = std::fs::write(file, &bytes);
+        }
+        Ok(bytes)
+    }
+
+    fn extract(&self, entry: &str) -> anyhow::Result<Vec<u8>> {
         std::fs::create_dir_all(&self.scratch)
             .map_err(|err| anyhow::anyhow!("failed to create {}: {err}", self.scratch.display()))?;
         let wanted = BTreeSet::from([entry.to_string()]);

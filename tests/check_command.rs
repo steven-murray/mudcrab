@@ -846,7 +846,7 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
     let report = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
-            cache_dir: downloads,
+            cache_dir: downloads.clone(),
             filter: Default::default(),
             masters_only: true,
             resources: None,
@@ -864,4 +864,26 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
     assert!(rocks.wins.is_empty());
     assert_eq!(other.wins, [("Rocks".to_string(), 1)]);
     assert!(rocks.read && other.read);
+
+    // Listings are kept between checks, but an archive that changes is
+    // listed again.
+    make_zip(
+        &downloads.join("Other-2-1-0.zip"),
+        &[
+            ("meshes/shared.nif", b"nif"),
+            ("ini/Other.ini", b"[Main]\nx=1\n"),
+            ("ini/Extra.ini", b"[Main]\ny=2\n"),
+        ],
+    );
+    let again = mudcrab::config::check::check_all(
+        &plan,
+        &mudcrab::config::check::CheckSettings {
+            cache_dir: downloads,
+            filter: Default::default(),
+            masters_only: true,
+            resources: None,
+        },
+    )
+    .unwrap();
+    assert_eq!(again.facts[1].inis, ["ini/extra.ini", "ini/other.ini"]);
 }

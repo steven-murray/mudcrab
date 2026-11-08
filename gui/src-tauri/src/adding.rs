@@ -29,7 +29,7 @@ pub(super) struct ArchiveRow {
 
 /// Every archive in the downloads folder and the other folders to look in,
 /// newest first, each with the mods that already use it.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn archives(state: tauri::State<'_, State>) -> Result<Vec<ArchiveRow>, String> {
     let located = locate(&state)?;
     let dirs: Vec<PathBuf> = located
@@ -509,7 +509,7 @@ pub(super) async fn add_plan(
 }
 
 /// Add the mod (`add`), into the history like any edit.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn add_mod(
     state: tauri::State<'_, State>,
     request: AddRequest,
@@ -567,7 +567,7 @@ pub(super) async fn choose_walk(
 }
 
 /// Write what the walk chose (`choose`), into the history like any edit.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn choose_write(
     state: tauri::State<'_, State>,
     id: String,
@@ -780,7 +780,7 @@ pub(super) async fn nexus_fetch(
 
 /// Look once for the archive being fetched by hand: its path once it has
 /// arrived (taken in from the browser's folder, with its `.meta`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn nexus_look(state: tauri::State<'_, State>) -> Result<Option<String>, String> {
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let Some((item, watcher)) = session.fetching.as_mut() else {

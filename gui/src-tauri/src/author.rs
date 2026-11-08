@@ -66,7 +66,7 @@ pub(super) struct LoadOrder {
     merged: BTreeMap<String, String>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn load_order(state: tauri::State<'_, State>) -> Result<LoadOrder, String> {
     let plan = current_plan(&state)?;
     let masters = state
@@ -158,7 +158,7 @@ pub(super) struct ModView {
     archives: Vec<ArchiveChoice>,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<ModView, String> {
     let plan = current_plan(&state)?;
     let source = config::loader::load_modlist(&state.list()?).map_err(shown)?;
