@@ -97,7 +97,9 @@ pub struct PlannedArchive {
 
 /// Mod `id`'s `number`th archive (counting from 1) in `text`, read as the
 /// modlist at `path`, compiled and planned with `overrides` answering its
-/// questions (the rest take their defaults).
+/// questions (the rest take their defaults). Planned for writing the list
+/// ([`crate::config::query::build_authoring_plan`]): a mod the answers leave
+/// out is planned as it would install if it were in.
 pub fn planned_archive(
     text: &str,
     path: &Path,
@@ -116,13 +118,20 @@ pub fn planned_archive(
         .ok_or_else(|| anyhow::anyhow!("mod '{id}' has no archive {number}"))?
         .clone();
     let compiled = compile_text(text, path)?;
-    let plan = crate::config::query::build_plan(&compiled.modlist, overrides, None)?;
+    let planned = crate::config::query::build_authoring_plan(&compiled.modlist, overrides)?;
+    let plan = planned.plan;
     let entry = plan
         .mods
         .iter()
         .find(|entry| entry.id == id)
         .ok_or_else(|| {
-            anyhow::anyhow!("the list's answers leave '{id}' out; answer for it with --set")
+            let why = planned
+                .notes
+                .iter()
+                .find(|note| note.contains(&format!("mod {id}:")))
+                .cloned()
+                .unwrap_or_else(|| "it cannot be planned with these answers".to_string());
+            anyhow::anyhow!("'{id}' cannot be planned: {why}")
         })?
         .clone();
     // An archive whose condition is not met is not in the plan.

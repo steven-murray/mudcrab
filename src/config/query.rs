@@ -34,6 +34,49 @@ pub fn build_plan(
     overrides: &Overrides,
     ask: Option<Ask<'_>>,
 ) -> anyhow::Result<PersonalizedPlan> {
+    plan_with(compiled, overrides, ask, false).map(|planned| planned.plan)
+}
+
+/// The list planned for writing it rather than installing it: every mod,
+/// the ones the answers leave out too, as each would install if it were in
+/// -- its own `if` set aside, while what it installs (its archives', FOMOD
+/// selections' and actions' conditions) still follows the answers. What
+/// would stop an install (a dependency left out, a merge's source left out)
+/// is noted instead.
+pub struct AuthoringPlan {
+    /// Its `mods` hold every mod that can be planned; `selected_mods` only
+    /// those the answers install, and `plugins` their load order.
+    pub plan: PersonalizedPlan,
+    /// The mods the answers leave out, by id.
+    pub left_out: Vec<String>,
+    /// What an install with these answers would refuse, or could not plan.
+    pub notes: Vec<String>,
+}
+
+/// Plan `compiled` for writing it: see [`AuthoringPlan`].
+pub fn build_authoring_plan(
+    compiled: &CompiledModlist,
+    overrides: &Overrides,
+) -> anyhow::Result<AuthoringPlan> {
+    plan_with(compiled, overrides, None, true)
+}
+
+fn plan_with(
+    compiled: &CompiledModlist,
+    overrides: &Overrides,
+    ask: Option<Ask<'_>>,
+    authoring: bool,
+) -> anyhow::Result<AuthoringPlan> {
+    let mut notes: Vec<String> = Vec::new();
+    // Refused for an install; for writing the list, noted.
+    let mut refuse = |message: String| -> anyhow::Result<()> {
+        if authoring {
+            notes.push(message);
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!(message))
+        }
+    };
     anyhow::ensure!(
         !compiled.component,
         "{} is a component, written to be included in other lists, not installed on its own",
@@ -46,22 +89,28 @@ pub fn build_plan(
 
     let mut selected_mods = Vec::new();
     let mut mods = Vec::new();
+    let mut left_out = Vec::new();
     for entry in &compiled.mods {
-        if !included[entry.id.as_str()] {
-            continue;
+        let installed = included[entry.id.as_str()];
+        if !installed {
+            left_out.push(entry.id.clone());
+            if !authoring {
+                continue;
+            }
         }
         if let Some(dep) = entry
             .dependencies
             .iter()
+            .filter(|_| installed)
             .find(|dep| !included.get(dep.as_str()).copied().unwrap_or(false))
         {
-            anyhow::bail!(
+            refuse(format!(
                 "mod {} is included but depends on {dep}, which is not; give {} `if = '{}'` \
                  (or change the answers) so they come and go together",
                 entry.id,
                 entry.id,
                 crate::config::condition::mod_term(dep)
-            );
+            ))?;
         }
 
         let applies = |expr: Option<&str>| -> anyhow::Result<bool> {
@@ -79,16 +128,26 @@ pub fn build_plan(
                 actions.push(action.action.clone());
             }
         }
-        let archives = resolve_archives(&entry.id, &entry.archives, &applies)?;
+        let archives = match resolve_archives(&entry.id, &entry.archives, &applies) {
+            Ok(archives) => archives,
+            Err(err) if authoring => {
+                refuse(format!("{err:#}"))?;
+                continue;
+            }
+            Err(err) => return Err(err),
+        };
         if archives.is_empty() && !entry.archives.is_empty() {
-            anyhow::bail!(
+            refuse(format!(
                 "mod {}: every archive's `if` left it out, so it would install nothing; \
                  put the condition on the mod instead",
                 entry.id
-            );
+            ))?;
+            continue;
         }
 
-        selected_mods.push(entry.id.clone());
+        if installed {
+            selected_mods.push(entry.id.clone());
+        }
         mods.push(PersonalizedMod {
             id: entry.id.clone(),
             origin: entry.origin.clone(),
@@ -154,14 +213,14 @@ pub fn build_plan(
                 .copied()
                 .unwrap_or(true)
         }) {
-            anyhow::bail!(
+            refuse(format!(
                 "merge {} takes {} from mod {}, which is left out; give the merge `if = '{}'`, \
                  or a second merge without it for when it is out",
                 entry.id,
                 source.plugin,
                 source.mod_id,
                 crate::config::condition::mod_term(&source.mod_id)
-            );
+            ))?;
         }
     }
     let keep = |plugin: &String| !left_out_plugins.contains(&plugin.to_ascii_lowercase());
@@ -178,7 +237,7 @@ pub fn build_plan(
         .cloned()
         .collect();
 
-    Ok(PersonalizedPlan {
+    let plan = PersonalizedPlan {
         guide: compiled.guide.clone(),
         schema_version: compiled.schema_version,
         name: compiled.name.clone(),
@@ -193,6 +252,11 @@ pub fn build_plan(
         mods,
         plugins,
         inactive_plugins,
+    };
+    Ok(AuthoringPlan {
+        plan,
+        left_out,
+        notes,
     })
 }
 
