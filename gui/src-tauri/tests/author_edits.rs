@@ -146,9 +146,14 @@ fn edits_are_the_commands_and_can_be_undone() {
             .contains("action add"),
         "{hidden}"
     );
+    // Each action as written, with its `if` (none) and whether it holds.
     assert_eq!(
         call(&webview, "actions", json!({ "id": "A" })).unwrap()[0],
-        "action = \"file_hide\", conflicts_with = [\"B\"]"
+        json!({
+            "text": "action = \"file_hide\", conflicts_with = [\"B\"]",
+            "condition": null,
+            "applies": null,
+        })
     );
     call(
         &webview,
