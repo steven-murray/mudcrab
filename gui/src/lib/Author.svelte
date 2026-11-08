@@ -213,6 +213,16 @@
     }
   });
   let filtersOpen = $state(false);
+  // Where the filters open: under their button, kept on screen. Fixed, as
+  // the list pane would cut off anything wider than itself.
+  let filtersAt = $state("");
+  function openFilters(button: HTMLElement) {
+    const at = button.getBoundingClientRect();
+    const width = 340;
+    const left = Math.max(8, Math.min(at.left, window.innerWidth - width - 8));
+    filtersAt = `left: ${left}px; top: ${at.bottom + 4}px; width: ${width}px; max-height: ${window.innerHeight - at.bottom - 16}px`;
+    filtersOpen = true;
+  }
   const filtering = $derived(Object.keys(wants).length > 0);
   const needers = $derived(new Map(allMods.map((m) => [m.id, neededBy(m.id, allMods)])));
   const cx = $derived<Context>({
@@ -456,6 +466,10 @@
 
   // Ctrl+Z and Ctrl+Shift+Z (or Ctrl+Y), in author mode, unless typing.
   function onkeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && filtersOpen) {
+      filtersOpen = false;
+      return;
+    }
     const target = event.target as HTMLElement;
     if (!active || target.closest("input, textarea, select") || !(event.ctrlKey || event.metaKey)) return;
     const key = event.key.toLowerCase();
@@ -522,9 +536,11 @@
 
 <svelte:window
   {onkeydown}
+  onresize={() => (filtersOpen = false)}
   onclick={() => {
     modMenu = null;
     addMenu = false;
+    filtersOpen = false;
   }}
 />
 
@@ -742,13 +758,26 @@
     </div>
     <div class="bar" class:hidden={pane !== "list"}>
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
-      <button
-        class="plus filt"
-        class:on={filtering}
-        onclick={() => (filtersOpen = !filtersOpen)}
-        title={filtering ? `${Object.keys(wants).length} filter(s) on` : "Filter the list"}
-        >⚲{#if filtering}<span class="n">{Object.keys(wants).length}</span>{/if}</button
-      >
+      <div class="addwrap">
+        <button
+          class="plus filt"
+          class:on={filtering || filtersOpen}
+          onclick={(e) => {
+            e.stopPropagation();
+            if (filtersOpen) filtersOpen = false;
+            else openFilters(e.currentTarget);
+            addMenu = false;
+          }}
+          title={filtering ? `${Object.keys(wants).length} filter(s) on` : "Filter the list"}
+          >⚲{#if filtering}<span class="n">{Object.keys(wants).length}</span>{/if}</button
+        >
+        {#if filtersOpen}
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="filterpop" style={filtersAt} onclick={(e) => e.stopPropagation()}>
+            <ListFilters bind:wants scanning={listScanning} error={scanError} scanned={scan?.size ?? null} {rescan} />
+          </div>
+        {/if}
+      </div>
       <div class="addwrap">
         <button
           class="plus"
@@ -756,6 +785,7 @@
           onclick={(e) => {
             e.stopPropagation();
             addMenu = !addMenu;
+            filtersOpen = false;
           }}
           title="Add a mod to the list">+</button
         >
@@ -782,9 +812,7 @@
       </div>
     </div>
     <div class="list" class:hidden={pane !== "list"}>
-      {#if filtersOpen}
-        <ListFilters bind:wants scanning={listScanning} error={scanError} scanned={scan?.size ?? null} {rescan} />
-      {/if}
+
       {#snippet entries(items: Entry[], depth: number)}
         {#each items.filter((e) => matches(e, words)) as e (e.kind + e.anchor)}
           {#if e.kind === "section"}
@@ -1217,6 +1245,14 @@
   }
   .addwrap {
     position: relative;
+  }
+  .filterpop {
+    position: fixed;
+    z-index: 60;
+    overflow-y: auto;
+    background: var(--panel);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   }
   .plus {
     font-weight: 700;

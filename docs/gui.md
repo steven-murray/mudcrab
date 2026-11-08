@@ -176,7 +176,7 @@ history there, rather than be undone by it.
   scan takes a second or so. A mod needed by one that is not optional is
   marked **needed ×N** (hover for which: it cannot be made optional while
   they are not), and one that installs an INI, **INI**. **⚲** by the search
-  box filters the list, each filter any, yes or no, all of them together and
+  box opens the filters beside it, each any, yes or no, all of them together and
   with the search: whether a mod is needed, optional or unticked; has
   plugins or only resources, an INI, a BSA, installer choices; shares files
   with another mod, replaces another's or has its own replaced (later in the

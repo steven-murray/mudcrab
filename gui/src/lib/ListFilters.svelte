@@ -59,7 +59,6 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 6px 10px;
-    margin: 4px 0 8px;
     font-size: 12px;
   }
   .status {
