@@ -170,29 +170,31 @@ pub fn same_file(a: &str, b: &str) -> bool {
 pub fn groups(entry: &ModEntry, file: &str, scope: IniScope) -> Vec<IniGroup> {
     let mut out: Vec<IniGroup> = Vec::new();
     for conditional in &entry.actions {
-        let action = match &conditional.action {
-            ModAction::IniSet(spec) if spec.scope == scope && same_file(&spec.file, file) => {
-                IniAction::Set {
-                    section: spec.section.clone(),
-                    key: spec.key.clone(),
-                    value: spec.value.0.clone(),
+        let actions: Vec<IniAction> = match &conditional.action {
+            ModAction::IniSet(spec) if spec.scope == scope && same_file(&spec.file, file) => spec
+                .settings()
+                .into_iter()
+                .map(|s| IniAction::Set {
+                    section: s.section.map(str::to_string),
+                    key: s.key.to_string(),
+                    value: s.value.to_string(),
                     format: spec.format,
-                }
-            }
+                })
+                .collect(),
             ModAction::IniComment(spec)
                 if scope == IniScope::Mod && same_file(&spec.file, file) =>
             {
-                IniAction::Comment {
+                vec![IniAction::Comment {
                     key: spec.key.clone(),
                     format: spec.format,
-                }
+                }]
             }
             ModAction::IniAppendBlock(spec)
                 if scope == IniScope::Mod && same_file(&spec.file, file) =>
             {
-                IniAction::Append {
+                vec![IniAction::Append {
                     block: spec.block.clone(),
-                }
+                }]
             }
             _ => continue,
         };
@@ -200,10 +202,10 @@ pub fn groups(entry: &ModEntry, file: &str, scope: IniScope) -> Vec<IniGroup> {
             .iter_mut()
             .find(|group| group.condition == conditional.condition)
         {
-            Some(group) => group.actions.push(action),
+            Some(group) => group.actions.extend(actions),
             None => out.push(IniGroup {
                 condition: conditional.condition.clone(),
-                actions: vec![action],
+                actions,
             }),
         }
     }

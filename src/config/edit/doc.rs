@@ -269,8 +269,10 @@ pub fn remove_action(text: &str, id: &str, number: usize) -> anyhow::Result<Stri
 
 /// Write `layer` as mod `id`'s INI actions on its file under its condition --
 /// its settings, those it comments out and the lines it appends -- in place
-/// of the ones there were. One kept keeps its place and comments; a new one
-/// goes at the end of the mod's actions.
+/// of the ones there were. The settings are one `ini_set` (one per format),
+/// its `values` a sub-table, a section's keys in a table of their own. One
+/// kept keeps its place and comments; a new one goes at the end of the
+/// mod's actions.
 pub fn set_ini_layer(
     text: &str,
     id: &str,
@@ -311,8 +313,38 @@ pub fn set_ini_layer(
         (in_layer && fits).then_some(kind)
     };
 
-    let mut sets: Vec<Option<&crate::config::ini_edit::IniSetting>> =
-        layer.sets.iter().map(Some).collect();
+    // The settings by format, each written as one `ini_set`'s `values`.
+    let mut groups: Vec<(IniSetFormat, Vec<&crate::config::ini_edit::IniSetting>)> = Vec::new();
+    for setting in &layer.sets {
+        match groups.iter_mut().find(|(f, _)| *f == setting.format) {
+            Some((_, group)) => group.push(setting),
+            None => groups.push((setting.format, vec![setting])),
+        }
+    }
+    let values_of = |group: &[&crate::config::ini_edit::IniSetting]| {
+        let mut top = Table::new();
+        // No `[...values]` header of its own when it only holds sections.
+        top.set_implicit(true);
+        for setting in group {
+            let value = toml_edit::value(setting.value.as_str());
+            match &setting.section {
+                None => {
+                    top.insert(&setting.key, value);
+                }
+                Some(section) => {
+                    if let Some(keys) = top
+                        .entry(section)
+                        .or_insert(Item::Table(Table::new()))
+                        .as_table_mut()
+                    {
+                        keys.insert(&setting.key, value);
+                    }
+                }
+            }
+        }
+        Item::Table(top)
+    };
+    let mut placed: Vec<IniSetFormat> = Vec::new();
     let mut comments: Vec<Option<&crate::config::ini_edit::IniKey>> =
         layer.comments.iter().map(Some).collect();
     let mut block = layer.block.as_deref().filter(|b| !b.trim().is_empty());
@@ -322,24 +354,22 @@ pub fn set_ini_layer(
         let key = get(t, "key");
         let kept = match kind.as_str() {
             "ini_set" => {
-                let section = get(t, "section");
-                let found = sets.iter_mut().find(|s| {
-                    s.is_some_and(|s| {
-                        Some(&s.key) == key.as_ref()
-                            && section.as_ref().is_none_or(|was| {
-                                s.section
-                                    .as_ref()
-                                    .is_some_and(|now| now.eq_ignore_ascii_case(was))
-                            })
-                    })
-                });
-                match found.and_then(Option::take) {
-                    Some(setting) => {
-                        t.insert("value", toml_edit::value(setting.value.as_str()));
-                        set_format(t, setting.format);
+                // The first of a format's keeps its place, holding them all.
+                let format = match get(t, "format").as_deref() {
+                    Some("set-to") => IniSetFormat::SetTo,
+                    _ => IniSetFormat::Standard,
+                };
+                match groups.iter().find(|(f, _)| *f == format) {
+                    Some((_, group)) if !placed.contains(&format) => {
+                        for old in ["key", "value", "section", "values"] {
+                            t.remove(old);
+                        }
+                        t.insert("values", values_of(group));
+                        set_format(t, format);
+                        placed.push(format);
                         true
                     }
-                    None => false,
+                    _ => false,
                 }
             }
             "ini_comment" => match comments
@@ -378,17 +408,13 @@ pub fn set_ini_layer(
         t.insert("file", toml_edit::value(layer.file.as_str()));
         t
     };
-    for setting in sets.into_iter().flatten() {
+    for (format, group) in groups.iter().filter(|(f, _)| !placed.contains(f)) {
         let mut t = new("ini_set");
-        if let Some(section) = &setting.section {
-            t.insert("section", toml_edit::value(section.as_str()));
-        }
-        t.insert("key", toml_edit::value(setting.key.as_str()));
-        t.insert("value", toml_edit::value(setting.value.as_str()));
-        set_format(&mut t, setting.format);
+        set_format(&mut t, *format);
         if layer.scope == IniScope::Game {
             t.insert("scope", toml_edit::value("game"));
         }
+        t.insert("values", values_of(group));
         actions.push(t);
     }
     for comment in comments.into_iter().flatten() {
@@ -1368,13 +1394,41 @@ id = "B"
             ..IniLayer::default()
         };
         let out = super::set_ini_layer(text, "A", &layer).unwrap();
-        // Kept in place, comment and all; the one not given is gone; another
-        // condition's, and other actions, are left alone.
-        assert!(out.contains("# Smaller shadows for a slow machine.\n[[mods.actions]]\naction = \"ini_set\"\nif = \"potato\"\nfile = \"ini/a.ini\"\nsection = \"Display\"\nkey = \"Shadows\"\nvalue = \"512\""), "{out}");
+        // The settings are one ini_set per format: the first kept in place,
+        // comment and all, holding them by section; the one not given is
+        // gone; another condition's, and other actions, are left alone.
+        assert!(out.contains("# Smaller shadows for a slow machine.\n[[mods.actions]]\naction = \"ini_set\"\nif = \"potato\"\nfile = \"ini/a.ini\"\n\n[mods.actions.values.Display]\nShadows = \"512\""), "{out}");
         assert!(!out.contains("Gone"), "{out}");
         assert!(out.contains("key = \"Other\"\nvalue = \"2\""), "{out}");
         assert!(out.contains("action = \"file_hide\""), "{out}");
-        assert!(out.contains("action = \"ini_set\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkey = \"dc.x\"\nvalue = \"70\"\nformat = \"set-to\""), "{out}");
+        assert!(
+            out.contains("format = \"set-to\"\n\n[mods.actions.values]\n\"dc.x\" = \"70\""),
+            "{out}"
+        );
+        // And it reads back as the settings written.
+        let list: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+        let sets: Vec<String> = list.mods[0]
+            .actions
+            .iter()
+            .filter_map(|a| match &a.action {
+                crate::config::schema::ModAction::IniSet(set) => Some(set),
+                _ => None,
+            })
+            .flat_map(|set| {
+                set.settings()
+                    .into_iter()
+                    .map(|s| format!("{:?} {}={}", s.section, s.key, s.value))
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(
+            sets,
+            [
+                "Some(\"Display\") Shadows=512",
+                "None Other=2",
+                "None dc.x=70"
+            ]
+        );
         assert!(
             out.contains(
                 "action = \"ini_comment\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkey = \"Old\""

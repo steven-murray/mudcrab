@@ -759,6 +759,28 @@ profile's copy, never the original `Oblivion.ini`. `format` is `"standard"`
 (`key = value`) or `"set-to"` (`set key to value`). `value` accepts any TOML
 scalar; booleans become `1`/`0`.
 
+Several keys of one INI go in one action, as `values`: a key's value, or a
+table of a section's keys. `section`, if given, is where the plain keys go.
+
+```toml
+[[mods.actions]]
+action = "ini_set"
+file = "OBSE/Plugins/Oblivion_Display_Tweaks.ini"
+
+[mods.actions.values.Main]
+iTickFix = 1
+bFPSFix = 0
+
+[mods.actions.values.Display]
+iMaxFPSTolerance = 120
+```
+
+or, inline, `values = { bFPSFix = 0, Display = { iMaxFPSTolerance = 120 } }`
+(TOML lets an inline table be written only once, so keep plain keys and
+sections in the one). A key with a dot in it is quoted: `"dcvars.ini_x" = 70`.
+Each key is set as a lone `key` would be. Give `key` and `value`, or
+`values`, not both. The GUI's INI editor writes `values`.
+
 ### ini_append_block
 
 ```toml

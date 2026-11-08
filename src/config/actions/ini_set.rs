@@ -66,25 +66,36 @@ pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<
         );
     }
 
+    for setting in action.settings() {
+        set_one(cx, &ini_path, setting, action.format)?;
+    }
+    Ok(())
+}
+
+/// One of the action's keys, set in the file at `ini_path`.
+fn set_one(
+    cx: &ActionCx<'_>,
+    ini_path: &Path,
+    setting: crate::config::schema::IniSetting<'_>,
+    format: IniSetFormat,
+) -> anyhow::Result<()> {
+    let crate::config::schema::IniSetting {
+        section,
+        key,
+        value,
+    } = setting;
     if cx.settings.dry_run {
         tracing::info!(
             owner = cx.owner,
             ini = %ini_path.display(),
-            key = action.key,
-            value = %action.value,
-            scope = ?action.scope,
+            key,
+            value,
             "install dry-run ini_set action"
         );
         return Ok(());
     }
 
-    let outcome = apply_ini_set_in_section(
-        &ini_path,
-        action.section.as_deref(),
-        &action.key,
-        &action.value.0,
-        action.format,
-    )?;
+    let outcome = apply_ini_set_in_section(ini_path, section, key, value, format)?;
 
     // Every other action reports what it did; this one reported nothing at all,
     // which made its most surprising branch its quietest.
@@ -92,23 +103,23 @@ pub(super) fn apply(action: &IniSetAction, cx: &ActionCx<'_>) -> anyhow::Result<
         IniSetOutcome::Replaced => tracing::info!(
             owner = cx.owner,
             ini = %ini_path.display(),
-            key = action.key,
-            value = %action.value,
+            key,
+            value,
             "set an existing ini key"
         ),
         IniSetOutcome::AppendedToSection => tracing::info!(
             owner = cx.owner,
             ini = %ini_path.display(),
-            key = action.key,
-            value = %action.value,
-            section = ?action.section,
+            key,
+            value,
+            section = ?section,
             "added a missing ini key"
         ),
         IniSetOutcome::CreatedSection => tracing::warn!(
             owner = cx.owner,
             ini = %ini_path.display(),
-            key = action.key,
-            section = ?action.section,
+            key,
+            section = ?section,
             "ini_set created a [section] the file did not have. If the file marks \
              its sections with comments rather than headers, this is not the edit \
              you wanted -- the key the guide meant is elsewhere in the file, and \
@@ -548,6 +559,41 @@ pub(super) fn is_ini_key_line(line: &str, key: &str, format: IniSetFormat) -> bo
                 && separator.eq_ignore_ascii_case("to")
                 && found_key == key
         }
+    }
+}
+
+#[cfg(test)]
+mod values_tests {
+    use super::super::ActionCx;
+    use super::super::conflicts::tests::settings;
+
+    #[test]
+    fn every_value_is_set_in_its_section() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("mod");
+        std::fs::create_dir_all(&target).unwrap();
+        std::fs::write(
+            target.join("a.ini"),
+            "[Display]\niShadow=1024\n[Script]\nfTimer=0.5\n",
+        )
+        .unwrap();
+        let spec: crate::config::schema::IniSetAction = toml::from_str(
+            "file = \"a.ini\"\nvalues.Display = { iShadow = 512, bNew = 1 }\nvalues.Script = { fTimer = 1.5 }\n",
+        )
+        .unwrap();
+        let settings = settings(dir.path().join("mods"));
+        let cx = ActionCx {
+            owner: "Example",
+            settings: &settings,
+            mod_target: Some(&target),
+            plan_mods: &[],
+            active_plugins: &Default::default(),
+        };
+        super::apply(&spec, &cx).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(target.join("a.ini")).unwrap(),
+            "[Display]\niShadow=512\nbNew=1\n[Script]\nfTimer=1.5\n"
+        );
     }
 }
 

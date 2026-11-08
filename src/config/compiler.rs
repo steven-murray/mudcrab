@@ -1,6 +1,6 @@
 use crate::config::schema::{
     ArchiveLayout, ArchiveSpec, CompiledArchive, CompiledMod, CompiledModlist, IniScope,
-    IniSetAction, IniSetFormat, IniValue, ModAction, SourceModlist,
+    IniSetAction, ModAction, SourceModlist,
 };
 
 pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
@@ -173,11 +173,7 @@ pub fn compile_top_level_actions(ini: &toml::Table) -> Vec<ModAction> {
     let set = |section: Option<&str>, key: &str, value: &toml::Value| {
         ModAction::IniSet(IniSetAction {
             scope: IniScope::Game,
-            file: "Oblivion.ini".to_string(),
-            section: section.map(str::to_string),
-            key: key.to_string(),
-            value: IniValue(ini_value_to_string(value)),
-            format: IniSetFormat::Standard,
+            ..IniSetAction::one("Oblivion.ini", section, key, &ini_value_to_string(value))
         })
     };
     // `[ini.General]` names the section its keys belong in. A bare key is
@@ -224,7 +220,7 @@ mod tests {
         let mut sets: Vec<(Option<String>, String, String)> = compile_top_level_actions(&ini)
             .into_iter()
             .map(|action| match action {
-                ModAction::IniSet(set) => (set.section, set.key, set.value.0),
+                ModAction::IniSet(set) => (set.section, set.key.unwrap(), set.value.unwrap().0),
                 other => panic!("{other:?}"),
             })
             .collect();
