@@ -117,8 +117,9 @@
     values.clear();
     commented.clear();
     block = "";
-    readFrom = condition;
-    const group = view?.groups.find((g) => g.if === condition);
+    // Trimmed, as it is saved: a padded condition is the same one.
+    readFrom = condition?.trim() || null;
+    const group = view?.groups.find((g) => g.if === readFrom);
     for (const action of group?.actions ?? []) {
       if (action.kind === "set") {
         const own = inFile(action.section, action.key);
@@ -377,7 +378,10 @@
     <div class="dfoot">
       <span class="small dim">{view?.from ?? ""}</span>
       {#if changed}<button onclick={discard}>Discard</button>{/if}
-      <button class="primary" onclick={save} disabled={!changed || saving || (condition !== null && !condition.trim())}>Save</button>
+      <!-- Not until the file is read: what was shown of another would be saved to it. -->
+      <button class="primary" onclick={save} disabled={!changed || saving || loading || !view || (condition !== null && !condition.trim())}
+        >Save</button
+      >
     </div>
   </div>
 </div>
