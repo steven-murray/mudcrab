@@ -426,6 +426,8 @@ fn replace_set_to_value(line: &str, key: &str, value: &str) -> Option<String> {
 /// non-blank to a `;` comment (one outside quotes) or the end, its trailing
 /// blanks left out. A value can have spaces -- `sv_Construct "Silver
 /// Weapons"`, `(GetFormFromMod "Mod.esp" 00A0B4)` -- so it is not one word.
+/// Script strings have no escapes, so a quote always opens or closes one:
+/// `"M_\Silver\"` ends in a backslash.
 pub(crate) fn set_to_value_span(after_to: &str) -> (usize, usize) {
     let start = after_to.len() - after_to.trim_start().len();
     let mut quoted = false;
@@ -573,6 +575,18 @@ mod set_to_tests {
             )
             .as_deref(),
             Some("set Q.rListAdd to 0 ;a token")
+        );
+        // Script strings have no escapes: a backslash before the closing
+        // quote is a path's (Migck's `"M_\Silver\"`), and the comment
+        // after it is still a comment.
+        assert_eq!(
+            replace_set_to_value(
+                "set Q.sListAdd to sv_Construct \"M_\\Silver\\\" ;silver",
+                "Q.sListAdd",
+                "0"
+            )
+            .as_deref(),
+            Some("set Q.sListAdd to 0 ;silver")
         );
     }
 
