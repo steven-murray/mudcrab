@@ -249,25 +249,36 @@
               {@const set = values.get(k)}
               {@const off = commented.has(line.key)}
               {@const others = elsewhere(line.section, line.key)}
+              {@const repeated = line.times > 1}
               <div class="setting" class:changed={!!set} class:off>
                 <span class="key">{line.format === "set-to" ? "set " : ""}{line.key}</span>
                 <span class="eq">{line.format === "set-to" ? "to" : "="}</span>
                 <input
                   class="value"
                   value={set?.value ?? line.value}
-                  disabled={off}
+                  size={Math.min(60, Math.max(8, (set?.value ?? line.value).length + 1))}
+                  disabled={off || repeated}
+                  title={repeated
+                    ? `Set ${line.times} times in this file: a script building a list, not one setting. ini_set can't change one of these lines; Append lines can add to the list.`
+                    : ""}
                   spellcheck="false"
                   oninput={(e) => setValue(line, e.currentTarget.value, line.value)}
                 />
+                {#if line.comment}<span class="trailing">{line.comment}</span>{/if}
+                {#if repeated}<span class="tag" title="ini_set can't change one line of a list">×{line.times}</span>{/if}
                 {#if set}
                   <button class="link" title="Back to the file's value ({line.value})" onclick={() => ((values.delete(k), (dirty = true)))}>↺</button>
                 {/if}
                 {#if ini?.scope === "mod"}
                   <button
-                    class="link"
+                    class="link small"
                     class:on={off}
-                    title={off ? "Put it back" : "Comment it out (ini_comment), so the mod falls back to its own default"}
-                    onclick={() => toggleComment(line.key)}>{off ? "uncomment" : ";"}</button
+                    title={off
+                      ? "Put it back"
+                      : repeated
+                        ? "Comment out every line setting it (ini_comment)"
+                        : "Comment it out (ini_comment), so the mod falls back to its own default"}
+                    onclick={() => toggleComment(line.key)}>{off ? "uncomment" : "comment out"}</button
                   >
                 {/if}
                 {#each others as other (other)}<span class="tag">{other}</span>{/each}
@@ -416,9 +427,20 @@
   .value {
     font-family: var(--mono);
     font-size: 12px;
-    min-width: 80px;
-    width: 18ch;
     padding: 1px 4px;
+    max-width: 100%;
+  }
+  .trailing {
+    color: var(--dim);
+    white-space: pre;
+  }
+  .setting .link.small {
+    font-size: 11px;
+    opacity: 0.6;
+  }
+  .setting:hover .link.small,
+  .setting .link.small.on {
+    opacity: 1;
   }
   .tag {
     font-family: inherit;
