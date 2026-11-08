@@ -207,11 +207,14 @@ history there, rather than be undone by it.
   its place and comments. Search and **Changed only** narrow a long file to
   the settings that match, each with the comments just above it.
 
-  **Add an action…** adds any other action (`action add`) -- `qac`,
-  `delete_records`, `file_prune`, `pack_bsa` and the rest -- as a form of its
-  fields, the mod's files and plugins offered where a field names one, and
+  **Add an action…** adds one of the other actions (`action add`) -- `qac`,
+  `delete_records`, `write_file`, `pack_bsa`, `create_dummy_plugin`,
+  `extract_bsa`, `dds_decompress` -- as a form of its fields, the mod's files
+  and plugins offered where a field names one, and
   when it applies, chosen as in the INI editor. The list's checks run on it,
-  and one refused says why in the dialog.
+  and one refused says why in the dialog. INI actions are the INI editor's,
+  and moving, hiding and leaving out files are the Files and Conflicts
+  views'.
 
   Its actions follow (each can be removed: `action remove`), then each of
   its archives: its installer's choices, its filters and its fields (`set`),

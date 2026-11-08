@@ -3,8 +3,9 @@
   import ConditionPicker from "./ConditionPicker.svelte";
   import type { Archive } from "./ModFiles.svelte";
 
-  // Any action added to a mod (`action add`): its fields as a form, and when
-  // it applies. The list's checks run on the result, so a field left wrong
+  // An action added to a mod (`action add`): its fields as a form, and when
+  // it applies. INI and file actions have editors of their own (the INI
+  // editor, and the Files and Conflicts views), so they are not offered. The list's checks run on the result, so a field left wrong
   // is refused with the reason, and nothing is written.
   let {
     id,
@@ -45,35 +46,6 @@
       ],
     },
     {
-      action: "file_prune",
-      what: "Delete files: by glob, those another mod also has, or all but a few.",
-      fields: [
-        { name: "paths", kind: "list", hint: "Globs, one per line", suggest: "files" },
-        { name: "conflicts_with", kind: "list", hint: "Mods whose files to delete from this one, one per line" },
-        { name: "under", kind: "text", hint: "With conflicts_with: only under this folder" },
-        { name: "except", kind: "list", hint: "Globs to keep, one per line" },
-        { name: "keep", kind: "list", hint: "Alone: keep only these, one per line", suggest: "files" },
-      ],
-    },
-    {
-      action: "file_hide",
-      what: "Hide files from MO2 (renamed .mohidden) rather than delete them.",
-      fields: [
-        { name: "paths", kind: "list", hint: "Paths, one per line (not globs)", suggest: "files" },
-        { name: "conflicts_with", kind: "list", hint: "Mods whose files to hide in this one, one per line" },
-        { name: "under", kind: "text", hint: "With conflicts_with: only under this folder" },
-        { name: "except", kind: "list", hint: "Paths to leave, one per line" },
-      ],
-    },
-    {
-      action: "file_move",
-      what: "Move a file within the mod, e.g. a plugin into optional/.",
-      fields: [
-        { name: "from", kind: "text", required: true, suggest: "files" },
-        { name: "to", kind: "text", required: true },
-      ],
-    },
-    {
       action: "write_file",
       what: "Add a file no archive has, such as a dxvk.conf; never overwrites one.",
       fields: [
@@ -108,16 +80,6 @@
       action: "dds_decompress",
       what: "Decode DXT1 textures with transparency, which DXVK draws black (Linux/Proton).",
       fields: [{ name: "paths", kind: "list", required: true, hint: "Globs, one per line", suggest: "files" }],
-    },
-    {
-      action: "ini_tweak",
-      what: "A Wrye Bash INI Tweak, as a BAIN wizard's EditINI writes. To change an INI itself, use the INI editor.",
-      fields: [
-        { name: "file", kind: "text", required: true },
-        { name: "key", kind: "text", required: true },
-        { name: "value", kind: "text", required: true },
-        { name: "format", kind: "choice", choices: ["standard", "set-to"] },
-      ],
     },
   ];
 
