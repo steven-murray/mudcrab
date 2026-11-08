@@ -283,8 +283,8 @@ history there, rather than be undone by it.
     and ↓ reorder the sets, **Condition…** changes a set's `if`, ✕ takes it
     out, and **+ Add a set of choices**, just above **otherwise**, makes
     one: its condition typed, or made from a question and an answer (those
-    with a set already are left out). A new BAIN set starts as a copy of
-    **otherwise**.
+    with a set already are left out) and, for BAIN, its packages ticked,
+    starting as **otherwise**'s.
   - **FOMOD**: **Choose its FOMOD options…** walks its installer's steps
     again, each starting at what the list chooses now, and writes the new
     choices (`mudcrab choose`). A group's options can depend on the list's
