@@ -500,6 +500,34 @@ pub(super) fn actions(state: tauri::State<'_, State>, id: String) -> Result<Vec<
     doc::action_lines(&text, &place.id).map_err(shown)
 }
 
+/// Write one INI's settings under one condition (the INI editor): the
+/// mod's `ini_set`, `ini_comment` and `ini_append_block` actions on it with
+/// that `if`, in place of those there were.
+#[tauri::command]
+pub(super) fn set_ini(
+    state: tauri::State<'_, State>,
+    id: String,
+    layer: mudcrab::config::ini_edit::IniLayer,
+) -> Result<Edited, String> {
+    let (list, planned) = plan_mod(&state, &id, |text, source, written| {
+        anyhow::ensure!(
+            source.mods.iter().any(|m| m.id == written),
+            "the list has no mod with id '{id}'"
+        );
+        doc::set_ini_layer(text, written, &layer)
+    })?;
+    let mut command = format!(
+        "INI editor: {} in {}, for mod {}",
+        layer.file,
+        list_arg(&list),
+        quote(&id)
+    );
+    if let Some(condition) = &layer.condition {
+        command.push_str(&format!(", if {condition}"));
+    }
+    apply(&state, command, planned)
+}
+
 /// Declare a question (`input add`).
 #[tauri::command]
 pub(super) fn add_input(

@@ -713,3 +713,99 @@ pub(super) async fn conflicts_between(
     .map_err(shown)?;
     Ok(Between { shared, command })
 }
+
+/// An INI as the INI editor shows it: its lines, and the mod's INI actions
+/// on it by condition.
+#[derive(Serialize)]
+pub(super) struct IniView {
+    lines: Vec<config::ini_edit::IniLine>,
+    groups: Vec<config::ini_edit::IniGroup>,
+    /// Where the text was read from.
+    from: String,
+}
+
+/// Mod `id`'s INI `file` (`source` in its archive `number`), or the game's
+/// `Oblivion.ini` (its default, as the game ships it) for `scope = "game"`.
+#[tauri::command]
+pub(super) async fn ini_view(
+    state: tauri::State<'_, State>,
+    id: String,
+    file: String,
+    scope: config::schema::IniScope,
+    number: Option<usize>,
+    source: Option<String>,
+) -> Result<IniView, String> {
+    use config::schema::IniScope;
+    let list = state.list()?;
+    let located = locate(&state)?;
+    let modlist = config::loader::load_modlist(&list).map_err(shown)?;
+    let entry = modlist
+        .mods
+        .iter()
+        .find(|m| m.id == id)
+        .ok_or_else(|| format!("the list has no mod with id '{id}'"))?;
+    let groups = config::ini_edit::groups(entry, &file, scope);
+    let (text, from) = match scope {
+        IniScope::Game => {
+            let game = located
+                .game
+                .ok_or("say where the game folder is first (in Settings)")?;
+            let path = std::fs::read_dir(&game)
+                .map_err(|err| format!("failed to read {}: {err}", game.display()))?
+                .flatten()
+                .map(|e| e.path())
+                .find(|p| {
+                    p.file_name()
+                        .is_some_and(|n| n.eq_ignore_ascii_case("Oblivion_default.ini"))
+                })
+                .ok_or_else(|| format!("{} has no Oblivion_default.ini", game.display()))?;
+            let bytes = std::fs::read(&path).map_err(|err| err.to_string())?;
+            let text = match String::from_utf8(bytes) {
+                Ok(text) => text,
+                Err(err) => err.into_bytes().iter().map(|&b| b as char).collect(),
+            };
+            (text, path.display().to_string())
+        }
+        IniScope::Mod => {
+            let number = number.ok_or("which archive the INI is in")?;
+            let source = source.ok_or("where the INI is in its archive")?;
+            let downloads = located
+                .downloads
+                .ok_or("say where the downloads folder is first (in Settings)")?;
+            let answers: config::query::Overrides = state
+                .settings
+                .lock()
+                .map_err(|_| "a command panicked")?
+                .list(&list)
+                .current_answers()
+                .into_iter()
+                .collect();
+            let search = located.search.clone();
+            let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
+            let mod_id = id.clone();
+            let entry_name = source.clone();
+            tokio::task::spawn_blocking(move || {
+                let planned =
+                    config::pipeline::planned_archive(&text, &list, &mod_id, number, &answers)?;
+                let reference = config::archive_store::ArchiveRef::for_archive(&planned.archive);
+                let archive = config::archive_store::find(&downloads, &search, &reference)
+                    .ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "'{mod_id}'s archive {number} is not in {}; download it first",
+                            downloads.display()
+                        )
+                    })?;
+                let text = config::ini_edit::archive_text(&archive, &entry_name)?;
+                anyhow::Ok((text, format!("{} in {}", entry_name, archive.display())))
+            })
+            .await
+            .map_err(|err| err.to_string())?
+            .map_err(shown)?
+        }
+    };
+    Ok(IniView {
+        lines: config::ini_edit::read_lines(&text),
+        groups,
+        from,
+    })
+}
