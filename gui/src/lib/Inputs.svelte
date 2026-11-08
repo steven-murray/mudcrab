@@ -128,6 +128,42 @@
   one brings in from the mod itself.
 </p>
 
+{#if adding}
+  <form class="new" onsubmit={add}>
+    <p class="dim small">Added after the last question: one is asked after those above it, and only they can decide whether it is.</p>
+    <label>Name <input type="text" bind:value={fresh.name} placeholder="as conditions use it, e.g. big_textures" /></label>
+    <label
+      >Kind
+      <select bind:value={fresh.kind}
+        ><option value="bool">bool (yes or no)</option><option value="choice">choice (one of its answers)</option><option value="multi"
+          >multi (any of its answers)</option
+        ><option value="text">text</option></select
+      >
+    </label>
+    <label>Question <input type="text" bind:value={fresh.query} /></label>
+    {#if listed(fresh.kind)}
+      <label>Answers <textarea rows="3" bind:value={fresh.choices} placeholder="one per line"></textarea></label>
+    {/if}
+    <label
+      >Default
+      <span class="default">
+        <input type="checkbox" bind:checked={fresh.hasDefault} title="Whether the question has a default" />
+        {#if fresh.kind === "bool"}
+          <select bind:value={fresh.fallback} disabled={!fresh.hasDefault}><option>false</option><option>true</option></select>
+        {:else}
+          <input type="text" bind:value={fresh.fallback} disabled={!fresh.hasDefault} placeholder={fresh.hasDefault ? "(empty)" : "none"} />
+        {/if}
+      </span>
+    </label>
+    <div class="buttons">
+      <button type="submit" class="primary" disabled={!fresh.name.trim() || !fresh.query.trim()}>Add</button>
+      <button type="button" onclick={() => (adding = false)}>Cancel</button>
+    </div>
+  </form>
+{:else}
+  <button class="addq" onclick={() => (adding = true)}>Add a question…</button>
+{/if}
+
 {#each document.inputs as input (input.id)}
   {@const mods = asking.get(input.id) ?? []}
   <article>
@@ -214,40 +250,6 @@
   </article>
 {/each}
 
-{#if adding}
-  <form class="new" onsubmit={add}>
-    <label>Name <input type="text" bind:value={fresh.name} placeholder="as conditions use it, e.g. big_textures" /></label>
-    <label
-      >Kind
-      <select bind:value={fresh.kind}
-        ><option value="bool">bool (yes or no)</option><option value="choice">choice (one of its answers)</option><option value="multi"
-          >multi (any of its answers)</option
-        ><option value="text">text</option></select
-      >
-    </label>
-    <label>Question <input type="text" bind:value={fresh.query} /></label>
-    {#if listed(fresh.kind)}
-      <label>Answers <textarea rows="3" bind:value={fresh.choices} placeholder="one per line"></textarea></label>
-    {/if}
-    <label
-      >Default
-      <span class="default">
-        <input type="checkbox" bind:checked={fresh.hasDefault} title="Whether the question has a default" />
-        {#if fresh.kind === "bool"}
-          <select bind:value={fresh.fallback} disabled={!fresh.hasDefault}><option>false</option><option>true</option></select>
-        {:else}
-          <input type="text" bind:value={fresh.fallback} disabled={!fresh.hasDefault} placeholder={fresh.hasDefault ? "(empty)" : "none"} />
-        {/if}
-      </span>
-    </label>
-    <div class="buttons">
-      <button type="submit" class="primary" disabled={!fresh.name.trim() || !fresh.query.trim()}>Add</button>
-      <button type="button" onclick={() => (adding = false)}>Cancel</button>
-    </div>
-  </form>
-{:else}
-  <button onclick={() => (adding = true)}>Add a question…</button>
-{/if}
 
 <style>
   .small {
@@ -295,7 +297,10 @@
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 10px;
-    margin-top: 10px;
+    margin-bottom: 10px;
+  }
+  .addq {
+    margin-bottom: 10px;
   }
   label {
     display: grid;
