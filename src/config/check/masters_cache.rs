@@ -64,6 +64,25 @@ impl ArchiveMasters {
     }
 }
 
+/// The archive's file list, kept as its masters are: listing a 7z or a RAR
+/// is a process each time, and the list scan lists every archive.
+pub(crate) fn listing(archive: &Path) -> anyhow::Result<Vec<String>> {
+    let mut kept = ArchiveMasters::load_kind(archive, "listing");
+    if let Some(paths) = kept.get("") {
+        return Ok(paths.clone());
+    }
+    let paths = crate::archive::list_archive_paths(archive)?;
+    kept.put("", &paths);
+    kept.save();
+    Ok(paths)
+}
+
+/// Where entries read from the archive (a FOMOD's config) are kept, while
+/// it is the same file.
+pub(crate) fn entries_dir(archive: &Path) -> Option<PathBuf> {
+    key(archive).map(|key| crate::util::fs::cache_root().join("entries").join(key))
+}
+
 /// The archive's path, size and modification time, hashed.
 fn key(archive: &Path) -> Option<String> {
     let meta = std::fs::metadata(archive).ok()?;

@@ -845,7 +845,7 @@ pub fn archive_contents(
     {
         return Ok(None);
     }
-    let paths = archive::list_archive_paths(&source)
+    let paths = masters_cache::listing(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
     // Its own: a front end reads a mod's archives side by side.
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
@@ -853,7 +853,11 @@ pub fn archive_contents(
         "files-{}",
         NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
-    let reader = EntryReader::new(&source, scratch.join("entry"));
+    let reader = EntryReader::kept(
+        &source,
+        scratch.join("entry"),
+        masters_cache::entries_dir(&source),
+    );
     let exclude: Vec<String> = archive
         .exclude
         .iter()
@@ -951,7 +955,7 @@ fn check_single_archive(
 
     // Listing the archive is what proves it is readable and not a truncated
     // or misnamed download.
-    let paths = archive::list_archive_paths(&source)
+    let paths = masters_cache::listing(&source)
         .map_err(|err| anyhow::anyhow!("archive is not readable ({}): {err}", source.display()))?;
     if let Some(md5) = archive.md5.as_ref().filter(|_| !settings.masters_only) {
         let actual = crate::config::identify::md5_of_file(&source)?;
@@ -977,7 +981,11 @@ fn check_single_archive(
         return Ok(None);
     }
 
-    let reader = EntryReader::new(&source, scratch.join("entry"));
+    let reader = EntryReader::kept(
+        &source,
+        scratch.join("entry"),
+        masters_cache::entries_dir(&source),
+    );
     let label = source.display().to_string();
     let plan_with = |include: &[String], exclude: &[String]| {
         let exclude: Vec<String> = exclude
@@ -1816,7 +1824,7 @@ fn check_build_archive(archive: &CompiledArchive, settings: &CheckSettings) -> a
         let reference = ArchiveRef::new(&layer.path, layer.file_name.as_deref());
         let source = present(archive, &reference, settings)
             .map_err(|err| anyhow::anyhow!("build layer {}: {err}", layer_index + 1))?;
-        let layer_paths = archive::list_archive_paths(&source).map_err(|err| {
+        let layer_paths = masters_cache::listing(&source).map_err(|err| {
             anyhow::anyhow!(
                 "build layer {} is not readable ({}): {err}",
                 layer_index + 1,
