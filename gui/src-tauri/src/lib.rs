@@ -120,6 +120,13 @@ struct ListView {
     answers: BTreeMap<String, String>,
 }
 
+/// Something the window found slow, written to the log, to find what makes
+/// it feel sluggish.
+#[tauri::command]
+fn note_slow(what: String, ms: f64) {
+    tracing::info!(target: "mudcrab::gui", what, ms = ms.round() as u64, "slow in the window");
+}
+
 #[tauri::command]
 fn recent(state: tauri::State<'_, State>) -> Vec<String> {
     state
@@ -1547,6 +1554,7 @@ pub fn app<R: Runtime>(
             step_check,
             question_states,
             read_masters,
+            note_slow,
             scan_list,
             add_found_dependencies,
             find_resource_dependencies,

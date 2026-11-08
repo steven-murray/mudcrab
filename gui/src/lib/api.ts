@@ -1,7 +1,23 @@
 // The backend's commands and events, typed. Every edit or step goes through
 // one of these, which call mudcrab's library exactly as the CLI does.
 
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as call } from "@tauri-apps/api/core";
+
+/** Report something slow to the log (`note_slow`): a call to the backend, or
+ *  a step of an edit. */
+export function noteSlow(what: string, ms: number) {
+  if (ms >= 100) call("note_slow", { what, ms }).catch(() => {});
+}
+
+// Every command, timed: those that take long are logged.
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const start = performance.now();
+  try {
+    return await call<T>(cmd, args);
+  } finally {
+    noteSlow(`command ${cmd}`, performance.now() - start);
+  }
+}
 
 export type Markdown = string;
 

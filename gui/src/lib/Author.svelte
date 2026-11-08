@@ -9,6 +9,7 @@
     type Checked,
     type Conflicts as Found,
     type Edited,
+    noteSlow,
     type FoundDependencies,
     type FoundGroup,
     type FindingGroup,
@@ -412,11 +413,21 @@
     editing = true;
     error = null;
     try {
+      const start = performance.now();
       const done = (await edit()) as Edited;
+      const edited = performance.now();
       last = done.change;
       canUndo = done.can_undo;
       canRedo = done.can_redo;
       await refresh();
+      const refreshed = performance.now();
+      await new Promise((r) => setTimeout(r, 0));
+      void document.body.offsetHeight;
+      const shown = performance.now();
+      noteSlow(
+        `edit: ${Math.round(edited - start)} ms writing, ${Math.round(refreshed - edited)} ms reading back, ${Math.round(shown - refreshed)} ms showing`,
+        shown - start,
+      );
       return true;
     } catch (err) {
       error = String(err);
