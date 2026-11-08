@@ -1430,7 +1430,9 @@ pub struct CompiledArchive {
     pub fomod_selections: Vec<FomodSelection>,
     #[serde(default)]
     pub build: Vec<BuildLayer>,
+    #[serde(default)]
     pub include: Vec<String>,
+    #[serde(default)]
     pub exclude: Vec<String>,
     #[serde(default)]
     pub game_root_files: Vec<String>,
