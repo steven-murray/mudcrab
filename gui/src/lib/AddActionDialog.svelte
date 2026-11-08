@@ -4,8 +4,8 @@
   import type { Archive } from "./ModFiles.svelte";
 
   // An action added to a mod (`action add`): its fields as a form, and when
-  // it applies. INI and file actions have editors of their own (the INI
-  // editor, and the Files and Conflicts views), so they are not offered. The list's checks run on the result, so a field left wrong
+  // it applies. The INI and file actions with editors of their own (the INI
+  // editor, and the Files and Conflicts views) are not offered. The list's checks run on the result, so a field left wrong
   // is refused with the reason, and nothing is written.
   let {
     id,
@@ -60,7 +60,7 @@
         { name: "output", kind: "text", required: true, hint: "Example Mod.bsa" },
         { name: "include", kind: "list", hint: "Globs to pack, one per line (all, if none)" },
         { name: "exclude", kind: "list", hint: "Globs to leave loose, one per line" },
-        { name: "prune_packed", kind: "bool", hint: "Delete what went into the BSA" },
+        { name: "keep_loose", kind: "bool", hint: "Keep the loose files it packs (they are deleted otherwise)" },
       ],
     },
     {
@@ -74,6 +74,16 @@
       fields: [
         { name: "archive", kind: "text", required: true, suggest: "bsas" },
         { name: "keep_archive", kind: "bool", hint: "Keep the BSA after unpacking it" },
+      ],
+    },
+    {
+      action: "ini_tweak",
+      what: "A Wrye Bash INI Tweak, as a BAIN wizard's EditINI writes: a fragment under ini tweaks/, applied from Wrye Bash.",
+      fields: [
+        { name: "file", kind: "text", required: true },
+        { name: "key", kind: "text", required: true },
+        { name: "value", kind: "text", required: true },
+        { name: "format", kind: "choice", choices: ["standard", "set-to"] },
       ],
     },
     {
@@ -119,7 +129,8 @@
     const out: string[] = [];
     for (const f of spec.fields) {
       if (f.kind === "bool") {
-        if (flags[f.name]) out.push(`${f.name}=true`);
+        // Kept loose files are `prune_packed = false`: pruning is the default.
+        if (flags[f.name]) out.push(f.name === "keep_loose" ? "prune_packed=false" : `${f.name}=true`);
         continue;
       }
       const raw = values[f.name] ?? "";

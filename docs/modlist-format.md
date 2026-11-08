@@ -402,13 +402,13 @@ examples.
 | `write_file` | `path`, `content` | To add a file no archive has, such as a `dxvk.conf`; never overwrites one. |
 | `qac` | `plugins` | To clean plugins with xEdit's Quick Auto Clean. Needs xEdit set up in `tools.toml`. |
 | `delete_records` | `plugin`, `groups`, `form_ids` | When a guide says "remove these records in xEdit": whole groups (`WRLD`) or records (`xx010F43`). |
-| `pack_bsa` | `output`, `include`, `exclude`, `prune_packed` | To pack loose files into a BSA; `prune_packed` deletes what went in. |
+| `pack_bsa` | `output`, `include`, `exclude`, `prune_packed` | To pack loose files into a BSA. The loose files it packs are deleted once it is written; `prune_packed = false` keeps them. |
 | `create_dummy_plugin` | `output` | For a BSA with no plugin of the same name, which Oblivion would otherwise not load. |
 | `extract_bsa` | `archive`, `keep_archive` | To unpack a BSA the mod ships, to change what is in it. |
 | `dds_decompress` | `paths` | On Linux/Proton: menu textures with DXT1 transparency, which DXVK draws black. See [Linux / Proton in Known issues](known-issues.md#linux--proton). |
 
-`pack_bsa`, `create_dummy_plugin` and `file_prune` exist to be composed, in this order, for mods that ship loose assets
-the guide wants archived:
+`pack_bsa` and `create_dummy_plugin` are composed, in this order, for mods that ship
+loose assets the guide wants archived:
 
 ```toml
 [[mods]]
@@ -417,20 +417,20 @@ id = "Example Mod"
 actions = [
   { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
   { action = "create_dummy_plugin", output = "Example Mod.esp" },
-  { action = "file_prune", paths = ["meshes/**", "textures/**", "sound/**"] },
 ]
 ```
 
-`file_prune` is a separate action rather than a `pack_bsa` option because it has to run
-*after* the archive is written -- the loose files must still exist to be packed. Ordering
-is the only mechanism involved.
+The loose files `pack_bsa` packs are deleted once the archive is written, taken from the
+archive's own file list, so nothing it did not pack is touched; loose copies left beside
+it would shadow the archive. `prune_packed = false` keeps them, for a later action that
+still needs them.
 
 Oblivion loads `Foo.bsa` only when a plugin named `Foo.esp` is active, which is what
 `create_dummy_plugin` is for: a mod distributed as a bare archive needs an empty plugin
 beside it. The plugin is built through mudcrab's own plugin writer, so it is a real TES4
 file rather than a blob of hand-written bytes.
 
-Paths in all three are relative to the mod's staged data folder and may not escape it.
+Paths in both are relative to the mod's staged data folder and may not escape it.
 A BSA cannot store a file outside a folder, so anything at the top level of the staged
 mod (a readme, a plugin) is left loose and logged rather than packed.
 

@@ -979,3 +979,12 @@ fn conflicts_with_naming_an_unknown_mod_is_rejected() {
     assert!(reported.contains("No Such Mod"), "{reported}");
     assert!(target.join("meshes/rocks/rock01.nif").exists());
 }
+
+#[test]
+fn packing_deletes_the_loose_files_unless_told_to_keep_them() {
+    let read = |extra: &str| -> PackBsaAction {
+        toml::from_str(&format!("output = \"Example Mod.bsa\"\n{extra}")).unwrap()
+    };
+    assert!(read("").prune_packed);
+    assert!(!read("prune_packed = false").prune_packed);
+}

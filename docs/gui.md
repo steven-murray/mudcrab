@@ -209,10 +209,10 @@ history there, rather than be undone by it.
 
   **Add an action…** adds one of the other actions (`action add`) -- `qac`,
   `delete_records`, `write_file`, `pack_bsa`, `create_dummy_plugin`,
-  `extract_bsa`, `dds_decompress` -- as a form of its fields, the mod's files
+  `extract_bsa`, `ini_tweak`, `dds_decompress` -- as a form of its fields, the mod's files
   and plugins offered where a field names one, and
   when it applies, chosen as in the INI editor. The list's checks run on it,
-  and one refused says why in the dialog. INI actions are the INI editor's,
+  and one refused says why in the dialog. INI settings are the INI editor's,
   and moving, hiding and leaving out files are the Files and Conflicts
   views'.
 
