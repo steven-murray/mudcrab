@@ -169,6 +169,23 @@ history there, rather than be undone by it.
   mods, or a new group, in one click each; **Custom condition…** writes its
   `if` instead. **+** by
   the search box adds a mod, from an archive or a Nexus link.
+
+  The list is scanned when it opens and again after each change
+  (`check --masters-only`): each archive's files and its plugins' masters,
+  read once and kept, so after the first time -- slow for a big list -- a
+  scan takes a second or so. A mod needed by one that is not optional is
+  marked **needed ×N** (hover for which: it cannot be made optional while
+  they are not), and one that installs an INI, **INI**. **⚲** by the search
+  box opens the filters beside it, each any, yes or no, all of them together and
+  with the search: whether a mod is needed, optional or unticked; has
+  plugins or only resources, an INI, a BSA, installer choices; shares files
+  with another mod, replaces another's or has its own replaced (later in the
+  list wins, as in MO2); has archives not from Nexus or not downloaded, or
+  problems the scan found; has actions, INI changes, plugin cleaning or
+  xEdit edits, or is in a merge; has notes for the guide. Sections open to
+  show what matches, with how many. What a mod's actions do to its files is
+  not rehearsed by the scan: for one that packs a BSA, say, its files are
+  those its archives lay out. The filters chosen are kept.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
   file (`mudcrab docs`). Then its settings:
