@@ -572,7 +572,13 @@ fn mod_facts(plan: &PersonalizedPlan, folders: &BTreeMap<String, ModFolder>) -> 
             let all = facts_files(folder);
             ModFacts {
                 mod_id: id.to_string(),
-                inis: all.iter().filter(|p| ends(p, ".ini")).cloned().collect(),
+                // MO2's own `meta.ini`, at the top of a mod's folder, is
+                // not the game's.
+                inis: all
+                    .iter()
+                    .filter(|p| ends(p, ".ini") && p.as_str() != "meta.ini")
+                    .cloned()
+                    .collect(),
                 bsas: all.iter().filter(|p| ends(p, ".bsa")).cloned().collect(),
                 wins: named(&wins[index]),
                 losses: named(&losses[index]),

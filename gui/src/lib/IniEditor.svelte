@@ -38,7 +38,8 @@
     const byPath = new Map<string, Ini>();
     for (const archive of archives)
       for (const f of archive.tree?.installed ?? [])
-        if (f.taken && /\.ini$/i.test(f.path))
+        // MO2's own meta.ini, at the top of the mod's folder, is not one.
+        if (f.taken && /\.ini$/i.test(f.path) && f.path.toLowerCase() !== "meta.ini")
           byPath.set(f.path.toLowerCase(), { key: f.path.toLowerCase(), label: f.path, file: f.path, scope: "mod", number: archive.number, source: f.source });
     const out = [...byPath.values()].sort((a, b) => a.label.localeCompare(b.label));
     out.push({ key: "game", label: "Oblivion.ini (the game's)", file: "Oblivion.ini", scope: "game", number: null, source: null });
