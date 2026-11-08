@@ -221,6 +221,52 @@ pub fn add_action(
     Ok(doc.to_string())
 }
 
+/// Add an archive to the end of a mod's archives: `block` is an
+/// `[[mods.archives]]` entry, its FOMOD selections and all, as
+/// [`crate::config::installer::archive_block`] writes one.
+pub fn add_archive(text: &str, id: &str, block: &str) -> anyhow::Result<String> {
+    let fragment = parse(block)?;
+    let archive = fragment
+        .get("mods")
+        .and_then(|m| m.get("archives"))
+        .and_then(Item::as_array_of_tables)
+        .and_then(|a| a.get(0))
+        .ok_or_else(|| anyhow::anyhow!("not an archive entry: {block}"))?;
+    // Made afresh, so the new tables take their place after the mod's own
+    // rather than the places they had in the fragment.
+    fn fresh(table: &Table) -> Table {
+        let mut out = Table::new();
+        for (key, item) in table.iter() {
+            match item {
+                Item::ArrayOfTables(tables) => {
+                    let mut copy = ArrayOfTables::new();
+                    for t in tables.iter() {
+                        copy.push(fresh(t));
+                    }
+                    out.insert(key, Item::ArrayOfTables(copy));
+                }
+                Item::Table(t) => {
+                    out.insert(key, Item::Table(fresh(t)));
+                }
+                other => {
+                    out.insert(key, other.clone());
+                }
+            }
+        }
+        out
+    }
+    let archive = fresh(archive);
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    table
+        .entry("archives")
+        .or_insert(Item::ArrayOfTables(ArrayOfTables::new()))
+        .as_array_of_tables_mut()
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has `archives` written inline; write them as [[mods.archives]] tables to add one"))?
+        .push(archive);
+    Ok(doc.to_string())
+}
+
 /// Each of a mod's actions on one line, as written: `action = "file_hide",
 /// paths = ["a"]`.
 pub fn action_lines(text: &str, id: &str) -> anyhow::Result<Vec<String>> {
@@ -1721,5 +1767,19 @@ id = "B"
         );
         // Read back as the list.
         let _: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+    }
+
+    #[test]
+    fn an_archive_is_added_after_the_mods_own() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/2\"\n\n[[mods.actions]]\naction = \"file_hide\"\npaths = [\"a\"]\n\n[[mods]]\nid = \"B\"\n";
+        let block = "[[mods.archives]]\npath = \"nexus:oblivion/1/3\"\nfile_name = \"Patch.7z\"\nlayout = \"fomod\"\n\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"G\"\noptions = [\"X\"]\n";
+        let out = super::add_archive(text, "A", block).unwrap();
+        let list: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+        let a = &list.mods[0];
+        assert_eq!(a.archives.len(), 2, "{out}");
+        assert_eq!(a.archives[1].file_name.as_deref(), Some("Patch.7z"));
+        assert_eq!(a.archives[1].fomod_selections[0].options, ["X"]);
+        assert_eq!(a.actions.len(), 1);
+        assert!(list.mods[1].archives.is_empty(), "{out}");
     }
 }

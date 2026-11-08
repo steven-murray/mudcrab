@@ -9,6 +9,7 @@
     type Checked,
     type Conflicts as Found,
     type Edited,
+    type Answer,
     type AuthorProfile,
     type Conditional,
     type ChoiceTarget,
@@ -26,6 +27,7 @@
   } from "./api";
   import AddDialog from "./AddDialog.svelte";
   import ChooseDialog from "./ChooseDialog.svelte";
+  import AddArchiveDialog from "./AddArchiveDialog.svelte";
   import IniEditor from "./IniEditor.svelte";
   import ProfileDialog from "./ProfileDialog.svelte";
   import IfTag from "./IfTag.svelte";
@@ -205,6 +207,24 @@
     await archivesPane?.refresh();
   }
   let archivesPane = $state<Archives | null>(null);
+  // A mod an archive is being added to: chosen in the Archives pane, then
+  // its installer answered.
+  let archiveFor = $state<string | null>(null);
+  let addingArchive = $state<{ id: string; path: string } | null>(null);
+  let notice = $state<string | null>(null);
+  async function addArchive(id: string, request: { path: string; source: string | null; answers: Answer[] }) {
+    let added: { new_plugins: string[] } | null = null;
+    const why = await attempt(async () => (added = await api.addArchive(id, request)));
+    if (!why) {
+      archiveFor = null;
+      pane = "list";
+      const plugins = (added as { new_plugins: string[] } | null)?.new_plugins ?? [];
+      notice = plugins.length
+        ? `Added. It has plugins ${id} does not declare yet: ${plugins.join(", ")}. Add them to its plugins and the load order.`
+        : null;
+    }
+    return why;
+  }
 
   // Every mod in the document by id, the sections above it (by anchor, to
   // open them) and its section path (for moving it), in list order.
@@ -823,6 +843,15 @@
   <ProfileDialog {profile} inputs={list.document.inputs} saved={profileChanged} close={() => (answering = false)} />
 {/if}
 
+{#if addingArchive}
+  <AddArchiveDialog
+    path={addingArchive.path}
+    modId={addingArchive.id}
+    add={(request) => addArchive(addingArchive!.id, request)}
+    close={() => (addingArchive = null)}
+  />
+{/if}
+
 {#if editingIni}
   <IniEditor
     id={editingIni}
@@ -911,7 +940,16 @@
       <button class:on={pane === "archives"} onclick={() => (pane = "archives")} title="The archives in the downloads folders, to add mods from">Archives</button>
     </nav>
     <div class:hidden={pane !== "archives"}>
-      <Archives bind:this={archivesPane} add={(path) => (adding = path)} {select} />
+      <Archives
+        bind:this={archivesPane}
+        add={(path) => (archiveFor ? (addingArchive = { id: archiveFor, path }) : (adding = path))}
+        {select}
+        target={archiveFor}
+        cancelTarget={() => {
+          archiveFor = null;
+          pane = "list";
+        }}
+      />
     </div>
     <div class="bar" class:hidden={pane !== "list"}>
       <input type="text" placeholder="Find a mod or plugin" bind:value={filter} />
@@ -1064,6 +1102,7 @@
 
     <div class="content">
       {#if error}<pre class="error">{error}</pre>{/if}
+      {#if notice}<p class="notice small">{notice} <button class="link" onclick={() => (notice = null)}>Dismiss</button></p>{/if}
       {#if addingDeps}
         <p class="dim">
           {addingDeps === "masters" ? "Reading plugins' masters, and adding them" : "Adding resource dependencies"}…
@@ -1111,6 +1150,13 @@
             <p>
               <button onclick={() => (editingIni = chosen.id)} title="Change the settings in the mod's INIs, or the game's, as ini_set actions"
                 >INI editor…</button
+              >
+              <button
+                onclick={() => {
+                  archiveFor = chosen.id;
+                  pane = "archives";
+                }}
+                title="Add another archive to this mod: from the downloads folders, or a Nexus link">+ Add an archive…</button
               >
               <button onclick={() => (addingAction = chosen.id)} title="Add any action: QAC, xEdit record removal, files, BSAs (action add)"
                 >Add an action…</button
@@ -1588,6 +1634,9 @@
   .profilebar input {
     flex: 1;
     min-width: 0;
+  }
+  .notice {
+    color: var(--note);
   }
   .note {
     color: var(--note);

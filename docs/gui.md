@@ -254,6 +254,13 @@ history there, rather than be undone by it.
   comments. Search and **Changed only** narrow a long file to
   the settings that match, each with the comments just above it.
 
+  **+ Add an archive…** adds another archive to the mod: the Archives
+  pane opens with a note of which mod it is for, and an archive chosen
+  there -- from the downloads folders, or a file fetched from a Nexus
+  link -- has its source and installer answered, and goes after the mod's
+  own archives. Plugins it has that the mod does not declare are named, to
+  add to its plugins and the load order.
+
   **Add an action…** adds one of the other actions (`action add`) -- `qac`,
   `delete_records`, `write_file`, `pack_bsa`, `create_dummy_plugin`,
   `extract_bsa`, `ini_tweak`, `dds_decompress` -- as a form of its fields, the mod's files

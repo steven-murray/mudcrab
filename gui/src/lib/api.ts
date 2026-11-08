@@ -666,6 +666,10 @@ export const api = {
     invoke<Walk>("choose_walk", { id, number, answers, to }),
   chooseWrite: (id: string, number: number, answers: Answer[], to: ChoiceTarget = "default") =>
     invoke<Edited>("choose_write", { id, number, answers, to }),
+  /** Add an archive to mod `id`, after its own; says which of its plugins
+   *  the mod does not declare yet. */
+  addArchive: (id: string, request: { path: string; source: string | null; answers: Answer[] }) =>
+    invoke<Edited & { new_plugins: string[] }>("add_archive", { id, request }),
   writeBainSet: (id: string, number: number, to: ChoiceTarget, packages: string[]) =>
     invoke<Edited>("write_bain_set", { id, number, to, packages }),
   setChoiceCondition: (id: string, number: number, index: number, condition: string | null) =>

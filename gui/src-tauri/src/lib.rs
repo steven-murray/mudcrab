@@ -1613,6 +1613,7 @@ pub fn app<R: Runtime>(
             note_slow,
             scan_list,
             author::author_profile,
+            adding::add_archive,
             author::set_author_profile,
             author::set_author_answers,
             add_found_dependencies,

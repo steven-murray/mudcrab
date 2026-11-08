@@ -521,6 +521,93 @@ pub(super) fn add_mod(
     apply(&state, command(&list, &request, &new_mod), edit)
 }
 
+/// An archive to add to a mod already in the list: where it is, its source
+/// (blank for the one found), and the answers to its installer.
+#[derive(Deserialize)]
+pub(super) struct ArchiveRequest {
+    path: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    answers: Vec<Answer>,
+}
+
+/// What adding an archive to a mod did: the edit, and the plugins it has
+/// that the mod does not declare yet.
+#[derive(Serialize)]
+pub(super) struct ArchiveAdded {
+    #[serde(flatten)]
+    edited: Edited,
+    new_plugins: Vec<String>,
+}
+
+/// Add an archive to mod `id`: its entry as `add --archive` writes one, its
+/// installer answered, after the mod's own archives.
+#[tauri::command(async)]
+pub(super) fn add_archive(
+    state: tauri::State<'_, State>,
+    id: String,
+    request: ArchiveRequest,
+) -> Result<ArchiveAdded, String> {
+    let list = state.list()?;
+    let path = PathBuf::from(&request.path);
+    let report = report_of(&path)?;
+    let installed = match installer::walk(
+        &path,
+        &report,
+        &ListPlugins::default(),
+        &Default::default(),
+        &request.answers,
+        false,
+    )
+    .map_err(shown)?
+    {
+        Walk::Done { installed } => installed,
+        Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
+    };
+    let source = request
+        .source
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| installer::source_of(&path, &report));
+    let block = installer::archive_block(&path, &report, &source, &installed).map_err(shown)?;
+    let planned = config::edit::plan_mod(&list, &id, |text, _, written| {
+        doc::add_archive(text, written, &block)
+    })
+    .map_err(shown)?;
+    let declared: Vec<String> = config::loader::load_modlist(&list)
+        .map_err(shown)?
+        .mods
+        .iter()
+        .find(|m| m.id == id)
+        .map(|m| m.plugins.iter().map(|p| p.to_lowercase()).collect())
+        .unwrap_or_default();
+    // By name: a BAIN package or FOMOD option keeps its plugins in folders.
+    let mut new_plugins: Vec<String> = Vec::new();
+    for plugin in &report.plugins {
+        let name = plugin
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(plugin)
+            .to_string();
+        if !declared.contains(&name.to_lowercase())
+            && !new_plugins.iter().any(|n| n.eq_ignore_ascii_case(&name))
+        {
+            new_plugins.push(name);
+        }
+    }
+    let command = format!(
+        "add archive {} to mod {} in {}",
+        quote(&request.path),
+        quote(&id),
+        quote(list.display().to_string())
+    );
+    Ok(ArchiveAdded {
+        edited: apply(&state, command, planned)?,
+        new_plugins,
+    })
+}
+
 // --- An existing archive's installer, walked again ---------------------------------------
 
 /// Mod `id`'s `number`th archive, found for walking its installer again, with
