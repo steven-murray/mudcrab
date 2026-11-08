@@ -378,8 +378,9 @@ pub struct DdsDecompressAction {
 
 /// Pack the mod's staged files into a BSA.
 ///
-/// Runs in declaration order alongside the other actions, so a `file_prune`
-/// listed after it deletes the loose copies it just packed.
+/// Runs in declaration order alongside the other actions. The loose files it
+/// packs are deleted once the archive is written, unless `prune_packed =
+/// false` keeps them.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PackBsaAction {
@@ -400,7 +401,10 @@ pub struct PackBsaAction {
     /// from the pack's own file list rather than from a glob written by hand --
     /// so it cannot name a folder the archive does not have, or miss one it
     /// does. Nothing outside the archive is touched.
-    #[serde(default)]
+    ///
+    /// On unless turned off: loose copies left beside the archive they went
+    /// into would shadow it, which is never what packing is for.
+    #[serde(default = "default_true")]
     pub prune_packed: bool,
 }
 

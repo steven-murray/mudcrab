@@ -22,6 +22,8 @@
   } from "./api";
   import AddDialog from "./AddDialog.svelte";
   import ChooseDialog from "./ChooseDialog.svelte";
+  import IniEditor from "./IniEditor.svelte";
+  import AddActionDialog from "./AddActionDialog.svelte";
   import Archives from "./Archives.svelte";
   import Conflicts from "./Conflicts.svelte";
   import { startDrag, type Place } from "./drag";
@@ -85,6 +87,16 @@
   let adding = $state<string | null>(null);
   // The archive whose installer is being walked again.
   let choosing = $state<{ id: string; number: number; label: string } | null>(null);
+  // The mod whose INIs are being edited, or an action added to.
+  let editingIni = $state<string | null>(null);
+  let addingAction = $state<string | null>(null);
+  // An edit from a dialog, which shows why it was refused itself.
+  async function attempt(edit: () => Promise<Edited | unknown>): Promise<string | null> {
+    if (await run(edit)) return null;
+    const why = error ?? "Nothing was written.";
+    error = null;
+    return why;
+  }
   // A mod's right-click menu, and whether its removal is being confirmed.
   let modMenu = $state<{ x: number; y: number; id: string; title: string; enabled: boolean } | null>(null);
   let confirmRemove = $state(false);
@@ -727,6 +739,20 @@
   </div>
 {/snippet}
 
+{#if editingIni}
+  <IniEditor id={editingIni} archives={files} inputs={list.document.inputs} run={attempt} close={() => (editingIni = null)} />
+{/if}
+{#if addingAction}
+  <AddActionDialog
+    id={addingAction}
+    archives={files}
+    inputs={list.document.inputs}
+    known={[...new Set(actions.flatMap((a) => [...a.matchAll(/\bif = "([^"]*)"/g)].map((m) => m[1])))]}
+    run={attempt}
+    close={() => (addingAction = null)}
+  />
+{/if}
+
 {#if choosing}
   <ChooseDialog
     id={choosing.id}
@@ -952,6 +978,16 @@
             }}
             {run}
           />
+          {#if view && !view.left_out && view.archives.length}
+            <p>
+              <button onclick={() => (editingIni = chosen.id)} title="Change the settings in the mod's INIs, or the game's, as ini_set actions"
+                >INI editor…</button
+              >
+              <button onclick={() => (addingAction = chosen.id)} title="Add any action: QAC, xEdit record removal, files, BSAs (action add)"
+                >Add an action…</button
+              >
+            </p>
+          {/if}
           {#if actions.length}
             <h4>Actions</h4>
             <ol class="actions">

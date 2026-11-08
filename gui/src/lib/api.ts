@@ -265,6 +265,41 @@ export interface Tree {
   command: string;
 }
 
+export type IniFormat = "standard" | "set-to";
+
+/** A line of an INI: a section header, a setting, or anything else. */
+export type IniLine =
+  | { kind: "section"; name: string }
+  | { kind: "setting"; section: string | null; key: string; value: string; format: IniFormat; text: string }
+  | { kind: "text"; text: string };
+
+export type IniAction =
+  | { kind: "set"; section: string | null; key: string; value: string; format: IniFormat }
+  | { kind: "comment"; key: string; format: IniFormat }
+  | { kind: "append"; block: string };
+
+/** A mod's INI actions on one file that share a condition. */
+export interface IniGroup {
+  if: string | null;
+  actions: IniAction[];
+}
+
+export interface IniView {
+  lines: IniLine[];
+  groups: IniGroup[];
+  from: string;
+}
+
+/** What the INI editor writes for one file under one condition. */
+export interface IniLayer {
+  file: string;
+  scope: "mod" | "game";
+  if: string | null;
+  sets: { section: string | null; key: string; value: string; format: IniFormat }[];
+  comments: { key: string; format: IniFormat }[];
+  block: string | null;
+}
+
 export interface Partner {
   mod_id: string;
   files: number;
@@ -527,6 +562,9 @@ export const api = {
   addAction: (id: string, action: string, fields: string[], condition: string | null) =>
     invoke<Edited>("add_action", { id, action, fields, condition }),
   removeAction: (id: string, number: number) => invoke<Edited>("remove_action", { id, number }),
+  iniView: (id: string, file: string, scope: "mod" | "game", number: number | null, source: string | null) =>
+    invoke<IniView>("ini_view", { id, file, scope, number, source }),
+  setIni: (id: string, layer: IniLayer) => invoke<Edited>("set_ini", { id, layer }),
   actions: (id: string) => invoke<string[]>("actions", { id }),
   addInput: (name: string, kind: string, query: string, choices: string[], fallback: string | null) =>
     invoke<Edited>("add_input", { name, kind, query, choices, default: fallback }),

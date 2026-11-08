@@ -216,6 +216,31 @@ history there, rather than be undone by it.
     an optional mod a mod that stays would need, a mod in another included
     file, and a dependency that would make a loop -- each said.
 
+  **INI editor…** opens the mod's INIs -- each `.ini` it installs, picked
+  from a list, or the game's `Oblivion.ini` (shown as the game ships it,
+  `Oblivion_default.ini`) -- as written, comments and all, with an input for
+  each setting. A setting changed is marked, and ↺ puts it back; **;**
+  comments it out, so the mod falls back to its own default (`ini_comment`);
+  **Not in the file** adds a setting the file lacks, in a section; and
+  **Append lines** takes a guide's "paste these lines at the end"
+  (`ini_append_block`). **Applies** chooses the condition the changes are
+  for -- always, one already used, or another, typed or made from a yes/no
+  or choice question and an answer -- and what other conditions set is
+  shown beside each setting (`512 if potato`). **Save** writes that
+  condition's `ini_set`, `ini_comment` and `ini_append_block` actions on the
+  file in place of the ones there were, as one step to undo; one kept keeps
+  its place and comments. Search and **Changed only** narrow a long file to
+  the settings that match, each with the comments just above it.
+
+  **Add an action…** adds one of the other actions (`action add`) -- `qac`,
+  `delete_records`, `write_file`, `pack_bsa`, `create_dummy_plugin`,
+  `extract_bsa`, `ini_tweak`, `dds_decompress` -- as a form of its fields, the mod's files
+  and plugins offered where a field names one, and
+  when it applies, chosen as in the INI editor. The list's checks run on it,
+  and one refused says why in the dialog. INI settings are the INI editor's,
+  and moving, hiding and leaving out files are the Files and Conflicts
+  views'.
+
   Its actions follow (each can be removed: `action remove`), then each of
   its archives: its installer's choices, its filters and its fields (`set`),
   each written as it is changed -- its source, whether it is optional (as

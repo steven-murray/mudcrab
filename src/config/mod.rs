@@ -17,6 +17,7 @@ pub mod edit;
 pub mod filter;
 pub mod git;
 pub mod identify;
+pub mod ini_edit;
 pub mod inspect;
 pub mod install;
 pub mod installer;

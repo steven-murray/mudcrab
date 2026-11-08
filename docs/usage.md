@@ -859,6 +859,20 @@ A BSA cannot address a file outside a folder, so files at the top level of the
 staged mod are left loose and logged. Fails if nothing matched, rather than
 writing an empty archive.
 
+The loose files it packed are then deleted, taken from the archive's own file
+list -- loose copies would shadow the archive they went into -- and folders left
+empty go with them. `prune_packed = false` keeps them, for an action after it
+that still needs them. With `create_dummy_plugin`:
+
+```toml
+actions = [
+  { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
+  { action = "create_dummy_plugin", output = "Example Mod.esp" },
+]
+```
+
+leaves the mod folder holding just the `.bsa` and its `.esp`.
+
 ### create_dummy_plugin
 
 ```toml
@@ -878,20 +892,6 @@ needs one of these; give it the same stem as the BSA.
 
 Deletes staged files matching the globs, then removes any folders left empty.
 `paths` is required -- an empty list would match everything.
-
-This is a separate action rather than a `pack_bsa` option because it has to run
-*after* the archive is written: the loose files must still exist to be packed.
-The three compose in exactly that order:
-
-```toml
-actions = [
-  { action = "pack_bsa", output = "Example Mod.bsa", exclude = ["*.esp"] },
-  { action = "create_dummy_plugin", output = "Example Mod.esp" },
-  { action = "file_prune", paths = ["meshes/**", "textures/**", "sound/**"] },
-]
-```
-
-leaving the mod folder holding just the `.bsa` and its `.esp`.
 
 ## merge
 

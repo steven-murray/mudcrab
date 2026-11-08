@@ -267,6 +267,147 @@ pub fn remove_action(text: &str, id: &str, number: usize) -> anyhow::Result<Stri
     Ok(doc.to_string())
 }
 
+/// Write `layer` as mod `id`'s INI actions on its file under its condition --
+/// its settings, those it comments out and the lines it appends -- in place
+/// of the ones there were. One kept keeps its place and comments; a new one
+/// goes at the end of the mod's actions.
+pub fn set_ini_layer(
+    text: &str,
+    id: &str,
+    layer: &crate::config::ini_edit::IniLayer,
+) -> anyhow::Result<String> {
+    use crate::config::ini_edit::same_file;
+    use crate::config::schema::{IniScope, IniSetFormat};
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    let actions = table
+        .entry("actions")
+        .or_insert(Item::ArrayOfTables(ArrayOfTables::new()))
+        .as_array_of_tables_mut()
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has `actions` written inline; write them as [[mods.actions]] tables to edit them"))?;
+    let get = |t: &Table, key: &str| t.get(key).and_then(Item::as_str).map(str::to_string);
+    let set_format = |t: &mut Table, format: IniSetFormat| match format {
+        IniSetFormat::SetTo => {
+            t.insert("format", toml_edit::value("set-to"));
+        }
+        IniSetFormat::Standard => {
+            t.remove("format");
+        }
+    };
+    // The INI action a table is, when it is one of the layer's.
+    let kind_of = |t: &Table| -> Option<String> {
+        let kind = get(t, "action")?;
+        let in_layer = get(t, "file").is_some_and(|file| same_file(&file, &layer.file))
+            && get(t, "if") == layer.condition;
+        let scope = match get(t, "scope").as_deref() {
+            Some("game") => IniScope::Game,
+            _ => IniScope::Mod,
+        };
+        let fits = match kind.as_str() {
+            "ini_set" => scope == layer.scope,
+            "ini_comment" | "ini_append_block" => layer.scope == IniScope::Mod,
+            _ => false,
+        };
+        (in_layer && fits).then_some(kind)
+    };
+
+    let mut sets: Vec<Option<&crate::config::ini_edit::IniSetting>> =
+        layer.sets.iter().map(Some).collect();
+    let mut comments: Vec<Option<&crate::config::ini_edit::IniKey>> =
+        layer.comments.iter().map(Some).collect();
+    let mut block = layer.block.as_deref().filter(|b| !b.trim().is_empty());
+    let mut gone = Vec::new();
+    for (index, t) in actions.iter_mut().enumerate() {
+        let Some(kind) = kind_of(t) else { continue };
+        let key = get(t, "key");
+        let kept = match kind.as_str() {
+            "ini_set" => {
+                let section = get(t, "section");
+                let found = sets.iter_mut().find(|s| {
+                    s.is_some_and(|s| {
+                        Some(&s.key) == key.as_ref()
+                            && section.as_ref().is_none_or(|was| {
+                                s.section
+                                    .as_ref()
+                                    .is_some_and(|now| now.eq_ignore_ascii_case(was))
+                            })
+                    })
+                });
+                match found.and_then(Option::take) {
+                    Some(setting) => {
+                        t.insert("value", toml_edit::value(setting.value.as_str()));
+                        set_format(t, setting.format);
+                        true
+                    }
+                    None => false,
+                }
+            }
+            "ini_comment" => match comments
+                .iter_mut()
+                .find(|c| c.is_some_and(|c| Some(&c.key) == key.as_ref()))
+                .and_then(Option::take)
+            {
+                Some(comment) => {
+                    set_format(t, comment.format);
+                    true
+                }
+                None => false,
+            },
+            _ => match block.take() {
+                Some(lines) => {
+                    t.insert("block", toml_edit::value(lines));
+                    true
+                }
+                None => false,
+            },
+        };
+        if !kept {
+            gone.push(index);
+        }
+    }
+    for index in gone.into_iter().rev() {
+        actions.remove(index);
+    }
+
+    let new = |action: &str| {
+        let mut t = Table::new();
+        t.insert("action", toml_edit::value(action));
+        if let Some(condition) = &layer.condition {
+            t.insert("if", toml_edit::value(condition.as_str()));
+        }
+        t.insert("file", toml_edit::value(layer.file.as_str()));
+        t
+    };
+    for setting in sets.into_iter().flatten() {
+        let mut t = new("ini_set");
+        if let Some(section) = &setting.section {
+            t.insert("section", toml_edit::value(section.as_str()));
+        }
+        t.insert("key", toml_edit::value(setting.key.as_str()));
+        t.insert("value", toml_edit::value(setting.value.as_str()));
+        set_format(&mut t, setting.format);
+        if layer.scope == IniScope::Game {
+            t.insert("scope", toml_edit::value("game"));
+        }
+        actions.push(t);
+    }
+    for comment in comments.into_iter().flatten() {
+        let mut t = new("ini_comment");
+        t.insert("key", toml_edit::value(comment.key.as_str()));
+        set_format(&mut t, comment.format);
+        actions.push(t);
+    }
+    if let Some(lines) = block {
+        let mut t = new("ini_append_block");
+        t.insert("block", toml_edit::value(lines));
+        actions.push(t);
+    }
+    if actions.is_empty() {
+        table.remove("actions");
+    }
+    Ok(doc.to_string())
+}
+
 /// The `inputs` table, made if need be: as dotted keys at the top, the way a
 /// list keeps its questions above its mods.
 fn inputs(doc: &mut DocumentMut) -> anyhow::Result<&mut Table> {
@@ -1195,5 +1336,61 @@ id = "B"
             out.contains("[[mods.archives.fomod_selections]]\nif = \"!potato\"\nstep = \"S\"\ngroup = \"G\"\noptions = [\"Full\"]"),
             "{out}"
         );
+    }
+
+    #[test]
+    fn an_ini_layer_replaces_only_its_own_actions() {
+        use crate::config::ini_edit::{IniKey, IniLayer, IniSetting};
+        use crate::config::schema::IniSetFormat;
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.actions]]\naction = \"file_hide\"\npaths = [\"a\"]\n\n# Smaller shadows for a slow machine.\n[[mods.actions]]\naction = \"ini_set\"\nif = \"potato\"\nfile = \"ini/a.ini\"\nsection = \"Display\"\nkey = \"Shadows\"\nvalue = \"1024\"\n\n[[mods.actions]]\naction = \"ini_set\"\nif = \"potato\"\nfile = \"ini/a.ini\"\nkey = \"Gone\"\nvalue = \"1\"\n\n[[mods.actions]]\naction = \"ini_set\"\nfile = \"ini/a.ini\"\nkey = \"Other\"\nvalue = \"2\"\n";
+        let layer = IniLayer {
+            file: "INI\\A.ini".to_string(),
+            condition: Some("potato".to_string()),
+            sets: vec![
+                IniSetting {
+                    section: Some("Display".to_string()),
+                    key: "Shadows".to_string(),
+                    value: "512".to_string(),
+                    format: IniSetFormat::Standard,
+                },
+                IniSetting {
+                    section: None,
+                    key: "dc.x".to_string(),
+                    value: "70".to_string(),
+                    format: IniSetFormat::SetTo,
+                },
+            ],
+            comments: vec![IniKey {
+                key: "Old".to_string(),
+                format: IniSetFormat::Standard,
+            }],
+            block: Some("Extra=1\n".to_string()),
+            ..IniLayer::default()
+        };
+        let out = super::set_ini_layer(text, "A", &layer).unwrap();
+        // Kept in place, comment and all; the one not given is gone; another
+        // condition's, and other actions, are left alone.
+        assert!(out.contains("# Smaller shadows for a slow machine.\n[[mods.actions]]\naction = \"ini_set\"\nif = \"potato\"\nfile = \"ini/a.ini\"\nsection = \"Display\"\nkey = \"Shadows\"\nvalue = \"512\""), "{out}");
+        assert!(!out.contains("Gone"), "{out}");
+        assert!(out.contains("key = \"Other\"\nvalue = \"2\""), "{out}");
+        assert!(out.contains("action = \"file_hide\""), "{out}");
+        assert!(out.contains("action = \"ini_set\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkey = \"dc.x\"\nvalue = \"70\"\nformat = \"set-to\""), "{out}");
+        assert!(
+            out.contains(
+                "action = \"ini_comment\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkey = \"Old\""
+            ),
+            "{out}"
+        );
+        assert!(out.contains("action = \"ini_append_block\""), "{out}");
+
+        // An empty layer takes its actions out, and only them.
+        let empty = IniLayer {
+            file: "ini/a.ini".to_string(),
+            condition: Some("potato".to_string()),
+            ..IniLayer::default()
+        };
+        let out = super::set_ini_layer(&out, "A", &empty).unwrap();
+        assert!(!out.contains("potato"), "{out}");
+        assert!(out.contains("key = \"Other\""), "{out}");
     }
 }
