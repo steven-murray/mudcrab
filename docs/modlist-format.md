@@ -99,7 +99,7 @@ Each `[[mods]]` table is one mod folder in MO2.
 | `plugins` | When the mod ships plugins: their names. Each must also be in the top-level `plugins` (or be merged), unless the mod is not `enabled`. |
 | `enabled` | `false` for a mod installed but left unticked in MO2, such as a debugging tool the player switches on when they need it. Its plugins stay out of the top-level `plugins`: MO2 cannot see them until the mod is ticked, and then adds them at the end. Defaults to `true`. |
 | `if` | When the mod is optional: a condition. See [Optional mods and inputs](#optional-mods-and-inputs). |
-| `dependencies` | When the mod needs others to work: their ids. `query` refuses a plan that includes this mod but not them. |
+| `dependencies` | When the mod needs others to work: their ids. `query` refuses a plan that includes this mod but not them. See [Dependencies](#dependencies). |
 | `actions` | To change the mod after unpacking it: INI edits, files left out, plugins cleaned, BSAs packed. See [Actions](#actions). |
 | `type` | When the mod is not made from archives. See below. |
 | `merge` | With `type = "merge"`: what to merge. See [Merges](#merges). |
@@ -207,6 +207,24 @@ so a list can name the game's own plugins (`Oblivion.esm`, the DLCs).
 `inactive-plugins` is a subset of `plugins`: installed and placed, but not
 ticked in MO2. It is for what another tool takes over -- the plugins Wrye Bash
 merges into the Bashed Patch -- so reinstalling does not tick them again.
+
+## Dependencies
+
+`dependencies` is a list of the mods this one needs, or a table of them by
+why it needs them:
+
+```toml
+dependencies = ["Script Extender"]
+
+dependencies = { masters = ["Base"], resources = ["Rock Meshes"], custom = ["Script Extender"] }
+```
+
+`masters` and `resources` are what `check` found: the mods its plugins'
+masters come from, and the mods that alone provide a file its plugins name
+(see `check --resources`). The GUI writes them, each group whole, so one no
+longer found goes. `custom` is yours, and nothing found touches it; a plain
+list is all `custom`. Every group counts the same: the mod needs all of
+them. Written by hand, a plain list is all most mods need.
 
 ## Optional mods and inputs
 

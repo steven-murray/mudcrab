@@ -728,6 +728,174 @@ impl OptionalMod {
     }
 }
 
+/// A mod's `dependencies`: the mods it needs, by why it needs them.
+///
+/// `masters` and `resources` are what `check` found -- the mods its plugins'
+/// masters come from, and the mods that alone provide a file its plugins name
+/// -- and each is replaced whole when found again, so a dependency that no
+/// longer holds goes. `custom` is the author's own, which nothing found ever
+/// touches. Written as a plain list it is all `custom`, as every list was
+/// before the groups.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Dependencies {
+    pub masters: Vec<String>,
+    pub resources: Vec<String>,
+    pub custom: Vec<String>,
+}
+
+/// A mod's dependencies `check` found, as the compiled list and plan carry
+/// them: so `check` can say which no longer hold.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FoundDependencies {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub masters: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<String>,
+}
+
+impl FoundDependencies {
+    pub fn is_empty(&self) -> bool {
+        self.masters.is_empty() && self.resources.is_empty()
+    }
+}
+
+impl Dependencies {
+    pub fn found(&self) -> FoundDependencies {
+        FoundDependencies {
+            masters: self.masters.clone(),
+            resources: self.resources.clone(),
+        }
+    }
+}
+
+impl Dependencies {
+    /// Every mod it needs, whatever the reason: each once, the author's own
+    /// first.
+    pub fn all(&self) -> Vec<String> {
+        let mut out: Vec<String> = Vec::new();
+        for id in self
+            .custom
+            .iter()
+            .chain(&self.masters)
+            .chain(&self.resources)
+        {
+            if !out.contains(id) {
+                out.push(id.clone());
+            }
+        }
+        out
+    }
+
+    pub fn contains(&self, id: &str) -> bool {
+        self.groups()
+            .any(|(_, ids)| ids.iter().any(|dep| dep == id))
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.groups().all(|(_, ids)| ids.is_empty())
+    }
+
+    /// Each group, by its name.
+    pub fn groups(&self) -> impl Iterator<Item = (&'static str, &Vec<String>)> {
+        [
+            ("masters", &self.masters),
+            ("resources", &self.resources),
+            ("custom", &self.custom),
+        ]
+        .into_iter()
+    }
+
+    pub fn group_mut(&mut self, name: &str) -> Option<&mut Vec<String>> {
+        match name {
+            "masters" => Some(&mut self.masters),
+            "resources" => Some(&mut self.resources),
+            "custom" => Some(&mut self.custom),
+            _ => None,
+        }
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut String> {
+        self.masters
+            .iter_mut()
+            .chain(self.resources.iter_mut())
+            .chain(self.custom.iter_mut())
+    }
+
+    /// As TOML: a plain list while only the author's own are there, which
+    /// is how lists without found dependencies stay as they were written.
+    pub fn to_toml(&self) -> String {
+        let list = |ids: &[String]| {
+            let ids: Vec<String> = ids.iter().map(|id| toml_string(id)).collect();
+            format!("[{}]", ids.join(", "))
+        };
+        if self.masters.is_empty() && self.resources.is_empty() {
+            return list(&self.custom);
+        }
+        let groups: Vec<String> = self
+            .groups()
+            .filter(|(_, ids)| !ids.is_empty())
+            .map(|(name, ids)| format!("{name} = {}", list(ids)))
+            .collect();
+        format!("{{ {} }}", groups.join(", "))
+    }
+}
+
+fn toml_string(text: &str) -> String {
+    toml::Value::String(text.to_string()).to_string()
+}
+
+impl Serialize for Dependencies {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeMap;
+        if self.masters.is_empty() && self.resources.is_empty() {
+            return self.custom.serialize(serializer);
+        }
+        let groups: Vec<_> = self.groups().filter(|(_, ids)| !ids.is_empty()).collect();
+        let mut map = serializer.serialize_map(Some(groups.len()))?;
+        for (name, ids) in groups {
+            map.serialize_entry(name, ids)?;
+        }
+        map.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for Dependencies {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Groups {
+            #[serde(default)]
+            masters: Vec<String>,
+            #[serde(default)]
+            resources: Vec<String>,
+            #[serde(default)]
+            custom: Vec<String>,
+        }
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Written {
+            List(Vec<String>),
+            Groups(Groups),
+        }
+        match Written::deserialize(deserializer).map_err(|_| {
+            serde::de::Error::custom(
+                "`dependencies` is a list of mod ids, or a table of them by group \
+                 (`masters`, `resources`, `custom`)",
+            )
+        })? {
+            Written::List(custom) => Ok(Dependencies {
+                custom,
+                ..Default::default()
+            }),
+            Written::Groups(groups) => Ok(Dependencies {
+                masters: groups.masters,
+                resources: groups.resources,
+                custom: groups.custom,
+            }),
+        }
+    }
+}
+
 /// One mod in the flat `[[mods]]` list.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -792,8 +960,9 @@ pub struct ModEntry {
     /// Always a list, so there is a single shape to read, write and test.
     #[serde(default)]
     pub section: Vec<String>,
+    /// The mods it needs; see [`Dependencies`].
     #[serde(default)]
-    pub dependencies: Vec<String>,
+    pub dependencies: Dependencies,
     #[serde(rename = "if")]
     pub condition: Option<String>,
     /// Left to the player: `true` for the list's optional mods, a group's
@@ -1207,6 +1376,9 @@ pub struct CompiledMod {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge: Option<MergeSpec>,
     pub dependencies: Vec<String>,
+    /// Of those, the ones `check` found; see [`Dependencies`].
+    #[serde(default, skip_serializing_if = "FoundDependencies::is_empty")]
+    pub found: FoundDependencies,
     /// The question it is a choice of, when it is one of the optional mods;
     /// see `ModEntry::optional_in`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1342,6 +1514,8 @@ pub struct PersonalizedMod {
     /// mods its `if` asks about (so comes and goes with).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub dependencies: Vec<String>,
+    #[serde(default, skip_serializing_if = "FoundDependencies::is_empty")]
+    pub found: FoundDependencies,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub optional_in: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

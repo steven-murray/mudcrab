@@ -100,16 +100,44 @@ impl VirtualData {
     }
 
     fn has(&self, path: &str) -> bool {
-        if self.files.contains(path) {
-            return true;
-        }
-        // A sound may name a folder, from which the game picks a file.
-        let folder = format!("{path}/");
-        self.files
-            .range(folder.clone()..)
-            .next()
-            .is_some_and(|first| first.starts_with(&folder))
+        provides(&self.files, path)
     }
+}
+
+/// Every file in the game's own `Data`, loose or in its BSAs, lowercased and
+/// `/`-separated: what a plugin can name without any mod providing it.
+pub fn game_files(game_dir: &Path) -> anyhow::Result<BTreeSet<String>> {
+    let mut data = VirtualData {
+        files: BTreeSet::new(),
+        plugins: HashMap::new(),
+    };
+    let folder = game_dir.join("Data");
+    anyhow::ensure!(
+        folder.is_dir(),
+        "{} has no Data folder: is it the game's folder?",
+        game_dir.display()
+    );
+    data.add_folder(&folder)?;
+    Ok(data.files)
+}
+
+/// `files` has what a plugin names at `path`: the file, or -- a sound may
+/// name a folder, from which the game picks a file -- a file in it.
+pub fn provides(files: &BTreeSet<String>, path: &str) -> bool {
+    if files.contains(path) {
+        return true;
+    }
+    let folder = format!("{path}/");
+    files
+        .range(folder.clone()..)
+        .next()
+        .is_some_and(|first| first.starts_with(&folder))
+}
+
+/// The files `plugin` names, each once, sorted.
+pub fn named_paths(plugin: &Plugin) -> Vec<String> {
+    let paths: BTreeSet<String> = references(plugin).into_iter().map(|r| r.path).collect();
+    paths.into_iter().collect()
 }
 
 /// The active plugins of `profile`, in load order.

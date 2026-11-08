@@ -186,10 +186,18 @@ history there, rather than be undone by it.
     (**Find from its masters**, or the load order), the mods its plugins'
     masters come from are offered too -- **Add them**, or ticked to start in
     **Choose…** -- and an optional one it may not need is named, with what
-    to do. For every mod at once, **Check** has **Add plugin masters as
-    dependencies to all mods** (one edit, undone at once), and a mod's
-    right-click menu has the same for that mod alone. Both cover the mods
-    the current answers install.
+    to do. A mod `check` found is marked with why (*a master*, *its files*).
+    For every mod at once, **Check** has **Add plugin masters as
+    dependencies to all mods**, which sets each mod's
+    `dependencies.masters` (see [Dependencies](modlist-format.md#dependencies)),
+    taking out those no longer needed; and **Find resource dependencies**
+    (`check --masters-only --resources`), which lists the mods that alone
+    provide files a mod's plugins name, then **Add resource dependencies to
+    all mods**, likewise for `dependencies.resources`. Each is one edit,
+    undone at once; a mod's right-click menu has the same for that mod
+    alone. They cover the mods the current answers install, and leave out
+    an optional mod a mod that stays would need, a mod in another included
+    file, and a dependency that would make a loop -- each said.
 
   **INI editor…** opens the mod's INIs -- each `.ini` it installs, picked
   from a list, or the game's `Oblivion.ini` (shown as the game ships it,

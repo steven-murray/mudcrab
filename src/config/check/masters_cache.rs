@@ -18,9 +18,15 @@ pub(super) struct ArchiveMasters {
 
 impl ArchiveMasters {
     pub(super) fn load(archive: &Path) -> Self {
+        Self::load_kind(archive, "masters")
+    }
+
+    /// The same, for another kind of fact about each entry, kept apart: the
+    /// files a plugin names, say.
+    pub(super) fn load_kind(archive: &Path, kind: &str) -> Self {
         let file = key(archive).map(|key| {
             crate::util::fs::cache_root()
-                .join("masters")
+                .join(kind)
                 .join(format!("{key}.json"))
         });
         let known = file

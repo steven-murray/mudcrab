@@ -982,7 +982,21 @@ Then, across the finished folders:
   and `validate` and the GUI know of it too. When it is an optional mod and
   this one is not optional and its `if` does not follow it, that is an error,
   whatever this plan's answers are: the player can untick the optional mod
-  and leave the plugin without its master.
+  and leave the plugin without its master. A mod listed in
+  `dependencies.masters` that its plugins' masters no longer need is a note.
+- **resources**, with `--resources`: each plugin is read whole for the meshes
+  (`MODL` and the like, SpeedTree files for trees) and sound files it names,
+  and each BSA a mod ships for the files in it. A file the mod has itself, or
+  the game has (its `Data`, loose or in its BSAs), needs nothing; one exactly
+  one other mod provides makes that mod a dependency. One several mods
+  provide needs none of them -- any would do, and the order only decides
+  whose wins -- so reordering never changes what is found. Not listed, it is
+  a warning, as for masters (and an optional mod's, in a mod that is not
+  optional, is a warning too: a missing mesh shows a marker, where a missing
+  master stops the game). Textures are named by the meshes, not the
+  plugins, so they are not read. Needs the game folder: `--game-dir`, or
+  `GAME_DIR`. What is read is kept in `~/.cache/mudcrab/resources`, as
+  masters are.
 - **load order**: a plugin in `plugins` that no mod installs is an error (a
   merge's output and Wrye Bash's `Bashed Patch, 0.esp` are made later), as is
   a plugin a mod declares but does not install. A plugin a mod installs that
@@ -1007,7 +1021,8 @@ solid 7z, unpacking one file means unpacking everything before it, which for
 a large archive takes a while.
 
 `--masters-only` checks only the masters: no MD5s, no filters, no actions
-rehearsed, nothing about the load order or BSAs (dependencies are). Once the masters are kept,
+rehearsed, nothing about the load order or BSAs (dependencies are, and
+resources with `--resources`). Once the masters are kept,
 it takes moments, which is what the GUI's load order runs. A mod whose
 actions change its files is read as its archives lay it out.
 

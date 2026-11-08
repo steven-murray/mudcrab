@@ -22,7 +22,8 @@ pub fn compile(source: SourceModlist) -> anyhow::Result<CompiledModlist> {
                 mod_type: spec.mod_type,
                 enabled: spec.enabled,
                 merge: spec.merge.clone(),
-                dependencies: spec.dependencies.clone(),
+                dependencies: spec.dependencies.all(),
+                found: spec.dependencies.found(),
                 optional_in: spec.optional_in.clone(),
                 plugins: spec.plugins.clone(),
                 archives: spec

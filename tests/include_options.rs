@@ -110,7 +110,7 @@ fn an_override_replaces_fields_and_appends_to_lists() {
     assert_eq!(b.oracle_name.as_deref(), Some("Bee"));
     assert_eq!(b.actions.len(), 2);
     // Untouched fields are the file's.
-    assert_eq!(b.dependencies, ["A"]);
+    assert_eq!(b.dependencies.all(), ["A"]);
     assert_eq!(b.origin, Some(dir.path().join("part.toml")));
     assert_eq!(source.mods[2].docs.summary.as_deref(), Some("Mine."));
 }
@@ -140,7 +140,7 @@ fn a_prefix_renames_the_mods_and_what_they_say_about_each_other() {
     let ids: Vec<&str> = source.mods.iter().map(|m| m.id.as_str()).collect();
     assert_eq!(ids, ["Part: A", "Part: B", "Part: C"]);
     let b = &source.mods[1];
-    assert_eq!(b.dependencies, ["Part: A"]);
+    assert_eq!(b.dependencies.all(), ["Part: A"]);
     assert_eq!(b.condition.as_deref(), Some("mod:\"Part: A\" || hd"));
     assert_eq!(b.written_id.as_deref(), Some("B"));
     mudcrab::config::validator::validate(&source).unwrap();

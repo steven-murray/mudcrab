@@ -12,6 +12,11 @@
 //! plugin against what the mods install, every BSA against the plugins that
 //! load it. Nothing is unpacked but plugin headers (and a BSA an action
 //! unpacks), and nothing the user owns is changed.
+//!
+//! Asked for, it also reads each plugin whole, for the files it names, and
+//! each BSA a mod ships, for the files in it: what a mod needs of another for
+//! its meshes and sounds (see `resource_needs`). Both are kept, as masters
+//! are, so only a changed archive is read again.
 
 mod masters_cache;
 mod rehearse;
@@ -39,6 +44,11 @@ pub struct CheckSettings {
     /// no actions rehearsed, nothing about the load order or BSAs. What the
     /// author's load order wants, quickly.
     pub masters_only: bool,
+    /// Also find the mods each mod's plugins need for the files they name,
+    /// with this game folder's own files as what no mod has to provide.
+    /// Reading every plugin whole costs more than its header, so it is
+    /// asked for.
+    pub resources: Option<PathBuf>,
 }
 
 pub struct CheckReport {
@@ -53,6 +63,12 @@ pub struct CheckReport {
     /// Each plugin read from an archive: the mod installing it and its
     /// masters, for showing the load order with them.
     pub plugins: Vec<PluginMasters>,
+    /// What each mod needs of another for the files its plugins name, when
+    /// asked for (see [`CheckSettings::resources`]); else `None`.
+    pub resources: Option<Vec<FoundNeed>>,
+    /// The mods whose archives were all read: what was found for them is
+    /// all they need, so a found dependency they no longer have can go.
+    pub read: Vec<String>,
 }
 
 /// A plugin a mod installs, and the masters its header names.
@@ -94,6 +110,9 @@ pub enum Kind {
     Overwritten,
     Unordered,
     Undeclared,
+    OptionalResources,
+    UndeclaredResources,
+    Stale,
     Filters,
     NotChecked,
 }
@@ -119,6 +138,18 @@ impl Kind {
             Kind::Undeclared => {
                 "Mods whose plugins need another mod, which their `dependencies` do not list"
             }
+            Kind::OptionalResources => {
+                "Plugins that use files only a mod the player may untick provides, in a mod \
+                 that stays"
+            }
+            Kind::UndeclaredResources => {
+                "Mods whose plugins use files only another mod provides, which their \
+                 `dependencies` do not list"
+            }
+            Kind::Stale => {
+                "Found dependencies that no longer hold (adding found dependencies again \
+                 takes them out)"
+            }
             Kind::Filters => "Filters that do nothing",
             Kind::NotChecked => "Not checked",
         }
@@ -126,8 +157,13 @@ impl Kind {
 
     pub fn tone(self) -> Tone {
         match self {
-            Kind::Overwritten | Kind::Unordered | Kind::Undeclared | Kind::Filters => Tone::Warning,
-            Kind::NotChecked => Tone::Note,
+            Kind::Overwritten
+            | Kind::Unordered
+            | Kind::Undeclared
+            | Kind::OptionalResources
+            | Kind::UndeclaredResources
+            | Kind::Filters => Tone::Warning,
+            Kind::NotChecked | Kind::Stale => Tone::Note,
             _ => Tone::Problem,
         }
     }
@@ -218,10 +254,26 @@ struct ModFolder {
     /// not be rehearsed: the folder is then not complete, so nothing is
     /// concluded from what it lacks.
     complete: bool,
+    /// Every archive's contents were read: what was found of it is all
+    /// there is, even where its actions leave the folder unknown.
+    read: bool,
+    /// When resources are asked for: the files each plugin at the top of the
+    /// folder names, by lowercased name.
+    references: BTreeMap<String, Vec<String>>,
+    /// When resources are asked for: the files it provides, loose or in its
+    /// BSAs. Kept apart from `files`, as it is filled in even when the
+    /// folder is not complete -- what is known is still worth knowing.
+    assets: BTreeSet<String>,
 }
 
 pub fn check_all(plan: &PersonalizedPlan, settings: &CheckSettings) -> anyhow::Result<CheckReport> {
-    let scratch = crate::util::fs::cache_scratch_dir("check");
+    // Its own: two checks at once in one process -- a front end reading
+    // masters while a check runs -- would otherwise clear each other's.
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let scratch = crate::util::fs::cache_scratch_dir(&format!(
+        "check-{}",
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     let result = check_in(plan, settings, &scratch);
     let _ = std::fs::remove_dir_all(&scratch);
     result
@@ -347,6 +399,17 @@ fn check_in(
     }
     dependency_problems(plan, &folders, &mut findings);
     let whole_plan = settings.filter.is_empty();
+    // Which mod alone provides a file is only known from every mod's files.
+    let resources = match &settings.resources {
+        Some(game_dir) if whole_plan => {
+            let game = crate::config::assets::game_files(game_dir)?;
+            let needs = resource_needs(plan, &folders, &game);
+            resource_problems(&needs, &mut findings);
+            Some(needs)
+        }
+        _ => None,
+    };
+    stale_dependencies(plan, &folders, resources.as_deref(), &mut findings);
     if !settings.masters_only {
         load_order_problems(plan, &folders, whole_plan, &mut findings);
         bsa_problems(plan, &folders, &mut findings);
@@ -408,6 +471,12 @@ fn check_in(
         warnings,
         findings: findings.0,
         plugins: plugin_masters(&folders),
+        resources,
+        read: folders
+            .iter()
+            .filter(|(_, folder)| folder.read)
+            .map(|(id, _)| id.clone())
+            .collect(),
     })
 }
 
@@ -429,12 +498,17 @@ fn check_mod(
             mod_entry.mod_type,
             Some(ModType::Merge | ModType::Mo2Plugin | ModType::BuildFromFiles)
         ),
+        read: true,
         ..ModFolder::default()
     };
     // Destination -> where its real bytes were put, when they matter.
     let mut planned: Vec<(String, Option<PathBuf>)> = Vec::new();
     // Masters of every plugin the archives hold, at any depth, by destination.
     let mut masters_at: HashMap<String, Vec<String>> = HashMap::new();
+    // When resources are asked for, likewise: the files each plugin names,
+    // and the files in each BSA.
+    let mut references_at: HashMap<String, Vec<String>> = HashMap::new();
+    let mut bsa_files_at: HashMap<String, Vec<String>> = HashMap::new();
     // BSAs are unpacked only for a rehearsal.
     let extract_bsas = if settings.masters_only {
         BTreeSet::new()
@@ -472,8 +546,13 @@ fn check_mod(
             Ok(Some(contents)) => {
                 planned.extend(contents.files);
                 masters_at.extend(contents.masters);
+                references_at.extend(contents.references);
+                bsa_files_at.extend(contents.bsa_files);
             }
-            Ok(None) => folder.complete = false,
+            Ok(None) => {
+                folder.complete = false;
+                folder.read = false;
+            }
             Err(err) => {
                 let message = format!("{err:#}");
                 let (kind, message) = if message.contains("is not in the downloads folder") {
@@ -489,6 +568,7 @@ fn check_mod(
                         .about(&mod_entry.id),
                 });
                 folder.complete = false;
+                folder.read = false;
             }
         }
     }
@@ -506,6 +586,13 @@ fn check_mod(
         // Still worth reading what is known, for the masters check.
         for (destination, _) in &planned {
             add_plugin(&mut folder, destination, masters_at.get(destination));
+            add_resources(
+                &mut folder,
+                destination,
+                destination,
+                &references_at,
+                &bsa_files_at,
+            );
         }
         return folder;
     }
@@ -553,6 +640,9 @@ fn check_mod(
             .collect()
     };
     for file in finished {
+        if let Some(from) = &file.origin {
+            add_resources(&mut folder, &file.path, from, &references_at, &bsa_files_at);
+        }
         if !file.path.contains('/') && layout::plan::is_plugin_name(&file.path) {
             // Planned from an archive, or made by an action (a dummy plugin).
             let masters = match &file.origin {
@@ -590,6 +680,25 @@ fn add_plugin(folder: &mut ModFolder, destination: &str, masters: Option<&Vec<St
             (destination.to_string(), masters.clone()),
         );
     }
+}
+
+/// What a file at `path` in the folder, planned at `from`, gives the resource
+/// check: itself, the files a plugin names, the files in a BSA.
+fn add_resources(
+    folder: &mut ModFolder,
+    path: &str,
+    from: &str,
+    references_at: &HashMap<String, Vec<String>>,
+    bsa_files_at: &HashMap<String, Vec<String>>,
+) {
+    let path = path.to_lowercase();
+    if let Some(named) = references_at.get(from) {
+        folder.references.insert(path.clone(), named.clone());
+    }
+    if let Some(files) = bsa_files_at.get(from) {
+        folder.assets.extend(files.iter().cloned());
+    }
+    folder.assets.insert(path);
 }
 
 /// An archive as `install` sees it: every entry, and the entries it takes.
@@ -630,6 +739,7 @@ pub fn archive_contents(
         masters_only: false,
         cache_dir: cache_dir.to_path_buf(),
         filter: ModFilter::default(),
+        resources: None,
     };
     let source = present(archive, &ArchiveRef::for_archive(archive), &settings)?;
     if matches!(
@@ -720,6 +830,10 @@ pub fn planned_files(
 struct Contents {
     files: Vec<(String, Option<PathBuf>)>,
     masters: HashMap<String, Vec<String>>,
+    /// When resources are asked for: the files each plugin names, and the
+    /// files in each BSA at the top of the folder, by destination.
+    references: HashMap<String, Vec<String>>,
+    bsa_files: HashMap<String, Vec<String>>,
 }
 
 /// The archive is in the downloads folder, opens, and matches its recorded
@@ -838,18 +952,36 @@ fn check_single_archive(
     let mut contents = Contents {
         files: Vec::new(),
         masters: HashMap::new(),
+        references: HashMap::new(),
+        bsa_files: HashMap::new(),
     };
 
     // Plugins (at any depth: a `file_move` may bring one up) and BSAs an
     // action unpacks are the files whose bytes matter -- a plugin's only
     // until its masters are known from an earlier check.
     let mut known = masters_cache::ArchiveMasters::load(&source);
+    // A plugin's named files, and a BSA's: kept as its masters are, under
+    // `plugin:` and `bsa:` and the entry.
+    let mut resources = settings
+        .resources
+        .as_ref()
+        .map(|_| masters_cache::ArchiveMasters::load_kind(&source, "resources"));
+    let is_bsa = |destination: &str| {
+        !destination.contains('/') && destination.to_lowercase().ends_with(".bsa")
+    };
+    let unread = |kind: &str, source: &str| {
+        resources
+            .as_ref()
+            .is_some_and(|known| known.get(&format!("{kind}:{source}")).is_none())
+    };
     let wanted: BTreeMap<String, String> = planned
         .files
         .iter()
         .map(|file| (format!("{prefix}{}", file.destination), file.source.clone()))
         .filter(|(destination, source)| {
-            (layout::plan::is_plugin_name(destination) && known.get(source).is_none())
+            (layout::plan::is_plugin_name(destination)
+                && (known.get(source).is_none() || unread("plugin", source)))
+                || (is_bsa(destination) && unread("bsa", source))
                 || extract_bsas.contains(&destination.to_lowercase())
         })
         .collect();
@@ -862,6 +994,38 @@ fn check_single_archive(
     for file in &planned.files {
         let destination = format!("{prefix}{}", file.destination);
         let bytes_at = wanted.get(&destination).map(|from| real.join(from));
+        if let Some(resources) = resources.as_mut() {
+            let read = |kind: &str,
+                        resources: &mut masters_cache::ArchiveMasters,
+                        list: fn(&Path) -> anyhow::Result<Vec<String>>| {
+                let key = format!("{kind}:{}", file.source);
+                if let Some(found) = resources.get(&key) {
+                    return Some(found.clone());
+                }
+                let path = bytes_at.as_ref()?;
+                // One that cannot be read is said in the log and left out:
+                // the resource check is a help, not a gate.
+                match list(path) {
+                    Ok(found) => {
+                        resources.put(&key, &found);
+                        Some(found)
+                    }
+                    Err(err) => {
+                        tracing::warn!(entry = %file.source, "check: not read for resources: {err:#}");
+                        None
+                    }
+                }
+            };
+            if layout::plan::is_plugin_name(&destination) {
+                if let Some(named) = read("plugin", resources, named_files) {
+                    contents.references.insert(destination.clone(), named);
+                }
+            } else if is_bsa(&destination)
+                && let Some(files) = read("bsa", resources, bsa_files)
+            {
+                contents.bsa_files.insert(destination.clone(), files);
+            }
+        }
         if layout::plan::is_plugin_name(&destination) {
             if let Some(masters) = known.get(&file.source) {
                 contents
@@ -883,27 +1047,69 @@ fn check_single_archive(
             .push((destination, bytes_at.filter(|_| keep_bytes)));
     }
     known.save();
+    if let Some(resources) = &resources {
+        resources.save();
+    }
     Ok(Some(contents))
 }
 
-/// A mod one of a mod's plugins needs, by its masters, that the mod's
-/// `dependencies` do not list.
+/// The files a plugin on disk names.
+fn named_files(path: &Path) -> anyhow::Result<Vec<String>> {
+    let plugin = crate::plugin::Plugin::read(path)?;
+    Ok(crate::config::assets::named_paths(&plugin))
+}
+
+/// The files in a BSA on disk, lowercased and `/`-separated.
+fn bsa_files(path: &Path) -> anyhow::Result<Vec<String>> {
+    Ok(crate::bsa::reader::list_paths(path)?
+        .into_iter()
+        .map(|p| p.replace('\\', "/").to_lowercase())
+        .collect())
+}
+
+/// A mod one of a mod's plugins needs: for a master, or for a file only
+/// that mod provides.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct UnlistedNeed {
+pub struct FoundNeed {
     pub mod_id: String,
     pub needs: String,
-    /// The first of its plugins, and that plugin's master, to say so.
+    /// The first of its plugins, and what it names that `needs` provides
+    /// (a master, or a file), to say so.
     pub plugin: String,
-    pub master: String,
+    pub named: String,
+    /// How many files of `needs` its plugins name; 1 for a master.
+    pub count: usize,
+    /// `dependencies` already lists it, in any group.
+    pub listed: bool,
     /// `needs` is optional, while `mod_id` is not and does not follow it:
     /// listing it is refused, as the player may untick it.
     pub optional: bool,
 }
 
+impl FoundNeed {
+    fn new(
+        plan: &HashMap<&str, &PersonalizedMod>,
+        needing: &PersonalizedMod,
+        needs: &str,
+        (plugin, named, count): (&str, &str, usize),
+    ) -> Self {
+        FoundNeed {
+            mod_id: needing.id.clone(),
+            needs: needs.to_string(),
+            plugin: plugin.to_string(),
+            named: named.to_string(),
+            count,
+            listed: needing.dependencies.iter().any(|dep| dep == needs),
+            optional: plan.get(needs).is_some_and(|m| m.optional_in.is_some())
+                && needing.optional_in.is_none()
+                && !needing.follows.iter().any(|f| f == needs),
+        }
+    }
+}
+
 /// What each mod's plugins need of other mods, by their masters (as `check`
-/// read them), that its `dependencies` do not list: in plan order, each
-/// mod's by the mod it needs.
-pub fn unlisted_needs(plan: &PersonalizedPlan, plugins: &[PluginMasters]) -> Vec<UnlistedNeed> {
+/// read them): in plan order, each mod's by the mod it needs.
+pub fn master_needs(plan: &PersonalizedPlan, plugins: &[PluginMasters]) -> Vec<FoundNeed> {
     let by_id: HashMap<&str, &PersonalizedMod> =
         plan.mods.iter().map(|m| (m.id.as_str(), m)).collect();
     // The mod installing each plugin: as read, else as a mod declares it.
@@ -920,27 +1126,87 @@ pub fn unlisted_needs(plan: &PersonalizedPlan, plugins: &[PluginMasters]) -> Vec
     }
     let mut out = Vec::new();
     for needing in &plan.mods {
-        let mut needs: BTreeMap<&str, (&str, &str)> = BTreeMap::new();
+        let mut needs: BTreeMap<&str, (&str, &str, usize)> = BTreeMap::new();
         for read in plugins.iter().filter(|p| p.mod_id == needing.id) {
             for master in &read.masters {
                 if let Some(&from) = provider.get(&master.to_ascii_lowercase())
                     && from != needing.id
-                    && !needing.dependencies.iter().any(|dep| dep == from)
                 {
-                    needs.entry(from).or_insert((&read.plugin, master));
+                    needs.entry(from).or_insert((&read.plugin, master, 1));
                 }
             }
         }
-        for (from, (plugin, master)) in needs {
-            out.push(UnlistedNeed {
-                mod_id: needing.id.clone(),
-                needs: from.to_string(),
-                plugin: plugin.to_string(),
-                master: master.to_string(),
-                optional: by_id.get(from).is_some_and(|m| m.optional_in.is_some())
-                    && needing.optional_in.is_none()
-                    && !needing.follows.iter().any(|f| f == from),
-            });
+        for (from, why) in needs {
+            out.push(FoundNeed::new(&by_id, needing, from, why));
+        }
+    }
+    out
+}
+
+/// What each mod's plugins need of other mods for the files they name: a
+/// file the mod has itself, or the game has, needs nothing; one that exactly
+/// one other mod provides needs that mod. One several mods provide needs
+/// none of them in particular -- any would do, and which one wins is the
+/// order's business, not a dependency -- and one nothing provides is
+/// `assets`'s business. So the order never changes what is found here; only
+/// which mods, and which files, there are.
+fn resource_needs(
+    plan: &PersonalizedPlan,
+    folders: &BTreeMap<String, ModFolder>,
+    game: &BTreeSet<String>,
+) -> Vec<FoundNeed> {
+    use crate::config::assets::provides;
+    let by_id: HashMap<&str, &PersonalizedMod> =
+        plan.mods.iter().map(|m| (m.id.as_str(), m)).collect();
+    // Each file, with the mods providing it. A sound may name a folder, so
+    // a folder under `sound/` counts as provided by each mod with a file in
+    // it.
+    let mut providers: HashMap<&str, Vec<&str>> = HashMap::new();
+    let mut sound_folders: HashMap<String, Vec<&str>> = HashMap::new();
+    for (id, folder) in folders {
+        for file in &folder.assets {
+            providers.entry(file.as_str()).or_default().push(id);
+            if file.starts_with("sound/") {
+                let mut at = file.as_str();
+                while let Some((parent, _)) = at.rsplit_once('/') {
+                    let mods = sound_folders.entry(parent.to_string()).or_default();
+                    if mods.last() != Some(&id.as_str()) {
+                        mods.push(id);
+                    }
+                    at = parent;
+                }
+            }
+        }
+    }
+    let mut out = Vec::new();
+    for needing in &plan.mods {
+        let Some(folder) = folders.get(&needing.id) else {
+            continue;
+        };
+        let mut needs: BTreeMap<&str, (&str, &str, usize)> = BTreeMap::new();
+        for (plugin, named) in &folder.references {
+            let plugin = folder
+                .plugins
+                .get(plugin)
+                .map(|(name, _)| name.as_str())
+                .unwrap_or(plugin);
+            for path in named {
+                if provides(&folder.assets, path) || provides(game, path) {
+                    continue;
+                }
+                let from = providers
+                    .get(path.as_str())
+                    .or_else(|| sound_folders.get(path.as_str()));
+                if let Some([only]) = from.map(Vec::as_slice) {
+                    needs
+                        .entry(only)
+                        .and_modify(|(_, _, count)| *count += 1)
+                        .or_insert((plugin, path, 1));
+                }
+            }
+        }
+        for (from, why) in needs {
+            out.push(FoundNeed::new(&by_id, needing, from, why));
         }
     }
     out
@@ -957,12 +1223,15 @@ fn dependency_problems(
     folders: &BTreeMap<String, ModFolder>,
     findings: &mut Findings,
 ) {
-    for need in unlisted_needs(plan, &plugin_masters(folders)) {
+    for need in master_needs(plan, &plugin_masters(folders)) {
+        if need.listed {
+            continue;
+        }
         let shown = Text::new()
             .plain("its ")
             .name(&need.plugin)
             .plain(" has ")
-            .name(&need.master)
+            .name(&need.named)
             .plain(format!(" as a master, from {}, ", need.needs));
         if need.optional {
             findings.about(
@@ -980,6 +1249,76 @@ fn dependency_problems(
                 &need.mod_id,
                 shown.plain("which its `dependencies` do not list"),
             );
+        }
+    }
+}
+
+/// As [`dependency_problems`], for the files plugins name. Only warnings: a
+/// mesh the game cannot find shows as a marker, where a missing master stops
+/// the game.
+fn resource_problems(needs: &[FoundNeed], findings: &mut Findings) {
+    for need in needs.iter().filter(|need| !need.listed) {
+        let more = match need.count {
+            1 => String::new(),
+            n => format!(" (and {} more of its files)", n - 1),
+        };
+        let shown = Text::new()
+            .plain("its ")
+            .name(&need.plugin)
+            .plain(" uses ")
+            .name(&need.named)
+            .plain(format!(", which only {} provides{more}, ", need.needs));
+        if need.optional {
+            findings.about(
+                Kind::OptionalResources,
+                &need.mod_id,
+                shown.plain(format!(
+                    "and is optional; make {} optional too, or give it `if = '{}'`",
+                    need.mod_id,
+                    crate::config::condition::mod_term(&need.needs)
+                )),
+            );
+        } else {
+            findings.about(
+                Kind::UndeclaredResources,
+                &need.mod_id,
+                shown.plain("which its `dependencies` do not list"),
+            );
+        }
+    }
+}
+
+/// Found dependencies (`masters`, and `resources` when they were looked
+/// for) that were not found this time, for the mods whose plugins were all
+/// read. Not wrong to keep -- only no longer the reason given.
+fn stale_dependencies(
+    plan: &PersonalizedPlan,
+    folders: &BTreeMap<String, ModFolder>,
+    resources: Option<&[FoundNeed]>,
+    findings: &mut Findings,
+) {
+    let masters = master_needs(plan, &plugin_masters(folders));
+    for mod_entry in &plan.mods {
+        if !folders.get(&mod_entry.id).is_some_and(|f| f.read) {
+            continue;
+        }
+        let mut groups = vec![("masters", &mod_entry.found.masters, masters.as_slice())];
+        if let Some(resources) = resources {
+            groups.push(("resources", &mod_entry.found.resources, resources));
+        }
+        for (group, listed, needs) in groups {
+            for dep in listed {
+                if !needs
+                    .iter()
+                    .any(|n| n.mod_id == mod_entry.id && &n.needs == dep)
+                {
+                    findings.about(
+                        Kind::Stale,
+                        &mod_entry.id,
+                        format!("`dependencies.{group}` lists {dep}, which it no longer needs"),
+                    );
+                }
+            }
         }
     }
 }

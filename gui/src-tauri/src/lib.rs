@@ -47,6 +47,11 @@ struct Session {
     planned_at: Option<std::time::SystemTime>,
     /// Each plugin's masters, as the last `check` read them.
     masters: Option<Vec<config::check::PluginMasters>>,
+    /// What each mod needs for the files its plugins name, as the last
+    /// `check --resources` found.
+    resources: Option<Vec<config::check::FoundNeed>>,
+    /// The mods whose archives the last `check` read whole.
+    read: Vec<String>,
     /// The edits made here, for undo, redo and the session's changes.
     history: edits::History,
     /// Archives still to come by hand, and what watches for them.
@@ -1015,16 +1020,17 @@ async fn step_check(
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: false,
+        resources: None,
     };
     let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
         .await
         .map_err(|err| err.to_string())?
         .map_err(shown)?;
-    state
-        .session
-        .lock()
-        .map_err(|_| "a command panicked")?
-        .masters = Some(report.plugins);
+    {
+        let mut session = state.session.lock().map_err(|_| "a command panicked")?;
+        session.masters = Some(report.plugins);
+        session.read = report.read;
+    }
     {
         let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
         settings.list_mut(&list).checked = (report.problems == 0).then_some(fingerprint);
@@ -1067,103 +1073,180 @@ async fn masters_of(
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: true,
+        resources: None,
     };
     let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
         .await
         .map_err(|err| err.to_string())?
         .map_err(shown)?;
-    state
-        .session
-        .lock()
-        .map_err(|_| "a command panicked")?
-        .masters = Some(report.plugins.clone());
+    let mut session = state.session.lock().map_err(|_| "a command panicked")?;
+    session.masters = Some(report.plugins.clone());
+    session.read = report.read;
     Ok(report.plugins)
 }
 
-/// What adding plugins' masters as dependencies did.
+/// What looking for resource dependencies found.
 #[derive(Serialize)]
-struct MasterDependencies {
-    /// The edit, when there was anything to add.
+struct ResourceScan {
+    /// Every mod a mod's plugins need for their files, listed or not.
+    needs: Vec<config::check::FoundNeed>,
+    /// The findings about them: those not listed, and those no longer
+    /// needed.
+    findings: Vec<config::check::Finding>,
+    groups: Vec<FindingGroup>,
+}
+
+/// What each mod's plugins need of other mods for the files they name
+/// (`check --masters-only --resources`): read from the archives once, then
+/// kept, so it is quicker after the first time.
+#[tauri::command]
+async fn find_resource_dependencies(
+    state: tauri::State<'_, State>,
+) -> Result<ResourceScan, String> {
+    let plan = author::current_plan(&state)?;
+    let found = locate(&state)?;
+    let downloads = found
+        .downloads
+        .ok_or("say where the downloads folder is first")?;
+    let game = found.game.ok_or(
+        "say where the game folder is first: its own files are what no mod has to provide",
+    )?;
+    let settings = config::check::CheckSettings {
+        cache_dir: downloads,
+        filter: Default::default(),
+        masters_only: true,
+        resources: Some(game),
+    };
+    let report = tokio::task::spawn_blocking(move || config::check::check_all(&plan, &settings))
+        .await
+        .map_err(|err| err.to_string())?
+        .map_err(shown)?;
+    let needs = report.resources.unwrap_or_default();
+    {
+        let mut session = state.session.lock().map_err(|_| "a command panicked")?;
+        session.masters = Some(report.plugins);
+        session.resources = Some(needs.clone());
+        session.read = report.read;
+    }
+    use config::check::Kind;
+    let findings: Vec<_> = report
+        .findings
+        .into_iter()
+        .filter(|f| {
+            matches!(
+                f.kind,
+                Kind::OptionalResources | Kind::UndeclaredResources | Kind::Stale
+            )
+        })
+        .collect();
+    Ok(ResourceScan {
+        needs,
+        groups: grouped(&findings),
+        findings,
+    })
+}
+
+/// What adding found dependencies did.
+#[derive(Serialize)]
+struct FoundDependencies {
+    /// The edit, when anything changed.
     edited: Option<edits::Edited>,
-    /// How many mods were given dependencies.
+    /// How many mods' `dependencies` changed.
     mods: usize,
     /// Those not added: optional mods that mods which stay would need.
-    refused: Vec<config::check::UnlistedNeed>,
-    /// Mods left as they were, and why.
+    refused: Vec<config::check::FoundNeed>,
+    /// Dependencies left out, or mods left as they were, and why.
     skipped: Vec<String>,
 }
 
-/// Add to each mod's `dependencies` the mods its plugins' masters come from,
-/// as the masters read (or read now) have them: every mod in the plan, or
-/// only `id`'s. One edit, undone at once. A master from an optional mod in
-/// a mod that stays is not added -- `validate` would refuse it -- but said.
+/// Set each mod's found dependencies of one group -- `masters`, the mods its
+/// plugins' masters come from, or `resources`, the mods that alone provide
+/// files its plugins name -- as last found (masters are read now if they
+/// were not; resources have to have been looked for): every mod in the
+/// plan, or only `id`. The group is replaced, so what no longer holds goes,
+/// for the mods whose archives were all read. One edit, undone at once. An
+/// optional mod a mod that stays would need is not added -- `validate`
+/// would refuse it -- but said.
 #[tauri::command]
-async fn add_master_dependencies(
+async fn add_found_dependencies(
     state: tauri::State<'_, State>,
+    group: String,
     id: Option<String>,
-) -> Result<MasterDependencies, String> {
+) -> Result<FoundDependencies, String> {
     let plan = author::current_plan(&state)?;
-    let known = state
+    let needs = match group.as_str() {
+        "masters" => {
+            let known = state
+                .session
+                .lock()
+                .map_err(|_| "a command panicked")?
+                .masters
+                .clone();
+            let masters = match known {
+                Some(masters) => masters,
+                None => masters_of(&state, plan.clone()).await?,
+            };
+            config::check::master_needs(&plan, &masters)
+        }
+        "resources" => state
+            .session
+            .lock()
+            .map_err(|_| "a command panicked")?
+            .resources
+            .clone()
+            .ok_or("look for resource dependencies first")?,
+        _ => return Err(format!("{group}: not a group of found dependencies")),
+    };
+    let read = state
         .session
         .lock()
         .map_err(|_| "a command panicked")?
-        .masters
+        .read
         .clone();
-    let masters = match known {
-        Some(masters) => masters,
-        None => masters_of(&state, plan.clone()).await?,
-    };
-    let (refused, wanted): (Vec<_>, Vec<_>) = config::check::unlisted_needs(&plan, &masters)
+    let (refused, wanted): (Vec<_>, Vec<_>) = needs
         .into_iter()
         .filter(|need| id.as_ref().is_none_or(|id| &need.mod_id == id))
         .partition(|need| need.optional);
-    let mut add: Vec<(String, Vec<String>)> = Vec::new();
-    for need in wanted {
-        match add.last_mut() {
-            Some((mod_id, needs)) if *mod_id == need.mod_id => needs.push(need.needs),
-            _ => add.push((need.mod_id, vec![need.needs])),
-        }
-    }
+    // Every mod read, so one that needs nothing now loses what it had.
+    let found: Vec<(String, Vec<String>)> = plan
+        .mods
+        .iter()
+        .filter(|m| id.as_ref().is_none_or(|id| &m.id == id) && read.contains(&m.id))
+        .map(|m| {
+            let needs = wanted
+                .iter()
+                .filter(|need| need.mod_id == m.id)
+                .map(|need| need.needs.clone())
+                .collect();
+            (m.id.clone(), needs)
+        })
+        .collect();
     let list = state.list()?;
-    let (planned, added, skipped) = config::edit::plan_dependencies(&list, &add).map_err(shown)?;
-    let planned: Vec<_> = planned.into_iter().filter(|e| e.changes()).collect();
-    let edited = if planned.is_empty() {
+    let planned = config::edit::plan_found_dependencies(&list, &group, &found).map_err(shown)?;
+    let edits: Vec<_> = planned.edits.into_iter().filter(|e| e.changes()).collect();
+    let edited = if edits.is_empty() {
         None
     } else {
-        // As `set` writes it: the whole list, the new after what was there.
-        let command = added
+        let command = planned
+            .changed
             .iter()
-            .map(|(mod_id, needs)| {
-                let had = plan
-                    .mods
-                    .iter()
-                    .find(|m| &m.id == mod_id)
-                    .map(|m| m.dependencies.clone())
-                    .unwrap_or_default();
-                let needs: Vec<_> = had.iter().chain(needs).collect();
+            .map(|(mod_id, value)| {
                 format!(
                     "mudcrab set {} --mod {} {}",
                     quote(list.display().to_string()),
                     quote(mod_id),
-                    quote(format!(
-                        "dependencies=[{}]",
-                        needs
-                            .iter()
-                            .map(|n| format!("{n:?}"))
-                            .collect::<Vec<_>>()
-                            .join(", ")
-                    ))
+                    quote(format!("dependencies={value}"))
                 )
             })
             .collect::<Vec<_>>()
             .join("\n");
-        Some(edits::apply_all(&state, command, planned)?)
+        Some(edits::apply_all(&state, command, edits)?)
     };
-    Ok(MasterDependencies {
+    Ok(FoundDependencies {
         edited,
-        mods: added.len(),
+        mods: planned.changed.len(),
         refused,
-        skipped,
+        skipped: planned.skipped,
     })
 }
 
@@ -1363,7 +1446,8 @@ pub fn app<R: Runtime>(
             step_check,
             question_states,
             read_masters,
-            add_master_dependencies,
+            add_found_dependencies,
+            find_resource_dependencies,
             step_install,
             cancel_run,
             manual_steps,
