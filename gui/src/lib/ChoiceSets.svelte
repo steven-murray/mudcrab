@@ -48,6 +48,8 @@
   let conditioning = $state<number | null>(null);
   let draft = $state<string | null>(null);
   let adding = $state(false);
+  // A new BAIN set's packages, starting as otherwise's.
+  let fresh = $state<string[]>([]);
   function startCondition(n: number) {
     adding = false;
     conditioning = n;
@@ -65,7 +67,7 @@
     if (fomod) {
       adding = false;
       choose({ new: condition }, `a new set, if ${condition}`);
-    } else if (await run(() => api.writeBainSet(id, number, { new: condition }, own.packages))) adding = false;
+    } else if (await run(() => api.writeBainSet(id, number, { new: condition }, fresh))) adding = false;
   }
   const when = (c: string | null) => (c ? `if ${c}` : "always");
 </script>
@@ -83,9 +85,26 @@
     {#if adding}
       <div class="edit">
         <ConditionPicker bind:value={draft} {inputs} required taken={known} />
+        {#if !fomod}
+          <div class="packages">
+            {#each packages as pkg (pkg)}
+              <label>
+                <input
+                  type="checkbox"
+                  checked={lower(fresh).includes(pkg.toLowerCase())}
+                  onchange={(e) =>
+                    (fresh = e.currentTarget.checked
+                      ? packages.filter((p) => lower(fresh).includes(p.toLowerCase()) || p === pkg)
+                      : fresh.filter((p) => p.toLowerCase() !== pkg.toLowerCase()))}
+                />
+                {pkg}
+              </label>
+            {/each}
+          </div>
+        {/if}
         <div class="buttons">
           <button class="primary small" onclick={addSet} disabled={!draft?.trim()}
-            >{fomod ? "Choose its options…" : "Add (as a copy of otherwise)"}</button
+            >{fomod ? "Choose its options…" : "Add"}</button
           >
           <button class="small" onclick={() => (adding = false)}>Cancel</button>
         </div>
@@ -96,6 +115,7 @@
         onclick={() => {
           conditioning = null;
           draft = "";
+          fresh = [...own.packages];
           adding = true;
         }}>+ Add a set of choices</button
       >
