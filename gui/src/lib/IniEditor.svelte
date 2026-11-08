@@ -138,13 +138,17 @@
   });
   $effect(() => {
     void condition;
-    if (!untrack(() => dirty)) untrack(loadLayer);
+    // Opened on a block (its Edit), the view is that block: a condition
+    // chosen is where it goes, not another block to look at.
+    if (!untrack(() => dirty) && !opening) untrack(loadLayer);
   });
   const target = $derived(condition?.trim() || null);
   const readGroup = $derived(view?.groups.find((g) => g.if === readFrom) ?? null);
   const targetGroup = $derived(view?.groups.find((g) => g.if === target) ?? null);
-  const moving = $derived(dirty && target !== readFrom && !!readGroup);
-  const replacing = $derived(dirty && target !== readFrom && !!targetGroup);
+  // A block moved to another condition is a change to save, like an edit.
+  const changed = $derived(dirty || target !== readFrom);
+  const moving = $derived(changed && target !== readFrom && !!readGroup);
+  const replacing = $derived(changed && target !== readFrom && !!targetGroup);
   const when = (c: string | null) => (c ? `if ${c}` : "always");
 
   function setValue(s: { section: string | null; key: string; value: string; format: IniFormat }, to: string, file?: string) {
@@ -218,6 +222,12 @@
     setValue({ section: newSection.trim() || null, key, value: newValue, format: usual }, newValue);
     newKey = "";
     newValue = "";
+  }
+
+  // Back to the block as read: its condition too.
+  function discard() {
+    condition = readFrom;
+    loadLayer();
   }
 
   let saving = $state(false);
@@ -366,8 +376,8 @@
     </div>
     <div class="dfoot">
       <span class="small dim">{view?.from ?? ""}</span>
-      {#if dirty}<button onclick={loadLayer}>Discard</button>{/if}
-      <button class="primary" onclick={save} disabled={!dirty || saving || (condition !== null && !condition.trim())}>Save</button>
+      {#if changed}<button onclick={discard}>Discard</button>{/if}
+      <button class="primary" onclick={save} disabled={!changed || saving || (condition !== null && !condition.trim())}>Save</button>
     </div>
   </div>
 </div>
