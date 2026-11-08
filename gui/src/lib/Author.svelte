@@ -88,8 +88,23 @@
   let adding = $state<string | null>(null);
   // The archive whose installer is being walked again.
   let choosing = $state<{ id: string; number: number; label: string } | null>(null);
-  // The mod whose INIs are being edited, or an action added to.
+  // The mod whose INIs are being edited (and the file and condition it
+  // opens on), or an action added to.
   let editingIni = $state<string | null>(null);
+  let iniStart = $state<{ file: string; scope: "mod" | "game"; condition: string | null } | null>(null);
+  // An INI action's file, scope and condition, read from its line, to open
+  // the INI editor on it.
+  function iniActionOf(line: string): { file: string; scope: "mod" | "game"; condition: string | null } | null {
+    if (!/(?:^|, )action = "ini_(set|comment|append_block)"/.test(line)) return null;
+    const field = (name: string) => {
+      const m = new RegExp(`(?:^|, )${name} = (?:"((?:[^"\\\\]|\\\\.)*)"|'([^']*)')`).exec(line);
+      if (!m) return null;
+      return m[1] !== undefined ? (JSON.parse(`"${m[1]}"`) as string) : m[2];
+    };
+    const file = field("file");
+    if (!file) return null;
+    return { file, scope: field("scope") === "game" ? "game" : "mod", condition: field("if") };
+  }
   let addingAction = $state<string | null>(null);
   // An edit from a dialog, which shows why it was refused itself.
   async function attempt(edit: () => Promise<Edited | unknown>): Promise<string | null> {
@@ -751,7 +766,17 @@
 {/snippet}
 
 {#if editingIni}
-  <IniEditor id={editingIni} archives={files} inputs={list.document.inputs} run={attempt} close={() => (editingIni = null)} />
+  <IniEditor
+    id={editingIni}
+    archives={files}
+    inputs={list.document.inputs}
+    start={iniStart}
+    run={attempt}
+    close={() => {
+      editingIni = null;
+      iniStart = null;
+    }}
+  />
 {/if}
 {#if addingAction}
   <AddActionDialog
@@ -1003,8 +1028,19 @@
             <h4>Actions</h4>
             <ol class="actions">
               {#each actions as action, i}
+                {@const ini = iniActionOf(action)}
                 <li>
                   <code>{action}</code>
+                  {#if ini}
+                    <button
+                      class="link"
+                      onclick={() => {
+                        iniStart = ini;
+                        editingIni = chosen.id;
+                      }}
+                      title="Open it in the INI editor">Edit</button
+                    >
+                  {/if}
                   <button class="link danger" onclick={() => run(() => api.removeAction(chosen.id, i + 1))}>Remove</button>
                 </li>
               {/each}

@@ -232,6 +232,17 @@ pub struct IniLayer {
     /// Lines to append.
     #[serde(default)]
     pub block: Option<String>,
+    /// The condition these were read from, when it was another: its
+    /// actions on the file are taken out, so the block moves.
+    #[serde(default)]
+    pub moved_from: Option<MovedFrom>,
+}
+
+/// Where an INI layer was read from: its condition, or none for always.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct MovedFrom {
+    #[serde(rename = "if", default)]
+    pub condition: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
