@@ -384,7 +384,7 @@ pub(super) fn walk_installer(
             );
         }
         answers.push(match asked {
-            Asked::Choose { question } => {
+            Asked::Choose { question, .. } => {
                 Answer::Pick(super::choose::ask(&mut input, &mut output, &question)?)
             }
             Asked::YesNo { path } => Answer::Yes(yes_no(

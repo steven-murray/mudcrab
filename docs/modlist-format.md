@@ -391,7 +391,8 @@ bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
 ```
 
 A FOMOD group whose rows are all left out gets the installer's own default, as
-if it had no row. A mod whose archives are all left out, or a BAIN archive
+if it had no row. The GUI writes these rows from its FOMOD walk (**Depends on a
+question…** on a group). A mod whose archives are all left out, or a BAIN archive
 whose subpackages all are, is refused by `query`: it would install nothing, and
 the condition belongs on the mod (or the archive) instead.
 

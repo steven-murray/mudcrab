@@ -230,7 +230,15 @@ history there, rather than be undone by it.
     its wizard, if it has one.
   - **FOMOD**: **Choose its FOMOD options…** walks its installer's steps
     again, each starting at what the list chooses now, and writes the new
-    choices (`mudcrab choose`).
+    choices (`mudcrab choose`). A group's options can depend on the list's
+    questions: **Depends on a question…** picks a yes-or-no or choice
+    question, and the group gets a row of options per answer, each written
+    with its `if` (see [Conditions inside a mod](modlist-format.md#conditions-inside-a-mod)).
+    Each row's `if` can be edited, rows added or taken out, and **Doesn't
+    depend on a question** goes back to one choice. The row that holds on
+    the answers now is marked, and the walk goes on with it. Rows already in
+    the list start as they are; `mudcrab choose` in a terminal refuses an
+    archive with any, rather than drop them.
 
   Each archive's `include` and `exclude` are listed, each with how many
   files it matches (one that matches nothing is marked: filters match a

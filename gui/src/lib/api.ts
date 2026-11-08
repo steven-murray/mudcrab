@@ -403,10 +403,23 @@ export interface Question {
   default: number[];
 }
 
-export type Answer = { pick: number[] } | { yes: boolean };
+/** A FOMOD group's options when `if` holds. */
+export interface Row {
+  if: string;
+  pick: number[];
+}
+
+/** `depends`: a FOMOD group's options for each condition on the list's
+ *  questions, the walk going on with `now`. */
+export type Answer = { pick: number[] } | { yes: boolean } | { depends: { now: number[]; rows: Row[] } };
 
 export type Walk =
-  | { kind: "ask"; asked: { kind: "choose"; question: Question } | { kind: "yes_no"; path: string } }
+  | {
+      kind: "ask";
+      /** `rows` for a FOMOD group: the entry's rows that depend on the
+       *  list's questions. */
+      asked: { kind: "choose"; question: Question; rows?: Row[] } | { kind: "yes_no"; path: string };
+    }
   | { kind: "done"; installed: { notes: string[]; actions: string[] } };
 
 export interface AddRequest {

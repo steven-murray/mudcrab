@@ -589,7 +589,7 @@ pub(super) fn choose_write(
         Walk::Done { installed } => installed,
         Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
     };
-    let edit = installer::plan_choice(&list, &id, number, &installed).map_err(shown)?;
+    let edit = installer::plan_choice(&list, &id, number, &installed, true).map_err(shown)?;
     let mut command = format!(
         "mudcrab choose {} --mod {}",
         quote(list.display().to_string()),
