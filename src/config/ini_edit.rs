@@ -184,10 +184,13 @@ pub fn groups(entry: &ModEntry, file: &str, scope: IniScope) -> Vec<IniGroup> {
             ModAction::IniComment(spec)
                 if scope == IniScope::Mod && same_file(&spec.file, file) =>
             {
-                vec![IniAction::Comment {
-                    key: spec.key.clone(),
-                    format: spec.format,
-                }]
+                spec.keys()
+                    .into_iter()
+                    .map(|key| IniAction::Comment {
+                        key: key.to_string(),
+                        format: spec.format,
+                    })
+                    .collect()
             }
             ModAction::IniAppendBlock(spec)
                 if scope == IniScope::Mod && same_file(&spec.file, file) =>

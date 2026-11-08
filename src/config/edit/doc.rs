@@ -345,13 +345,20 @@ pub fn set_ini_layer(
         Item::Table(top)
     };
     let mut placed: Vec<IniSetFormat> = Vec::new();
-    let mut comments: Vec<Option<&crate::config::ini_edit::IniKey>> =
-        layer.comments.iter().map(Some).collect();
+    // The keys to comment out by format, each one `ini_comment`'s `keys`.
+    let mut commented: Vec<(IniSetFormat, Vec<&str>)> = Vec::new();
+    for comment in &layer.comments {
+        match commented.iter_mut().find(|(f, _)| *f == comment.format) {
+            Some((_, keys)) => keys.push(&comment.key),
+            None => commented.push((comment.format, vec![&comment.key])),
+        }
+    }
+    let keys_of = |keys: &[&str]| Item::Value(Value::Array(keys.iter().copied().collect()));
+    let mut placed_comments: Vec<IniSetFormat> = Vec::new();
     let mut block = layer.block.as_deref().filter(|b| !b.trim().is_empty());
     let mut gone = Vec::new();
     for (index, t) in actions.iter_mut().enumerate() {
         let Some(kind) = kind_of(t) else { continue };
-        let key = get(t, "key");
         let kept = match kind.as_str() {
             "ini_set" => {
                 // The first of a format's keeps its place, holding them all.
@@ -372,17 +379,22 @@ pub fn set_ini_layer(
                     _ => false,
                 }
             }
-            "ini_comment" => match comments
-                .iter_mut()
-                .find(|c| c.is_some_and(|c| Some(&c.key) == key.as_ref()))
-                .and_then(Option::take)
-            {
-                Some(comment) => {
-                    set_format(t, comment.format);
-                    true
+            "ini_comment" => {
+                let format = match get(t, "format").as_deref() {
+                    Some("set-to") => IniSetFormat::SetTo,
+                    _ => IniSetFormat::Standard,
+                };
+                match commented.iter().find(|(f, _)| *f == format) {
+                    Some((_, keys)) if !placed_comments.contains(&format) => {
+                        t.remove("key");
+                        t.insert("keys", keys_of(keys));
+                        set_format(t, format);
+                        placed_comments.push(format);
+                        true
+                    }
+                    _ => false,
                 }
-                None => false,
-            },
+            }
             _ => match block.take() {
                 Some(lines) => {
                     t.insert("block", toml_edit::value(lines));
@@ -417,10 +429,13 @@ pub fn set_ini_layer(
         t.insert("values", values_of(group));
         actions.push(t);
     }
-    for comment in comments.into_iter().flatten() {
+    for (format, keys) in commented
+        .iter()
+        .filter(|(f, _)| !placed_comments.contains(f))
+    {
         let mut t = new("ini_comment");
-        t.insert("key", toml_edit::value(comment.key.as_str()));
-        set_format(&mut t, comment.format);
+        t.insert("keys", keys_of(keys));
+        set_format(&mut t, *format);
         actions.push(t);
     }
     if let Some(lines) = block {
@@ -1431,7 +1446,7 @@ id = "B"
         );
         assert!(
             out.contains(
-                "action = \"ini_comment\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkey = \"Old\""
+                "action = \"ini_comment\"\nif = \"potato\"\nfile = 'INI\\A.ini'\nkeys = [\"Old\"]"
             ),
             "{out}"
         );

@@ -412,7 +412,7 @@ examples.
 | `action` | Fields | When you need it |
 | --- | --- | --- |
 | `ini_set` | `file`, `key` and `value` or `values`, `section`, `format`, `scope` | To change settings: in an INI the mod ships (`scope = "mod"`, the default) or in the game's `Oblivion.ini` (`scope = "game"`). One as `key` and `value`, or several as `values` (`{ key = value }`, a table in it a section's keys: see [ini_set](usage.md#ini_set)). `section` when a key occurs in more than one; `format = "set-to"` for script INIs written `set key to value`. |
-| `ini_comment` | `file`, `key`, `format` | To comment a setting out, so the mod's script falls back to its own default. |
+| `ini_comment` | `file`, `key` or `keys`, `format` | To comment settings out, so the mod's script falls back to its own defaults: one as `key`, several as `keys = [...]`. |
 | `ini_append_block` | `file`, `block` | When a guide says "paste these lines into the INI": appended verbatim, order and repeats kept. |
 | `ini_tweak` | `file`, `key`, `value`, `format` | For a Wrye Bash INI Tweak, as a BAIN wizard's `EditINI` writes: a fragment under `ini tweaks/<file>`, applied from Wrye Bash. |
 | `file_prune` | `paths` or `conflicts_with` (+ `under`), `except`; or `keep` alone | To delete files: by glob (`paths`, with exceptions); every file another mod also provides (`conflicts_with`, optionally `under` one folder); or everything except a few (`keep`). |

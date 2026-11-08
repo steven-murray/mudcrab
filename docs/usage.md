@@ -825,6 +825,10 @@ format = "set-to"
 key = "EasyMenu.iAltExitKey"
 ```
 
+Several settings of one INI go in one action as `keys = ["a", "b"]`, in
+place of `key`. If any has no active line, nothing is written. The GUI's INI
+editor writes `keys`.
+
 ### file_prune: keep
 
 `keep` is the other way round: delete everything in the mod *except* the named
