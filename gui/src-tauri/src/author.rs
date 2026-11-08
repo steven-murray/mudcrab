@@ -171,8 +171,36 @@ pub(super) struct ArchiveChoice {
     number: usize,
     label: String,
     layout: Option<ArchiveLayout>,
-    /// The archive's `if`, when it has one.
+    /// The archive's `if`, when it has one, and whether it holds in Author
+    /// mode's profile.
     condition: Option<String>,
+    applies: Option<bool>,
+    /// Its FOMOD selections and BAIN packages as written, every one, each
+    /// with its `if` and whether that holds.
+    choices: Vec<Conditional>,
+}
+
+/// Something a mod does only under a condition, or always: its text, its
+/// `if`, and whether that holds in Author mode's profile.
+#[derive(Serialize)]
+pub(super) struct Conditional {
+    text: String,
+    condition: Option<String>,
+    applies: Option<bool>,
+}
+
+impl Conditional {
+    pub(super) fn new(
+        text: String,
+        condition: Option<String>,
+        authoring: &config::query::AuthoringPlan,
+    ) -> Self {
+        Self {
+            applies: condition.as_deref().and_then(|c| authoring.holds(c)),
+            condition,
+            text,
+        }
+    }
 }
 
 /// A mod: whether Author mode's profile installs it, and its archives as
@@ -236,7 +264,34 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
                     path.rsplit(['/', ':']).next().unwrap_or(path).to_string()
                 }),
                 layout: archive.layout,
+                applies: archive
+                    .condition
+                    .as_deref()
+                    .and_then(|c| authoring.holds(c)),
                 condition: archive.condition.clone(),
+                choices: archive
+                    .fomod_selections
+                    .iter()
+                    .map(|row| Conditional {
+                        text: format!(
+                            "{} › {}: {}",
+                            row.step,
+                            row.group,
+                            if row.options.is_empty() {
+                                "none".to_string()
+                            } else {
+                                row.options.join(", ")
+                            }
+                        ),
+                        applies: row.condition.as_deref().and_then(|c| authoring.holds(c)),
+                        condition: row.condition.clone(),
+                    })
+                    .chain(archive.bain_subpackages.iter().map(|p| Conditional {
+                        text: format!("package {}", p.name()),
+                        applies: p.condition().and_then(|c| authoring.holds(c)),
+                        condition: p.condition().map(str::to_string),
+                    }))
+                    .collect(),
             })
             .collect(),
         id,

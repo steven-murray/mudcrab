@@ -66,6 +66,17 @@ fn left_out_mods_are_planned_as_if_they_were_in() {
         birds.archives[0].path.as_deref(),
         Some("manual:birds-1k.zip")
     );
+    // Every archive is kept, as it would install, the 2k one too.
+    let every: Vec<Option<&str>> = authoring.every_archive["Birds"]
+        .iter()
+        .map(|a| a.as_ref().and_then(|a| a.path.as_deref()))
+        .collect();
+    assert_eq!(
+        every,
+        [Some("manual:birds-1k.zip"), Some("manual:birds-2k.zip")]
+    );
+    assert_eq!(authoring.holds("res == 2k"), Some(false));
+    assert_eq!(authoring.holds("mod:Core"), Some(true));
     let sets = parse_overrides(&["res=2k".to_string()]).unwrap();
     let big = build_authoring_plan(&compiled.modlist, &sets).unwrap();
     assert_eq!(

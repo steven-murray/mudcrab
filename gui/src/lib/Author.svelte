@@ -10,6 +10,7 @@
     type Conflicts as Found,
     type Edited,
     type AuthorProfile,
+    type Conditional,
     noteSlow,
     type FoundDependencies,
     type FoundGroup,
@@ -26,6 +27,7 @@
   import ChooseDialog from "./ChooseDialog.svelte";
   import IniEditor from "./IniEditor.svelte";
   import ProfileDialog from "./ProfileDialog.svelte";
+  import IfTag from "./IfTag.svelte";
   import AddActionDialog from "./AddActionDialog.svelte";
   import Archives from "./Archives.svelte";
   import Conflicts from "./Conflicts.svelte";
@@ -62,7 +64,7 @@
   let view = $state<ModView | null>(null);
   // The mod's archives, each with its files once read.
   let files = $state<ModArchive[]>([]);
-  let actions = $state<string[]>([]);
+  let actions = $state<Conditional[]>([]);
   let order = $state<Order | null>(null);
   let found = $state<Found | null>(null);
   let conflictsError = $state<string | null>(null);
@@ -345,7 +347,15 @@
   // old ones stay shown until the new are read.
   async function readFiles(id: string, quietly = false) {
     if (!view) return;
-    const base: ModArchive[] = view.archives.map((a) => ({ number: a.number, label: a.label, condition: a.condition, tree: null, error: null }));
+    const base: ModArchive[] = view.archives.map((a) => ({
+      number: a.number,
+      label: a.label,
+      condition: a.condition,
+      applies: a.applies,
+      choices: a.choices,
+      tree: null,
+      error: null,
+    }));
     if (!quietly) files = base;
     const read = await Promise.all(
       base.map(async (a) => {
@@ -827,7 +837,7 @@
     id={addingAction}
     archives={files}
     inputs={list.document.inputs}
-    known={[...new Set(actions.flatMap((a) => [...a.matchAll(/\bif = "([^"]*)"/g)].map((m) => m[1])))]}
+    known={[...new Set(actions.flatMap((a) => (a.condition ? [a.condition] : [])))]}
     run={attempt}
     close={() => (addingAction = null)}
   />
@@ -1105,9 +1115,10 @@
             <h4>Actions</h4>
             <ol class="actions">
               {#each actions as action, i}
-                {@const ini = iniActionOf(action)}
-                <li>
-                  <code>{action}</code>
+                {@const ini = iniActionOf(action.text)}
+                <li class:off={action.applies === false}>
+                  <code>{action.text}</code>
+                  {#if action.condition}<IfTag condition={action.condition} applies={action.applies} />{/if}
                   {#if ini}
                     <button
                       class="link"
@@ -1612,6 +1623,9 @@
     margin: 0;
     padding-left: 22px;
     font-size: 12px;
+  }
+  .actions li.off code {
+    opacity: 0.55;
   }
   .actions li {
     margin: 2px 0;

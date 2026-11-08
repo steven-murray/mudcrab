@@ -52,6 +52,24 @@ pub struct AuthoringPlan {
     pub left_out: Vec<String>,
     /// What an install with these answers would refuse, or could not plan.
     pub notes: Vec<String>,
+    /// Each mod's archives, every one -- those the answers leave out too,
+    /// each as it would install, its own `if` set aside (its FOMOD rows'
+    /// and BAIN packages' still followed). `None` for one that would
+    /// install nothing with these answers.
+    pub every_archive: HashMap<String, Vec<Option<CompiledArchive>>>,
+}
+
+impl AuthoringPlan {
+    /// Whether condition `expr` holds on these answers; `None` when it
+    /// cannot be read.
+    pub fn holds(&self, expr: &str) -> Option<bool> {
+        Condition::parse(expr)
+            .ok()?
+            .eval(&self.plan.responses, &mut |id| {
+                Ok(self.plan.selected_mods.iter().any(|m| m == id))
+            })
+            .ok()
+    }
 }
 
 /// Plan `compiled` for writing it: see [`AuthoringPlan`].
@@ -91,6 +109,7 @@ fn plan_with(
     let mut selected_mods = Vec::new();
     let mut mods = Vec::new();
     let mut left_out = Vec::new();
+    let mut every_archive = HashMap::new();
     for entry in &compiled.mods {
         let installed = included[entry.id.as_str()];
         if !installed {
@@ -128,6 +147,20 @@ fn plan_with(
             if applies(action.condition.as_deref())? {
                 actions.push(action.action.clone());
             }
+        }
+        if authoring {
+            let each = entry
+                .archives
+                .iter()
+                .map(|archive| {
+                    let mut regardless = archive.clone();
+                    regardless.condition = None;
+                    resolve_archives(&entry.id, std::slice::from_ref(&regardless), &applies)
+                        .ok()
+                        .and_then(|mut one| one.pop())
+                })
+                .collect();
+            every_archive.insert(entry.id.clone(), each);
         }
         let archives = match resolve_archives(&entry.id, &entry.archives, &applies) {
             Ok(archives) => archives,
@@ -258,6 +291,7 @@ fn plan_with(
         plan,
         left_out,
         notes,
+        every_archive,
     })
 }
 

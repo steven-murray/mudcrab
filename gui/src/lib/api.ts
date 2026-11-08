@@ -238,7 +238,24 @@ export interface ModView {
   overridden: string[];
   /** The shim it takes its definition from (`use`), relative to the list. */
   used: string | null;
-  archives: { number: number; label: string; layout: string | null; condition: string | null }[];
+  /** Each archive as written: its `if` and whether it holds in Author mode's
+   *  profile, and every FOMOD row and BAIN package with theirs. */
+  archives: {
+    number: number;
+    label: string;
+    layout: string | null;
+    condition: string | null;
+    applies: boolean | null;
+    choices: Conditional[];
+  }[];
+}
+
+/** Something done only under a condition, or always: its `if`, and whether
+ *  that holds in Author mode's profile. */
+export interface Conditional {
+  text: string;
+  condition: string | null;
+  applies: boolean | null;
 }
 
 export interface FileRow {
@@ -609,7 +626,7 @@ export const api = {
   iniView: (id: string, file: string, scope: "mod" | "game", number: number | null, source: string | null) =>
     invoke<IniView>("ini_view", { id, file, scope, number, source }),
   setIni: (id: string, layer: IniLayer) => invoke<Edited>("set_ini", { id, layer }),
-  actions: (id: string) => invoke<string[]>("actions", { id }),
+  actions: (id: string) => invoke<Conditional[]>("actions", { id }),
   addInput: (name: string, kind: string, query: string, choices: string[], fallback: string | null) =>
     invoke<Edited>("add_input", { name, kind, query, choices, default: fallback }),
   setInput: (name: string, sets: string[], unsets: string[]) =>

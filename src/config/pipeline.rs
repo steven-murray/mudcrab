@@ -134,17 +134,30 @@ pub fn planned_archive(
             anyhow::anyhow!("'{id}' cannot be planned: {why}")
         })?
         .clone();
-    // An archive whose condition is not met is not in the plan.
+    // Every archive, as it would install: one the answers leave out too.
+    let same = |a: &CompiledArchive| {
+        a.path == spec.path && (spec.file_name.is_none() || a.file_name == spec.file_name)
+    };
     let archive = entry
         .archives
         .iter()
-        .find(|a| {
-            a.path == spec.path && (spec.file_name.is_none() || a.file_name == spec.file_name)
+        .find(|a| same(a))
+        .cloned()
+        .or_else(|| {
+            planned
+                .every_archive
+                .get(id)?
+                .iter()
+                .flatten()
+                .find(|a| same(a))
+                .cloned()
         })
         .ok_or_else(|| {
-            anyhow::anyhow!("the list's answers leave this archive out; answer for it with --set")
-        })?
-        .clone();
+            anyhow::anyhow!(
+                "with these answers, this archive would install nothing: every BAIN \
+                 subpackage's `if` leaves it out"
+            )
+        })?;
     Ok(PlannedArchive {
         entry,
         archive,

@@ -162,9 +162,12 @@ history there, rather than be undone by it.
   kept apart from Install mode's -- a set of answers to look at the list
   by, as many as you like (**New profile…**), each with its **Answers…**.
   Install mode's drop-down offers the same profiles, and Author mode its.
-  Whatever needs no answer is always shown; what depends on one (a mod's
-  archives, installer choices and actions with an `if`) follows the
-  profile. A mod the profile leaves out is still shown, as it would
+  Everything is shown: each of a mod's archives, FOMOD selections, BAIN
+  packages and actions, those with an `if` too, the `if` marked by whether
+  it holds in the profile (outlined green when it does, dashed and dimmed
+  when it does not). What depends on the profile is which of them the
+  profile installs; an archive it leaves out still has its files shown, as
+  it would install. A mod the profile leaves out is still shown, as it would
   install -- its files, INIs, installer choices and badges -- marked as not
   installed in that profile, with the condition that brings it in. Its
   conflicts are counted only against mods the profile installs, and the
