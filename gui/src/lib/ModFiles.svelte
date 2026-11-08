@@ -96,17 +96,19 @@
     }
     return path;
   }
-  const files = $derived<File[]>(
-    archives
-      .flatMap((a) =>
-        (a.tree?.installed ?? []).map((f) => ({
-          ...f,
-          path: movedTo(f.path),
-          taken: ticked.get(f.path) ?? f.taken,
-          archive: a,
-        })),
-      )
-      .sort((x, y) => x.path.localeCompare(y.path)),
+  const files = $derived.by<File[]>(
+    () => {
+      // One file per path: where two archives put the same one -- the same
+      // archive twice, or two that overlap -- the later's is the one the
+      // mod's folder ends up with.
+      const byPath = new Map<string, File>();
+      for (const a of archives)
+        for (const f of a.tree?.installed ?? []) {
+          const file = { ...f, path: movedTo(f.path), taken: ticked.get(f.path) ?? f.taken, archive: a };
+          byPath.set(file.path.toLowerCase(), file);
+        }
+      return [...byPath.values()].sort((x, y) => x.path.localeCompare(y.path));
+    },
   );
   // Shown at once; put back if the edit is not written.
   async function showing(paths: string[], taken: boolean, write: () => Promise<boolean>) {
