@@ -43,6 +43,7 @@ pub fn build_plan(
 /// selections' and actions' conditions) still follows the answers. What
 /// would stop an install (a dependency left out, a merge's source left out)
 /// is noted instead.
+#[derive(Debug, Clone)]
 pub struct AuthoringPlan {
     /// Its `mods` hold every mod that can be planned; `selected_mods` only
     /// those the answers install, and `plugins` their load order.

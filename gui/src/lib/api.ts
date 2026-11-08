@@ -228,7 +228,10 @@ export interface LoadOrder {
 
 export interface ModView {
   id: string;
+  /** Left out by Author mode's profile: shown as it would install. */
   left_out: boolean;
+  /** Why it cannot be planned with the profile's answers, when it cannot. */
+  unplanned: string | null;
   /** The included file the mod is written in, relative to the list. */
   origin: string | null;
   /** The fields the include that brings it overrides. */
@@ -327,6 +330,14 @@ export interface IniLayer {
   block: string | null;
   /** The condition these were read from, when it was another: that block moves. */
   moved_from?: { if: string | null };
+}
+
+/** Author mode's profile: the answers it plans the list with. */
+export interface AuthorProfile {
+  name: string;
+  /** Both modes' profiles. */
+  profiles: string[];
+  answers: Record<string, string>;
 }
 
 export interface Partner {
@@ -554,7 +565,11 @@ export const api = {
   download: () => invoke<Downloaded>("step_download"),
   lookForDownloads: () => invoke<ByHand[]>("look_for_downloads"),
   openPage: (url: string) => invoke<void>("open_page", { url }),
-  check: (again = false) => invoke<Checked>("step_check", { again }),
+  /** `author`: what Author mode's profile installs, not Install mode's. */
+  check: (again = false, author = false) => invoke<Checked>("step_check", { again, author }),
+  authorProfile: () => invoke<AuthorProfile>("author_profile"),
+  setAuthorProfile: (name: string) => invoke<AuthorProfile>("set_author_profile", { name }),
+  setAuthorAnswers: (answers: Record<string, string>) => invoke<AuthorProfile>("set_author_answers", { answers }),
   readMasters: () => invoke<void>("read_masters"),
   scanList: () => invoke<import("./listFilters").ListScan>("scan_list"),
   /** Set one group of each mod's found `dependencies` (every mod in the plan, or `id`'s), as last found. */

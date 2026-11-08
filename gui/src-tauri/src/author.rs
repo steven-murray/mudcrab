@@ -6,7 +6,7 @@
 //! Everything reads the list as planned with the answers last given for it
 //! (install mode's), planned again whenever the file has changed on disk.
 
-use super::{State, locate, plan_of, quote, shown};
+use super::{State, locate, quote, shown};
 use mudcrab::config;
 use mudcrab::config::schema::{ArchiveLayout, PersonalizedPlan};
 use serde::Serialize;
@@ -14,31 +14,64 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::time::SystemTime;
 
 /// When the open list's file last changed.
-fn modified(state: &State) -> Result<Option<SystemTime>, String> {
+pub(super) fn modified(state: &State) -> Result<Option<SystemTime>, String> {
     Ok(std::fs::metadata(state.list()?)
         .and_then(|m| m.modified())
         .ok())
 }
 
-/// The plan, made again with the remembered answers when the list has
-/// changed since it was made (or it never was).
-pub(super) fn current_plan(state: &State) -> Result<PersonalizedPlan, String> {
+/// Author mode's plans, made from its profile's answers: what that profile
+/// installs, and every mod as it would install (for looking at the list).
+#[derive(Clone)]
+pub(super) struct AuthorPlans {
+    /// When the list's file had last changed, and the answers: made again
+    /// when either has changed.
+    at: Option<SystemTime>,
+    answers: BTreeMap<String, String>,
+    install: Result<PersonalizedPlan, String>,
+    pub(super) authoring: config::query::AuthoringPlan,
+}
+
+pub(super) fn author_plans(state: &State) -> Result<AuthorPlans, String> {
     let now = modified(state)?;
-    let fresh = {
-        let session = state.session.lock().map_err(|_| "a command panicked")?;
-        session.plan.is_some() && session.planned_at.is_some() && session.planned_at == now
-    };
-    if !fresh {
-        let list = state.list()?;
-        let answers = state
-            .settings
-            .lock()
-            .map_err(|_| "a command panicked")?
-            .list(&list)
-            .current_answers();
-        super::plan_with(state, answers)?;
+    let list = state.list()?;
+    let answers = state
+        .settings
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .list(&list)
+        .author_answers();
+    if let Some(plans) = state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .author
+        .as_ref()
+        .filter(|p| p.at == now && p.answers == answers)
+    {
+        return Ok(plans.clone());
     }
-    plan_of(state)
+    let compiled = config::pipeline::compile(&list, false).map_err(shown)?;
+    let overrides: config::query::Overrides = answers.clone().into_iter().collect();
+    let plans = AuthorPlans {
+        at: now,
+        install: config::query::build_plan(&compiled.modlist, &overrides, None).map_err(shown),
+        authoring: config::query::build_authoring_plan(&compiled.modlist, &overrides)
+            .map_err(shown)?,
+        answers,
+    };
+    state
+        .session
+        .lock()
+        .map_err(|_| "a command panicked")?
+        .author = Some(plans.clone());
+    Ok(plans)
+}
+
+/// What Author mode's profile installs: for its check, load order and
+/// conflicts.
+pub(super) fn current_plan(state: &State) -> Result<PersonalizedPlan, String> {
+    author_plans(state)?.install
 }
 
 // --- The load order -----------------------------------------------------------------
@@ -141,13 +174,15 @@ pub(super) struct ArchiveChoice {
     condition: Option<String>,
 }
 
-/// A mod: whether the answers given plan it, and its archives as the list
-/// declares them.
+/// A mod: whether Author mode's profile installs it, and its archives as
+/// the list declares them.
 #[derive(Serialize)]
 pub(super) struct ModView {
     id: String,
-    /// Left out by the answers given, so not planned.
+    /// Left out by the profile's answers: shown as it would install.
     left_out: bool,
+    /// Why it cannot be planned with these answers, when it cannot.
+    unplanned: Option<String>,
     /// The included file it is written in, relative to the list; absent for
     /// the list's own.
     origin: Option<String>,
@@ -160,7 +195,7 @@ pub(super) struct ModView {
 
 #[tauri::command(async)]
 pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<ModView, String> {
-    let plan = current_plan(&state)?;
+    let authoring = author_plans(&state)?.authoring;
     let source = config::loader::load_modlist(&state.list()?).map_err(shown)?;
     let entry = source
         .mods
@@ -169,7 +204,15 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
         .ok_or_else(|| format!("the list has no mod with id '{id}'"))?;
     let base = source.base_dir.clone().unwrap_or_default();
     Ok(ModView {
-        left_out: !plan.mods.iter().any(|m| m.id == id),
+        left_out: authoring.left_out.contains(&id),
+        unplanned: (!authoring.plan.mods.iter().any(|m| m.id == id)).then(|| {
+            authoring
+                .notes
+                .iter()
+                .find(|note| note.contains(&format!("mod {id}:")))
+                .cloned()
+                .unwrap_or_else(|| "it cannot be planned with these answers".to_string())
+        }),
         origin: entry
             .origin
             .as_deref()
@@ -323,7 +366,7 @@ pub(super) async fn mod_files(
         .lock()
         .map_err(|_| "a command panicked")?
         .list(&list)
-        .current_answers()
+        .author_answers()
         .into_iter()
         .collect();
     let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
@@ -777,7 +820,7 @@ pub(super) async fn ini_view(
                 .lock()
                 .map_err(|_| "a command panicked")?
                 .list(&list)
-                .current_answers()
+                .author_answers()
                 .into_iter()
                 .collect();
             let search = located.search.clone();
@@ -808,4 +851,75 @@ pub(super) async fn ini_view(
         groups,
         from,
     })
+}
+
+/// Author mode's profile: its name, the profiles to choose from (both
+/// modes'), and its answers.
+#[derive(Serialize)]
+pub(super) struct AuthorProfile {
+    name: String,
+    profiles: Vec<String>,
+    answers: BTreeMap<String, String>,
+}
+
+fn author_profile_of(state: &State) -> Result<AuthorProfile, String> {
+    let list = state.list()?;
+    let instance = locate(state)?.instance;
+    let settings = state.settings.lock().map_err(|_| "a command panicked")?;
+    let chosen = settings.list(&list);
+    let mut profiles = chosen.profile_names();
+    if let Some(instance) = instance {
+        profiles.extend(super::instance_profiles(&instance));
+        profiles.sort();
+        profiles.dedup();
+    }
+    Ok(AuthorProfile {
+        name: chosen.author_profile(),
+        profiles,
+        answers: chosen.author_answers(),
+    })
+}
+
+/// Author mode's profile (`author_profile`).
+#[tauri::command(async)]
+pub(super) fn author_profile(state: tauri::State<'_, State>) -> Result<AuthorProfile, String> {
+    author_profile_of(&state)
+}
+
+/// Plan Author mode with profile `name`: one already made, or a new one,
+/// starting from the answers it had.
+#[tauri::command(async)]
+pub(super) fn set_author_profile(
+    state: tauri::State<'_, State>,
+    name: String,
+) -> Result<AuthorProfile, String> {
+    let name = name.trim().to_string();
+    if name.is_empty() {
+        return Err("a profile needs a name".to_string());
+    }
+    let list = state.list()?;
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        let chosen = settings.list_mut(&list);
+        let answers = chosen.author_answers();
+        chosen.author_profile = Some(name.clone());
+        chosen.profile_answers.entry(name).or_insert(answers);
+        let _ = settings.save();
+    }
+    author_profile_of(&state)
+}
+
+/// Author mode's profile's answers, kept.
+#[tauri::command(async)]
+pub(super) fn set_author_answers(
+    state: tauri::State<'_, State>,
+    answers: BTreeMap<String, String>,
+) -> Result<AuthorProfile, String> {
+    let list = state.list()?;
+    {
+        let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
+        settings.list_mut(&list).set_author_answers(answers);
+        let _ = settings.save();
+    }
+    author_profile_of(&state)
 }

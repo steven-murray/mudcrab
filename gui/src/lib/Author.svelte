@@ -9,6 +9,7 @@
     type Checked,
     type Conflicts as Found,
     type Edited,
+    type AuthorProfile,
     noteSlow,
     type FoundDependencies,
     type FoundGroup,
@@ -24,6 +25,7 @@
   import AddDialog from "./AddDialog.svelte";
   import ChooseDialog from "./ChooseDialog.svelte";
   import IniEditor from "./IniEditor.svelte";
+  import ProfileDialog from "./ProfileDialog.svelte";
   import AddActionDialog from "./AddActionDialog.svelte";
   import Archives from "./Archives.svelte";
   import Conflicts from "./Conflicts.svelte";
@@ -88,6 +90,38 @@
   let adding = $state<string | null>(null);
   // The archive whose installer is being walked again.
   let choosing = $state<{ id: string; number: number; label: string } | null>(null);
+  // Author mode's profile: the answers it plans the list with, apart from
+  // Install mode's. Changing it plans the list again.
+  let profile = $state<AuthorProfile | null>(null);
+  let answering = $state(false);
+  let naming = $state(false);
+  let newProfile = $state("");
+  async function readProfile() {
+    try {
+      profile = await api.authorProfile();
+    } catch (err) {
+      error = String(err);
+    }
+  }
+  $effect(() => {
+    if (active && !profile) untrack(readProfile);
+  });
+  // A profile chosen or its answers changed: what is shown follows them.
+  async function profileChanged(next: AuthorProfile) {
+    profile = next;
+    order = null;
+    checked = null;
+    await refresh();
+    rescan();
+  }
+  async function chooseProfile(name: string) {
+    try {
+      await profileChanged(await api.setAuthorProfile(name));
+    } catch (err) {
+      error = String(err);
+    }
+  }
+
   // The mod whose INIs are being edited (and the file and condition it
   // opens on), or an action added to.
   let editingIni = $state<string | null>(null);
@@ -374,7 +408,7 @@
     checking = true;
     error = null;
     try {
-      checked = await api.check();
+      checked = await api.check(false, true);
       order = await api.loadOrder();
     } catch (err) {
       error = String(err);
@@ -765,6 +799,10 @@
   </div>
 {/snippet}
 
+{#if answering && profile}
+  <ProfileDialog {profile} inputs={list.document.inputs} saved={profileChanged} close={() => (answering = false)} />
+{/if}
+
 {#if editingIni}
   <IniEditor
     id={editingIni}
@@ -795,7 +833,7 @@
     number={choosing.number}
     label={choosing.label}
     inputs={list.document.inputs}
-    current={list.answers}
+    current={profile?.answers ?? {}}
     write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers))}
     close={() => (choosing = null)}
   />
@@ -813,6 +851,39 @@
 
 <div class="author">
   <section class="left" bind:this={scroller} data-tour="author-list">
+    <div class="profilebar">
+      <span class="dim">Profile</span>
+      <select
+        value={profile?.name ?? ""}
+        onchange={async (e) => {
+          const name = e.currentTarget.value;
+          if (name === "\u0000new") {
+            e.currentTarget.value = profile?.name ?? "";
+            newProfile = "";
+            naming = true;
+          } else await chooseProfile(name);
+        }}
+        title="The answers Author mode plans the list with"
+      >
+        {#each profile?.profiles ?? [] as name (name)}<option value={name}>{name}</option>{/each}
+        <option value={"\u0000new"}>New profile…</option>
+      </select>
+      <button class="link" onclick={() => (answering = true)} disabled={!profile}>Answers…</button>
+    </div>
+    {#if naming}
+      <form
+        class="profilebar"
+        onsubmit={async (e) => {
+          e.preventDefault();
+          naming = false;
+          await chooseProfile(newProfile);
+        }}
+      >
+        <input bind:value={newProfile} placeholder="a new profile's name" />
+        <button type="submit" disabled={!newProfile.trim()}>Make</button>
+        <button type="button" class="link" onclick={() => (naming = false)}>Cancel</button>
+      </form>
+    {/if}
     <nav class="panes" data-tour="author-archives">
       <button class:on={pane === "list"} onclick={() => (pane = "list")}>The list</button>
       <button class:on={pane === "archives"} onclick={() => (pane = "archives")} title="The archives in the downloads folders, to add mods from">Archives</button>
@@ -1014,7 +1085,7 @@
             }}
             {run}
           />
-          {#if view && !view.left_out && view.archives.length}
+          {#if view && !view.unplanned && view.archives.length}
             <p>
               <button onclick={() => (editingIni = chosen.id)} title="Change the settings in the mod's INIs, or the game's, as ini_set actions"
                 >INI editor…</button
@@ -1047,7 +1118,14 @@
             </ol>
           {/if}
           {#if view?.left_out}
-            <p class="dim">The answers given in Install leave this mod out, so its files are not planned.</p>
+            <p class="note small">
+              Not installed in profile <b>{profile?.name}</b>{#if chosen.condition}
+                (it needs <code>{chosen.condition.text}</code>){:else if chosen.optional}
+                (it is optional, and not ticked){/if}: shown as it would install.
+            </p>
+          {/if}
+          {#if view?.unplanned}
+            <p class="dim">Can't be planned with profile <b>{profile?.name}</b>'s answers: {view.unplanned}</p>
           {:else if view && !view.archives.length}
             <p class="dim">No archives: this mod is made at install.</p>
           {:else if view}
@@ -1475,6 +1553,21 @@
   .mod.off .title {
     color: var(--dim);
     font-style: italic;
+  }
+  .profilebar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px 0;
+    font-size: 13px;
+  }
+  .profilebar select,
+  .profilebar input {
+    flex: 1;
+    min-width: 0;
+  }
+  .note {
+    color: var(--note);
   }
   .panes {
     display: flex;

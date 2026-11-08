@@ -540,11 +540,22 @@ fn mod_facts(plan: &PersonalizedPlan, folders: &BTreeMap<String, ModFolder>) -> 
     }
     let mut wins: Vec<BTreeMap<usize, usize>> = vec![BTreeMap::new(); checked.len()];
     let mut losses: Vec<BTreeMap<usize, usize>> = vec![BTreeMap::new(); checked.len()];
+    // A mod the plan does not install (planned for writing the list) is
+    // compared only with those it does: two left out are alternatives as
+    // often as not, and never meet in an install.
+    let installed: Vec<bool> = checked
+        .iter()
+        .map(|(id, _)| plan.selected_mods.iter().any(|s| s == id))
+        .collect();
     for indices in owners.values().filter(|o| o.len() > 1) {
         for (n, &earlier) in indices.iter().enumerate() {
             for &later in &indices[n + 1..] {
-                *wins[later].entry(earlier).or_default() += 1;
-                *losses[earlier].entry(later).or_default() += 1;
+                if installed[earlier] {
+                    *wins[later].entry(earlier).or_default() += 1;
+                }
+                if installed[later] {
+                    *losses[earlier].entry(later).or_default() += 1;
+                }
             }
         }
     }

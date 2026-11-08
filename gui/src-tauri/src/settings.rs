@@ -34,6 +34,10 @@ pub struct ListSettings {
     pub downloads: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<String>,
+    /// The profile Author mode plans with: a set of answers to look at the
+    /// list by, kept apart from the one installed into.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author_profile: Option<String>,
     /// Other folders that may already hold the list's archives, looked in
     /// before anything is downloaded (`download --archive-search-path`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -72,6 +76,37 @@ impl ListSettings {
     pub fn set_answers(&mut self, answers: BTreeMap<String, String>) {
         self.profile_answers.insert(self.profile(), answers.clone());
         self.answers = answers;
+    }
+
+    /// The profile Author mode plans with: its own, else the one installed
+    /// into.
+    pub fn author_profile(&self) -> String {
+        self.author_profile
+            .clone()
+            .unwrap_or_else(|| self.profile())
+    }
+
+    /// The answers Author mode plans with: its profile's, or the last given.
+    pub fn author_answers(&self) -> BTreeMap<String, String> {
+        self.profile_answers
+            .get(&self.author_profile())
+            .cloned()
+            .unwrap_or_else(|| self.answers.clone())
+    }
+
+    /// Remember `answers` for Author mode's profile.
+    pub fn set_author_answers(&mut self, answers: BTreeMap<String, String>) {
+        self.profile_answers.insert(self.author_profile(), answers);
+    }
+
+    /// Every profile with answers, and the two chosen: both modes offer the
+    /// same ones.
+    pub fn profile_names(&self) -> Vec<String> {
+        let mut names: Vec<String> = self.profile_answers.keys().cloned().collect();
+        names.extend([self.profile(), self.author_profile()]);
+        names.sort();
+        names.dedup();
+        names
     }
 }
 
