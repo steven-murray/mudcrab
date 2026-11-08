@@ -4,9 +4,9 @@
   import IfTag from "./IfTag.svelte";
 
   // An archive's installer choices as sets, in order: the first whose `if`
-  // holds is installed, the archive's own when none does. The one Author
-  // mode's profile installs is marked. A BAIN set's packages are ticked in
-  // place; a FOMOD set is chosen by walking its installer.
+  // holds is installed, and the last, "otherwise", when none does. The one
+  // Author mode's profile installs is marked. A BAIN set's packages are
+  // ticked in place; a FOMOD set is chosen by walking its installer.
   let {
     id,
     number,
@@ -51,18 +51,20 @@
   function startCondition(n: number) {
     adding = false;
     conditioning = n;
-    draft = sets[n].condition;
+    draft = sets[n].condition ?? "";
   }
   async function saveCondition() {
     if (conditioning === null) return;
     const n = conditioning;
-    if (await run(() => api.setChoiceCondition(id, number, n, draft?.trim() || null))) conditioning = null;
+    if (!draft?.trim()) return;
+    if (await run(() => api.setChoiceCondition(id, number, n, draft!.trim()))) conditioning = null;
   }
   async function addSet() {
     const condition = draft?.trim() || null;
+    if (!condition) return;
     if (fomod) {
       adding = false;
-      choose({ new: condition }, condition ? `a new set, if ${condition}` : "a new set");
+      choose({ new: condition }, `a new set, if ${condition}`);
     } else if (await run(() => api.writeBainSet(id, number, { new: condition }, own.packages))) adding = false;
   }
   const when = (c: string | null) => (c ? `if ${c}` : "always");
@@ -71,11 +73,34 @@
 <div class="sets">
   <div class="shead">
     <strong class="small">Install choices</strong>
-    <span class="dim small">the first set whose condition holds is installed; the archive's own when none does</span>
+    <span class="dim small">the first set whose condition holds is installed; <i>otherwise</i>, when none does</span>
   </div>
   {#each [...sets.map((set, n) => ({ set, n })), { set: own, n: -1 }] as { set, n } (n)}
     {@const to: ChoiceTarget = n < 0 ? "default" : { set: n }}
     {@const on = n < 0 ? installed === null : installed === n}
+    {#if n < 0}
+      <!-- New sets go just above otherwise, which comes last. -->
+    {#if adding}
+      <div class="edit">
+        <ConditionPicker bind:value={draft} {inputs} required taken={known} />
+        <div class="buttons">
+          <button class="primary small" onclick={addSet} disabled={!draft?.trim()}
+            >{fomod ? "Choose its options…" : "Add (as a copy of otherwise)"}</button
+          >
+          <button class="small" onclick={() => (adding = false)}>Cancel</button>
+        </div>
+      </div>
+    {:else}
+      <button
+        class="link small"
+        onclick={() => {
+          conditioning = null;
+          draft = "";
+          adding = true;
+        }}>+ Add a set of choices</button
+      >
+    {/if}
+    {/if}
     <div class="set" class:on>
       <div class="row">
         {#if n >= 0}
@@ -87,12 +112,12 @@
           </span>
           {#if set.condition}<IfTag condition={set.condition} applies={set.applies} />{:else}<span class="tag">always</span>{/if}
         {:else}
-          <span class="tag">{sets.length ? "otherwise" : "always"}</span>
+          <span class="tag" title="Used when no condition above holds">{sets.length ? "otherwise" : "always"}</span>
         {/if}
         {#if on}<span class="now" title="What Author mode's profile installs">installed</span>{/if}
         <span class="grow"></span>
         {#if fomod}
-          <button class="link small" onclick={() => choose(to, n < 0 ? "the archive's own choices" : `set ${n + 1}, ${when(set.condition)}`)}
+          <button class="link small" onclick={() => choose(to, n < 0 ? "otherwise (when no condition holds)" : `set ${n + 1}, ${when(set.condition)}`)}
             >Choose…</button
           >
         {/if}
@@ -103,9 +128,9 @@
       </div>
       {#if conditioning === n && n >= 0}
         <div class="edit">
-          <ConditionPicker bind:value={draft} {known} {inputs} />
+          <ConditionPicker bind:value={draft} {inputs} required taken={known.filter((c) => c !== set.condition)} />
           <div class="buttons">
-            <button class="primary small" onclick={saveCondition} disabled={draft !== null && !draft.trim()}>Save</button>
+            <button class="primary small" onclick={saveCondition} disabled={!draft?.trim()}>Save</button>
             <button class="small" onclick={() => (conditioning = null)}>Cancel</button>
           </div>
         </div>
@@ -134,26 +159,6 @@
       {/if}
     </div>
   {/each}
-  {#if adding}
-    <div class="edit">
-      <ConditionPicker bind:value={draft} {known} {inputs} />
-      <div class="buttons">
-        <button class="primary small" onclick={addSet} disabled={draft !== null && !draft.trim()}
-          >{fomod ? "Choose its options…" : "Add, starting from the archive's own"}</button
-        >
-        <button class="small" onclick={() => (adding = false)}>Cancel</button>
-      </div>
-    </div>
-  {:else}
-    <button
-      class="link small"
-      onclick={() => {
-        conditioning = null;
-        draft = null;
-        adding = true;
-      }}>+ Add a set of choices</button
-    >
-  {/if}
 </div>
 
 <style>
