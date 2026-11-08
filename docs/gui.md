@@ -228,8 +228,9 @@ history there, rather than be undone by it.
   or choice question and an answer -- and what other conditions set is
   shown beside each setting (`512 if potato`). **Save** writes that
   condition's `ini_set`, `ini_comment` and `ini_append_block` actions on the
-  file in place of the ones there were, as one step to undo; one kept keeps
-  its place and comments. Search and **Changed only** narrow a long file to
+  file in place of the ones there were, as one step to undo -- the settings
+  as one `ini_set`, its `values` by section; one kept keeps its place and
+  comments. Search and **Changed only** narrow a long file to
   the settings that match, each with the comments just above it.
 
   **Add an action…** adds one of the other actions (`action add`) -- `qac`,

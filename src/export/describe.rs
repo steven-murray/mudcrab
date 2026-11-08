@@ -475,20 +475,22 @@ pub fn action(action: &ModAction) -> Step {
     };
     match action {
         ModAction::IniSet(set) => {
-            let section = set
-                .section
-                .as_deref()
-                .map(|s| format!(" under `[{s}]`"))
-                .unwrap_or_default();
             let file = match set.scope {
                 crate::config::schema::IniScope::Game => format!("the game's {}", code(&set.file)),
                 crate::config::schema::IniScope::Mod => code(&set.file),
             };
-            plain(format!(
-                "In {file}, set {}{section} to {}.",
-                code(&set.key),
-                value(&set.value.to_string())
-            ))
+            let each: Vec<String> = set
+                .settings()
+                .iter()
+                .map(|s| {
+                    let section = s
+                        .section
+                        .map(|name| format!(" under `[{name}]`"))
+                        .unwrap_or_default();
+                    format!("{}{section} to {}", code(s.key), value(s.value))
+                })
+                .collect();
+            plain(format!("In {file}, set {}.", each.join(", ")))
         }
         ModAction::IniTweak(tweak) => plain(format!(
             "In {}, set {} to {}.",

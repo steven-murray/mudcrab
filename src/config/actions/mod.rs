@@ -174,8 +174,54 @@ mod tests {
             let ModAction::IniSet(spec) = parse(&src).unwrap() else {
                 panic!("expected ini_set for {fragment}");
             };
-            assert_eq!(spec.value.0, expected, "for {fragment}");
+            assert_eq!(spec.value.unwrap().0, expected, "for {fragment}");
         }
+    }
+
+    #[test]
+    fn ini_set_takes_several_values_by_section_or_not() {
+        let ModAction::IniSet(spec) = parse(
+            r#"
+            action = "ini_set"
+            file = "a.ini"
+            section = "Display"
+            values = { iShadow = 512, bSpecular = false, "dc.x" = "set to", Script = { fTimer = 1.5 } }
+            "#,
+        )
+        .unwrap() else {
+            panic!("expected ini_set");
+        };
+        let got: Vec<(Option<&str>, &str, &str)> = spec
+            .settings()
+            .iter()
+            .map(|s| (s.section, s.key, s.value))
+            .collect();
+        assert_eq!(
+            got,
+            [
+                (Some("Display"), "iShadow", "512"),
+                (Some("Display"), "bSpecular", "0"),
+                (Some("Display"), "dc.x", "set to"),
+                (Some("Script"), "fTimer", "1.5"),
+            ]
+        );
+        // Written back as it was given.
+        let json = serde_json::to_string(&spec).unwrap();
+        let back: crate::config::schema::IniSetAction = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.settings(), spec.settings());
+
+        // One form or the other.
+        let both = "action=\"ini_set\"\nfile=\"a.ini\"\nkey=\"k\"\nvalue=1\nvalues={ j = 2 }";
+        assert!(parse(both).unwrap_err().to_string().contains("not both"));
+        let neither = "action=\"ini_set\"\nfile=\"a.ini\"";
+        assert!(
+            parse(neither)
+                .unwrap_err()
+                .to_string()
+                .contains("`values` for several")
+        );
+        let half = "action=\"ini_set\"\nfile=\"a.ini\"\nkey=\"k\"";
+        assert!(parse(half).is_err());
     }
 
     #[test]

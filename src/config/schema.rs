@@ -540,9 +540,11 @@ pub struct ExtractBsaAction {
     pub keep_archive: bool,
 }
 
-/// Set a key in an INI file.
+/// Set keys in an INI file: one, as `key` and `value`, or several, as
+/// `values` -- `{ key = value, ... }`, a table in it a section of its own
+/// (`values.Display = { iShadowMapResolution = 512 }`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
+#[serde(try_from = "RawIniSet")]
 pub struct IniSetAction {
     /// Path to the INI. Relative to the mod's staged data folder for
     /// `scope = "mod"`, or to the game/profile INI location for `scope = "game"`.
@@ -556,12 +558,126 @@ pub struct IniSetAction {
     /// both, because there is no reading of "set Amount" that means both.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub section: Option<String>,
-    pub key: String,
-    pub value: IniValue,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub value: Option<IniValue>,
+    /// Several keys, by name; a table among them is a section's.
+    #[serde(default, skip_serializing_if = "IndexMap::is_empty")]
+    pub values: IndexMap<String, IniEntry>,
     #[serde(default)]
     pub format: IniSetFormat,
     #[serde(default)]
     pub scope: IniScope,
+}
+
+/// One of an `ini_set`'s `values`: a key's value, or a section of them.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum IniEntry {
+    Value(IniValue),
+    Section(IndexMap<String, IniValue>),
+}
+
+/// An `ini_set` as written, before it is checked to say one thing.
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RawIniSet {
+    file: String,
+    #[serde(default)]
+    section: Option<String>,
+    #[serde(default)]
+    key: Option<String>,
+    #[serde(default)]
+    value: Option<IniValue>,
+    #[serde(default)]
+    values: IndexMap<String, IniEntry>,
+    #[serde(default)]
+    format: IniSetFormat,
+    #[serde(default)]
+    scope: IniScope,
+}
+
+impl TryFrom<RawIniSet> for IniSetAction {
+    type Error = String;
+
+    fn try_from(raw: RawIniSet) -> Result<Self, String> {
+        match (&raw.key, &raw.value, raw.values.is_empty()) {
+            (Some(_), Some(_), true) | (None, None, false) => {}
+            (_, _, false) => {
+                return Err(format!(
+                    "ini_set on {}: give `values`, or `key` and `value`, not both",
+                    raw.file
+                ));
+            }
+            _ => {
+                return Err(format!(
+                    "ini_set on {}: give `key` and `value`, or `values` for several",
+                    raw.file
+                ));
+            }
+        }
+        Ok(Self {
+            file: raw.file,
+            section: raw.section,
+            key: raw.key,
+            value: raw.value,
+            values: raw.values,
+            format: raw.format,
+            scope: raw.scope,
+        })
+    }
+}
+
+/// One key an `ini_set` sets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct IniSetting<'a> {
+    pub section: Option<&'a str>,
+    pub key: &'a str,
+    pub value: &'a str,
+}
+
+impl IniSetAction {
+    /// The one key it sets.
+    pub fn one(file: &str, section: Option<&str>, key: &str, value: &str) -> Self {
+        Self {
+            file: file.to_string(),
+            section: section.map(str::to_string),
+            key: Some(key.to_string()),
+            value: Some(IniValue(value.to_string())),
+            values: IndexMap::new(),
+            format: IniSetFormat::Standard,
+            scope: IniScope::Mod,
+        }
+    }
+
+    /// Every key it sets, in order: its `key`, or each of its `values`, a
+    /// section's under that section and the rest under `section`.
+    pub fn settings(&self) -> Vec<IniSetting<'_>> {
+        if let (Some(key), Some(value)) = (&self.key, &self.value) {
+            return vec![IniSetting {
+                section: self.section.as_deref(),
+                key,
+                value: &value.0,
+            }];
+        }
+        let mut out = Vec::new();
+        for (name, entry) in &self.values {
+            match entry {
+                IniEntry::Value(value) => out.push(IniSetting {
+                    section: self.section.as_deref(),
+                    key: name,
+                    value: &value.0,
+                }),
+                IniEntry::Section(keys) => out.extend(keys.iter().map(|(key, value)| IniSetting {
+                    section: Some(name.as_str()),
+                    key,
+                    value: &value.0,
+                })),
+            }
+        }
+        out
+    }
 }
 
 /// Delete records or whole groups from a plugin.
