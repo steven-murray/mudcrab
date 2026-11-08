@@ -57,6 +57,16 @@ pulldown-cmark = { version = "0.13", default-features = false, features = ["html
 similar = "2"
 toml_edit = "0.22"
 
+# Dev builds (`cargo run`, `tauri dev`) optimise the dependencies and the
+# library: unoptimised, reading a 700-mod list took ~165 ms instead of ~15,
+# and the GUI reads it for nearly every command, so each edit took seconds.
+# The crates being worked on rebuild almost as quickly as before.
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.mudcrab]
+opt-level = 1
+
 [profile.release]
 # The audience downloads a binary rather than building one; debug symbols are
 # 2.5 MB of a 12.8 MB file and help nobody who is not building from source.

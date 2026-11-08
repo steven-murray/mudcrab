@@ -222,7 +222,7 @@ fn rewrite(state: &State, recorded: &Recorded, undo: bool) -> Result<(), String>
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
     let last = {
         let session = state.session.lock().map_err(|_| "a command panicked")?;
@@ -254,7 +254,7 @@ pub(super) fn undo(state: tauri::State<'_, State>) -> Result<Edited, String> {
     ))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn redo(state: tauri::State<'_, State>) -> Result<Edited, String> {
     let next = {
         let session = state.session.lock().map_err(|_| "a command panicked")?;
@@ -284,7 +284,7 @@ pub(super) struct Changes {
     can_redo: bool,
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn changes(state: tauri::State<'_, State>) -> Result<Changes, String> {
     let session = state.session.lock().map_err(|_| "a command panicked")?;
     let history = &session.history;
@@ -308,7 +308,7 @@ pub(super) fn changes(state: tauri::State<'_, State>) -> Result<Changes, String>
 // --- The edits ------------------------------------------------------------------------
 
 /// Move a plugin to just before another, or to the end (`plugins move`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn move_plugin(
     state: tauri::State<'_, State>,
     plugin: String,
@@ -334,7 +334,7 @@ pub(super) fn move_plugin(
 
 /// Tick a plugin in the load order, or leave it unticked (`plugins activate`,
 /// `plugins deactivate`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_plugin_active(
     state: tauri::State<'_, State>,
     plugin: String,
@@ -353,7 +353,7 @@ pub(super) fn set_plugin_active(
 
 /// Move a mod to a section, before another mod or at the section's end
 /// (`move`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn move_mod(
     state: tauri::State<'_, State>,
     id: String,
@@ -379,7 +379,7 @@ pub(super) fn move_mod(
 
 /// Add strings to or take them out of an archive's `include`, `exclude` or
 /// `bain_subpackages` (`files`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn edit_filter(
     state: tauri::State<'_, State>,
     id: String,
@@ -412,7 +412,7 @@ pub(super) fn edit_filter(
 
 /// Set or remove fields of a mod or one of its archives (`set`). `sets` are
 /// `key=value`, values in TOML (a bare word is a string).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_fields(
     state: tauri::State<'_, State>,
     id: String,
@@ -444,7 +444,7 @@ pub(super) fn set_fields(
 }
 
 /// Add an action to the end of a mod's actions (`action add`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn add_action(
     state: tauri::State<'_, State>,
     id: String,
@@ -475,7 +475,7 @@ pub(super) fn add_action(
 }
 
 /// Remove a mod's action by its number, from 1 (`action remove`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn remove_action(
     state: tauri::State<'_, State>,
     id: String,
@@ -493,7 +493,7 @@ pub(super) fn remove_action(
 }
 
 /// A mod's actions, numbered as `action remove` takes them.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn actions(state: tauri::State<'_, State>, id: String) -> Result<Vec<String>, String> {
     let place = edit::place_of_mod(&state.list()?, &id).map_err(shown)?;
     let text = std::fs::read_to_string(&place.file).map_err(|err| err.to_string())?;
@@ -503,7 +503,7 @@ pub(super) fn actions(state: tauri::State<'_, State>, id: String) -> Result<Vec<
 /// Write one INI's settings under one condition (the INI editor): the
 /// mod's `ini_set`, `ini_comment` and `ini_append_block` actions on it with
 /// that `if`, in place of those there were.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_ini(
     state: tauri::State<'_, State>,
     id: String,
@@ -529,7 +529,7 @@ pub(super) fn set_ini(
 }
 
 /// Declare a question (`input add`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn add_input(
     state: tauri::State<'_, State>,
     name: String,
@@ -586,7 +586,7 @@ pub(super) fn add_input(
 }
 
 /// Change a question's fields (`input set`).
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_input(
     state: tauri::State<'_, State>,
     name: String,
@@ -608,7 +608,7 @@ pub(super) fn set_input(
 }
 
 /// Remove a question (`input remove`); refused while a condition asks it.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn remove_input(state: tauri::State<'_, State>, name: String) -> Result<Edited, String> {
     let (list, planned) = plan(&state, |text, _| doc::remove_input(text, &name))?;
     let command = format!("mudcrab input remove {} {}", list_arg(&list), quote(&name));
@@ -617,7 +617,7 @@ pub(super) fn remove_input(state: tauri::State<'_, State>, name: String) -> Resu
 
 /// Write a mod's notes (`docs`): each field set to its text, or removed when
 /// `None` or empty -- in the list or its docs file, wherever they already are.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_docs(
     state: tauri::State<'_, State>,
     id: String,
@@ -636,7 +636,7 @@ pub(super) fn set_docs(
 }
 
 /// A mod's plain fields, or one of its archives', as `set` changes them.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn fields(
     state: tauri::State<'_, State>,
     id: String,
@@ -649,7 +649,7 @@ pub(super) fn fields(
 
 /// Remove a mod (`remove`): its block, its plugins from the load order, and
 /// its notes from the docs file -- one step, undone as one.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn remove_mod(state: tauri::State<'_, State>, id: String) -> Result<Edited, String> {
     let list = state.list()?;
     let edits = edit::plan_remove(&list, &id).map_err(shown)?;
@@ -659,7 +659,7 @@ pub(super) fn remove_mod(state: tauri::State<'_, State>, id: String) -> Result<E
 
 /// Tick a mod in MO2 or leave it unticked (`enable`, `disable`), its plugins
 /// put back in the load order or taken out.
-#[tauri::command]
+#[tauri::command(async)]
 pub(super) fn set_enabled(
     state: tauri::State<'_, State>,
     id: String,

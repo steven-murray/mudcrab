@@ -122,12 +122,12 @@ struct ListView {
 
 /// Something the window found slow, written to the log, to find what makes
 /// it feel sluggish.
-#[tauri::command]
+#[tauri::command(async)]
 fn note_slow(what: String, ms: f64) {
     tracing::info!(target: "mudcrab::gui", what, ms = ms.round() as u64, "slow in the window");
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn recent(state: tauri::State<'_, State>) -> Vec<String> {
     state
         .settings
@@ -143,7 +143,7 @@ fn recent(state: tauri::State<'_, State>) -> Vec<String> {
 }
 
 /// The parts of the guided tour already shown.
-#[tauri::command]
+#[tauri::command(async)]
 fn toured(state: tauri::State<'_, State>) -> Vec<String> {
     state
         .settings
@@ -153,7 +153,7 @@ fn toured(state: tauri::State<'_, State>) -> Vec<String> {
 }
 
 /// Remember that a part of the tour was shown (seen through or skipped).
-#[tauri::command]
+#[tauri::command(async)]
 fn tour_shown(state: tauri::State<'_, State>, part: String) -> Result<(), String> {
     let mut settings = state.settings.lock().map_err(|_| "a command panicked")?;
     if !settings.toured.contains(&part) {
@@ -164,7 +164,7 @@ fn tour_shown(state: tauri::State<'_, State>, part: String) -> Result<(), String
 }
 
 /// Start a new, empty list at `path` (`new`); the page then opens it.
-#[tauri::command]
+#[tauri::command(async)]
 fn new_list(path: String, name: String) -> Result<String, String> {
     let path = PathBuf::from(path);
     config::edit::create_list(&path, &name).map_err(shown)?;
@@ -174,7 +174,7 @@ fn new_list(path: String, name: String) -> Result<String, String> {
 /// Copy the open list to a new file, named `name` (`edit::clone_list`),
 /// with this list's settings here -- its MO2 instance, folders and answers
 /// -- so the copy opens ready to install.
-#[tauri::command]
+#[tauri::command(async)]
 fn clone_list(
     state: tauri::State<'_, State>,
     path: String,
@@ -192,7 +192,7 @@ fn clone_list(
     Ok(to.display().to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn open_list<R: Runtime>(
     app: tauri::AppHandle<R>,
     state: tauri::State<'_, State>,
@@ -248,7 +248,7 @@ fn read_list(
 
 /// The open list read again, after an edit, keeping the session (its plan,
 /// history and checks).
-#[tauri::command]
+#[tauri::command(async)]
 fn reload_list(state: tauri::State<'_, State>) -> Result<ListView, String> {
     let path = state.list()?;
     let (modlist, document) = read_list(&path)?;
@@ -469,12 +469,12 @@ fn instance_profiles(instance: &std::path::Path) -> Vec<String> {
     names
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn locations(state: tauri::State<'_, State>) -> Result<Locations, String> {
     locate(&state).map(|located| located.shown)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 fn set_location(
     state: tauri::State<'_, State>,
     kind: String,
@@ -521,7 +521,7 @@ fn set_location(
 }
 
 /// Use this tools.toml (or with `None`, the usual one), from now on.
-#[tauri::command]
+#[tauri::command(async)]
 fn set_tools_config(
     state: tauri::State<'_, State>,
     path: Option<String>,
@@ -541,7 +541,7 @@ fn set_tools_config(
 
 /// Keep the Nexus API key in the tools.toml in use (or with `None`, take it
 /// out), where the command line reads it too, as `setup-tools` writes it.
-#[tauri::command]
+#[tauri::command(async)]
 fn set_api_key(state: tauri::State<'_, State>, key: Option<String>) -> Result<Locations, String> {
     let path = config::tools::ToolsConfig::default_path()
         .ok_or("there is no tools.toml to keep the key in (no config folder)")?;
@@ -583,7 +583,7 @@ const TOOL_KEYS: &[&str] = &[
     "wine.proton",
 ];
 
-#[tauri::command]
+#[tauri::command(async)]
 fn tool_settings() -> ToolSettings {
     use config::tools::ToolsConfig;
     let path = ToolsConfig::default_path();
@@ -638,7 +638,7 @@ fn tool_settings() -> ToolSettings {
 }
 
 /// Set one setting in tools.toml (or with `None`, take it out).
-#[tauri::command]
+#[tauri::command(async)]
 fn set_tool(key: String, value: Option<String>) -> Result<ToolSettings, String> {
     if !TOOL_KEYS.contains(&key.as_str()) {
         return Err(format!("no tools.toml setting called {key}"));
@@ -650,7 +650,7 @@ fn set_tool(key: String, value: Option<String>) -> Result<ToolSettings, String> 
 }
 
 /// Look in another folder for archives, before downloading them.
-#[tauri::command]
+#[tauri::command(async)]
 fn add_search_folder(state: tauri::State<'_, State>, path: String) -> Result<Locations, String> {
     let list = state.list()?;
     {
@@ -666,7 +666,7 @@ fn add_search_folder(state: tauri::State<'_, State>, path: String) -> Result<Loc
 }
 
 /// Stop looking in a folder.
-#[tauri::command]
+#[tauri::command(async)]
 fn remove_search_folder(state: tauri::State<'_, State>, path: String) -> Result<Locations, String> {
     let list = state.list()?;
     {
@@ -690,7 +690,7 @@ struct Done {
 }
 
 /// Compile the list and plan it with these answers: `compile`, then `query`.
-#[tauri::command]
+#[tauri::command(async)]
 fn step_plan(
     state: tauri::State<'_, State>,
     answers: BTreeMap<String, String>,
@@ -708,7 +708,7 @@ fn step_plan(
 
 /// Stop the run in progress at its next archive or mod
 /// (`mudcrab::util::cancel`).
-#[tauri::command]
+#[tauri::command(async)]
 fn cancel_run() {
     mudcrab::util::cancel::request();
 }
@@ -881,7 +881,7 @@ async fn step_download(state: tauri::State<'_, State>) -> Result<Downloaded, Str
 /// Look once for the archives being fetched by hand: what has arrived is
 /// taken in (moved from the browser's folder, with its `.meta`), and what is
 /// still missing comes back.
-#[tauri::command]
+#[tauri::command(async)]
 fn look_for_downloads(state: tauri::State<'_, State>) -> Result<Vec<ByHand>, String> {
     let mut session = state.session.lock().map_err(|_| "a command panicked")?;
     let Session {
@@ -912,7 +912,7 @@ fn report_warning(message: &str) {
 }
 
 /// Open a page in the browser.
-#[tauri::command]
+#[tauri::command(async)]
 fn open_page(url: String) -> Result<(), String> {
     // Only web pages: a list names these, and a list is someone else's file.
     if !(url.starts_with("https://") || url.starts_with("http://")) {
@@ -966,7 +966,7 @@ fn grouped(findings: &[config::check::Finding]) -> Vec<FindingGroup> {
 /// Which of the list's questions are asked, and each one's default, as
 /// these answers leave them: a question whose `if` does not hold is hidden,
 /// and a default may follow an earlier answer.
-#[tauri::command]
+#[tauri::command(async)]
 fn question_states(
     state: tauri::State<'_, State>,
     answers: std::collections::HashMap<String, String>,
@@ -1441,7 +1441,7 @@ struct StepByHand {
 }
 
 /// The steps left to do by hand, and which are done.
-#[tauri::command]
+#[tauri::command(async)]
 fn manual_steps(state: tauri::State<'_, State>) -> Result<Vec<StepByHand>, String> {
     let plan = plan_of(&state)?;
     let settings = install_settings(&state)?;
@@ -1488,7 +1488,7 @@ fn manual_steps(state: tauri::State<'_, State>) -> Result<Vec<StepByHand>, Strin
 /// The list given on the command line, to open at start.
 pub struct Opening(pub Option<String>);
 
-#[tauri::command]
+#[tauri::command(async)]
 fn opening(start: tauri::State<'_, Opening>) -> Option<String> {
     start.0.clone()
 }
