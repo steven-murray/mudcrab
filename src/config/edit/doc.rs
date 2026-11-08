@@ -980,6 +980,110 @@ pub fn field_values(
         .collect())
 }
 
+/// Write one set of an installer's choices into a mod's archive (from 1):
+/// `set`'s, or the base set's for `None`, the others' kept, as
+/// [`crate::config::installer_sets`] lays them out. A BAIN wizard's choices
+/// go only into the base set: its plugins left out are the archive's.
+pub fn set_installer_set(
+    text: &str,
+    id: &str,
+    archive: usize,
+    chosen: &crate::config::inspect::Chosen,
+    set: Option<&str>,
+) -> anyhow::Result<String> {
+    use crate::config::inspect::Chosen;
+    use crate::config::installer_sets;
+    use crate::config::schema::{BainSubpackage, FomodSelection};
+    anyhow::ensure!(
+        set.is_none() || !matches!(chosen, Chosen::Wizard { .. }),
+        "a BAIN wizard's choices cannot depend on a question; choose its packages directly"
+    );
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    match chosen {
+        Chosen::Fomod(selections) => {
+            let old: Vec<Table> = table
+                .get("fomod_selections")
+                .and_then(Item::as_array_of_tables)
+                .map(|tables| tables.iter().cloned().collect())
+                .unwrap_or_default();
+            let rows: Vec<FomodSelection> = old
+                .iter()
+                .map(|t| toml::from_str(&t.to_string()))
+                .collect::<Result<_, _>>()
+                .map_err(|err| anyhow::anyhow!("mod '{id}': a FOMOD selection: {err}"))?;
+            let plain: Vec<FomodSelection> = selections
+                .iter()
+                .filter(|s| s.condition.is_none())
+                .cloned()
+                .collect();
+            let written = installer_sets::write_fomod(&rows, set, &plain);
+            let mut tables = ArrayOfTables::new();
+            for selection in &written {
+                let mut new = Table::new();
+                // The row's old table, for its comments.
+                if let Some(was) = old.iter().find(|t| {
+                    t.get("step").and_then(Item::as_str) == Some(selection.step.as_str())
+                        && t.get("group").and_then(Item::as_str) == Some(selection.group.as_str())
+                        && t.get("if").and_then(Item::as_str) == selection.condition.as_deref()
+                }) {
+                    *new.decor_mut() = was.decor().clone();
+                }
+                if let Some(condition) = &selection.condition {
+                    new.insert("if", toml_edit::value(condition.as_str()));
+                }
+                new.insert("step", toml_edit::value(selection.step.as_str()));
+                new.insert("group", toml_edit::value(selection.group.as_str()));
+                new.insert(
+                    "options",
+                    Item::Value(Value::Array(
+                        selection.options.iter().map(String::as_str).collect(),
+                    )),
+                );
+                tables.push(new);
+            }
+            if tables.is_empty() {
+                table.remove("fomod_selections");
+            } else {
+                table.insert("fomod_selections", Item::ArrayOfTables(tables));
+            }
+            Ok(doc.to_string())
+        }
+        Chosen::Bain(names) => {
+            let entries: Vec<BainSubpackage> = match table.get("bain_subpackages") {
+                Some(item) => toml::from_str::<
+                    std::collections::BTreeMap<String, Vec<BainSubpackage>>,
+                >(&format!("x = {}", item.to_string().trim()))
+                .map_err(|err| anyhow::anyhow!("mod '{id}': bain_subpackages: {err}"))?
+                .remove("x")
+                .unwrap_or_default(),
+                None => Vec::new(),
+            };
+            let order: Vec<String> = entries
+                .iter()
+                .map(|e| e.name().to_string())
+                .chain(names.iter().cloned())
+                .collect();
+            let written = installer_sets::write_bain(&entries, set, names, &order)?;
+            let mut array = Array::new();
+            for entry in &written {
+                match entry {
+                    BainSubpackage::Name(name) => array.push(name.as_str()),
+                    BainSubpackage::Conditional { name, condition } => {
+                        let mut t = toml_edit::InlineTable::new();
+                        t.insert("name", name.as_str().into());
+                        t.insert("if", condition.as_str().into());
+                        array.push(Value::InlineTable(t));
+                    }
+                }
+            }
+            table.insert("bain_subpackages", Item::Value(Value::Array(array)));
+            Ok(doc.to_string())
+        }
+        Chosen::Wizard { .. } => set_installer(text, id, archive, chosen, false),
+    }
+}
+
 /// Write an installer's choices into a mod's archive (from 1): a FOMOD's as
 /// its `fomod_selections`, one table per group asked, in order (a group's
 /// table keeps its comments); BAIN packages as `bain_subpackages`; a
@@ -1507,5 +1611,36 @@ id = "B"
             out.contains("key = \"Other\""),
             "another condition is left: {out}"
         );
+    }
+
+    #[test]
+    fn an_installer_set_is_written_beside_the_others() {
+        use crate::config::inspect::Chosen;
+        use crate::config::schema::FomodSelection;
+        let fomod = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\n\n# The usual size.\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"Size\"\noptions = [\"1K\"]\n";
+        let row = |group: &str, option: &str| FomodSelection {
+            condition: None,
+            step: "S".to_string(),
+            group: group.to_string(),
+            options: vec![option.to_string()],
+        };
+        let chosen = Chosen::Fomod(vec![row("Size", "2K")]);
+        let out = super::set_installer_set(fomod, "A", 1, &chosen, Some("res == 2k")).unwrap();
+        assert!(out.contains("# The usual size.\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"Size\"\noptions = [\"1K\"]"), "{out}");
+        assert!(out.contains("[[mods.archives.fomod_selections]]\nif = \"res == 2k\"\nstep = \"S\"\ngroup = \"Size\"\noptions = [\"2K\"]"), "{out}");
+
+        let bain = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\nbain_subpackages = [\"00 Core\", \"01 1K\"]\n";
+        let chosen = Chosen::Bain(vec!["00 Core".to_string(), "02 2K".to_string()]);
+        let out = super::set_installer_set(bain, "A", 1, &chosen, Some("res == 2k")).unwrap();
+        assert!(
+            out.contains("bain_subpackages = [\"00 Core\", { name = \"01 1K\", if = \"res != 2k\" }, { name = \"02 2K\", if = \"res == 2k\" }]"),
+            "{out}"
+        );
+        // A wizard's choices go only in the base set.
+        let wizard = Chosen::Wizard {
+            subpackages: vec![],
+            exclude: vec![],
+        };
+        assert!(super::set_installer_set(bain, "A", 1, &wizard, Some("x")).is_err());
     }
 }

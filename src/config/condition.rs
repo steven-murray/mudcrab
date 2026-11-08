@@ -188,8 +188,29 @@ impl Condition {
             .iter()
             .map(|all| {
                 all.iter()
-                    .map(|(negated, term)| {
-                        format!("{}{}", if *negated { "!" } else { "" }, term_text(term))
+                    .map(|(negated, term)| match (negated, term) {
+                        // `!k == v` reads better as `k != v`.
+                        (
+                            true,
+                            Condition::Input {
+                                key,
+                                test: InputTest::Equals(want),
+                            },
+                        ) => term_text(&Condition::Input {
+                            key: key.clone(),
+                            test: InputTest::NotEquals(want.clone()),
+                        }),
+                        (
+                            true,
+                            Condition::Input {
+                                key,
+                                test: InputTest::NotEquals(want),
+                            },
+                        ) => term_text(&Condition::Input {
+                            key: key.clone(),
+                            test: InputTest::Equals(want.clone()),
+                        }),
+                        _ => format!("{}{}", if *negated { "!" } else { "" }, term_text(term)),
                     })
                     .collect::<Vec<_>>()
                     .join(" && ")
@@ -251,6 +272,24 @@ fn term_text(term: &Condition) -> String {
         },
         _ => unreachable!("only terms are left once multiplied out"),
     }
+}
+
+/// None of `conditions`, as one condition's text: what holds when none of
+/// them does. Written out without parentheses, which conditions do not
+/// have: `!(a && b)` becomes `!a || !b`.
+pub fn none_of(conditions: &[&str]) -> anyhow::Result<String> {
+    let all = conditions
+        .iter()
+        .map(|c| Ok(Condition::Not(Box::new(Condition::parse(c)?))))
+        .collect::<anyhow::Result<Vec<_>>>()?;
+    Ok(Condition::All(all).to_text())
+}
+
+/// `expr` in its plain written form, to compare two conditions by.
+pub fn normalized(expr: &str) -> String {
+    Condition::parse(expr)
+        .map(|c| c.to_text())
+        .unwrap_or_else(|_| expr.trim().to_string())
 }
 
 /// Both `a` and `b`, as one condition's text.
@@ -522,5 +561,19 @@ mod tests {
             format!("{err:#}").contains("mod:\"Cleaned DLC Masters\""),
             "{err:#}"
         );
+    }
+}
+
+#[cfg(test)]
+mod none_of_tests {
+    #[test]
+    fn none_of_is_written_without_parentheses() {
+        assert_eq!(super::none_of(&["potato"]).unwrap(), "!potato");
+        assert_eq!(
+            super::none_of(&["res == 2k", "potato"]).unwrap(),
+            "res != 2k && !potato"
+        );
+        // `!(a && b)` has no parentheses to be written with.
+        assert_eq!(super::none_of(&["a && b"]).unwrap(), "!a || !b");
     }
 }

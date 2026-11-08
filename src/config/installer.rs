@@ -109,6 +109,10 @@ pub struct Prior {
     /// Walk the installer even on defaults, so each choice is written out
     /// (`choose`). Adding leaves an installer nobody walked to its defaults.
     pub always: bool,
+    /// Offer each FOMOD group's options to depend on the list's questions,
+    /// a row per condition (`Asked::Choose`'s `rows`). Off where whole sets
+    /// of choices are chosen per condition instead.
+    pub per_group: bool,
 }
 
 /// The walk stopped at a question with no answer yet.
@@ -267,10 +271,11 @@ fn walk_with(
             let mut depends: Vec<crate::config::schema::FomodSelection> = Vec::new();
             let selections = choose_fomod(&xml, config_path, &active, &mut |group| {
                 // What the entry chooses already, where it names this group.
+                // The last row naming the group, as install takes it.
                 let default = prior
                     .fomod
                     .iter()
-                    .find(|s| s.step == group.step && s.group == group.group)
+                    .rfind(|s| s.step == group.step && s.group == group.group)
                     .map(|s| {
                         (0..group.options.len())
                             .filter(|&i| s.options.contains(&group.options[i].name))
@@ -312,7 +317,7 @@ fn walk_with(
                             .collect(),
                         default,
                     },
-                    Some(rows),
+                    prior.per_group.then_some(rows),
                 )?;
                 depends.extend(rows.into_iter().map(|row| {
                     crate::config::schema::FomodSelection {
@@ -712,10 +717,58 @@ pub fn existing(
                 .map(|p| p.name().to_string())
                 .collect(),
             always: true,
+            per_group: true,
         },
         list: ListPlugins::of(&source),
         report,
         archive,
+    })
+}
+
+/// The same, for walking one set of its choices: `set`'s (`None`: the
+/// base set, chosen when no condition holds), each question starting at
+/// what that set chooses now. See [`crate::config::installer_sets`].
+pub fn existing_set(
+    path: &Path,
+    id: &str,
+    number: usize,
+    overrides: &crate::config::query::Overrides,
+    downloads: &Path,
+    search: &[std::path::PathBuf],
+    set: Option<&str>,
+) -> anyhow::Result<Existing> {
+    let mut found = existing(path, id, number, overrides, downloads, search)?;
+    let text = std::fs::read_to_string(path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    let source = crate::config::loader::parse_modlist(&text, path)?;
+    let spec = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .and_then(|entry| entry.archives.get(number.wrapping_sub(1)))
+        .ok_or_else(|| anyhow::anyhow!("'{id}' has no archive {number}"))?;
+    found.prior.fomod = crate::config::installer_sets::fomod_set(&spec.fomod_selections, set);
+    found.prior.rows = Vec::new();
+    found.prior.per_group = false;
+    found.prior.packages = crate::config::installer_sets::bain_set(&spec.bain_subpackages, set);
+    Ok(found)
+}
+
+/// Plan writing one set of choices -- `set`'s, `None` for the base -- into
+/// mod `id`'s `number`th archive, in the list at `path`: the others kept.
+pub fn plan_choice_set(
+    path: &Path,
+    id: &str,
+    number: usize,
+    installed: &Installed,
+    set: Option<&str>,
+) -> anyhow::Result<crate::config::edit::Edit> {
+    let chosen = installed
+        .chosen
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("this archive's installer has nothing to choose"))?;
+    crate::config::edit::plan_mod(path, id, |text, _, id| {
+        crate::config::edit::doc::set_installer_set(text, id, number, chosen, set)
     })
 }
 
@@ -810,6 +863,10 @@ mod tests {
         let archive = archive(dir.path());
         let report = inspect_archive(&archive, false).unwrap();
         let list = ListPlugins::default();
+        let per_group = Prior {
+            per_group: true,
+            ..Prior::default()
+        };
         let row = |condition: &str, pick: Vec<usize>| Row {
             condition: condition.to_string(),
             pick,
@@ -823,7 +880,7 @@ mod tests {
             Answer::Pick(vec![]),
         ];
         let Walk::Done { installed } =
-            walk(&archive, &report, &list, &Prior::default(), &answers, false).unwrap()
+            walk(&archive, &report, &list, &per_group, &answers, false).unwrap()
         else {
             panic!("the walk should be done");
         };
@@ -854,6 +911,7 @@ mod tests {
         let prior = Prior {
             fomod: vec![selections[1].clone()],
             rows: selections.clone(),
+            per_group: true,
             ..Prior::default()
         };
         let Walk::Ask {
@@ -873,7 +931,7 @@ mod tests {
             now: vec![0],
             rows: vec![row(" ", vec![1])],
         }];
-        assert!(walk(&archive, &report, &list, &Prior::default(), &blank, false).is_err());
+        assert!(walk(&archive, &report, &list, &per_group, &blank, false).is_err());
     }
 
     #[test]

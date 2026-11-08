@@ -21,6 +21,7 @@ pub mod ini_edit;
 pub mod inspect;
 pub mod install;
 pub mod installer;
+pub mod installer_sets;
 pub mod loader;
 pub mod mo2;
 pub mod pipeline;
