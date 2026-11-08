@@ -9,6 +9,7 @@ use super::edits::{Edited, apply};
 use super::{State, locate, quote, shown};
 use mudcrab::config;
 use mudcrab::config::add::{LoadPosition, NewMod, Placement, plan_add};
+use mudcrab::config::edit::doc;
 use mudcrab::config::inspect::{InspectReport, inspect_archive};
 use mudcrab::config::installer::{self, Answer, ListPlugins, Walk};
 use serde::{Deserialize, Serialize};
@@ -524,7 +525,13 @@ pub(super) fn add_mod(
 
 /// Mod `id`'s `number`th archive, found for walking its installer again, with
 /// the answers given in Install deciding which archives it has.
-fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existing, String> {
+/// Mod `id`'s archive, walked from one of its sets of choices.
+fn existing(
+    state: &State,
+    id: &str,
+    number: usize,
+    to: &doc::ChoiceTarget,
+) -> Result<installer::Existing, String> {
     let list = state.list()?;
     let located = locate(state)?;
     let downloads = located
@@ -538,7 +545,8 @@ fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existin
         .author_answers()
         .into_iter()
         .collect();
-    installer::existing(&list, id, number, &answers, &downloads, &located.search).map_err(shown)
+    installer::existing_choice(&list, id, number, &answers, &downloads, &located.search, to)
+        .map_err(shown)
 }
 
 /// The installer of mod `id`'s archive walked with `answers` so far, what the
@@ -549,8 +557,10 @@ pub(super) async fn choose_walk(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    to: Option<doc::ChoiceTarget>,
 ) -> Result<Walk, String> {
-    let found = existing(&state, &id, number)?;
+    let to = to.unwrap_or(doc::ChoiceTarget::Default);
+    let found = existing(&state, &id, number, &to)?;
     tokio::task::spawn_blocking(move || {
         installer::walk(
             &found.archive,
@@ -573,9 +583,11 @@ pub(super) fn choose_write(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    to: Option<doc::ChoiceTarget>,
 ) -> Result<Edited, String> {
+    let to = to.unwrap_or(doc::ChoiceTarget::Default);
     let list = state.list()?;
-    let found = existing(&state, &id, number)?;
+    let found = existing(&state, &id, number, &to)?;
     let installed = match installer::walk(
         &found.archive,
         &found.report,
@@ -589,7 +601,7 @@ pub(super) fn choose_write(
         Walk::Done { installed } => installed,
         Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
     };
-    let edit = installer::plan_choice(&list, &id, number, &installed, true).map_err(shown)?;
+    let edit = installer::plan_choice_to(&list, &id, number, &installed, &to).map_err(shown)?;
     let mut command = format!(
         "mudcrab choose {} --mod {}",
         quote(list.display().to_string()),

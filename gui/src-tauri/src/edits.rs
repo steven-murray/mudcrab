@@ -550,6 +550,86 @@ pub(super) fn set_ini(
     apply(&state, command, planned)
 }
 
+/// An edit to one of an archive's sets of choices, as one step to undo.
+fn choice_edit(
+    state: &State,
+    id: &str,
+    number: usize,
+    what: &str,
+    change: impl FnOnce(&str, &str) -> anyhow::Result<String>,
+) -> Result<Edited, String> {
+    let (list, planned) = plan_mod(state, id, |text, source, written| {
+        anyhow::ensure!(
+            source.mods.iter().any(|m| m.id == written),
+            "the list has no mod with id '{id}'"
+        );
+        change(text, written)
+    })?;
+    let command = format!(
+        "choice sets: {what}, archive {number} of mod {} in {}",
+        quote(id),
+        list_arg(&list)
+    );
+    apply(state, command, planned)
+}
+
+/// BAIN packages chosen for one of an archive's sets of choices: its own, a
+/// set's, or a new set's.
+#[tauri::command(async)]
+pub(super) fn write_bain_set(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    to: doc::ChoiceTarget,
+    packages: Vec<String>,
+) -> Result<Edited, String> {
+    let chosen = mudcrab::config::inspect::Chosen::Bain(packages);
+    choice_edit(&state, &id, number, "packages", |text, written| {
+        doc::write_choice_set(text, written, number, &to, &chosen)
+    })
+}
+
+/// A choice set's `if` set, or (empty) cleared.
+#[tauri::command(async)]
+pub(super) fn set_choice_condition(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    index: usize,
+    condition: Option<String>,
+) -> Result<Edited, String> {
+    choice_edit(&state, &id, number, "condition", |text, written| {
+        doc::set_choice_condition(text, written, number, index, condition.as_deref())
+    })
+}
+
+/// A choice set taken out.
+#[tauri::command(async)]
+pub(super) fn remove_choice_set(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    index: usize,
+) -> Result<Edited, String> {
+    choice_edit(&state, &id, number, "remove", |text, written| {
+        doc::remove_choice_set(text, written, number, index)
+    })
+}
+
+/// A choice set moved, earlier tried first.
+#[tauri::command(async)]
+pub(super) fn move_choice_set(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+    from: usize,
+    to: usize,
+) -> Result<Edited, String> {
+    choice_edit(&state, &id, number, "move", |text, written| {
+        doc::move_choice_set(text, written, number, from, to)
+    })
+}
+
 /// Declare a question (`input add`).
 #[tauri::command(async)]
 pub(super) fn add_input(

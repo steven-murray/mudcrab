@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import type { Conditional, Tree } from "./api";
+  import type { ChoiceSetView, ChoiceTarget, Conditional, Tree } from "./api";
   import IfTag from "./IfTag.svelte";
   /** One of the mod's archives, and its tree once read. */
   export type Archive = {
@@ -10,6 +10,10 @@
     applies?: boolean | null;
     /** Its FOMOD rows and BAIN packages as written, with their `if`s. */
     choices?: Conditional[];
+    /** Its sets of choices, its own, and the one installed. */
+    sets?: ChoiceSetView[];
+    own?: ChoiceSetView;
+    installed?: number | null;
     tree: Tree | null;
     error: string | null;
   };
@@ -17,6 +21,7 @@
 
 <script lang="ts">
   import { tick as rendered } from "svelte";
+  import ChoiceSets from "./ChoiceSets.svelte";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { startDrag } from "./drag";
   import type { InputDoc } from "./api";
@@ -51,7 +56,8 @@
     move: (from: string, to: string) => Promise<boolean>;
     problem: (message: string) => void;
     /** Walk an archive's installer again. */
-    choose: (number: number, label: string) => void;
+    /** Walk an archive's FOMOD installer for one of its sets of choices. */
+    choose: (number: number, label: string, to: ChoiceTarget, title: string) => void;
     /** The list's questions, for an archive's `if`. */
     inputs: InputDoc[];
     /** Run an edit; resolves true when written. */
@@ -343,32 +349,27 @@
       <strong>{several ? `${archive.number}. ` : ""}{archive.label}</strong>
       {#if archive.condition}<IfTag condition={archive.condition} applies={archive.applies} />{/if}
       {#if archive.tree}<span class="tag" title="Its layout">{archive.tree.layout ?? "automatic"}</span>{/if}
-      {#if archive.tree && (fomodOf(archive.tree) || archive.tree.layout === "bain")}
-        <button
-          class="small"
-          onclick={() => choose(archive.number, archive.label)}
-          title="Walk its installer again, starting at what the list chooses now (mudcrab choose)"
-          >Choose its {fomodOf(archive.tree) ? "FOMOD options" : "BAIN packages"}…</button
-        >
-      {/if}
     </div>
-    {#if archive.choices?.some((c) => c.condition)}
-      <ul class="choices">
-        {#each archive.choices as c, n (n)}
-          <li class:off={c.applies === false}>
-            {c.text}
-            {#if c.condition}<IfTag condition={c.condition} applies={c.applies} />{/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
     {#if archive.error}
       <pre class="error">{archive.error}</pre>
     {:else if !archive.tree}
       <p class="dim small">Reading the archive…</p>
     {:else}
       {@const tree = archive.tree}
-      {#if packagesOf(tree).length}
+      {#if archive.own && (fomodOf(tree) || packagesOf(tree).length)}
+        <ChoiceSets
+          {id}
+          number={archive.number}
+          fomod={fomodOf(tree)}
+          packages={packagesOf(tree).map((p) => p.name)}
+          sets={archive.sets ?? []}
+          own={archive.own}
+          installed={archive.installed ?? null}
+          {inputs}
+          {run}
+          choose={(to, title) => choose(archive.number, archive.label, to, title)}
+        />
+      {:else if packagesOf(tree).length}
         <div class="packages">
           <span class="dim">Packages:</span>
           {#each packagesOf(tree) as pkg}
@@ -496,14 +497,6 @@
 {#if !files.length && archives.every((a) => a.tree)}<p class="dim small">Nothing goes in the mod's folder.</p>{/if}
 
 <style>
-  .choices {
-    margin: 2px 0 6px;
-    padding-left: 18px;
-    font-size: 12px;
-  }
-  .choices li.off {
-    color: var(--faint);
-  }
   .archive {
     border: 1px solid var(--line);
     border-radius: 6px;

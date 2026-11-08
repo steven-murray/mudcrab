@@ -35,8 +35,15 @@ fn packages(list: &std::path::Path, set: &[&str]) -> Vec<String> {
     let sets: Vec<String> = set.iter().map(|s| s.to_string()).collect();
     let plan = build_plan(&compiled.modlist, &parse_overrides(&sets).unwrap(), None).unwrap();
     let archive = &plan.mods[0].archives[0];
-    assert!(archive.choices.is_empty(), "the plan holds only what is chosen");
-    archive.bain_subpackages.iter().map(|p| p.name().to_string()).collect()
+    assert!(
+        archive.choices.is_empty(),
+        "the plan holds only what is chosen"
+    );
+    archive
+        .bain_subpackages
+        .iter()
+        .map(|p| p.name().to_string())
+        .collect()
 }
 
 #[test]
@@ -51,6 +58,8 @@ fn the_first_set_whose_if_holds_is_installed() {
 
     // A set's `if` is checked like any other.
     std::fs::write(&list, LIST.replace("map == Classic", "style == Classic")).unwrap();
-    let err = compile(&list, false).err().expect("an undeclared input is refused");
+    let err = compile(&list, false)
+        .err()
+        .expect("an undeclared input is refused");
     assert!(format!("{err:#}").contains("choice set 2"), "{err:#}");
 }

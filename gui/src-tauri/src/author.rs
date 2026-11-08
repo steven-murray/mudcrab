@@ -178,6 +178,60 @@ pub(super) struct ArchiveChoice {
     /// Its FOMOD selections and BAIN packages as written, every one, each
     /// with its `if` and whether that holds.
     choices: Vec<Conditional>,
+    /// Its sets of choices, in order, each with its `if` and whether that
+    /// holds; then its own, installed when none does.
+    sets: Vec<ChoiceSetView>,
+    own: ChoiceSetView,
+    /// The set Author mode's profile installs: an index into `sets`, or
+    /// `None` for its own.
+    installed: Option<usize>,
+}
+
+/// One set of an archive's installer choices, as the Mod tab lists it.
+#[derive(Serialize)]
+pub(super) struct ChoiceSetView {
+    condition: Option<String>,
+    applies: Option<bool>,
+    /// Its FOMOD selections, one line each (`Step › Group: options`).
+    fomod: Vec<String>,
+    /// Its BAIN packages, and those of them chosen only under an `if` of
+    /// their own.
+    packages: Vec<String>,
+    conditional: Vec<String>,
+}
+
+fn set_view(
+    condition: Option<String>,
+    fomod: &[config::schema::FomodSelection],
+    bain: &[config::schema::BainSubpackage],
+    authoring: &config::query::AuthoringPlan,
+) -> ChoiceSetView {
+    ChoiceSetView {
+        applies: condition.as_deref().and_then(|c| authoring.holds(c)),
+        condition,
+        fomod: fomod
+            .iter()
+            .map(|row| {
+                let options = if row.options.is_empty() {
+                    "none".to_string()
+                } else {
+                    row.options.join(", ")
+                };
+                let when = row
+                    .condition
+                    .as_deref()
+                    .map(|c| format!(" (if {c})"))
+                    .unwrap_or_default();
+                format!("{} › {}: {options}{when}", row.step, row.group)
+            })
+            .collect(),
+        packages: bain.iter().map(|p| p.name().to_string()).collect(),
+        conditional: bain
+            .iter()
+            .filter(|p| p.condition().is_some())
+            .map(|p| p.name().to_string())
+            .collect(),
+    }
 }
 
 /// Something a mod does only under a condition, or always: its text, its
@@ -292,6 +346,29 @@ pub(super) fn mod_view(state: tauri::State<'_, State>, id: String) -> Result<Mod
                         condition: p.condition().map(str::to_string),
                     }))
                     .collect(),
+                sets: archive
+                    .choices
+                    .iter()
+                    .map(|set| {
+                        set_view(
+                            set.condition.clone(),
+                            &set.fomod_selections,
+                            &set.bain_subpackages,
+                            &authoring,
+                        )
+                    })
+                    .collect(),
+                own: set_view(
+                    None,
+                    &archive.fomod_selections,
+                    &archive.bain_subpackages,
+                    &authoring,
+                ),
+                installed: archive.choices.iter().position(|set| {
+                    set.condition
+                        .as_deref()
+                        .is_none_or(|c| authoring.holds(c) == Some(true))
+                }),
             })
             .collect(),
         id,

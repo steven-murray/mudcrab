@@ -275,6 +275,14 @@ history there, rather than be undone by it.
   - **BAIN**: its packages are ticked to choose them, as in Wrye Bash's
     installer tab (`files --package`); **Choose its BAIN packages…** runs
     its wizard, if it has one.
+  - **Install choices** lists an archive's sets of choices in order, then
+    its own (**otherwise**): the first set whose condition holds is
+    installed, and the one Author mode's profile installs is marked. A BAIN
+    set's packages are ticked in place; a FOMOD set is chosen with
+    **Choose…**, walking its installer from that set. ↑ and ↓ reorder the
+    sets, **Condition…** changes a set's `if`, ✕ takes it out, and **+ Add
+    a set of choices** makes one, with a condition chosen as in the INI
+    editor (a BAIN set starts from the archive's own packages).
   - **FOMOD**: **Choose its FOMOD options…** walks its installer's steps
     again, each starting at what the list chooses now, and writes the new
     choices (`mudcrab choose`). A group's options can depend on the list's

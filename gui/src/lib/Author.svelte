@@ -11,6 +11,7 @@
     type Edited,
     type AuthorProfile,
     type Conditional,
+    type ChoiceTarget,
     noteSlow,
     type FoundDependencies,
     type FoundGroup,
@@ -91,7 +92,7 @@
   let pane = $state<"list" | "archives">("list");
   let adding = $state<string | null>(null);
   // The archive whose installer is being walked again.
-  let choosing = $state<{ id: string; number: number; label: string } | null>(null);
+  let choosing = $state<{ id: string; number: number; label: string; to: ChoiceTarget; title: string } | null>(null);
   // Author mode's profile: the answers it plans the list with, apart from
   // Install mode's. Changing it plans the list again.
   let profile = $state<AuthorProfile | null>(null);
@@ -353,6 +354,9 @@
       condition: a.condition,
       applies: a.applies,
       choices: a.choices,
+      sets: a.sets,
+      own: a.own,
+      installed: a.installed,
       tree: null,
       error: null,
     }));
@@ -850,7 +854,9 @@
     label={choosing.label}
     inputs={list.document.inputs}
     current={profile?.answers ?? {}}
-    write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers))}
+    to={choosing.to}
+    title={choosing.title}
+    write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers, choosing!.to))}
     close={() => (choosing = null)}
   />
 {/if}
@@ -1152,7 +1158,7 @@
               edit={(number, key, add, drop) => run(() => api.editFilter(chosen.id, number, key, add, drop))}
               move={(from, to) => run(() => api.addAction(chosen.id, "file_move", [`from=${JSON.stringify(from)}`, `to=${JSON.stringify(to)}`], null))}
               problem={(message) => (error = message)}
-              choose={(number, label) => (choosing = { id: chosen.id, number, label })}
+              choose={(number, label, to, title) => (choosing = { id: chosen.id, number, label, to, title })}
               inputs={list.document.inputs}
               {run}
             />
