@@ -490,7 +490,9 @@ pub(super) async fn mod_files(
     id: String,
     number: usize,
 ) -> Result<Tree, String> {
-    let downloads = locate(&state)?
+    let located = locate(&state)?;
+    let search = located.search.clone();
+    let downloads = located
         .downloads
         .ok_or("say where the downloads folder is first (in Settings)")?;
     let list = state.list()?;
@@ -507,10 +509,12 @@ pub(super) async fn mod_files(
     let mod_id = id.clone();
     let (contents, archive, actions) = tokio::task::spawn_blocking(move || {
         let planned = config::pipeline::planned_archive(&text, &path, &mod_id, number, &answers)?;
-        let contents = config::check::archive_contents(
+        // In the downloads folder, or one of the others to look in.
+        let contents = config::check::archive_contents_in(
             &planned.entry,
             &planned.archive,
             &downloads,
+            &search,
             &planned.active_plugins,
         )?;
         anyhow::Ok((contents, planned.archive, planned.entry.actions))
