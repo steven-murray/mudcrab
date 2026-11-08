@@ -590,6 +590,16 @@ pub struct CheckArgs {
     /// author reordering plugins wants.
     #[arg(long)]
     pub masters_only: bool,
+    /// Also read each plugin whole for the meshes and sounds it names, and
+    /// each BSA a mod ships for the files in it: a file only one other mod
+    /// provides makes that mod a dependency. Needs the game folder, whose
+    /// own files no mod has to provide. Slow the first time; what is read is
+    /// kept.
+    #[arg(long)]
+    pub resources: bool,
+    /// The game folder, for `--resources`. Defaults to `GAME_DIR`.
+    #[arg(long)]
+    pub game_dir: Option<PathBuf>,
     #[command(flatten)]
     pub filter: FilterArgs,
 }

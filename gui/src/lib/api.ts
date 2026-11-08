@@ -70,6 +70,8 @@ export interface ModDoc {
   optional?: { input: string; group?: string; query: string; default: boolean };
   /** The mods it needs, by id. */
   dependencies?: string[];
+  /** Of those, the ones `check` found, by why. */
+  found?: { masters?: string[]; resources?: string[] };
   docs: Docs;
   archives: ArchiveDoc[];
   plugins: string[];
@@ -320,16 +322,41 @@ export interface Edited {
   can_redo: boolean;
 }
 
-/** What adding plugins' masters as dependencies did. */
-export interface MasterDependencies {
-  /** The edit, when there was anything to add. */
+/** A mod one of a mod's plugins needs: for a master, or for a file only
+ *  that mod provides. */
+export interface FoundNeed {
+  mod_id: string;
+  needs: string;
+  /** The first of its plugins, and what it names (a master, or a file). */
+  plugin: string;
+  named: string;
+  /** How many of `needs`'s files its plugins name; 1 for a master. */
+  count: number;
+  /** `dependencies` lists it already. */
+  listed: boolean;
+  /** `needs` is optional while `mod_id` is not, nor follows it. */
+  optional: boolean;
+}
+
+/** The two groups of dependencies `check` finds. */
+export type FoundGroup = "masters" | "resources";
+
+/** What setting a group of found dependencies did. */
+export interface FoundDependencies {
+  /** The edit, when anything changed. */
   edited: Edited | null;
-  /** How many mods were given dependencies. */
+  /** How many mods' `dependencies` changed. */
   mods: number;
   /** Not added: optional mods that mods which stay would need. */
-  refused: { mod_id: string; needs: string; plugin: string; master: string }[];
-  /** Mods left as they were, and why. */
+  refused: FoundNeed[];
+  /** Dependencies left out, or mods left as they were, and why. */
   skipped: string[];
+}
+
+/** What looking for resource dependencies found. */
+export interface ResourceScan {
+  needs: FoundNeed[];
+  groups: FindingGroup[];
 }
 
 export interface Changes {
@@ -452,9 +479,11 @@ export const api = {
   openPage: (url: string) => invoke<void>("open_page", { url }),
   check: (again = false) => invoke<Checked>("step_check", { again }),
   readMasters: () => invoke<void>("read_masters"),
-  /** Each mod's plugins' masters' mods into its `dependencies`: every mod in the plan, or `id`'s. */
-  addMasterDependencies: (id: string | null) =>
-    invoke<MasterDependencies>("add_master_dependencies", { id }),
+  /** Set one group of each mod's found `dependencies` (every mod in the plan, or `id`'s), as last found. */
+  addFoundDependencies: (group: FoundGroup, id: string | null) =>
+    invoke<FoundDependencies>("add_found_dependencies", { group, id }),
+  /** What each mod's plugins need of other mods for the files they name (`check --resources`). */
+  findResourceDependencies: () => invoke<ResourceScan>("find_resource_dependencies"),
   /** Which questions these answers leave asked, and each one's default. */
   questionStates: (answers: Record<string, string>) =>
     invoke<{ id: string; asked: boolean; default?: InputValue }[]>("question_states", { answers }),

@@ -99,6 +99,7 @@ pub fn build_plan(
             merge: entry.merge.clone(),
             plugins: entry.plugins.clone(),
             dependencies: entry.dependencies.clone(),
+            found: entry.found.clone(),
             optional_in: entry.optional_in.clone(),
             follows: match &entry.condition {
                 Some(expr) => Condition::parse(expr)?

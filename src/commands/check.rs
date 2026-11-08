@@ -9,6 +9,15 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
         cache_dir,
         filter: args.filter.to_mod_filter(),
         masters_only: args.masters_only,
+        resources: if args.resources {
+            Some(
+                super::resolve_game_dir(args.game_dir.clone(), None)?.ok_or_else(|| {
+                    anyhow::anyhow!("--resources needs the game folder: pass --game-dir")
+                })?,
+            )
+        } else {
+            None
+        },
     };
 
     let report = config::check::check_all(&plan, &settings)?;
