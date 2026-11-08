@@ -507,8 +507,49 @@ pub(crate) fn decode_xml(bytes: &[u8], label: &str) -> anyhow::Result<String> {
         bytes
     };
 
-    String::from_utf8(payload.to_vec())
-        .map_err(|err| anyhow::anyhow!("failed to decode UTF-8 XML {label}: {err}"))
+    // Not UTF-8: Windows-1252, what the Windows tools these are written
+    // with save (a BAIN wizard's curly quotes, an author's accented name).
+    // Every byte means something in it, so this cannot fail.
+    match std::str::from_utf8(payload) {
+        Ok(text) => Ok(text.to_string()),
+        Err(_) => {
+            tracing::debug!(entry = label, "not UTF-8: read as Windows-1252");
+            Ok(payload.iter().map(|&b| windows_1252(b)).collect())
+        }
+    }
+}
+
+/// A byte as Windows-1252 has it: Latin-1, but for 0x80-0x9F, where it puts
+/// the curly quotes, dashes and the euro sign.
+fn windows_1252(byte: u8) -> char {
+    const HIGH: [char; 32] = [
+        '\u{20AC}', '\u{81}', '\u{201A}', '\u{192}', '\u{201E}', '\u{2026}', '\u{2020}',
+        '\u{2021}', '\u{2C6}', '\u{2030}', '\u{160}', '\u{2039}', '\u{152}', '\u{8D}', '\u{17D}',
+        '\u{8F}', '\u{90}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2022}', '\u{2013}',
+        '\u{2014}', '\u{2DC}', '\u{2122}', '\u{161}', '\u{203A}', '\u{153}', '\u{9D}', '\u{17E}',
+        '\u{178}',
+    ];
+    match byte {
+        0x80..=0x9F => HIGH[(byte - 0x80) as usize],
+        _ => byte as char,
+    }
+}
+
+#[cfg(test)]
+mod decode_tests {
+    #[test]
+    fn text_that_is_not_utf8_is_read_as_windows_1252() {
+        // Curly quotes, an accent and an apostrophe, as Notepad saved them.
+        let bytes = b"Note \x93Map Markers\x94 by Andr\xe9\x92s";
+        assert_eq!(
+            super::decode_xml(bytes, "Wizard.txt").unwrap(),
+            "Note \u{201C}Map Markers\u{201D} by Andr\u{e9}\u{2019}s"
+        );
+        assert_eq!(
+            super::decode_xml("plain é".as_bytes(), "x").unwrap(),
+            "plain é"
+        );
+    }
 }
 pub(crate) fn build_fomod_selection_map(
     selections: &[FomodSelection],
