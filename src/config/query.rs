@@ -497,6 +497,19 @@ fn resolve_archives(
         }
         let mut archive = archive.clone();
         archive.condition = None;
+        // The first set of choices whose `if` holds, in place of the
+        // archive's own, which are installed when none does.
+        let mut chosen = None;
+        for set in std::mem::take(&mut archive.choices) {
+            if applies(set.condition.as_deref())? {
+                chosen = Some(set);
+                break;
+            }
+        }
+        if let Some(set) = chosen {
+            archive.fomod_selections = set.fomod_selections;
+            archive.bain_subpackages = set.bain_subpackages;
+        }
 
         let mut selections = Vec::new();
         for selection in archive.fomod_selections {
