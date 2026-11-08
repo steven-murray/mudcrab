@@ -45,6 +45,8 @@ struct Session {
     /// When the list's file had last changed when `plan` was made, so author
     /// mode can tell it is out of date.
     planned_at: Option<std::time::SystemTime>,
+    /// Author mode's plans, from its own profile's answers.
+    author: Option<author::AuthorPlans>,
     /// Each plugin's masters, as the last `check` read them.
     masters: Option<Vec<config::check::PluginMasters>>,
     /// What each mod needs for the files its plugins name, as the last
@@ -441,11 +443,19 @@ fn locate(state: &State) -> Result<Located, String> {
             downloads: Location::of(downloads),
             game: Location::of(game),
             profile: chosen.profile(),
-            profiles: chosen
-                .instance
-                .as_deref()
-                .map(instance_profiles)
-                .unwrap_or_default(),
+            // The instance's, and those given answers here (Author mode's
+            // too): one made there can be installed.
+            profiles: {
+                let mut names: Vec<String> = chosen
+                    .instance
+                    .as_deref()
+                    .map(instance_profiles)
+                    .unwrap_or_default();
+                names.extend(chosen.profile_answers.keys().cloned());
+                names.sort();
+                names.dedup();
+                names
+            },
             answers: chosen.current_answers(),
             search: chosen
                 .search
@@ -711,6 +721,27 @@ fn step_plan(
 #[tauri::command(async)]
 fn cancel_run() {
     mudcrab::util::cancel::request();
+}
+
+/// Install mode's plan, made again with its profile's answers when the list
+/// has changed since it was made (or it never was).
+fn install_plan(state: &State) -> Result<PersonalizedPlan, String> {
+    let now = author::modified(state)?;
+    let fresh = {
+        let session = state.session.lock().map_err(|_| "a command panicked")?;
+        session.plan.is_some() && session.planned_at.is_some() && session.planned_at == now
+    };
+    if !fresh {
+        let list = state.list()?;
+        let answers = state
+            .settings
+            .lock()
+            .map_err(|_| "a command panicked")?
+            .list(&list)
+            .current_answers();
+        plan_with(state, answers)?;
+    }
+    plan_of(state)
 }
 
 /// `compile` and `query` with these answers, keeping the plan for the steps
@@ -981,9 +1012,15 @@ fn question_states(
 async fn step_check(
     state: tauri::State<'_, State>,
     again: Option<bool>,
+    author: Option<bool>,
 ) -> Result<Checked, String> {
     let again = again.unwrap_or(false);
-    let plan = author::current_plan(&state)?;
+    // Author mode checks what its own profile installs.
+    let plan = if author.unwrap_or(false) {
+        author::current_plan(&state)?
+    } else {
+        install_plan(&state)?
+    };
     let downloads = locate(&state)?.downloads;
     let downloads = downloads.ok_or("say where the downloads folder is first")?;
     let command = format!(
@@ -1099,7 +1136,9 @@ async fn scan_list(state: tauri::State<'_, State>) -> Result<ListScan, String> {
     use config::check::Kind;
     use config::schema::ArchiveLayout;
     use mudcrab::events::Tone;
-    let plan = author::current_plan(&state)?;
+    // Every mod, as each would install: those the profile leaves out too.
+    let plan = author::author_plans(&state)?.authoring.plan;
+    let installed: std::collections::HashSet<String> = plan.selected_mods.iter().cloned().collect();
     let installers: HashMap<String, Vec<&'static str>> = plan
         .mods
         .iter()
@@ -1138,8 +1177,17 @@ async fn scan_list(state: tauri::State<'_, State>) -> Result<ListScan, String> {
         session.masters = Some(report.plugins.clone());
         session.read = report.read.clone();
     }
+    // What the masters say of a mod the profile leaves out is noise (its
+    // masters may be left out too); that its archive is missing is not.
+    let counts = |f: &config::check::Finding| {
+        f.item
+            .mod_id
+            .as_deref()
+            .is_none_or(|id| installed.contains(id))
+            || f.kind == Kind::MissingArchive
+    };
     let mut about: HashMap<&str, Vec<&config::check::Finding>> = HashMap::new();
-    for finding in &report.findings {
+    for finding in report.findings.iter().filter(|f| counts(f)) {
         if let Some(id) = finding.item.mod_id.as_deref() {
             about.entry(id).or_default().push(finding);
         }
@@ -1162,10 +1210,18 @@ async fn scan_list(state: tauri::State<'_, State>) -> Result<ListScan, String> {
             }
         })
         .collect();
+    let counted: Vec<&config::check::Finding> =
+        report.findings.iter().filter(|f| counts(f)).collect();
     Ok(ListScan {
         mods,
-        problems: report.problems,
-        warnings: report.warnings,
+        problems: counted
+            .iter()
+            .filter(|f| f.kind.tone() == Tone::Problem)
+            .count(),
+        warnings: counted
+            .iter()
+            .filter(|f| f.kind.tone() == Tone::Warning)
+            .count(),
     })
 }
 
@@ -1556,6 +1612,9 @@ pub fn app<R: Runtime>(
             read_masters,
             note_slow,
             scan_list,
+            author::author_profile,
+            author::set_author_profile,
+            author::set_author_answers,
             add_found_dependencies,
             find_resource_dependencies,
             step_install,

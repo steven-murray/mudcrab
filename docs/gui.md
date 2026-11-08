@@ -158,6 +158,21 @@ history there, rather than be undone by it.
   plugin of the mod before it, unless you say). The entry is shown as the
   diff it makes, with the `mudcrab add` command that writes the same; **Add
   to the list** writes it, undoably.
+- **Profile**, above the list: the answers Author mode plans the list with,
+  kept apart from Install mode's -- a set of answers to look at the list
+  by, as many as you like (**New profile…**), each with its **Answers…**.
+  Install mode's drop-down offers the same profiles, and Author mode its.
+  Everything is shown: each of a mod's archives, FOMOD selections, BAIN
+  packages and actions, those with an `if` too, the `if` marked by whether
+  it holds in the profile (outlined green when it does, dashed and dimmed
+  when it does not). What depends on the profile is which of them the
+  profile installs; an archive it leaves out still has its files shown, as
+  it would install. A mod the profile leaves out is still shown, as it would
+  install -- its files, INIs, installer choices and badges -- marked as not
+  installed in that profile, with the condition that brings it in. Its
+  conflicts are counted only against mods the profile installs, and the
+  masters check speaks only of those. The Check, Load order and Conflicts
+  tabs are of what the profile installs.
 - **The list** on the left: sections as a tree, each mod with a note of
   whether it is optional (`if`), left unticked in MO2 (`off`), or not made
   from archives. Choose one to see it on the right. Drag a mod by its handle

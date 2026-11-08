@@ -535,7 +535,7 @@ fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existin
         .lock()
         .map_err(|_| "a command panicked")?
         .list(&list)
-        .current_answers()
+        .author_answers()
         .into_iter()
         .collect();
     installer::existing(&list, id, number, &answers, &downloads, &located.search).map_err(shown)

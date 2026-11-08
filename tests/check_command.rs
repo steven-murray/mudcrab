@@ -823,6 +823,7 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
             ("meshes/shared.nif", b"nif"),
             ("ini/Other.ini", b"[Main]\nx=1\n"),
             ("readme.txt", b"hi"),
+            ("meta.ini", b"[General]\nmodid=2\n"),
         ],
     );
     let list = root.join("list.toml");

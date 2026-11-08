@@ -46,10 +46,15 @@
   const given = new SvelteSet<string>(untrack(() => Object.keys(list.answers)));
   // Each profile has its own answers: choosing another brings its
   // answers back (or the last given anywhere, for a new one).
+  // A profile's answers saved elsewhere (in Author mode) are brought in too.
   let shownProfile = untrack(() => locations?.profile);
+  let shownAnswers = untrack(() => JSON.stringify(locations?.answers ?? {}));
   $effect(() => {
-    if (!locations || locations.profile === shownProfile) return;
+    if (!locations) return;
+    const savedNow = JSON.stringify(locations.answers);
+    if (locations.profile === shownProfile && savedNow === shownAnswers) return;
     shownProfile = locations.profile;
+    shownAnswers = savedNow;
     // What a check said about another profile's steps is not this one's.
     notes = {};
     const saved = locations.answers;

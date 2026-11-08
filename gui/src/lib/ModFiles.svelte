@@ -1,7 +1,18 @@
 <script lang="ts" module>
-  import type { Tree } from "./api";
+  import type { Conditional, Tree } from "./api";
+  import IfTag from "./IfTag.svelte";
   /** One of the mod's archives, and its tree once read. */
-  export type Archive = { number: number; label: string; condition: string | null; tree: Tree | null; error: string | null };
+  export type Archive = {
+    number: number;
+    label: string;
+    condition: string | null;
+    /** Whether its `if` holds in Author mode's profile. */
+    applies?: boolean | null;
+    /** Its FOMOD rows and BAIN packages as written, with their `if`s. */
+    choices?: Conditional[];
+    tree: Tree | null;
+    error: string | null;
+  };
 </script>
 
 <script lang="ts">
@@ -330,7 +341,7 @@
   <div class="archive">
     <div class="ahead">
       <strong>{several ? `${archive.number}. ` : ""}{archive.label}</strong>
-      {#if archive.condition}<span class="dim">if {archive.condition}</span>{/if}
+      {#if archive.condition}<IfTag condition={archive.condition} applies={archive.applies} />{/if}
       {#if archive.tree}<span class="tag" title="Its layout">{archive.tree.layout ?? "automatic"}</span>{/if}
       {#if archive.tree && (fomodOf(archive.tree) || archive.tree.layout === "bain")}
         <button
@@ -341,6 +352,16 @@
         >
       {/if}
     </div>
+    {#if archive.choices?.some((c) => c.condition)}
+      <ul class="choices">
+        {#each archive.choices as c, n (n)}
+          <li class:off={c.applies === false}>
+            {c.text}
+            {#if c.condition}<IfTag condition={c.condition} applies={c.applies} />{/if}
+          </li>
+        {/each}
+      </ul>
+    {/if}
     {#if archive.error}
       <pre class="error">{archive.error}</pre>
     {:else if !archive.tree}
@@ -475,6 +496,14 @@
 {#if !files.length && archives.every((a) => a.tree)}<p class="dim small">Nothing goes in the mod's folder.</p>{/if}
 
 <style>
+  .choices {
+    margin: 2px 0 6px;
+    padding-left: 18px;
+    font-size: 12px;
+  }
+  .choices li.off {
+    color: var(--faint);
+  }
   .archive {
     border: 1px solid var(--line);
     border-radius: 6px;

@@ -494,10 +494,32 @@ pub(super) fn remove_action(
 
 /// A mod's actions, numbered as `action remove` takes them.
 #[tauri::command(async)]
-pub(super) fn actions(state: tauri::State<'_, State>, id: String) -> Result<Vec<String>, String> {
-    let place = edit::place_of_mod(&state.list()?, &id).map_err(shown)?;
+pub(super) fn actions(
+    state: tauri::State<'_, State>,
+    id: String,
+) -> Result<Vec<super::author::Conditional>, String> {
+    let list = state.list()?;
+    let place = edit::place_of_mod(&list, &id).map_err(shown)?;
     let text = std::fs::read_to_string(&place.file).map_err(|err| err.to_string())?;
-    doc::action_lines(&text, &place.id).map_err(shown)
+    let lines = doc::action_lines(&text, &place.id).map_err(shown)?;
+    // Each one's `if`, from the list as read, and whether it holds in Author
+    // mode's profile.
+    let source = mudcrab::config::loader::load_modlist(&list).map_err(shown)?;
+    let conditions: Vec<Option<String>> = source
+        .mods
+        .iter()
+        .find(|m| m.id == id)
+        .map(|m| m.actions.iter().map(|a| a.condition.clone()).collect())
+        .unwrap_or_default();
+    let authoring = super::author::author_plans(&state)?.authoring;
+    Ok(lines
+        .into_iter()
+        .enumerate()
+        .map(|(index, text)| {
+            let condition = conditions.get(index).cloned().flatten();
+            super::author::Conditional::new(text, condition, &authoring)
+        })
+        .collect())
 }
 
 /// Write one INI's settings under one condition (the INI editor): the
