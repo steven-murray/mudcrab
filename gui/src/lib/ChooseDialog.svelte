@@ -1,12 +1,14 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { api, type Answer, type InputDoc, type Walk } from "./api";
+  import ConditionPicker from "./ConditionPicker.svelte";
   import InstallerQuestions from "./InstallerQuestions.svelte";
 
   // An archive's installer walked again (`mudcrab choose`): each question
   // starts at what the list chooses now, and the new choices are written as
-  // the archive's `fomod_selections` or `bain_subpackages`. A FOMOD group's
-  // options can depend on the list's questions, written as a row per `if`.
+  // the archive's `fomod_selections` or `bain_subpackages`. The choices are
+  // sets, one per condition: the base set, when none holds, and each
+  // condition's, overriding it where it holds -- walked one at a time.
   let {
     id,
     number,
@@ -22,8 +24,8 @@
     /** The list's questions, and the answers now. */
     inputs: InputDoc[];
     current: Record<string, string>;
-    /** Write the choices; resolves true when written. */
-    write: (answers: Answer[]) => Promise<boolean>;
+    /** Write the choices, as set `set`'s; resolves true when written. */
+    write: (answers: Answer[], set: string | null) => Promise<boolean>;
     close: () => void;
   } = $props();
 
@@ -32,18 +34,48 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
 
+  // The set walked: its condition, null for the base; and the conditions
+  // the archive's choices already name.
+  let condition = $state<string | null>(null);
+  const set = $derived(condition?.trim() || null);
+  let known = $state<string[]>([]);
+  onMount(async () => {
+    try {
+      known = await api.installerSets(id, number);
+    } catch {
+      known = [];
+    }
+  });
+  // Another set chosen: walked again from its choices (once typing stops).
+  let walked: string | null | undefined = undefined;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  $effect(() => {
+    const now = set;
+    if (now === walked) return;
+    clearTimeout(timer);
+    timer = setTimeout(
+      () =>
+        untrack(() => {
+          walked = now;
+          answers = [];
+          walk = null;
+          step();
+        }),
+      walked === undefined ? 0 : 400,
+    );
+  });
+
   async function step() {
     busy = true;
     error = null;
     try {
-      walk = await api.chooseWalk(id, number, answers);
+      walk = await api.chooseWalk(id, number, answers, set);
     } catch (err) {
       error = String(err);
     } finally {
       busy = false;
     }
   }
-  onMount(step);
 
   async function answer(given: Answer) {
     answers = [...answers, given];
@@ -56,7 +88,7 @@
   async function defaults() {
     busy = true;
     try {
-      let next = await api.chooseWalk(id, number, answers);
+      let next = await api.chooseWalk(id, number, answers, set);
       while (next.kind === "ask") {
         const asked = next.asked;
         // A group's rows that depend on the questions are kept as they are.
@@ -67,7 +99,7 @@
               ? { depends: { now: asked.question.default, rows: asked.rows } }
               : { pick: asked.question.default };
         answers = [...answers, given];
-        next = await api.chooseWalk(id, number, answers);
+        next = await api.chooseWalk(id, number, answers, set);
       }
       walk = next;
     } catch (err) {
@@ -79,7 +111,7 @@
   async function save() {
     busy = true;
     try {
-      if (await write(answers)) close();
+      if (await write(answers, set)) close();
     } finally {
       busy = false;
     }
@@ -95,7 +127,18 @@
       <button class="link" onclick={close}>Cancel</button>
     </div>
     <div class="dbody">
-      <p class="dim small">Each question starts at what the list chooses now.</p>
+      <div class="sets">
+        <ConditionPicker bind:value={condition} {known} {inputs} />
+        <p class="dim small">
+          {#if set}
+            The choices <b>if {set}</b>: where it holds, they take the place of the base's, group by group (BAIN
+            packages, all of them). Each question starts at what this set chooses now.
+          {:else}
+            The base choices: those installed when no condition holds. Each question starts at what the list chooses
+            now.
+          {/if}
+        </p>
+      </div>
       {#if error}<pre class="error">{error}</pre>{/if}
       <InstallerQuestions {walk} answered={answers.length} {busy} {answer} {back} {defaults} {inputs} {current} />
     </div>
@@ -146,6 +189,9 @@
   .dbody {
     padding: 10px 18px 16px;
     overflow: auto;
+  }
+  .sets {
+    margin-bottom: 8px;
   }
   .small {
     font-size: 12px;

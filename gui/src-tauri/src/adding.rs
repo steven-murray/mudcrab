@@ -524,7 +524,14 @@ pub(super) fn add_mod(
 
 /// Mod `id`'s `number`th archive, found for walking its installer again, with
 /// the answers given in Install deciding which archives it has.
-fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existing, String> {
+/// Mod `id`'s archive, with one set of its choices -- `set`'s, `None` for the
+/// base -- to start the walk from.
+fn existing(
+    state: &State,
+    id: &str,
+    number: usize,
+    set: Option<&str>,
+) -> Result<installer::Existing, String> {
     let list = state.list()?;
     let located = locate(state)?;
     let downloads = located
@@ -538,7 +545,39 @@ fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existin
         .author_answers()
         .into_iter()
         .collect();
-    installer::existing(&list, id, number, &answers, &downloads, &located.search).map_err(shown)
+    installer::existing_set(
+        &list,
+        id,
+        number,
+        &answers,
+        &downloads,
+        &located.search,
+        set,
+    )
+    .map_err(shown)
+}
+
+/// The conditions an archive's installer choices name: its sets beside the
+/// base (`installer_sets`).
+#[tauri::command(async)]
+pub(super) fn installer_sets(
+    state: tauri::State<'_, State>,
+    id: String,
+    number: usize,
+) -> Result<Vec<String>, String> {
+    let list = state.list()?;
+    let text = std::fs::read_to_string(&list).map_err(|err| err.to_string())?;
+    let source = config::loader::parse_modlist(&text, &list).map_err(shown)?;
+    let spec = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .and_then(|entry| entry.archives.get(number.wrapping_sub(1)))
+        .ok_or_else(|| format!("'{id}' has no archive {number}"))?;
+    Ok(config::installer_sets::conditions(
+        &spec.fomod_selections,
+        &spec.bain_subpackages,
+    ))
 }
 
 /// The installer of mod `id`'s archive walked with `answers` so far, what the
@@ -549,8 +588,9 @@ pub(super) async fn choose_walk(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    set: Option<String>,
 ) -> Result<Walk, String> {
-    let found = existing(&state, &id, number)?;
+    let found = existing(&state, &id, number, set.as_deref())?;
     tokio::task::spawn_blocking(move || {
         installer::walk(
             &found.archive,
@@ -573,9 +613,10 @@ pub(super) fn choose_write(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    set: Option<String>,
 ) -> Result<Edited, String> {
     let list = state.list()?;
-    let found = existing(&state, &id, number)?;
+    let found = existing(&state, &id, number, set.as_deref())?;
     let installed = match installer::walk(
         &found.archive,
         &found.report,
@@ -589,7 +630,8 @@ pub(super) fn choose_write(
         Walk::Done { installed } => installed,
         Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
     };
-    let edit = installer::plan_choice(&list, &id, number, &installed, true).map_err(shown)?;
+    let edit = installer::plan_choice_set(&list, &id, number, &installed, set.as_deref())
+        .map_err(shown)?;
     let mut command = format!(
         "mudcrab choose {} --mod {}",
         quote(list.display().to_string()),
@@ -597,6 +639,9 @@ pub(super) fn choose_write(
     );
     if number != 1 {
         command.push_str(&format!(" --archive {number}"));
+    }
+    if let Some(set) = &set {
+        command.push_str(&format!(" (if {set})"));
     }
     apply(&state, command, edit)
 }

@@ -850,7 +850,7 @@
     label={choosing.label}
     inputs={list.document.inputs}
     current={profile?.answers ?? {}}
-    write={(answers) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers))}
+    write={(answers, set) => run(() => api.chooseWrite(choosing!.id, choosing!.number, answers, set))}
     close={() => (choosing = null)}
   />
 {/if}

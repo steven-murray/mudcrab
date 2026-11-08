@@ -642,10 +642,12 @@ export const api = {
   addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),
   addPlan: (request: AddRequest) => invoke<AddPlan>("add_plan", { request }),
   addMod: (request: AddRequest) => invoke<Edited>("add_mod", { request }),
-  chooseWalk: (id: string, number: number, answers: Answer[]) =>
-    invoke<Walk>("choose_walk", { id, number, answers }),
-  chooseWrite: (id: string, number: number, answers: Answer[]) =>
-    invoke<Edited>("choose_write", { id, number, answers }),
+  /** `set`: the condition whose set of choices is walked, null for the base. */
+  chooseWalk: (id: string, number: number, answers: Answer[], set: string | null = null) =>
+    invoke<Walk>("choose_walk", { id, number, answers, set }),
+  chooseWrite: (id: string, number: number, answers: Answer[], set: string | null = null) =>
+    invoke<Edited>("choose_write", { id, number, answers, set }),
+  installerSets: (id: string, number: number) => invoke<string[]>("installer_sets", { id, number }),
   nexusLink: (link: string) => invoke<NexusMod>("nexus_link", { link }),
   nexusFetch: (modId: number, fileId: number, fileName: string | null) =>
     invoke<Fetched>("nexus_fetch", { modId, fileId, fileName }),
