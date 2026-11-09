@@ -656,6 +656,8 @@ export const api = {
   fields: (id: string, archive: number | null) =>
     invoke<[string, string | number | boolean | (string | number | boolean)[]][]>("fields", { id, archive }),
   removeMod: (id: string) => invoke<Edited>("remove_mod", { id }),
+  /** Rename a mod: its id, and everything in the list naming it. */
+  renameMod: (id: string, renamed: string) => invoke<Edited>("rename_mod", { id, new: renamed }),
   setEnabled: (id: string, enabled: boolean) => invoke<Edited>("set_enabled", { id, enabled }),
   archives: () => invoke<ArchiveRow[]>("archives"),
   addStart: (path: string) => invoke<Started>("add_start", { path }),

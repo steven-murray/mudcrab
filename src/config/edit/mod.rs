@@ -505,6 +505,51 @@ impl<'a> Work<'a> {
     }
 }
 
+/// Plan renaming mod `old` to `new` in the list at `list`: its id -- also
+/// its folder in MO2 -- and everything in the list and its docs file that
+/// names it (see [`doc::rename_mod`]). A list whose mods come from more than
+/// one file is refused: what names a mod could be in any of them.
+pub fn plan_rename(list: &Path, old: &str, new: &str) -> anyhow::Result<Vec<Edit>> {
+    let new = new.trim();
+    crate::config::install::safe_mod_dir_name(new)?;
+    let source = load_modlist(list)?;
+    anyhow::ensure!(
+        source.mods.iter().any(|m| m.id == old),
+        "the list has no mod with id '{old}'"
+    );
+    anyhow::ensure!(
+        !source.mods.iter().any(|m| m.id == new),
+        "the list already has a mod with id '{new}'"
+    );
+    anyhow::ensure!(
+        source
+            .mods
+            .iter()
+            .all(|m| m.origin.is_none() && m.written_id.is_none()),
+        "this list's mods come from more than one file (include or use); renaming one there is \
+         not done yet -- rename it in each file that names it"
+    );
+    let mut work = Work::new(list);
+    work.change(list, |text, _| doc::rename_mod(text, old, new))?;
+    let mut edits = work.finish()?;
+    let own = parse_file(&read(list)?, list)?;
+    if let Some(path) = docs_file_of(list, &own)
+        && let Ok(before) = std::fs::read_to_string(&path)
+    {
+        let after = doc::rename_file_docs(&before, old, new)?;
+        if after != before {
+            toml::from_str::<crate::config::docs::DocsFile>(&after)
+                .map_err(|err| anyhow::anyhow!("not a valid docs file: {err}"))?;
+            edits.push(Edit {
+                path,
+                before,
+                after,
+            });
+        }
+    }
+    Ok(edits)
+}
+
 /// Plan removing mod `id` from the list at `list`: its block (comments,
 /// archives, actions) and its plugins from the load order, unless another
 /// mod also has them -- and its notes from the docs file, where it has some

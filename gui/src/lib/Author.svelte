@@ -188,6 +188,20 @@
   // Removing is refused while another mod names it; the menu stays open to
   // say why.
   let removeError = $state<string | null>(null);
+  // Renamed, the mod is chosen by its new name: not looked up by the old
+  // one while the list is read again.
+  async function renameMod(name: string): Promise<boolean> {
+    const was = selected;
+    if (!was) return false;
+    selected = null;
+    if (!(await run(() => api.renameMod(was, name)))) {
+      selected = was;
+      return false;
+    }
+    await select(name);
+    return true;
+  }
+
   async function removeMod(id: string) {
     removeError = null;
     // Not selected while the list is read again: it would be looked up gone.
@@ -1145,6 +1159,7 @@
               await readMasters();
             }}
             {run}
+            rename={renameMod}
           />
           {#if view && !view.unplanned && view.archives.length}
             <p>
