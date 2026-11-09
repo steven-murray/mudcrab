@@ -2,7 +2,7 @@
   import { api, tomlString, type InputDoc, type LoadOrder, type ModDoc } from "./api";
   import NeedsDialog from "./NeedsDialog.svelte";
   import OptionalDialog, { type Fresh } from "./OptionalDialog.svelte";
-  import { masterNeeds, neededBy, optionalGroups } from "./optional";
+  import { masterNeeds, neededBy, optionalGroups, optionalToml } from "./optional";
 
   // A mod's own settings: whether it is optional (its `if`), whether it is
   // installed inactive (`disable`), and what it needs (`dependencies`). Each
@@ -131,8 +131,18 @@
     <span class="name">Optional</span>
     <span>
       {#if mod.optional}
-        One of <strong>{mod.optional.group ?? "the list's optional mods"}</strong>, {mod.optional.default ? "ticked" : "unticked"} to
-        start{#if mod.condition}, and only if <strong>{mod.condition.text}</strong>{/if}
+        {@const opt = mod.optional}
+        One of <strong>{opt.group ?? "the list's optional mods"}</strong>,
+        <label
+          class="tick"
+          title="Whether it starts ticked: the player can still untick it, or tick it (optional = {'{'} default = true {'}'})"
+          ><input
+            type="checkbox"
+            checked={opt.default}
+            onchange={(e) => run(() => api.setFields(mod.id, null, [`optional=${optionalToml(opt.group ?? "", e.currentTarget.checked)}`], []))}
+          />
+          ticked to start</label
+        >{#if mod.condition}, and only if <strong>{mod.condition.text}</strong>{/if}
         <button class="link" onclick={() => (optional = true)}>Change…</button>
         · {@render alwaysButton()}
       {:else if mod.condition}
@@ -244,6 +254,11 @@
 {/if}
 
 <style>
+  .tick {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
   .fields {
     font-size: 13px;
     margin: 6px 0 10px;

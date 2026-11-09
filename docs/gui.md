@@ -210,7 +210,10 @@ history there, rather than be undone by it.
     panel, a tick per mod. Or it chooses the answers that bring it in -- one
     of the list's questions and which answers, a new question (added to the
     list with it: `input add`), or an `if` written out -- and writes the
-    mod's `if`. **Always install it** takes both out.
+    mod's `if`. **Always install it** takes both out. An optional mod's
+    **ticked to start** box chooses, in one click, whether it starts ticked
+    (`default = true`): the player can still untick it. A profile that has
+    already answered the group's question keeps its answer.
   - **Inactive**: ticked, the mod is installed but left unticked in MO2,
     its plugins inactive (`disable`; unticked again, `enable`).
   - **Needs**: **Choose…** ticks the mods it needs from every mod in the
