@@ -9,6 +9,7 @@ use super::edits::{Edited, apply};
 use super::{State, locate, quote, shown};
 use mudcrab::config;
 use mudcrab::config::add::{LoadPosition, NewMod, Placement, plan_add};
+use mudcrab::config::edit::doc;
 use mudcrab::config::inspect::{InspectReport, inspect_archive};
 use mudcrab::config::installer::{self, Answer, ListPlugins, Walk};
 use serde::{Deserialize, Serialize};
@@ -520,11 +521,104 @@ pub(super) fn add_mod(
     apply(&state, command(&list, &request, &new_mod), edit)
 }
 
+/// An archive to add to a mod already in the list: where it is, its source
+/// (blank for the one found), and the answers to its installer.
+#[derive(Deserialize)]
+pub(super) struct ArchiveRequest {
+    path: String,
+    #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    answers: Vec<Answer>,
+}
+
+/// What adding an archive to a mod did: the edit, and the plugins it has
+/// that the mod does not declare yet.
+#[derive(Serialize)]
+pub(super) struct ArchiveAdded {
+    #[serde(flatten)]
+    edited: Edited,
+    new_plugins: Vec<String>,
+}
+
+/// Add an archive to mod `id`: its entry as `add --archive` writes one, its
+/// installer answered, after the mod's own archives.
+#[tauri::command(async)]
+pub(super) fn add_archive(
+    state: tauri::State<'_, State>,
+    id: String,
+    request: ArchiveRequest,
+) -> Result<ArchiveAdded, String> {
+    let list = state.list()?;
+    let path = PathBuf::from(&request.path);
+    let report = report_of(&path)?;
+    let installed = match installer::walk(
+        &path,
+        &report,
+        &ListPlugins::default(),
+        &Default::default(),
+        &request.answers,
+        false,
+    )
+    .map_err(shown)?
+    {
+        Walk::Done { installed } => installed,
+        Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
+    };
+    let source = request
+        .source
+        .clone()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| installer::source_of(&path, &report));
+    let block = installer::archive_block(&path, &report, &source, &installed).map_err(shown)?;
+    let planned = config::edit::plan_mod(&list, &id, |text, _, written| {
+        doc::add_archive(text, written, &block)
+    })
+    .map_err(shown)?;
+    let declared: Vec<String> = config::loader::load_modlist(&list)
+        .map_err(shown)?
+        .mods
+        .iter()
+        .find(|m| m.id == id)
+        .map(|m| m.plugins.iter().map(|p| p.to_lowercase()).collect())
+        .unwrap_or_default();
+    // By name: a BAIN package or FOMOD option keeps its plugins in folders.
+    let mut new_plugins: Vec<String> = Vec::new();
+    for plugin in &report.plugins {
+        let name = plugin
+            .rsplit(['/', '\\'])
+            .next()
+            .unwrap_or(plugin)
+            .to_string();
+        if !declared.contains(&name.to_lowercase())
+            && !new_plugins.iter().any(|n| n.eq_ignore_ascii_case(&name))
+        {
+            new_plugins.push(name);
+        }
+    }
+    let command = format!(
+        "add archive {} to mod {} in {}",
+        quote(&request.path),
+        quote(&id),
+        quote(list.display().to_string())
+    );
+    Ok(ArchiveAdded {
+        edited: apply(&state, command, planned)?,
+        new_plugins,
+    })
+}
+
 // --- An existing archive's installer, walked again ---------------------------------------
 
 /// Mod `id`'s `number`th archive, found for walking its installer again, with
 /// the answers given in Install deciding which archives it has.
-fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existing, String> {
+/// Mod `id`'s archive, walked from one of its sets of choices.
+fn existing(
+    state: &State,
+    id: &str,
+    number: usize,
+    to: &doc::ChoiceTarget,
+) -> Result<installer::Existing, String> {
     let list = state.list()?;
     let located = locate(state)?;
     let downloads = located
@@ -538,7 +632,8 @@ fn existing(state: &State, id: &str, number: usize) -> Result<installer::Existin
         .author_answers()
         .into_iter()
         .collect();
-    installer::existing(&list, id, number, &answers, &downloads, &located.search).map_err(shown)
+    installer::existing_choice(&list, id, number, &answers, &downloads, &located.search, to)
+        .map_err(shown)
 }
 
 /// The installer of mod `id`'s archive walked with `answers` so far, what the
@@ -549,8 +644,10 @@ pub(super) async fn choose_walk(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    to: Option<doc::ChoiceTarget>,
 ) -> Result<Walk, String> {
-    let found = existing(&state, &id, number)?;
+    let to = to.unwrap_or(doc::ChoiceTarget::Default);
+    let found = existing(&state, &id, number, &to)?;
     tokio::task::spawn_blocking(move || {
         installer::walk(
             &found.archive,
@@ -573,9 +670,11 @@ pub(super) fn choose_write(
     id: String,
     number: usize,
     answers: Vec<Answer>,
+    to: Option<doc::ChoiceTarget>,
 ) -> Result<Edited, String> {
+    let to = to.unwrap_or(doc::ChoiceTarget::Default);
     let list = state.list()?;
-    let found = existing(&state, &id, number)?;
+    let found = existing(&state, &id, number, &to)?;
     let installed = match installer::walk(
         &found.archive,
         &found.report,
@@ -589,7 +688,7 @@ pub(super) fn choose_write(
         Walk::Done { installed } => installed,
         Walk::Ask { .. } => return Err("answer the installer's questions first".to_string()),
     };
-    let edit = installer::plan_choice(&list, &id, number, &installed, true).map_err(shown)?;
+    let edit = installer::plan_choice_to(&list, &id, number, &installed, &to).map_err(shown)?;
     let mut command = format!(
         "mudcrab choose {} --mod {}",
         quote(list.display().to_string()),

@@ -221,6 +221,74 @@ pub fn add_action(
     Ok(doc.to_string())
 }
 
+/// Take mod `id`'s `number`th archive (from 1) out, its choices with it.
+pub fn remove_archive(text: &str, id: &str, number: usize) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    let archives = table
+        .get_mut("archives")
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or_else(|| {
+            anyhow::anyhow!("mod '{id}' has no archives written as [[mods.archives]]")
+        })?;
+    anyhow::ensure!(
+        (1..=archives.len()).contains(&number),
+        "mod '{id}' has {} archive(s), so there is no archive {number}",
+        archives.len()
+    );
+    archives.remove(number - 1);
+    if archives.is_empty() {
+        table.remove("archives");
+    }
+    Ok(doc.to_string())
+}
+
+/// Add an archive to the end of a mod's archives: `block` is an
+/// `[[mods.archives]]` entry, its FOMOD selections and all, as
+/// [`crate::config::installer::archive_block`] writes one.
+pub fn add_archive(text: &str, id: &str, block: &str) -> anyhow::Result<String> {
+    let fragment = parse(block)?;
+    let archive = fragment
+        .get("mods")
+        .and_then(|m| m.get("archives"))
+        .and_then(Item::as_array_of_tables)
+        .and_then(|a| a.get(0))
+        .ok_or_else(|| anyhow::anyhow!("not an archive entry: {block}"))?;
+    // Made afresh, so the new tables take their place after the mod's own
+    // rather than the places they had in the fragment.
+    fn fresh(table: &Table) -> Table {
+        let mut out = Table::new();
+        for (key, item) in table.iter() {
+            match item {
+                Item::ArrayOfTables(tables) => {
+                    let mut copy = ArrayOfTables::new();
+                    for t in tables.iter() {
+                        copy.push(fresh(t));
+                    }
+                    out.insert(key, Item::ArrayOfTables(copy));
+                }
+                Item::Table(t) => {
+                    out.insert(key, Item::Table(fresh(t)));
+                }
+                other => {
+                    out.insert(key, other.clone());
+                }
+            }
+        }
+        out
+    }
+    let archive = fresh(archive);
+    let mut doc = parse(text)?;
+    let table = mod_table(&mut doc, id)?;
+    table
+        .entry("archives")
+        .or_insert(Item::ArrayOfTables(ArrayOfTables::new()))
+        .as_array_of_tables_mut()
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has `archives` written inline; write them as [[mods.archives]] tables to add one"))?
+        .push(archive);
+    Ok(doc.to_string())
+}
+
 /// Each of a mod's actions on one line, as written: `action = "file_hide",
 /// paths = ["a"]`.
 pub fn action_lines(text: &str, id: &str) -> anyhow::Result<Vec<String>> {
@@ -995,9 +1063,170 @@ pub fn set_installer(
     chosen: &crate::config::inspect::Chosen,
     rows: bool,
 ) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    write_chosen(table, id, chosen, rows)?;
+    Ok(doc.to_string())
+}
+
+/// Which of an archive's sets of choices an edit is to.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChoiceTarget {
+    /// The archive's own: installed when no set's `if` holds.
+    Default,
+    /// Its `choices`' `n`th, from 0.
+    Set(usize),
+    /// A new set at the end, with this `if`.
+    New(Option<String>),
+}
+
+fn choice_sets<'a>(table: &'a mut Table, id: &str) -> anyhow::Result<&'a mut ArrayOfTables> {
+    table
+        .entry("choices")
+        .or_insert(Item::ArrayOfTables(ArrayOfTables::new()))
+        .as_array_of_tables_mut()
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}': `choices` is not a list of tables"))
+}
+
+fn tidy_choices(table: &mut Table) {
+    if table
+        .get("choices")
+        .and_then(Item::as_array_of_tables)
+        .is_some_and(|sets| sets.is_empty())
+    {
+        table.remove("choices");
+    }
+}
+
+/// Write `chosen` into one of mod `id`'s archive's sets of choices (the
+/// archive counted from 1): its own, a set's, or a new set's.
+pub fn write_choice_set(
+    text: &str,
+    id: &str,
+    archive: usize,
+    to: &ChoiceTarget,
+    chosen: &crate::config::inspect::Chosen,
+) -> anyhow::Result<String> {
     use crate::config::inspect::Chosen;
     let mut doc = parse(text)?;
     let table = target(&mut doc, id, Some(archive))?;
+    if *to == ChoiceTarget::Default {
+        write_chosen(table, id, chosen, true)?;
+        return Ok(doc.to_string());
+    }
+    anyhow::ensure!(
+        !matches!(chosen, Chosen::Wizard { .. }),
+        "a BAIN wizard's choices go in the archive's own set (the plugins it leaves out are \
+         the archive's); choose the packages directly for a set of their own"
+    );
+    let sets = choice_sets(table, id)?;
+    let set = match to {
+        ChoiceTarget::Set(n) => {
+            let count = sets.len();
+            sets.get_mut(*n).ok_or_else(|| {
+                anyhow::anyhow!(
+                    "mod '{id}' archive {archive} has {count} choice set(s), not {}",
+                    n + 1
+                )
+            })?
+        }
+        ChoiceTarget::New(condition) => {
+            let mut new = Table::new();
+            if let Some(condition) = condition
+                .as_deref()
+                .map(str::trim)
+                .filter(|c| !c.is_empty())
+            {
+                new.insert("if", toml_edit::value(condition));
+            }
+            sets.push(new);
+            sets.get_mut(sets.len() - 1).expect("just pushed")
+        }
+        ChoiceTarget::Default => unreachable!(),
+    };
+    write_chosen(set, id, chosen, true)?;
+    Ok(doc.to_string())
+}
+
+/// Set (or, `None`, clear) the `if` of choice set `n` (from 0).
+pub fn set_choice_condition(
+    text: &str,
+    id: &str,
+    archive: usize,
+    n: usize,
+    condition: Option<&str>,
+) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    let sets = choice_sets(table, id)?;
+    let set = sets
+        .get_mut(n)
+        .ok_or_else(|| anyhow::anyhow!("mod '{id}' has no choice set {}", n + 1))?;
+    match condition.map(str::trim).filter(|c| !c.is_empty()) {
+        Some(condition) => {
+            set.insert("if", toml_edit::value(condition));
+        }
+        None => {
+            set.remove("if");
+        }
+    }
+    Ok(doc.to_string())
+}
+
+/// Take choice set `n` (from 0) out.
+pub fn remove_choice_set(text: &str, id: &str, archive: usize, n: usize) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    let sets = choice_sets(table, id)?;
+    anyhow::ensure!(n < sets.len(), "mod '{id}' has no choice set {}", n + 1);
+    sets.remove(n);
+    tidy_choices(table);
+    Ok(doc.to_string())
+}
+
+/// Move choice set `from` to place `to` (both from 0): earlier is tried
+/// first.
+pub fn move_choice_set(
+    text: &str,
+    id: &str,
+    archive: usize,
+    from: usize,
+    to: usize,
+) -> anyhow::Result<String> {
+    let mut doc = parse(text)?;
+    let table = target(&mut doc, id, Some(archive))?;
+    let sets = choice_sets(table, id)?;
+    anyhow::ensure!(
+        from < sets.len() && to < sets.len(),
+        "mod '{id}' has {} choice set(s)",
+        sets.len()
+    );
+    // Each table keeps its place in the file: the places stay, the tables
+    // move between them.
+    let places: Vec<Option<usize>> = sets.iter().map(Table::position).collect();
+    let mut all: Vec<Table> = sets.iter().cloned().collect();
+    let moved = all.remove(from);
+    all.insert(to, moved);
+    let mut rebuilt = ArrayOfTables::new();
+    for (mut t, place) in all.into_iter().zip(places) {
+        if let Some(place) = place {
+            t.set_position(place);
+        }
+        rebuilt.push(t);
+    }
+    *sets = rebuilt;
+    Ok(doc.to_string())
+}
+
+/// `chosen` written into `table`: an archive's, or one of its choice sets'.
+fn write_chosen(
+    table: &mut Table,
+    id: &str,
+    chosen: &crate::config::inspect::Chosen,
+    rows: bool,
+) -> anyhow::Result<()> {
+    use crate::config::inspect::Chosen;
     let conditional = |item: Option<&Item>| -> bool {
         match item {
             Some(Item::ArrayOfTables(tables)) => tables.iter().any(|t| t.contains_key("if")),
@@ -1079,7 +1308,7 @@ pub fn set_installer(
             }
         }
     }
-    Ok(doc.to_string())
+    Ok(())
 }
 
 /// The docs file without mod `id`'s notes.
@@ -1507,5 +1736,86 @@ id = "B"
             out.contains("key = \"Other\""),
             "another condition is left: {out}"
         );
+    }
+
+    #[test]
+    fn choice_sets_are_written_moved_and_removed() {
+        use super::ChoiceTarget;
+        use crate::config::inspect::Chosen;
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"x\"\nbain_subpackages = [\"00 Core\", \"01 Plain\"]\n";
+        let bain = |names: &[&str]| Chosen::Bain(names.iter().map(|s| s.to_string()).collect());
+        let out = super::write_choice_set(
+            text,
+            "A",
+            1,
+            &ChoiceTarget::New(Some("map == Elven".into())),
+            &bain(&["00 Core", "01 Elven"]),
+        )
+        .unwrap();
+        let out = super::write_choice_set(
+            &out,
+            "A",
+            1,
+            &ChoiceTarget::New(Some("map == Classic".into())),
+            &bain(&["00 Core", "01 Classic"]),
+        )
+        .unwrap();
+        assert!(out.contains("[[mods.archives.choices]]\nif = \"map == Elven\"\nbain_subpackages = [\"00 Core\", \"01 Elven\"]"), "{out}");
+        let out = super::move_choice_set(&out, "A", 1, 1, 0).unwrap();
+        assert!(
+            out.find("Classic").unwrap() < out.find("Elven").unwrap(),
+            "{out}"
+        );
+        let out = super::write_choice_set(
+            &out,
+            "A",
+            1,
+            &ChoiceTarget::Set(0),
+            &bain(&["00 Core", "01 Classic", "02 Extra"]),
+        )
+        .unwrap();
+        assert!(
+            out.contains("bain_subpackages = [\"00 Core\", \"01 Classic\", \"02 Extra\"]"),
+            "{out}"
+        );
+        let out = super::set_choice_condition(&out, "A", 1, 0, Some("map == Old")).unwrap();
+        assert!(out.contains("if = \"map == Old\""), "{out}");
+        let out = super::remove_choice_set(&out, "A", 1, 0).unwrap();
+        let out = super::remove_choice_set(&out, "A", 1, 0).unwrap();
+        assert!(!out.contains("choices"), "{out}");
+        assert!(
+            out.contains("bain_subpackages = [\"00 Core\", \"01 Plain\"]"),
+            "{out}"
+        );
+        // Read back as the list.
+        let _: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+    }
+
+    #[test]
+    fn an_archive_is_added_after_the_mods_own() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/2\"\n\n[[mods.actions]]\naction = \"file_hide\"\npaths = [\"a\"]\n\n[[mods]]\nid = \"B\"\n";
+        let block = "[[mods.archives]]\npath = \"nexus:oblivion/1/3\"\nfile_name = \"Patch.7z\"\nlayout = \"fomod\"\n\n[[mods.archives.fomod_selections]]\nstep = \"S\"\ngroup = \"G\"\noptions = [\"X\"]\n";
+        let out = super::add_archive(text, "A", block).unwrap();
+        let list: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+        let a = &list.mods[0];
+        assert_eq!(a.archives.len(), 2, "{out}");
+        assert_eq!(a.archives[1].file_name.as_deref(), Some("Patch.7z"));
+        assert_eq!(a.archives[1].fomod_selections[0].options, ["X"]);
+        assert_eq!(a.actions.len(), 1);
+        assert!(list.mods[1].archives.is_empty(), "{out}");
+    }
+
+    #[test]
+    fn an_archive_is_removed_with_its_choices() {
+        let text = "name = \"L\"\n\n[[mods]]\nid = \"A\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/2\"\n\n[[mods.archives]]\npath = \"nexus:oblivion/1/3\"\n\n[[mods.archives.choices]]\nif = \"x\"\nbain_subpackages = [\"00\"]\n\n[[mods.actions]]\naction = \"file_hide\"\npaths = [\"a\"]\n";
+        let out = super::remove_archive(text, "A", 2).unwrap();
+        let list: crate::config::schema::SourceModlist = toml::from_str(&out).unwrap();
+        assert_eq!(list.mods[0].archives.len(), 1);
+        assert_eq!(
+            list.mods[0].archives[0].path.as_deref(),
+            Some("nexus:oblivion/1/2")
+        );
+        assert_eq!(list.mods[0].actions.len(), 1);
+        assert!(super::remove_archive(text, "A", 3).is_err());
     }
 }

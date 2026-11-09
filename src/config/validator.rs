@@ -262,6 +262,40 @@ fn validate_list(modlist: &SourceModlist) -> anyhow::Result<Vec<String>> {
                                 ))
                             }),
                     )
+                    .chain(
+                        archive
+                            .choices
+                            .iter()
+                            .enumerate()
+                            .flat_map(move |(n, set)| {
+                                let site = format!(
+                                    "choice set {} of {}",
+                                    n + 1,
+                                    archive.path.as_deref().unwrap_or("(build)")
+                                );
+                                set.condition
+                                    .iter()
+                                    .map({
+                                        let site = site.clone();
+                                        move |expr| (expr, site.clone(), false)
+                                    })
+                                    .chain(set.fomod_selections.iter().filter_map({
+                                        let site = site.clone();
+                                        move |s| {
+                                            s.condition
+                                                .as_ref()
+                                                .map(|expr| (expr, site.clone(), false))
+                                        }
+                                    }))
+                                    .chain(set.bain_subpackages.iter().filter_map(move |p| {
+                                        let BainSubpackage::Conditional { condition, .. } = p
+                                        else {
+                                            return None;
+                                        };
+                                        Some((condition, site.clone(), false))
+                                    }))
+                            }),
+                    )
             }));
         for (expr, site, gates_mod) in conditions {
             let condition = Condition::parse(expr)

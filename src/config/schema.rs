@@ -1361,6 +1361,11 @@ pub struct ArchiveSpec {
     pub bain_subpackages: Vec<BainSubpackage>,
     #[serde(default)]
     pub fomod_selections: Vec<FomodSelection>,
+    /// Sets of installer choices, in order: the first whose `if` holds is
+    /// installed, in place of `fomod_selections` and `bain_subpackages`,
+    /// which are what is installed when none does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<ChoiceSet>,
     #[serde(default)]
     pub build: Vec<BuildLayer>,
     #[serde(default)]
@@ -1389,6 +1394,19 @@ pub struct FomodSelection {
     pub group: String,
     #[serde(default)]
     pub options: Vec<String>,
+}
+
+/// One set of an archive's installer choices, installed when its `if` holds
+/// (always, without one) and no set before it is.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ChoiceSet {
+    #[serde(rename = "if", default, skip_serializing_if = "Option::is_none")]
+    pub condition: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fomod_selections: Vec<FomodSelection>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bain_subpackages: Vec<BainSubpackage>,
 }
 
 /// A BAIN subpackage to install: its folder name, or, when it depends on an
@@ -1593,6 +1611,11 @@ pub struct CompiledArchive {
     pub bain_subpackages: Vec<BainSubpackage>,
     #[serde(default)]
     pub fomod_selections: Vec<FomodSelection>,
+    /// Sets of installer choices, in order: the first whose `if` holds is
+    /// installed, in place of `fomod_selections` and `bain_subpackages`,
+    /// which are what is installed when none does.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<ChoiceSet>,
     #[serde(default)]
     pub build: Vec<BuildLayer>,
     #[serde(default)]

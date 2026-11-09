@@ -247,8 +247,28 @@ export interface ModView {
     condition: string | null;
     applies: boolean | null;
     choices: Conditional[];
+    /** Its sets of choices in order, the first whose `if` holds installed;
+     *  then its own, installed when none does. */
+    sets: ChoiceSetView[];
+    own: ChoiceSetView;
+    /** The set Author mode's profile installs: an index into `sets`, or null
+     *  for its own. */
+    installed: number | null;
   }[];
 }
+
+/** One set of an archive's installer choices. */
+export interface ChoiceSetView {
+  condition: string | null;
+  applies: boolean | null;
+  fomod: string[];
+  packages: string[];
+  /** Packages chosen only under an `if` of their own, changed in the file. */
+  conditional: string[];
+}
+
+/** Which set of an archive's choices an edit is to. */
+export type ChoiceTarget = "default" | { set: number } | { new: string | null };
 
 /** Something done only under a condition, or always: its `if`, and whether
  *  that holds in Author mode's profile. */
@@ -642,10 +662,22 @@ export const api = {
   addWalk: (path: string, answers: Answer[]) => invoke<Walk>("add_walk", { path, answers }),
   addPlan: (request: AddRequest) => invoke<AddPlan>("add_plan", { request }),
   addMod: (request: AddRequest) => invoke<Edited>("add_mod", { request }),
-  chooseWalk: (id: string, number: number, answers: Answer[]) =>
-    invoke<Walk>("choose_walk", { id, number, answers }),
-  chooseWrite: (id: string, number: number, answers: Answer[]) =>
-    invoke<Edited>("choose_write", { id, number, answers }),
+  chooseWalk: (id: string, number: number, answers: Answer[], to: ChoiceTarget = "default") =>
+    invoke<Walk>("choose_walk", { id, number, answers, to }),
+  chooseWrite: (id: string, number: number, answers: Answer[], to: ChoiceTarget = "default") =>
+    invoke<Edited>("choose_write", { id, number, answers, to }),
+  /** Add an archive to mod `id`, after its own; says which of its plugins
+   *  the mod does not declare yet. */
+  addArchive: (id: string, request: { path: string; source: string | null; answers: Answer[] }) =>
+    invoke<Edited & { new_plugins: string[] }>("add_archive", { id, request }),
+  removeArchive: (id: string, number: number) => invoke<Edited>("remove_archive", { id, number }),
+  writeBainSet: (id: string, number: number, to: ChoiceTarget, packages: string[]) =>
+    invoke<Edited>("write_bain_set", { id, number, to, packages }),
+  setChoiceCondition: (id: string, number: number, index: number, condition: string | null) =>
+    invoke<Edited>("set_choice_condition", { id, number, index, condition }),
+  removeChoiceSet: (id: string, number: number, index: number) => invoke<Edited>("remove_choice_set", { id, number, index }),
+  moveChoiceSet: (id: string, number: number, from: number, to: number) =>
+    invoke<Edited>("move_choice_set", { id, number, from, to }),
   nexusLink: (link: string) => invoke<NexusMod>("nexus_link", { link }),
   nexusFetch: (modId: number, fileId: number, fileName: string | null) =>
     invoke<Fetched>("nexus_fetch", { modId, fileId, fileName }),

@@ -719,6 +719,63 @@ pub fn existing(
     })
 }
 
+/// The same, walking one of the archive's sets of choices from what it
+/// chooses now: its own, one of its `choices`, or a new set (from its own).
+pub fn existing_choice(
+    path: &Path,
+    id: &str,
+    number: usize,
+    overrides: &crate::config::query::Overrides,
+    downloads: &Path,
+    search: &[std::path::PathBuf],
+    to: &crate::config::edit::doc::ChoiceTarget,
+) -> anyhow::Result<Existing> {
+    use crate::config::edit::doc::ChoiceTarget;
+    let mut found = existing(path, id, number, overrides, downloads, search)?;
+    let text = std::fs::read_to_string(path)
+        .map_err(|err| anyhow::anyhow!("failed to read {}: {err}", path.display()))?;
+    let source = crate::config::loader::parse_modlist(&text, path)?;
+    let spec = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .and_then(|entry| entry.archives.get(number.wrapping_sub(1)))
+        .ok_or_else(|| anyhow::anyhow!("'{id}' has no archive {number}"))?;
+    let (fomod, packages) = match to {
+        ChoiceTarget::Set(n) => {
+            let set = spec.choices.get(*n).ok_or_else(|| {
+                anyhow::anyhow!("'{id}' archive {number} has no choice set {}", n + 1)
+            })?;
+            (set.fomod_selections.clone(), set.bain_subpackages.clone())
+        }
+        ChoiceTarget::Default | ChoiceTarget::New(_) => {
+            (spec.fomod_selections.clone(), spec.bain_subpackages.clone())
+        }
+    };
+    found.prior.fomod = fomod.clone();
+    found.prior.rows = fomod;
+    found.prior.packages = packages.iter().map(|p| p.name().to_string()).collect();
+    Ok(found)
+}
+
+/// Plan writing what the walk chose into one of the archive's sets of
+/// choices.
+pub fn plan_choice_to(
+    path: &Path,
+    id: &str,
+    number: usize,
+    installed: &Installed,
+    to: &crate::config::edit::doc::ChoiceTarget,
+) -> anyhow::Result<crate::config::edit::Edit> {
+    let chosen = installed
+        .chosen
+        .as_ref()
+        .ok_or_else(|| anyhow::anyhow!("this archive's installer has nothing to choose"))?;
+    crate::config::edit::plan_mod(path, id, |text, _, id| {
+        crate::config::edit::doc::write_choice_set(text, id, number, to, chosen)
+    })
+}
+
 /// Plan writing what the walk chose into mod `id`'s `number`th archive, in
 /// the list at `path`: with `rows`, its FOMOD selections that depend on the
 /// list's questions replace the entry's (the walk showed them).

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { api, type Answer, type InputDoc, type Walk } from "./api";
+  import { api, type Answer, type ChoiceTarget, type InputDoc, type Walk } from "./api";
   import InstallerQuestions from "./InstallerQuestions.svelte";
 
   // An archive's installer walked again (`mudcrab choose`): each question
@@ -13,6 +13,8 @@
     label,
     inputs,
     current,
+    to = "default",
+    title = "",
     write,
     close,
   }: {
@@ -22,6 +24,9 @@
     /** The list's questions, and the answers now. */
     inputs: InputDoc[];
     current: Record<string, string>;
+    /** The set of the archive's choices walked, and what to call it. */
+    to?: ChoiceTarget;
+    title?: string;
     /** Write the choices; resolves true when written. */
     write: (answers: Answer[]) => Promise<boolean>;
     close: () => void;
@@ -36,7 +41,7 @@
     busy = true;
     error = null;
     try {
-      walk = await api.chooseWalk(id, number, answers);
+      walk = await api.chooseWalk(id, number, answers, to);
     } catch (err) {
       error = String(err);
     } finally {
@@ -56,7 +61,7 @@
   async function defaults() {
     busy = true;
     try {
-      let next = await api.chooseWalk(id, number, answers);
+      let next = await api.chooseWalk(id, number, answers, to);
       while (next.kind === "ask") {
         const asked = next.asked;
         // A group's rows that depend on the questions are kept as they are.
@@ -67,7 +72,7 @@
               ? { depends: { now: asked.question.default, rows: asked.rows } }
               : { pick: asked.question.default };
         answers = [...answers, given];
-        next = await api.chooseWalk(id, number, answers);
+        next = await api.chooseWalk(id, number, answers, to);
       }
       walk = next;
     } catch (err) {
@@ -91,7 +96,7 @@
   <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
   <div class="dialog" role="dialog" tabindex="-1" aria-label="Choose the installer's options" onclick={(e) => e.stopPropagation()}>
     <div class="dhead">
-      <strong>{id}: {label}</strong>
+      <strong>{id}: {label}{#if title} — {title}{/if}</strong>
       <button class="link" onclick={close}>Cancel</button>
     </div>
     <div class="dbody">

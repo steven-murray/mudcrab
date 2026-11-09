@@ -1,5 +1,5 @@
 <script lang="ts" module>
-  import type { Conditional, Tree } from "./api";
+  import type { ChoiceSetView, ChoiceTarget, Conditional, Tree } from "./api";
   import IfTag from "./IfTag.svelte";
   /** One of the mod's archives, and its tree once read. */
   export type Archive = {
@@ -10,6 +10,10 @@
     applies?: boolean | null;
     /** Its FOMOD rows and BAIN packages as written, with their `if`s. */
     choices?: Conditional[];
+    /** Its sets of choices, its own, and the one installed. */
+    sets?: ChoiceSetView[];
+    own?: ChoiceSetView;
+    installed?: number | null;
     tree: Tree | null;
     error: string | null;
   };
@@ -17,6 +21,8 @@
 
 <script lang="ts">
   import { tick as rendered } from "svelte";
+  import ChoiceSets from "./ChoiceSets.svelte";
+  import { api } from "./api";
   import { SvelteMap, SvelteSet } from "svelte/reactivity";
   import { startDrag } from "./drag";
   import type { InputDoc } from "./api";
@@ -51,7 +57,8 @@
     move: (from: string, to: string) => Promise<boolean>;
     problem: (message: string) => void;
     /** Walk an archive's installer again. */
-    choose: (number: number, label: string) => void;
+    /** Walk an archive's FOMOD installer for one of its sets of choices. */
+    choose: (number: number, label: string, to: ChoiceTarget, title: string) => void;
     /** The list's questions, for an archive's `if`. */
     inputs: InputDoc[];
     /** Run an edit; resolves true when written. */
@@ -59,6 +66,8 @@
   } = $props();
 
   const lower = (list: string[]) => list.map((v) => v.toLowerCase());
+  // The archive whose removal is being confirmed.
+  let removing = $state<number | null>(null);
   // As globset escapes a path: each metacharacter in brackets.
   const escape = (path: string) => path.replace(/[*?[\]{}]/g, (c) => `[${c}]`);
 
@@ -87,17 +96,19 @@
     }
     return path;
   }
-  const files = $derived<File[]>(
-    archives
-      .flatMap((a) =>
-        (a.tree?.installed ?? []).map((f) => ({
-          ...f,
-          path: movedTo(f.path),
-          taken: ticked.get(f.path) ?? f.taken,
-          archive: a,
-        })),
-      )
-      .sort((x, y) => x.path.localeCompare(y.path)),
+  const files = $derived.by<File[]>(
+    () => {
+      // One file per path: where two archives put the same one -- the same
+      // archive twice, or two that overlap -- the later's is the one the
+      // mod's folder ends up with.
+      const byPath = new Map<string, File>();
+      for (const a of archives)
+        for (const f of a.tree?.installed ?? []) {
+          const file = { ...f, path: movedTo(f.path), taken: ticked.get(f.path) ?? f.taken, archive: a };
+          byPath.set(file.path.toLowerCase(), file);
+        }
+      return [...byPath.values()].sort((x, y) => x.path.localeCompare(y.path));
+    },
   );
   // Shown at once; put back if the edit is not written.
   async function showing(paths: string[], taken: boolean, write: () => Promise<boolean>) {
@@ -343,32 +354,37 @@
       <strong>{several ? `${archive.number}. ` : ""}{archive.label}</strong>
       {#if archive.condition}<IfTag condition={archive.condition} applies={archive.applies} />{/if}
       {#if archive.tree}<span class="tag" title="Its layout">{archive.tree.layout ?? "automatic"}</span>{/if}
-      {#if archive.tree && (fomodOf(archive.tree) || archive.tree.layout === "bain")}
-        <button
-          class="small"
-          onclick={() => choose(archive.number, archive.label)}
-          title="Walk its installer again, starting at what the list chooses now (mudcrab choose)"
-          >Choose its {fomodOf(archive.tree) ? "FOMOD options" : "BAIN packages"}…</button
+      <span class="grow"></span>
+      {#if removing === archive.number}
+        <span class="small">Remove this archive, and its choices?</span>
+        <button class="small danger" onclick={() => run(() => api.removeArchive(id, archive.number)).then(() => (removing = null))}
+          >Remove</button
         >
+        <button class="small" onclick={() => (removing = null)}>Keep it</button>
+      {:else}
+        <button class="link small danger" onclick={() => (removing = archive.number)} title="Take this archive out of the mod">Remove</button>
       {/if}
     </div>
-    {#if archive.choices?.some((c) => c.condition)}
-      <ul class="choices">
-        {#each archive.choices as c, n (n)}
-          <li class:off={c.applies === false}>
-            {c.text}
-            {#if c.condition}<IfTag condition={c.condition} applies={c.applies} />{/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
     {#if archive.error}
       <pre class="error">{archive.error}</pre>
     {:else if !archive.tree}
       <p class="dim small">Reading the archive…</p>
     {:else}
       {@const tree = archive.tree}
-      {#if packagesOf(tree).length}
+      {#if archive.own && (fomodOf(tree) || packagesOf(tree).length)}
+        <ChoiceSets
+          {id}
+          number={archive.number}
+          fomod={fomodOf(tree)}
+          packages={packagesOf(tree).map((p) => p.name)}
+          sets={archive.sets ?? []}
+          own={archive.own}
+          installed={archive.installed ?? null}
+          {inputs}
+          {run}
+          choose={(to, title) => choose(archive.number, archive.label, to, title)}
+        />
+      {:else if packagesOf(tree).length}
         <div class="packages">
           <span class="dim">Packages:</span>
           {#each packagesOf(tree) as pkg}
@@ -496,20 +512,15 @@
 {#if !files.length && archives.every((a) => a.tree)}<p class="dim small">Nothing goes in the mod's folder.</p>{/if}
 
 <style>
-  .choices {
-    margin: 2px 0 6px;
-    padding-left: 18px;
-    font-size: 12px;
-  }
-  .choices li.off {
-    color: var(--faint);
-  }
   .archive {
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 6px 10px;
     margin: 6px 0;
     font-size: 13px;
+  }
+  .ahead .grow {
+    flex: 1;
   }
   .ahead {
     display: flex;

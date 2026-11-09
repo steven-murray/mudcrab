@@ -117,6 +117,11 @@ pub fn planned_archive(
         .get(number.wrapping_sub(1))
         .ok_or_else(|| anyhow::anyhow!("mod '{id}' has no archive {number}"))?
         .clone();
+    let source_count = source
+        .mods
+        .iter()
+        .find(|entry| entry.id == id)
+        .map_or(0, |entry| entry.archives.len());
     let compiled = compile_text(text, path)?;
     let planned = crate::config::query::build_authoring_plan(&compiled.modlist, overrides)?;
     let plan = planned.plan;
@@ -135,23 +140,17 @@ pub fn planned_archive(
         })?
         .clone();
     // Every archive, as it would install: one the answers leave out too.
+    // By its place among the mod's archives, as written -- the same file
+    // can be an archive twice, with different choices -- else by what it is.
     let same = |a: &CompiledArchive| {
         a.path == spec.path && (spec.file_name.is_none() || a.file_name == spec.file_name)
     };
-    let archive = entry
-        .archives
-        .iter()
-        .find(|a| same(a))
-        .cloned()
-        .or_else(|| {
-            planned
-                .every_archive
-                .get(id)?
-                .iter()
-                .flatten()
-                .find(|a| same(a))
-                .cloned()
-        })
+    let every = planned.every_archive.get(id);
+    let archive = every
+        .filter(|all| all.len() == source_count)
+        .and_then(|all| all.get(number - 1).cloned().flatten())
+        .or_else(|| entry.archives.iter().find(|a| same(a)).cloned())
+        .or_else(|| every?.iter().flatten().find(|a| same(a)).cloned())
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "with these answers, this archive would install nothing: every BAIN \

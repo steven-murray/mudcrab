@@ -676,6 +676,24 @@ fn each_condition(
                 change(text)?;
             }
         }
+        for set in &mut archive.choices {
+            if let Some(text) = &mut set.condition {
+                change(text)?;
+            }
+            for selection in &mut set.fomod_selections {
+                if let Some(text) = &mut selection.condition {
+                    change(text)?;
+                }
+            }
+            for package in &mut set.bain_subpackages {
+                if let BainSubpackage::Conditional {
+                    condition: text, ..
+                } = package
+                {
+                    change(text)?;
+                }
+            }
+        }
     }
     Ok(())
 }

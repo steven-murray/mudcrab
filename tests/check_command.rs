@@ -113,6 +113,7 @@ fn check_as_a_library_returns_its_findings_and_reports_them_as_events() {
     let report = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
+            search: Vec::new(),
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: false,
@@ -554,6 +555,7 @@ fn a_master_from_another_mod_is_a_dependency() {
         let report = mudcrab::config::check::check_all(
             &plan,
             &mudcrab::config::check::CheckSettings {
+                search: Vec::new(),
                 cache_dir: downloads.clone(),
                 filter: Default::default(),
                 masters_only: true,
@@ -609,6 +611,7 @@ fn masters_are_written_as_dependencies() {
     let report = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
+            search: Vec::new(),
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: true,
@@ -778,6 +781,7 @@ fn a_file_only_one_other_mod_provides_is_a_resource_dependency() {
     let report = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
+            search: Vec::new(),
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: true,
@@ -847,6 +851,7 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
     let report = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
+            search: Vec::new(),
             cache_dir: downloads.clone(),
             filter: Default::default(),
             masters_only: true,
@@ -879,6 +884,7 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
     let again = mudcrab::config::check::check_all(
         &plan,
         &mudcrab::config::check::CheckSettings {
+            search: Vec::new(),
             cache_dir: downloads,
             filter: Default::default(),
             masters_only: true,
@@ -887,4 +893,50 @@ fn each_mods_inis_bsas_and_shared_files_are_reported() {
     )
     .unwrap();
     assert_eq!(again.facts[1].inis, ["ini/extra.ini", "ini/other.ini"]);
+}
+
+#[test]
+fn an_archive_in_another_folder_is_read_where_it_is() {
+    use mudcrab::config::check::Kind;
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    let downloads = root.join("downloads");
+    let elsewhere = root.join("elsewhere");
+    std::fs::create_dir_all(&downloads).unwrap();
+    make_zip(
+        &elsewhere.join("Rocks-1-1-0.zip"),
+        &[("ini/Rocks.ini", b"[Main]\nx=1\n")],
+    );
+    let list = root.join("list.toml");
+    std::fs::write(
+        &list,
+        "name = \"L\"\n\n[[mods]]\nid = \"Rocks\"\n[[mods.archives]]\npath = \"nexus:oblivion/1/10\"\nfile_name = \"Rocks-1-1-0.zip\"\n",
+    )
+    .unwrap();
+    let compiled = mudcrab::config::pipeline::compile(&list, false).unwrap();
+    let plan =
+        mudcrab::config::query::build_plan(&compiled.modlist, &Default::default(), None).unwrap();
+    let check = |search: Vec<std::path::PathBuf>| {
+        mudcrab::config::check::check_all(
+            &plan,
+            &mudcrab::config::check::CheckSettings {
+                cache_dir: downloads.clone(),
+                search,
+                filter: Default::default(),
+                masters_only: true,
+                resources: None,
+            },
+        )
+        .unwrap()
+    };
+    let missing = |report: &mudcrab::config::check::CheckReport| {
+        report
+            .findings
+            .iter()
+            .any(|f| f.kind == Kind::MissingArchive)
+    };
+    assert!(missing(&check(Vec::new())));
+    let found = check(vec![elsewhere]);
+    assert!(!missing(&found), "{:?}", found.findings);
+    assert_eq!(found.facts[0].inis, ["ini/rocks.ini"]);
 }

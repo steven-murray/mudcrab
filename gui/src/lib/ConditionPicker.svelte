@@ -3,20 +3,28 @@
 
   // When something applies: always, under a condition already used, or
   // under a new one -- typed, or made from one of the list's questions and
-  // an answer to it.
+  // an answer to it. With `required`, only a condition: typed, or made from
+  // a question, an answer already `taken` left out.
   let {
     value = $bindable(),
     known = [],
     inputs,
+    required = false,
+    taken = [],
   }: {
     /** The condition, or null for always. */
     value: string | null;
     /** Conditions already in use, offered first. */
     known?: string[];
     inputs: InputDoc[];
+    /** A condition must be given: no always, nothing already used offered. */
+    required?: boolean;
+    /** Conditions already used, their answers not offered again. */
+    taken?: string[];
   } = $props();
 
   let other = $state(false);
+  const same = (a: string, b: string) => a.replace(/["\s]/g, "") === b.replace(/["\s]/g, "");
   let question = $state("");
   const askable = $derived(inputs.filter((i) => !i.optional_group && (i.type === "bool" || i.type === "choice")));
   const asked = $derived(askable.find((i) => i.id === question) ?? null);
@@ -29,9 +37,10 @@
         ]
       : (asked?.choices ?? []).filter((c) => !c.includes('"')).map((c) => ({ label: c, condition: `${asked!.id} == "${c}"` })),
   );
+  const offered = $derived(answers.filter((a) => !taken.some((t) => same(t, a.condition))));
 </script>
 
-<div class="picker">
+{#if !required}<div class="picker">
   <span class="dim small">Applies</span>
   <button class="chip" class:on={value === null && !other} onclick={() => ((value = null), (other = false))}>always</button>
   {#each known as condition (condition)}
@@ -40,8 +49,8 @@
     >
   {/each}
   <button class="chip" class:on={other} onclick={() => ((other = true), (value = value ?? ""))}>another condition…</button>
-</div>
-{#if other}
+</div>{/if}
+{#if other || required}
   <div class="other">
     <span class="dim small">if</span>
     <input class="cond" bind:value placeholder="a condition, as in an if" spellcheck="false" />
@@ -51,8 +60,10 @@
         {#each askable as input (input.id)}<option value={input.id}>{input.id}</option>{/each}
       </select>
       {#if asked}
-        {#each answers as answer (answer.condition)}
+        {#each offered as answer (answer.condition)}
           <button class="chip" class:on={value === answer.condition} onclick={() => (value = answer.condition)}>{answer.label}</button>
+        {:else}
+          <span class="dim small">every answer has a set</span>
         {/each}
       {/if}
     {/if}

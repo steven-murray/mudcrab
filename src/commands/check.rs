@@ -6,6 +6,7 @@ pub async fn run(args: CheckArgs) -> anyhow::Result<()> {
 
     let cache_dir = super::resolve_downloads_dir(args.downloads.clone(), None)?;
     let settings = config::check::CheckSettings {
+        search: Vec::new(),
         cache_dir,
         filter: args.filter.to_mod_filter(),
         masters_only: args.masters_only,

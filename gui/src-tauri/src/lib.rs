@@ -1061,6 +1061,7 @@ async fn step_check(
         });
     }
     let settings = config::check::CheckSettings {
+        search: locate(&state)?.search,
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: false,
@@ -1163,6 +1164,7 @@ async fn scan_list(state: tauri::State<'_, State>) -> Result<ListScan, String> {
         .downloads
         .ok_or("say where the downloads folder is first")?;
     let settings = config::check::CheckSettings {
+        search: locate(&state)?.search,
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: true,
@@ -1234,6 +1236,7 @@ async fn masters_of(
         .downloads
         .ok_or("say where the downloads folder is first")?;
     let settings = config::check::CheckSettings {
+        search: locate(state)?.search,
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: true,
@@ -1276,6 +1279,7 @@ async fn find_resource_dependencies(
         "say where the game folder is first: its own files are what no mod has to provide",
     )?;
     let settings = config::check::CheckSettings {
+        search: found.search.clone(),
         cache_dir: downloads,
         filter: Default::default(),
         masters_only: true,
@@ -1613,6 +1617,7 @@ pub fn app<R: Runtime>(
             note_slow,
             scan_list,
             author::author_profile,
+            adding::add_archive,
             author::set_author_profile,
             author::set_author_answers,
             add_found_dependencies,
@@ -1637,6 +1642,11 @@ pub fn app<R: Runtime>(
             edits::set_fields,
             edits::add_action,
             edits::set_ini,
+            edits::write_bain_set,
+            edits::remove_archive,
+            edits::set_choice_condition,
+            edits::remove_choice_set,
+            edits::move_choice_set,
             edits::remove_action,
             edits::actions,
             edits::add_input,

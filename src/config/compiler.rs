@@ -142,6 +142,7 @@ pub fn compile_archive(id: &str, archive: &ArchiveSpec) -> anyhow::Result<Compil
         inner_archive: archive.inner_archive.clone(),
         bain_subpackages: archive.bain_subpackages.clone(),
         fomod_selections: archive.fomod_selections.clone(),
+        choices: archive.choices.clone(),
         build: archive.build.clone(),
         include: archive.include.clone(),
         exclude: archive.exclude.clone(),

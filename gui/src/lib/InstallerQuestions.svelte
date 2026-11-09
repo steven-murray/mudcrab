@@ -115,10 +115,7 @@
         type={single ? "radio" : "checkbox"}
         checked={choice.availability === "required" || from.includes(i)}
         disabled={choice.availability === "required" || choice.availability === "unavailable"}
-        onclick={(e) => {
-          e.preventDefault();
-          set(toggled(q, from, i));
-        }}
+        onchange={() => set(toggled(q, from, i))}
       />
       <span>
         {choice.name}

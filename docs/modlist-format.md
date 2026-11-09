@@ -390,6 +390,30 @@ layout = "bain"
 bain_subpackages = ["00 Core", { name = "01 2K Textures", if = "res == 2k" }]
 ```
 
+An archive can instead hold whole **sets of choices**, in order, each with an
+optional `if`: the first set whose condition holds is installed, in place of
+the archive's `fomod_selections` and `bain_subpackages` -- which are what is
+installed otherwise, when none does. One question choosing between an archive's
+alternatives reads best this way:
+
+```toml
+[[mods.archives]]
+path = "nexus:oblivion/12345/67890"
+bain_subpackages = ["00 Core", "01 Elven"]      # when no set's `if` holds
+
+[[mods.archives.choices]]
+if = 'map == "Classic"'
+bain_subpackages = ["00 Core", "01 Classic"]
+
+[[mods.archives.choices]]
+if = 'map == "Parchment"'
+bain_subpackages = ["00 Core", "01 Parchment"]
+```
+
+A set holds `fomod_selections` the same way. The GUI lists an archive's sets
+in order (*otherwise* last), marks the one the profile installs, and edits,
+re-conditions, reorders and removes them.
+
 A FOMOD group whose rows are all left out gets the installer's own default, as
 if it had no row. The GUI writes these rows from its FOMOD walk (**Depends on a
 question…** on a group). A mod whose archives are all left out, or a BAIN archive

@@ -38,6 +38,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Default)]
 pub struct CheckSettings {
     pub cache_dir: PathBuf,
+    /// Other folders an archive may be in, read where it is when it is not
+    /// in `cache_dir` (as `download --archive-search-path` finds them).
+    pub search: Vec<PathBuf>,
     /// Which mods to check. Empty means the whole plan.
     pub filter: ModFilter,
     /// Only read each plugin's masters and check them: no MD5s, no filters,
@@ -848,9 +851,22 @@ pub fn archive_contents(
     cache_dir: &Path,
     active_plugins: &HashSet<String>,
 ) -> anyhow::Result<Option<ArchiveContents>> {
+    archive_contents_in(mod_entry, archive, cache_dir, &[], active_plugins)
+}
+
+/// The same, looking for the archive in `search` too when it is not in
+/// `cache_dir`.
+pub fn archive_contents_in(
+    mod_entry: &PersonalizedMod,
+    archive: &CompiledArchive,
+    cache_dir: &Path,
+    search: &[PathBuf],
+    active_plugins: &HashSet<String>,
+) -> anyhow::Result<Option<ArchiveContents>> {
     let settings = CheckSettings {
         masters_only: false,
         cache_dir: cache_dir.to_path_buf(),
+        search: search.to_vec(),
         filter: ModFilter::default(),
         resources: None,
     };
@@ -1791,7 +1807,7 @@ fn present(
     reference: &ArchiveRef<'_>,
     settings: &CheckSettings,
 ) -> anyhow::Result<PathBuf> {
-    if let Some(found) = archive_store::find(&settings.cache_dir, &[], reference) {
+    if let Some(found) = archive_store::find(&settings.cache_dir, &settings.search, reference) {
         if found.is_dir() {
             anyhow::bail!("archive path is a directory: {}", found.display());
         }

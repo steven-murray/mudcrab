@@ -8,9 +8,14 @@
   let {
     add,
     select,
+    target = null,
+    cancelTarget = () => {},
   }: {
     add: (path: string) => void;
     select: (mod: string) => void;
+    /** A mod an archive is being chosen for, instead of a new mod. */
+    target?: string | null;
+    cancelTarget?: () => void;
   } = $props();
 
   let rows = $state<ArchiveRow[] | null>(null);
@@ -122,6 +127,12 @@
 
 <svelte:window onclick={() => (menu = null)} onkeydown={(e) => e.key === "Escape" && (menu = null)} />
 
+{#if target}
+  <div class="target">
+    <span>Choose an archive, or a file from a Nexus link, to add to <b>{target}</b>.</span>
+    <button class="link" onclick={cancelTarget}>Cancel</button>
+  </div>
+{/if}
 <form class="link" onsubmit={lookUp}>
   <input type="text" placeholder="Paste a Nexus link to add a mod from" bind:value={link} bind:this={linkInput} />
   <button type="submit" disabled={!link.trim() || looking}>{looking ? "…" : "Look up"}</button>
@@ -207,12 +218,24 @@
       onclick={() => {
         add(menu!.row.path);
         menu = null;
-      }}>Add to the list…</button
+      }}>{target ? `Add to ${target}…` : "Add to the list…"}</button
     >
   </div>
 {/if}
 
 <style>
+  .target {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 8px 12px;
+    margin: 6px 10px 0;
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    background: var(--accent-soft);
+    font-size: 13px;
+  }
   form.link {
     display: flex;
     gap: 4px;
