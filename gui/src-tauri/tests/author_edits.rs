@@ -278,6 +278,16 @@ fn edits_are_the_commands_and_can_be_undone() {
     );
     assert_eq!(std::fs::read_to_string(&docs_list).unwrap(), documented);
 
+    // A mod renamed: its id, and what names it, in one step to undo.
+    call(&webview, "open_list", json!({ "path": list })).unwrap();
+    let renamed = call(&webview, "rename_mod", json!({ "id": "C", "new": "Cee" })).unwrap();
+    assert!(read().contains("id = \"Cee\""), "{}", read());
+    assert!(!read().contains("id = \"C\""));
+    assert_eq!(renamed["can_undo"], true);
+    assert!(call(&webview, "rename_mod", json!({ "id": "Cee", "new": "A" })).is_err());
+    call(&webview, "undo", json!({})).unwrap();
+    assert!(read().contains("id = \"C\""));
+
     // A new list, started here and opened like any other; never over a file.
     let fresh = root.join("fresh.toml");
     let made = call(

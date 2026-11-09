@@ -765,6 +765,49 @@ pub(super) fn fields(
     doc::field_values(&text, &place.id, archive).map_err(shown)
 }
 
+/// Rename a mod: its id (its MO2 folder) and everything in the list and its
+/// docs file that names it, as one step; and the answers saved for the
+/// list's profiles that tick it in an optional group.
+#[tauri::command(async)]
+pub(super) fn rename_mod(
+    state: tauri::State<'_, State>,
+    id: String,
+    new: String,
+) -> Result<Edited, String> {
+    let list = state.list()?;
+    let new = new.trim().to_string();
+    let edits = edit::plan_rename(&list, &id, &new).map_err(shown)?;
+    let command = format!(
+        "rename mod {} to {} in {}",
+        quote(&id),
+        quote(&new),
+        list_arg(&list)
+    );
+    let done = apply_all(&state, command, edits)?;
+    // A multi answer is its choices with commas: the old name among them is
+    // the new one now.
+    if let Ok(mut settings) = state.settings.lock() {
+        let chosen = settings.list_mut(&list);
+        let rename = |answers: &mut std::collections::BTreeMap<String, String>| {
+            for value in answers.values_mut() {
+                if value.split(',').any(|v| v == id) {
+                    *value = value
+                        .split(',')
+                        .map(|v| if v == id { new.as_str() } else { v })
+                        .collect::<Vec<_>>()
+                        .join(",");
+                }
+            }
+        };
+        rename(&mut chosen.answers);
+        for answers in chosen.profile_answers.values_mut() {
+            rename(answers);
+        }
+        let _ = settings.save();
+    }
+    Ok(done)
+}
+
 /// Remove a mod (`remove`): its block, its plugins from the load order, and
 /// its notes from the docs file -- one step, undone as one.
 #[tauri::command(async)]

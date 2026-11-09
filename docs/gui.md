@@ -204,6 +204,14 @@ history there, rather than be undone by it.
 - **Mod**: its **Notes** -- title, one-line summary and body, in Markdown,
   with a preview -- written where they already are, in the list or its docs
   file (`mudcrab docs`). Then its settings:
+  - **Name**: the mod's id, which is also its folder in MO2. **Rename…**
+    renames it and everything in the list that names it -- other mods'
+    `dependencies` and `conflicts_with`, every `if` asking `mod:` about it,
+    merge sources, a declared question's choices, its notes in the docs
+    file -- as one step to undo, and the answers saved for the list's
+    profiles that tick it in an optional group. An installed copy keeps its
+    old folder until installed again. A list whose mods come from more than
+    one file (`include`, `use`) is not renamed yet.
   - **Optional**: **Make this mod optional…** puts it among the list's
     optional mods (`optional`): in the list's own group or another, ticked
     or not to start -- each group is one question in Install's Profile

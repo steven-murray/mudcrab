@@ -536,6 +536,127 @@ pub fn set_ini_layer(
     Ok(doc.to_string())
 }
 
+/// Rename mod `old` to `new` in a list's text: its `id`, and everything that
+/// names it -- other mods' `dependencies` (either form), `conflicts_with`,
+/// merge sources' `mod`, every `if` asking `mod:old` (of a mod, archive,
+/// action, choice set, FOMOD row or BAIN package), and a declared question's
+/// `choices` and `default` (an optional group's mods).
+pub fn rename_mod(text: &str, old: &str, new: &str) -> anyhow::Result<String> {
+    use crate::config::condition::Condition;
+    let mut doc = parse(text)?;
+    // A string value equal to `old`, made `new`, its decor kept.
+    fn swap(value: &mut Value, old: &str, new: &str) {
+        if value.as_str() == Some(old) {
+            let decor = value.decor().clone();
+            *value = Value::from(new);
+            *value.decor_mut() = decor;
+        }
+    }
+    fn swap_all(item: &mut Item, old: &str, new: &str) {
+        match item {
+            Item::Value(Value::Array(array)) => array.iter_mut().for_each(|v| swap(v, old, new)),
+            Item::Value(v) => swap(v, old, new),
+            _ => {}
+        }
+    }
+    fn fix_if(item: &mut Item, old: &str, new: &str) -> anyhow::Result<()> {
+        let Some(text) = item.as_str() else {
+            return Ok(());
+        };
+        let mut condition = Condition::parse(text)?;
+        if !condition.mods().contains(&old) {
+            return Ok(());
+        }
+        condition.rename_mods(&|id| (id == old).then(|| new.to_string()));
+        let decor = item.as_value().map(|v| v.decor().clone());
+        *item = toml_edit::value(condition.to_text());
+        if let (Some(decor), Some(v)) = (decor, item.as_value_mut()) {
+            *v.decor_mut() = decor;
+        }
+        Ok(())
+    }
+    // Every reference in a table and those within it.
+    fn walk(table: &mut dyn toml_edit::TableLike, old: &str, new: &str) -> anyhow::Result<()> {
+        for (key, item) in table.iter_mut() {
+            match key.get() {
+                "if" => fix_if(item, old, new)?,
+                "conflicts_with" | "masters" | "resources" | "custom" | "mod" => {
+                    swap_all(item, old, new)
+                }
+                "dependencies" if !item.is_table_like() => swap_all(item, old, new),
+                _ => {}
+            }
+            match item {
+                Item::Table(t) => walk(t, old, new)?,
+                Item::ArrayOfTables(tables) => {
+                    for t in tables.iter_mut() {
+                        walk(t, old, new)?;
+                    }
+                }
+                Item::Value(Value::InlineTable(t)) => walk(t, old, new)?,
+                Item::Value(Value::Array(array)) => {
+                    for v in array.iter_mut() {
+                        if let Value::InlineTable(t) = v {
+                            walk(t, old, new)?;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+    let mods = doc
+        .get_mut("mods")
+        .and_then(Item::as_array_of_tables_mut)
+        .ok_or_else(|| anyhow::anyhow!("the list has no [[mods]]"))?;
+    anyhow::ensure!(
+        !mods
+            .iter()
+            .any(|m| m.get("id").and_then(Item::as_str) == Some(new)),
+        "the list already has a mod with id '{new}'"
+    );
+    let mut found = false;
+    for table in mods.iter_mut() {
+        if table.get("id").and_then(Item::as_str) == Some(old) {
+            let item = table.get_mut("id").expect("just read");
+            let decor = item.as_value().map(|v| v.decor().clone());
+            *item = toml_edit::value(new);
+            if let (Some(decor), Some(v)) = (decor, item.as_value_mut()) {
+                *v.decor_mut() = decor;
+            }
+            found = true;
+        }
+        walk(table, old, new)?;
+    }
+    anyhow::ensure!(found, "the list has no mod with id '{old}'");
+    if let Some(inputs) = doc.get_mut("inputs").and_then(Item::as_table_like_mut) {
+        for (_, input) in inputs.iter_mut() {
+            if let Some(input) = input.as_table_like_mut() {
+                for key in ["choices", "default"] {
+                    if let Some(item) = input.get_mut(key) {
+                        swap_all(item, old, new);
+                    }
+                }
+            }
+        }
+    }
+    Ok(doc.to_string())
+}
+
+/// Mod `old`'s notes in a docs file, kept under `new`.
+pub fn rename_file_docs(text: &str, old: &str, new: &str) -> anyhow::Result<String> {
+    let mut doc = text
+        .parse::<DocumentMut>()
+        .map_err(|err| anyhow::anyhow!("the docs file is not valid TOML: {err}"))?;
+    if let Some(mods) = doc.get_mut("mods").and_then(Item::as_table_mut)
+        && let Some((_, item)) = mods.remove_entry(old)
+    {
+        mods.insert(new, item);
+    }
+    Ok(doc.to_string())
+}
+
 /// The `inputs` table, made if need be: as dotted keys at the top, the way a
 /// list keeps its questions above its mods.
 fn inputs(doc: &mut DocumentMut) -> anyhow::Result<&mut Table> {
@@ -1817,5 +1938,79 @@ id = "B"
         );
         assert_eq!(list.mods[0].actions.len(), 1);
         assert!(super::remove_archive(text, "A", 3).is_err());
+    }
+
+    #[test]
+    fn a_mod_is_renamed_with_everything_naming_it() {
+        let text = r#"name = "L"
+
+[inputs.extras]
+type = "multi"
+query = "Extras?"
+choices = ["Birds", "Rats"]
+default = ["Birds"]
+
+[[mods]]
+id = "Birds" # the birds
+
+[[mods.archives]]
+path = "manual:birds.zip"
+
+[[mods]]
+id = "Nests"
+if = 'mod:Birds && !mod:Rats'
+dependencies = { masters = ["Birds"], custom = ["Other"] }
+
+[[mods.archives]]
+path = "manual:nests.zip"
+
+[[mods.archives.choices]]
+if = "mod:Birds"
+bain_subpackages = ["00 Core"]
+
+[[mods.actions]]
+action = "file_hide"
+conflicts_with = ["Birds"]
+
+[[mods]]
+id = "Merged"
+dependencies = ["Birds", "Nests"]
+
+[mods.merge]
+output = "Merged.esp"
+sources = [{ mod = "Birds", plugin = "Birds.esp" }]
+"#;
+        let out = super::rename_mod(text, "Birds", "Better Birds").unwrap();
+        assert!(out.contains("id = \"Better Birds\" # the birds"), "{out}");
+        assert!(
+            out.contains("choices = [\"Better Birds\", \"Rats\"]"),
+            "{out}"
+        );
+        assert!(out.contains("default = [\"Better Birds\"]"), "{out}");
+        assert!(
+            out.contains("masters = [\"Better Birds\"], custom = [\"Other\"]"),
+            "{out}"
+        );
+        assert!(out.contains("conflicts_with = [\"Better Birds\"]"), "{out}");
+        assert!(
+            out.contains("dependencies = [\"Better Birds\", \"Nests\"]"),
+            "{out}"
+        );
+        assert!(
+            out.contains("{ mod = \"Better Birds\", plugin = \"Birds.esp\" }"),
+            "{out}"
+        );
+        assert!(!out.contains("mod:Birds"), "{out}");
+        assert!(out.contains("mod:\"Better Birds\""), "{out}");
+        assert!(super::rename_mod(text, "Birds", "Nests").is_err());
+        assert!(super::rename_mod(text, "Nobody", "X").is_err());
+
+        let docs = "[mods.Birds]\nsummary = \"Birds.\"\n\n[mods.Rats]\nsummary = \"Rats.\"\n";
+        let out = super::rename_file_docs(docs, "Birds", "Better Birds").unwrap();
+        let read: crate::config::docs::DocsFile = toml::from_str(&out).unwrap();
+        assert!(
+            read.mods.contains_key("Better Birds") && !read.mods.contains_key("Birds"),
+            "{out}"
+        );
     }
 }

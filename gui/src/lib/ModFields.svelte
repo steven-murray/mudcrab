@@ -15,6 +15,7 @@
     readingMasters,
     readMasters,
     run,
+    rename,
   }: {
     mod: ModDoc;
     inputs: InputDoc[];
@@ -27,7 +28,17 @@
     readMasters: () => void;
     /** Run an edit; resolves true when written. */
     run: (edit: () => Promise<unknown>) => Promise<boolean>;
+    /** Rename the mod (its id); resolves true when written. */
+    rename: (id: string) => Promise<boolean>;
   } = $props();
+
+  // The mod's new name, while one is typed.
+  let renaming = $state<string | null>(null);
+  async function saveName() {
+    const name = renaming?.trim();
+    if (!name || name === mod.id) return void (renaming = null);
+    if (await rename(name)) renaming = null;
+  }
 
   // `dependencies` as its file writes it: a list (the author's own), or a
   // table of them by group, `masters` and `resources` being what `check`
@@ -127,6 +138,33 @@
 
 {#if error}<pre class="error">{error}</pre>{/if}
 <div class="fields">
+  <div class="row">
+    <span class="name">Name</span>
+    <span>
+      {#if renaming === null}
+        <code>{mod.id}</code>
+        <button class="link" onclick={() => (renaming = mod.id)} title="Its id, which is also its folder in MO2: what names it in the list is renamed too"
+          >Rename…</button
+        >
+      {:else}
+        <form
+          class="rename"
+          onsubmit={(e) => {
+            e.preventDefault();
+            saveName();
+          }}
+        >
+          <input bind:value={renaming} spellcheck="false" />
+          <button type="submit" class="primary" disabled={!renaming.trim() || renaming.trim() === mod.id}>Rename</button>
+          <button type="button" onclick={() => (renaming = null)}>Cancel</button>
+        </form>
+        <div class="dim small">
+          Its folder in MO2 too: what names it in the list (dependencies, conditions, merges, notes) is renamed with
+          it. An installed copy keeps its old folder until installed again.
+        </div>
+      {/if}
+    </span>
+  </div>
   <div class="row">
     <span class="name">Optional</span>
     <span>
@@ -254,6 +292,15 @@
 {/if}
 
 <style>
+  .rename {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+  }
+  .rename input {
+    flex: 1;
+    min-width: 0;
+  }
   .tick {
     display: inline-flex;
     gap: 4px;
